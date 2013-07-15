@@ -1,7 +1,7 @@
 osync
 =====
 
-A two way sync script based on rsync that merges obackup script fault tolerance with sync logic based on bitpocket
+A two way sync script based on rsync that merges obackup script fault tolerance with sync logic derived from bitpocket project.
 
 ## About
 
@@ -14,7 +14,8 @@ I then decided to merge my obackup codebase with bitpocket's sync core, osync wa
 
 ## Installation
 
-No public release yet (expect it in mid July)
+Not even beta ready yet. The whole code is not stable at all.
+Hopefully will work by the end of July.
 
 ## Author
 

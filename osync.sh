@@ -1,184 +1,160 @@
 #!/bin/bash
 
-##### Two way sync script
-##### (C) 2013 by Orsiris "Ozy" de Jong | ozy@badministrateur.com
-OSYNC_VERSION=0.0 #### Build 1806201301
+#### Osyc 
+## Rsync based two way sync engine. Master/slave setup.
+OSYNC_VERSION=0.4
+OSYNC_BUILD=1507201301
 
-DEBUG=yes
+DEBUG=no
 SCRIPT_PID=$$
 
 LOCAL_USER=$(whoami)
 LOCAL_HOST=$(hostname)
 
-## Flags
-error_alert=0
-dryrun=0
-silent=0
+## Default log file until config file is loaded
+LOG_FILE=/var/log/osync.log
+
+## Working directory on master
+OSYNC_DIR=".osync_workdir"
+
+
+## Log a state message every $KEEP_LOGGING seconds. Should not be equal to soft or hard execution time so your log won't be unnecessary big.
+KEEP_LOGGING=1801
 
 function Log
 {
-	echo "TIME: $SECONDS - $1" >> "$LOG_FILE"
-	if [ $silent -eq 0 ]
-	then
-		echo "TIME: $SECONDS - $1"
-	fi
+        echo "TIME: $SECONDS - $1" >> "$LOG_FILE"
+        if [ $silent -eq 0 ]
+        then
+                echo "TIME: $SECONDS - $1"
+        fi
 }
 
 function LogError
 {
-	Log "$1"
-	error_alert=1
+        Log "$1"
+        error_alert=1
 }
 
 function TrapError
 {
-	local JOB="$0"
-	local LINE="$1"
-	local CODE="${2:-1}"
-	if [ $silent -eq 0 ]
-	then
-		echo " /!\ Error in ${JOB}: Near line ${LINE}, exit code ${CODE}"
-	fi
-}
-
-function TrapStop
-{
-	LogError " /!\ WARNING: Manual exit of sync script. Synchronization may be in inconsistent state."
-	if [ "$DEBUG" == "no" ]
-	then
-		CleanUp
-	fi
-	exit 1
+        local JOB="$0"
+        local LINE="$1"
+        local CODE="${2:-1}"
+        if [ $silent -eq 0 ]
+        then
+                echo " /!\ Error in ${JOB}: Near line ${LINE}, exit code ${CODE}"
+        fi
 }
 
 function Spinner
 {
-	if [ $silent -eq 1 ]
-	then
-		return 1
-	fi
+        if [ $silent -eq 1 ]
+        then
+                return 1
+        fi
 
-	case $toggle
-	in
-	1)
-	echo -n $1" \ "
-	echo -ne "\r"
-	toggle="2"
-	;;
+        case $toggle
+        in
+        1)
+        echo -n $1" \ "
+        echo -ne "\r"
+        toggle="2"
+        ;;
 
-	2)
-	echo -n $1" | "
-	echo -ne "\r"
-	toggle="3"
-	;;
+        2)
+        echo -n $1" | "
+        echo -ne "\r"
+        toggle="3"
+        ;;
 
-	3)
-	echo -n $1" / "
-	echo -ne "\r"
-	toggle="4"
-	;;
+        3)
+        echo -n $1" / "
+        echo -ne "\r"
+        toggle="4"
+        ;;
 
-	*)
-	echo -n $1" - "
-	echo -ne "\r"
-	toggle="1"
-	;;
-	esac
+        *)
+        echo -n $1" - "
+        echo -ne "\r"
+        toggle="1"
+        ;;
+        esac
 }
 
-function Dummy
+function CleanUp
 {
-	exit 1;
-}
-
-function StripQuotes
-{
-	echo $(echo $1 | sed "s/^\([\"']\)\(.*\)\1\$/\2/g")
-}
-
-function EscapeSpaces
-{
-	echo $(echo $1 | sed 's/ /\\ /g')
+        rm -f /dev/shm/osync_config_$SCRIPT_PID
+ 	rm -f /dev/shm/osync_run_local_$SCRIPT_PID
+	rm -f /dev/shm/osync_run_remote_$SCRIPT_PID
 }
 
 function SendAlert
 {
-	CheckConnectivityRemoteHost
-	CheckConnectivity3rdPartyHosts
-	cat "$LOG_FILE" | gzip -9 > /tmp/osync_lastlog.gz
+        CheckConnectivityRemoteHost
+        CheckConnectivity3rdPartyHosts
+        cat "$LOG_FILE" | gzip -9 > /tmp/osync_lastlog.gz
         if type -p mutt > /dev/null 2>&1
         then
                 echo $MAIL_ALERT_MSG | $(which mutt) -x -s "Sync alert for $SYNC_ID" $DESTINATION_MAILS -a /tmp/osync_lastlog.gz
                 if [ $? != 0 ]
                 then
                         Log "WARNING: Cannot send alert email via $(which mutt) !!!"
-		else
-			Log "Sent alert mail using mutt."
+                else
+                        Log "Sent alert mail using mutt."
                 fi
         elif type -p mail > /dev/null 2>&1
-	then
+        then
                 echo $MAIL_ALERT_MSG | $(which mail) -a /tmp/osync_lastlog.gz -s "Sync alert for $SYNC_ID" $DESTINATION_MAILS
                 if [ $? != 0 ]
                 then
                         Log "WARNING: Cannot send alert email via $(which mail) with attachments !!!"
-			echo $MAIL_ALERT_MSG | $(which mail) -s "Sync alert for $SYNC_ID" $DESTINATION_MAILS
-			if [ $? != 0 ]
-			then
-				Log "WARNING: Cannot send alert email via $(which mail) without attachments !!!"
-			else
-				Log "Sent alert mail using mail command without attachment."
-			fi
-		else
-			Log "Sent alert mail using mail command."
+                        echo $MAIL_ALERT_MSG | $(which mail) -s "Sync alert for $SYNC_ID" $DESTINATION_MAILS
+                        if [ $? != 0 ]
+                        then
+                                Log "WARNING: Cannot send alert email via $(which mail) without attachments !!!"
+                        else
+                                Log "Sent alert mail using mail command without attachment."
+                        fi
+                else
+                        Log "Sent alert mail using mail command."
                 fi
         else
-		Log "WARNING: Cannot send alert email (no mutt / mail present) !!!"
-		return 1
-	fi
+                Log "WARNING: Cannot send alert email (no mutt / mail present) !!!"
+                return 1
+        fi
 }
 
 function LoadConfigFile
 {
-	if [ ! -f "$1" ]
-	then
-		LogError "Cannot load sync configuration file [$1]. Synchronization cannot start."
-		return 1
-	elif [[ $1 != *.conf ]]
-	then
-		LogError "Wrong configuration file supplied [$1]. Synchronization cannot start."
-	else 
-		egrep '^#|^[^ ]*=[^;&]*'  "$1" > "/dev/shm/osync_config_$SCRIPT_PID"
-		source "/dev/shm/osync_config_$SCRIPT_PID"
-	fi
-} 
+        if [ ! -f "$1" ]
+        then
+                LogError "Cannot load configuration file [$1]. Sync cannot start."
+                return 1
+        elif [[ $1 != *.conf ]]
+        then
+                LogError "Wrong configuration file supplied [$1]. Sync cannot start."
+        else
+                egrep '^#|^[^ ]*=[^;&]*'  "$1" > "/dev/shm/osync_config_$SCRIPT_PID"
+                source "/dev/shm/osync_config_$SCRIPT_PID"
+        fi
+}
 
 function CheckEnvironment
 {
-	sed --version > /dev/null 2>&1
-        if [ $? != 0 ]
+        if [ "$REMOTE_SYNC" == "yes" ]
         then
-                LogError "GNU coreutils not found (tested for sed --version). Synchronization cannot start."
-        	return 1
-	fi
-	
-
-	if [ "$REMOTE_SYNC" == "yes" ]
-	then
-		if ! type -p ssh > /dev/null 2>&1
-		then
-			LogError "ssh not present. Cannot start backup."
-			return 1
-		fi
-	fi
-
-	if [ "$BACKUP_FILES" != "no" ]
-	then
-		if ! type -p rsync > /dev/null 2>&1 
-		then
-			LogError "rsync not present. Backup cannot start."
-			return 1
-		fi
-	fi
+                if ! type -p ssh > /dev/null 2>&1
+                then
+                        LogError "ssh not present. Cannot start sync."
+                        return 1
+                fi
+        fi
+        if ! type -p rsync > /dev/null 2>&1
+        then
+                LogError "rsync not present. Sync cannot start."
+                return 1
+        fi
 }
 
 # Waits for pid $1 to complete. Will log an alert if $2 seconds exec time exceeded unless $2 equals 0. Will stop task and log alert if $3 seconds exec time exceeded.
@@ -211,204 +187,368 @@ function WaitForTaskCompletition
         done
 }
 
-
 ## Runs local command $1 and waits for completition in $2 seconds
 function RunLocalCommand
 {
-	CheckConnectivity3rdPartyHosts
-	$1 > /dev/shm/osync_run_local_$SCRIPT_PID &
-	child_pid=$!
-	WaitForTaskCompletition $child_pid 0 $2
-	wait $child_pid
-	retval=$?
-	if [ $retval -eq 0 ]
-	then
-		Log "Running command [$1] on local host succeded."
-	else
-		Log "Running command [$1] on local host failed."
-	fi
+        CheckConnectivity3rdPartyHosts
+        $1 > /dev/shm/osync_run_local_$SCRIPT_PID &
+        child_pid=$!
+        WaitForTaskCompletition $child_pid 0 $2
+        wait $child_pid
+        retval=$?
+        if [ $retval -eq 0 ]
+        then
+                Log "Running command [$1] on local host succeded."
+        else
+                Log "Running command [$1] on local host failed."
+        fi
 
-	Log "Command output:"
-	Log "$(cat /dev/shm/osync_run_local_$SCRIPT_PID)"
+        Log "Command output:"
+        Log "$(cat /dev/shm/osync_run_local_$SCRIPT_PID)"
 }
 
 ## Runs remote command $1 and waits for completition in $2 seconds
 function RunRemoteCommand
 {
-	CheckConnectivity3rdPartyHosts
-	if [ "$REMOTE_SYNC" == "yes" ]
-	then
-		CheckConnectivityRemoteHost
-		if [ $? != 0 ]
-		then
-			LogError "Connectivity test failed. Cannot run remote command."
-			return 1
-		else
-			$(which ssh) $SSH_COMP -i $SSH_RSA_PRIVATE_KEY $REMOTE_USER@$REMOTE_HOST -p $REMOTE_PORT "$1" > /dev/shm/osync_run_remote_$SCRIPT_PID &
-		fi
-		child_pid=$!
-		WaitForTaskCompletition $child_pid 0 $2
-		wait $child_pid
-		retval=$?
-		if [ $retval -eq 0 ]
-		then
-			Log "Running command [$1] succeded."
-		else
-			LogError "Running command [$1] failed."
-		fi
-		
-		Log "Command output:"
-		Log "$(cat /dev/shm/osync_run_remote_$SCRIPT_PID)"
-	fi
+        CheckConnectivity3rdPartyHosts
+        if [ "$REMOTE_SYNC" == "yes" ]
+        then
+                CheckConnectivityRemoteHost
+                if [ $? != 0 ]
+                then
+                        LogError "Connectivity test failed. Cannot run remote command."
+                        return 1
+                else
+                        $(which ssh) $SSH_COMP -i $SSH_RSA_PRIVATE_KEY $REMOTE_USER@$REMOTE_HOST -p $REMOTE_PORT "$1" > /dev/shm/osync_run_remote_$SCRIPT_PID &
+                fi
+                child_pid=$!
+                WaitForTaskCompletition $child_pid 0 $2
+                wait $child_pid
+                retval=$?
+                if [ $retval -eq 0 ]
+                then
+                        Log "Running command [$1] succeded."
+                else
+                        LogError "Running command [$1] failed."
+                fi
+
+                if [ -f /dev/shm/osync_run_remote_$SCRIPT_PID ]
+                then
+                        Log "Command output: $(cat /dev/shm/osync_run_remote_$SCRIPT_PID)"
+                fi
+        fi
 }
 
 function RunBeforeHook
 {
-	if [ "$LOCAL_RUN_BEFORE_CMD" != "" ]
-	then
-		RunLocalCommand "$LOCAL_RUN_BEFORE_CMD" $MAX_EXEC_TIME_PER_CMD_BEFORE
-	fi
+        if [ "$LOCAL_RUN_BEFORE_CMD" != "" ]
+        then
+                RunLocalCommand "$LOCAL_RUN_BEFORE_CMD" $MAX_EXEC_TIME_PER_CMD_BEFORE
+        fi
 
-	if [ "$REMOTE_RUN_BEFORE_CMD" != "" ]
-	then
-		RunRemoteCommand "$REMOTE_RUN_BEFORE_CMD" $MAX_EXEC_TIME_PER_CMD_BEFORE
-	fi	
+        if [ "$REMOTE_RUN_BEFORE_CMD" != "" ]
+        then
+                RunRemoteCommand "$REMOTE_RUN_BEFORE_CMD" $MAX_EXEC_TIME_PER_CMD_BEFORE
+        fi
 }
 
 function RunAfterHook
 {
         if [ "$LOCAL_RUN_AFTER_CMD" != "" ]
         then
-		RunLocalCommand "$LOCAL_RUN_AFTER_CMD" $MAX_EXEC_TIME_PER_CMD_AFTER
+                RunLocalCommand "$LOCAL_RUN_AFTER_CMD" $MAX_EXEC_TIME_PER_CMD_AFTER
         fi
 
-	if [ "$REMOTE_RUN_AFTER_CMD" != "" ]
-	then
-		RunRemoteCommand "$REMOTE_RUN_AFTER_CMD" $MAX_EXEC_TIME_PER_CMD_AFTER
-	fi
+        if [ "$REMOTE_RUN_AFTER_CMD" != "" ]
+        then
+                RunRemoteCommand "$REMOTE_RUN_AFTER_CMD" $MAX_EXEC_TIME_PER_CMD_AFTER
+        fi
 }
 
 function SetCompressionOptions
 {
-	if [ "$COMPRESSION_PROGRAM" == "xz" ] && type -p xz > /dev/null 2>&1
-	then
-		COMPRESSION_EXTENSION=.xz
-	elif [ "$COMPRESSION_PROGRAM" == "lzma" ] && type -p lzma > /dev/null 2>&1
-	then
-		COMPRESSION_EXTENSION=.lzma
-	elif [ "$COMPRESSION_PROGRAM" == "gzip" ] && type -p gzip > /dev/null 2>&1
-	then	
-		COMPRESSION_EXTENSION=.gz
-		COMPRESSION_OPTIONS=--rsyncable
-	else
-		COMPRESSION_EXTENSION=
-	fi
-
-	if [ "$SSH_COMPRESSION" == "yes" ]
-	then
-        	SSH_COMP=-C
-	else
-        	SSH_COMP=
-	fi
+        if [ "$SSH_COMPRESSION" == "yes" ]
+        then
+                SSH_COMP=-C
+        else
+                SSH_COMP=
+        fi
 }
 
 function SetSudoOptions
 {
-	if [ "$SUDO_EXEC" == "yes" ]
-	then
-		RSYNC_PATH="sudo $(which rsync)"
-		COMMAND_SUDO="sudo"
-	else
-		RSYNC_PATH="$(which rsync)"
-		COMMAND_SUDO=""
-	fi
-}
-
-function CreateLocalStorageDirectories
-{
-	if [ ! -d $LOCAL_FILE_STORAGE ] && [ "$BACKUP_FILES" != "no" ]
-	then
-		mkdir -p $LOCAL_FILE_STORAGE
-	fi
-}
-
-function CheckLocalSpace
-{
-	# Not elegant solution to make df silent on errors
-	df -P $LOCAL_FILE_STORAGE > /dev/shm/osync_local_space_$SCRIPT_PID 2>&1
-	if [ $? != 0 ]
-	then
-		LOCAL_SPACE=0
-	else
-		LOCAL_SPACE=$(cat /dev/shm/osync_local_space_$SCRIPT_PID | tail -1 | awk '{print $4}')
-	fi
-
-	if [ $LOCAL_SPACE -eq 0 ]
-	then
-		LogError "Local disk space reported to be 0 Ko. This may also happen if local storage path doesn't exist."
-	elif [ $SYNC_SIZE_MINIMUM -gt $(($TOTAL_DATABASES_SIZE+$TOTAL_FILES_SIZE)) ]
-	then
-		LogError "Backup size is smaller then expected."
-	elif [ $LOCAL_STORAGE_WARN_MIN_SPACE -gt $LOCAL_SPACE ]
-	then
-		LogError "Local disk space is lower than warning value ($LOCAL_SPACE free Ko)."
-	elif [ $LOCAL_SPACE -lt $(($TOTAL_DATABASES_SIZE+$TOTAL_FILES_SIZE)) ]
-	then
-		LogError "Local disk space may be insufficient (depending on rsync delta and DB compression ratio)."
-	fi
-	Log "Local Space: $LOCAL_SPACE Ko - Databases size: $TOTAL_DATABASES_SIZE Ko - Files size: $TOTAL_FILES_SIZE Ko"
-}
-      
-function CheckTotalExecutionTime
-{
-	 #### Check if max execution time of whole script as been reached
-	if [ $SECONDS -gt $SOFT_MAX_EXEC_TIME_TOTAL ]
+        ## Add this to support prior config files without RSYNC_EXECUTABLE option
+        if [ "$RSYNC_EXECUTABLE" == "" ]
         then
-		if [ $soft_alert_total -eq 0 ]
-                then
-                	LogError "Max soft execution time of the whole sync exceeded while backing up $BACKUP_TASK."
-                        soft_alert_total=1
-                fi
-                if [ $SECONDS -gt $HARD_MAX_EXEC_TIME_TOTAL ]
-                then
-                        LogError "Max hard execution time of the whole backup exceeded while backing up $BACKUP_TASK, stopping backup process."
-                        exit 1
-                fi
+                RSYNC_EXECUTABLE=rsync
+        fi
+
+        if [ "$SUDO_EXEC" == "yes" ]
+        then
+                RSYNC_PATH="sudo $(which $RSYNC_EXECUTABLE)"
+                COMMAND_SUDO="sudo"
+        else
+                RSYNC_PATH="$(which $RSYNC_EXECUTABLE)"
+                COMMAND_SUDO=""
         fi
 }
 
 function CheckConnectivityRemoteHost
 {
-	if [ "$REMOTE_HOST_PING" != "no" ]
-	then
-		ping $REMOTE_HOST -c 2 > /dev/null 2>&1
-		if [ $? != 0 ]
-		then
-			LogError "Cannot ping $REMOTE_HOST"
-			return 1
-		fi
-	fi
+        if [ "$REMOTE_HOST_PING" != "no" ] && [ "$REMOTE_SYNC" != "no" ]
+        then
+                ping $REMOTE_HOST -c 2 > /dev/null 2>&1
+                if [ $? != 0 ]
+                then
+                        LogError "Cannot ping $REMOTE_HOST"
+                        return 1
+                fi
+        fi
 }
 
 function CheckConnectivity3rdPartyHosts
 {
-	if [ "$REMOTE_3RD_PARTY_HOSTS" != "" ]
+        if [ "$REMOTE_3RD_PARTY_HOSTS" != "" ]
+        then
+                remote_3rd_party_success=0
+                for $i in $REMOTE_3RD_PARTY_HOSTS
+                do
+                        ping $i -c 2 > /dev/null 2>&1
+                        if [ $? != 0 ]
+                        then
+                                LogError "Cannot ping 3rd party host $i"
+                        else
+                                remote_3rd_party_success=1
+                        fi
+                done
+                if [ $remote_3rd_party_success -ne 1 ]
+                then
+                        LogError "No remote 3rd party host responded to ping. No internet ?"
+                        return 1
+                fi
+        fi
+}
+
+
+function CreateDirs
+{
+	if ! [ -d $MASTER_SYNC_DIR/$OSYNC_DIR ]
 	then
-		remote_3rd_party_success=0
-		for $i in $REMOTE_3RD_PARTY_HOSTS
-		do
-			ping $i -c 2 > /dev/null 2>&1
-			if [ $? != 0 ]
-			then
-				LogError "Cannot ping 3rd party host $i"
-			else
-				remote_3rd_party_success=1
-			fi
-		done
-		if [ $remote_3rd_party_success -ne 1 ]
-		then
-			LogError "No remote 3rd party host responded to ping. No internet ?"
-			return 1
-		fi
+		mkdir $MASTER_SYNC_DIR/$OSYNC_DIR
+	fi
+	if ! [ -d $STATE_DIR ]
+	then
+		mkdir $STATE_DIR
+	fi
+	
+}
+
+function CheckMasterSlaveDirs
+{
+	if ! [ -d $MASTER_SYNC_DIR ]
+	then
+		LogError "Master directory [$MASTER_SYNC_DIR] does not exist."
+		return 1
+	fi
+
+	if ! [ -d $SLAVE_SYNC_DIR ]
+	then
+		LogError "Slave directory [$SLAVE_SYNC_DIR] does not exist."
+		return 1
 	fi
 }
+
+function LockMaster
+{
+	echo o
+}
+
+function LockSlave
+{
+	echo o
+}
+
+function Sync
+{
+	## decide if local or remote prevalence
+
+	## Lock master dir
+	## Lock slave dir
+
+	Log "Starting synchronization task."
+
+	## Create local file list
+	Log "Creating current master file list"
+	rsync -rlptgodE --exclude "$OSYNC_DIR" --list-only $MASTER_SYNC_DIR/ | grep "^-\|^d" | awk '{print $5}' | grep -v "^\.$" > $STATE_DIR/master-tree-current
+	Log "Creating current slave file list"
+	## Create distant file list
+	rsync -rlptgodE --exclude "$OSYNC_DIR" --list-only $SLAVE_SYNC_DIR/ | grep "^-\|^d" | awk '{print $5}' | grep -v "^\.$" > $STATE_DIR/slave-tree-current
+
+	## diff local file list and before file list except if before file list is empty >> deleted
+	Log "Creating master deleted file list"
+	if [ -f $STATE_DIR/master-tree-before ]
+	then
+		comm --nocheck-order -23 $STATE_DIR/master-tree-before $STATE_DIR/master-tree-current > $STATE_DIR/master-deleted-list
+	else
+		touch $STATE_DIR/master-deleted-list
+	fi
+
+	## diff local file list and before file list except if before file list is empty >> deleted
+	Log "Creating slave deleted file list"
+	if [ -f $STATE_DIR/slave-tree-before ]
+	then
+		comm --nocheck-order -23 $STATE_DIR/slave-tree-before $STATE_DIR/slave-tree-current > $STATE_DIR/slave-deleted-list
+	else
+		touch $STATE_DIR/slave-deleted-list
+	fi
+
+
+	## update local -> remote except deleted
+	Log "Updating slave replica"
+	rsync -rlptgodEui --backup --backup-dir "$MASTER_BACKUP_DIR" --exclude "$OSYNC_DIR" --exclude-from "$STATE_DIR/master-deleted-list" --exclude-from "$STATE_DIR/slave-deleted-list" $MASTER_SYNC_DIR/ $SLAVE_SYNC_DIR/
+	## update remote -> local except deleted
+	Log "Updating master replica"
+	rsync -rlptgodEui --backup --backup-dir "$SLAVE_BACKUP_DIR" --exclude "$OSYNC_DIR" --exclude-from "$STATE_DIR/slave-deleted-list" --exclude-from "$STATE_DIR/master-deleted-list" $SLAVE_SYNC_DIR/ $MASTER_SYNC_DIR/
+
+	Log "Propagating deletitions to slave"
+	rsync -rlptgodEui --backup --backup-dir "$MASTER_DELETE_DIR" --delete --exclude "$OSYNC_DIR" --include-from "$STATE_DIR/master-deleted-list" --exclude='*' $MASTER_SYNC_DIR/ $SLAVE_SYNC_DIR/ 
+	Log "Propagating deletitions to master"
+	rsync -rlptgodEui --backup --backup-dir "$SLAVE_DELETE_DIR" --delete --exclude "$OSYNC_DIR" --include-from "$STATE_DIR/slave-deleted-list" --exclude='*' $SLAVE_SYNC_DIR/ $MASTER_SYNC_DIR/ 
+
+        ## Create local file list
+        Log "Creating new master file list"
+        rsync -rlptgodE --exclude "$OSYNC_DIR" --list-only $MASTER_SYNC_DIR/ | grep "^-\|^d" | awk '{print $5}' | grep -v "^\.$" > $STATE_DIR/master-tree-before
+        Log "Creating new slave file list"
+        ## Create distant file list
+        rsync -rlptgodE --exclude "$OSYNC_DIR" --list-only $SLAVE_SYNC_DIR/ | grep "^-\|^d" | awk '{print $5}' | grep -v "^\.$" > $STATE_DIR/slave-tree-before
+
+	Log "Finished synchronization task."
+
+}
+
+function SoftDelete
+{
+	echo softd
+}
+
+function Init
+{
+        # Set error exit code if a piped command fails
+        set -o pipefail
+        set -o errtrace
+
+        trap TrapStop SIGINT SIGQUIT
+        if [ "$DEBUG" == "yes" ]
+        then
+                trap 'TrapError ${LINENO} $?' ERR
+        fi
+
+        LOG_FILE=/var/log/osync_$osync_VERSION-$BACKUP_ID.log
+        MAIL_ALERT_MSG="Warning: Execution of osync instance $OSYNC_ID (pid $SCRIPT_PID) as $LOCAL_USER@$LOCAL_HOST produced errors."
+
+	STATE_DIR="$MASTER_SYNC_DIR/$OSYNC_DIR/state"
+
+	## Working directories to keep backups of updated / deleted files
+	MASTER_BACKUP_DIR="$MASTER_SYNC_DIR/$OSYNC_DIR/backups"
+	MASTER_DELETE_DIR="$MASTER_SYNC_DIR/$OSYNC_DIR/deleted"
+	SLAVE_BACKUP_DIR="$SLAVE_SYNC_DIR/$OSYNC_DIR/backups"
+	SLAVE_DELETE_DIR="$SLAVE_SYNC_DIR/$OSYNC_DIR/deleted"
+}
+
+function DryRun
+{
+	echo dry
+}
+
+function Main
+{
+	CreateDirs
+	Sync
+}
+
+function Usage
+{
+	echo "Osync $OSYNC_VERSION $OSYNC_BUILD"
+	echo ""
+	echo "usage: osync /path/to/conf.file [--dry] [--silent]"
+	echo ""
+	echo "--dry: will run osync without actuallyv doing anything; just testing"
+	echo "--silent: will run osync without any output to stdout, usefull for cron jobs"
+	exit 128
+}
+
+# Comand line argument flags
+dryrun=0
+silent=0
+# Alert flags
+soft_alert_total=0
+error_alert=0
+
+if [ $# -eq 0 ]
+then
+	Usage
+	exit
+fi
+
+for i in "$@"
+do
+	case $i in
+		--dry)
+		dryrun=1
+		;;
+		--silent)
+		silent=1
+		;;
+		--help|-h)
+		Usage
+		;;
+	esac
+done
+
+CheckEnvironment
+if [ $? == 0 ]
+then
+	if [ "$1" != "" ]
+	then
+		LoadConfigFile $1
+		if [ $? == 0 ]
+		then
+			Init
+			DATE=$(date)
+			Log "---------------------------------------------------------"
+			Log "$DATE - Osync v$OSYNC_VERSION script begin."
+			Log "----------------------------------------------------------"
+			CheckMasterSlaveDirs
+			if [ $? == 0 ]
+			then
+				if [ $dryrun -eq 1 ]
+				then
+					DryRun
+				else
+					RunBeforeHook
+					Main
+					RunAfterHook
+				fi
+				CleanUp
+			fi
+		else
+			LogError "Configuration file could not be loaded."
+			exit 1
+		fi
+	else
+		LogError "No configuration file provided."
+		exit 1
+	fi
+else
+	LogError "Environment not suitable to run osync."
+fi
+
+if [ $error_alert -ne 0 ]
+then
+	SendAlert
+	LogError "Osync finished with errros."
+	exit 1
+else
+	Log "Osync script finished."
+	exit 0
+fi
