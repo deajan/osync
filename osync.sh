@@ -5,15 +5,13 @@
 
 
 ## todo:
-# add dryrun
+# add dryrun, DOC: never run dry when already run real or you will lose your deleted file history
 # add logging
 # add resume on error
-# add master/slave prevalance
-# thread sync function
 # remote functionnality
 
 OSYNC_VERSION=0.4
-OSYNC_BUILD=1607201302
+OSYNC_BUILD=1607201305
 
 DEBUG=no
 SCRIPT_PID=$$
@@ -32,10 +30,10 @@ KEEP_LOGGING=1801
 
 function Log
 {
-        echo "TIME: $SECONDS - $1" >> "$LOG_FILE"
+        echo -e "TIME: $SECONDS - $1" >> "$LOG_FILE"
         if [ $silent -eq 0 ]
         then
-                echo "TIME: $SECONDS - $1"
+                echo -e "TIME: $SECONDS - $1"
         fi
 }
 
@@ -55,6 +53,23 @@ function TrapError
                 echo " /!\ Error in ${JOB}: Near line ${LINE}, exit code ${CODE}"
         fi
 }
+
+function TrapStop
+{
+        LogError " /!\ WARNING: Manual exit of osync is really not recommended. Sync will be in inconsistent state."
+	LogError " /!\ WARNING: If you are sure, please hit CTRL+C another time to quit."
+	if [ $soft_stop -eq 0 ]
+	then
+		soft_stop=1
+	fi
+
+        if [ "$DEBUG" == "no" ] && [ $soft_stop -eq 1 ]
+        then
+                CleanUp
+		exit 1
+        fi
+}
+
 
 function Spinner
 {
@@ -96,6 +111,14 @@ function CleanUp
         rm -f /dev/shm/osync_config_$SCRIPT_PID
  	rm -f /dev/shm/osync_run_local_$SCRIPT_PID
 	rm -f /dev/shm/osync_run_remote_$SCRIPT_PID
+	rm -f /dev/shm/osync_master-tree-current_$SCRIPT_PID
+	rm -f /dev/shm/osync_slave-tree-current_$SCRIPT_PID
+	rm -f /dev/shm/osync_master-tree-before_$SCRIPT_PID
+	rm -f /dev/shm/osync_slave-tree-before_$SCRIPT_PID
+	rm -f /dev/shm/osync_update_master_replica_$SCRIPT_PID
+	rm -f /dev/shm/osync_update_slave_replica_$SCRIPT_PID
+	rm -f /dev/shm/osync_deletition_on_master_$SCRIPT_PID
+	rm -f /dev/shm/osync_deletition_on_slave_$SCRIPT_PID
 }
 
 function SendAlert
@@ -381,14 +404,44 @@ function LockSlave
 function sync_update_master
 {
 	Log "Updating slave replica."
-	rsync -rlptgodEui --backup --backup-dir "$MASTER_BACKUP_DIR" --exclude "$OSYNC_DIR" --exclude-from "$STATE_DIR/master-deleted-list" --exclude-from "$STATE_DIR/slave-deleted-list" $MASTER_SYNC_DIR/ $SLAVE_SYNC_DIR/
+	rsync $DRY_OPTION -rlptgodEui --backup --backup-dir "$SLAVE_BACKUP_DIR" --exclude "$OSYNC_DIR" --exclude-from "$STATE_DIR/master-deleted-list" --exclude-from "$STATE_DIR/slave-deleted-list" $MASTER_SYNC_DIR/ $SLAVE_SYNC_DIR/ > /dev/shm/osync_update_slave_replica_$SCRIPT_PID 2>&1 &
+	child_pid=$!
+       	WaitForTaskCompletition $child_pid $SOFT_MAX_EXEC_TIME 0
+        retval=$?
+        if [ $retval != 0 ]
+        then
+                LogError "Updating slave replica failed. Stopping execution."
+        else
+                Log "Updating slave replica succeded."
+        fi
+	
+	if [ "$VERBOSE_LOGS" == "yes" ]
+	then
+		Log "List:\n$(cat /dev/shm/osync_update_slave_replica_$SCRIPT_PID)"
+	fi
+	return $retval
 }
 
 # Subfunction of Sync
 function sync_update_slave
 {
 	Log "Updating master replica."
-	rsync -rlptgodEui --backup --backup-dir "$SLAVE_BACKUP_DIR" --exclude "$OSYNC_DIR" --exclude-from "$STATE_DIR/slave-deleted-list" --exclude-from "$STATE_DIR/master-deleted-list" $SLAVE_SYNC_DIR/ $MASTER_SYNC_DIR/
+	rsync $DRY_OPTION -rlptgodEui --backup --backup-dir "$MASTER_BACKUP_DIR" --exclude "$OSYNC_DIR" --exclude-from "$STATE_DIR/slave-deleted-list" --exclude-from "$STATE_DIR/master-deleted-list" $SLAVE_SYNC_DIR/ $MASTER_SYNC_DIR/ > /dev/shm/osync_update_master_replica_$SCRIPT_PID 2>&1 &
+	child_pid=$!
+        WaitForTaskCompletition $child_pid $SOFT_MAX_EXEC_TIME 0
+        retval=$?
+        if [ $retval != 0 ]
+        then
+                LogError "Updating master replica failed. Stopping execution."
+        else
+                Log "Updating master replica succeded."
+        fi
+
+	if [ "$VERBOSE_LOGS" == "yes" ]
+	then
+		Log "List:\n$(cat /dev/shm/osync_update_master_replica_$SCRIPT_PID)"
+	fi
+	return $retval
 }
 
 function Sync
@@ -398,14 +451,32 @@ function Sync
 
 	Log "Starting synchronization task."
 
-	## Create local file list
 	Log "Creating master replica file list."
-	rsync -rlptgodE --exclude "$OSYNC_DIR" --list-only $MASTER_SYNC_DIR/ | grep "^-\|^d" | awk '{print $5}' | grep -v "^\.$" > $STATE_DIR/master-tree-current
-	Log "Creating slave replica file list."
-	## Create distant file list
-	rsync -rlptgodE --exclude "$OSYNC_DIR" --list-only $SLAVE_SYNC_DIR/ | grep "^-\|^d" | awk '{print $5}' | grep -v "^\.$" > $STATE_DIR/slave-tree-current
+	rsync -rlptgodE --exclude "$OSYNC_DIR" --list-only $MASTER_SYNC_DIR/ | grep "^-\|^d" | awk '{print $5}' | grep -v "^\.$" > /dev/shm/osync_master-tree-current_$SCRIPT_PID &
+	child_pid=$!
+	WaitForTaskCompletition $child_pid $SOFT_MAX_EXEC_TIME $HARD_MAX_EXEC_TIME
+	retval=$?
+	if [ $retval == 0 ] && [ -f /dev/shm/osync_master-tree-current_$SCRIPT_PID ]
+	then
+		mv /dev/shm/osync_master-tree-current_$SCRIPT_PID $STATE_DIR/master-tree-current
+	else
+		LogError "Cannot create master file list."
+		return 1
+	fi
 
-	## diff local file list and before file list except if before file list is empty >> deleted
+	Log "Creating slave replica file list."
+	rsync -rlptgodE --exclude "$OSYNC_DIR" --list-only $SLAVE_SYNC_DIR/ | grep "^-\|^d" | awk '{print $5}' | grep -v "^\.$" > /dev/shm/osync_slave-tree-current_$SCRIPT_PID &
+	child_pid=$!
+	WaitForTaskCompletition $child_pid $SOFT_MAX_EXEC_TIME $HARD_MAX_EXEC_TIME
+	retval=$?
+	if [ $retval == 0 ] && [ -f /dev/shm/osync_slave-tree-current_$SCRIPT_PID ]
+	then
+		mv /dev/shm/osync_slave-tree-current_$SCRIPT_PID $STATE_DIR/slave-tree-current
+	else
+		LogError "Cannot create slave file list."
+		return 1
+	fi
+
 	Log "Creating master replica deleted file list."
 	if [ -f $STATE_DIR/master-tree-before ]
 	then
@@ -414,7 +485,6 @@ function Sync
 		touch $STATE_DIR/master-deleted-list
 	fi
 
-	## diff local file list and before file list except if before file list is empty >> deleted
 	Log "Creating slave replica deleted file list."
 	if [ -f $STATE_DIR/slave-tree-before ]
 	then
@@ -426,26 +496,83 @@ function Sync
 	if [ "$CONFLICT_PREVALANCE" != "master" ]
 	then
 		sync_update_slave
+		if [ $? != 0 ]
+		then
+			return 1
+		fi
 		sync_update_master
+		if [ $? != 0 ]
+		then
+			return 1
+		fi
 	else
 		sync_update_master
+		if [ $? != 0 ]
+		then
+			return 1
+		fi
 		sync_update_slave
+		if [ $? != 0 ]
+		then
+			return 1
+		fi
 	fi
 
 	Log "Propagating deletitions to slave replica."
-	rsync -rlptgodEui --backup --backup-dir "$MASTER_DELETE_DIR" --delete --exclude "$OSYNC_DIR" --include-from "$STATE_DIR/master-deleted-list" --exclude-from "$STATE_DIR/slave-deleted-list" $MASTER_SYNC_DIR/ $SLAVE_SYNC_DIR/ 
+	rsync $DRY_OPTION -rlptgodEui --backup --backup-dir "$SLAVE_DELETE_DIR" --delete --exclude "$OSYNC_DIR" --exclude-from "$STATE_DIR/slave-deleted-list" --include-from "$STATE_DIR/master-deleted-list" $MASTER_SYNC_DIR/ $SLAVE_SYNC_DIR/ > /dev/shm/osync_deletition_on_slave_$SCRIPT_PID 2>&1 &
+	child_pid=$!
+	WaitForTaskCompletition $child_pid $SOFT_MAX_EXEC_TIME 0
+	if [ $? != 0 ]
+	then
+		LogError "Deletition on slave failed."
+		return 1
+	fi
+	if [ "$VERBOSE_LOGS" == "yes" ]
+	then
+		Log "List:\n$(cat /dev/shm/osync_deletition_on_slave_$SCRIPT_PID)"
+	fi
+	
 	Log "Propagating deletitions to master replica."
-	rsync -rlptgodEui --backup --backup-dir "$SLAVE_DELETE_DIR" --delete --exclude "$OSYNC_DIR" --include-from "$STATE_DIR/slave-deleted-list" --exclude-from "$STATE_DIR/master-deleted-list" $SLAVE_SYNC_DIR/ $MASTER_SYNC_DIR/ 
+	rsync $DRY_OPTION -rlptgodEui --backup --backup-dir "$MASTER_DELETE_DIR" --delete --exclude "$OSYNC_DIR" --exclude-from "$STATE_DIR/master-deleted-list" --include-from "$STATE_DIR/slave-deleted-list" $SLAVE_SYNC_DIR/ $MASTER_SYNC_DIR/ > /dev/shm/osync_deletition_on_master_$SCRIPT_PID 2>&1 &
+	child_pid=$!
+	WaitForTaskCompletition $child_pid $SOFT_MAX_EXEC_TIME 0
+	if [ $? != 0 ]
+	then
+		LogError "Deletition on master failed."
+		return 1
+	fi
+	if [ "$VERBOSE_LOGS" == "yes" ]
+	then
+		Log "List:\n$(cat /dev/shm/osync_deletition_on_master_$SCRIPT_PID)"
+	fi
 
-        ## Create local file list
         Log "Creating new master replica file list."
-        rsync -rlptgodE --exclude "$OSYNC_DIR" --list-only $MASTER_SYNC_DIR/ | grep "^-\|^d" | awk '{print $5}' | grep -v "^\.$" > $STATE_DIR/master-tree-before
+        rsync -rlptgodE --exclude "$OSYNC_DIR" --list-only $MASTER_SYNC_DIR/ | grep "^-\|^d" | awk '{print $5}' | grep -v "^\.$" > /dev/shm/osync_master-tree-before_$SCRIPT_PID &
+	child_pid=$!
+        WaitForTaskCompletition $child_pid $SOFT_MAX_EXEC_TIME 0
+        retval=$?
+        if [ $retval == 0 ] && [ -f /dev/shm/osync_master-tree-before_$SCRIPT_PID ]
+        then
+                mv /dev/shm/osync_master-tree-before_$SCRIPT_PID $STATE_DIR/master-tree-before
+        else
+                LogError "Cannot create slave file list."
+                return 1
+        fi
+
         Log "Creating new slave replica file list."
-        ## Create distant file list
-        rsync -rlptgodE --exclude "$OSYNC_DIR" --list-only $SLAVE_SYNC_DIR/ | grep "^-\|^d" | awk '{print $5}' | grep -v "^\.$" > $STATE_DIR/slave-tree-before
+        rsync -rlptgodE --exclude "$OSYNC_DIR" --list-only $SLAVE_SYNC_DIR/ | grep "^-\|^d" | awk '{print $5}' | grep -v "^\.$" > /dev/shm/osync_slave-tree-before_$SCRIPT_PID &
+	child_pid=$!
+        WaitForTaskCompletition $child_pid $SOFT_MAX_EXEC_TIME 0
+        retval=$?
+        if [ $retval == 0 ] && [ -f /dev/shm/osync_slave-tree-before_$SCRIPT_PID ]
+        then
+                mv /dev/shm/osync_slave-tree-before_$SCRIPT_PID $STATE_DIR/slave-tree-before
+        else
+                LogError "Cannot create slave file list."
+                return 1
+        fi
 
 	Log "Finished synchronization task."
-
 }
 
 function SoftDelete
@@ -511,6 +638,13 @@ function Init
 	else
 		RUNNER=""
 	fi
+
+	## Dryrun option
+	if [ $dryrun -eq 1 ]
+	then
+		DRY_OPTION=--dry-run
+		DRY_WARNING="/!\ DRY RUN"
+	fi
 }
 
 function Main
@@ -536,6 +670,7 @@ silent=0
 # Alert flags
 soft_alert_total=0
 error_alert=0
+soft_stop=0
 
 if [ $# -eq 0 ]
 then
@@ -569,7 +704,7 @@ then
 			Init
 			DATE=$(date)
 			Log "-----------------------------------------------------------"
-			Log "$DATE - Osync v$OSYNC_VERSION script begin."
+			Log " $DRY_WARNING $DATE - Osync v$OSYNC_VERSION script begin."
 			Log "-----------------------------------------------------------"
 			CheckMasterSlaveDirs
 			if [ $? == 0 ]
