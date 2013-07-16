@@ -411,9 +411,9 @@ function Sync
 	rsync -rlptgodEui --backup --backup-dir "$SLAVE_BACKUP_DIR" --exclude "$OSYNC_DIR" --exclude-from "$STATE_DIR/slave-deleted-list" --exclude-from "$STATE_DIR/master-deleted-list" $SLAVE_SYNC_DIR/ $MASTER_SYNC_DIR/
 
 	Log "Propagating deletitions to slave"
-	rsync -rlptgodEui --backup --backup-dir "$MASTER_DELETE_DIR" --delete --exclude "$OSYNC_DIR" --include-from "$STATE_DIR/master-deleted-list" --exclude='*' $MASTER_SYNC_DIR/ $SLAVE_SYNC_DIR/ 
+	rsync -rlptgodEui --backup --backup-dir "$MASTER_DELETE_DIR" --delete --exclude "$OSYNC_DIR" --include-from "$STATE_DIR/master-deleted-list" --exclude-from "$STATE_DIR/slave-deleted-list" $MASTER_SYNC_DIR/ $SLAVE_SYNC_DIR/ 
 	Log "Propagating deletitions to master"
-	rsync -rlptgodEui --backup --backup-dir "$SLAVE_DELETE_DIR" --delete --exclude "$OSYNC_DIR" --include-from "$STATE_DIR/slave-deleted-list" --exclude='*' $SLAVE_SYNC_DIR/ $MASTER_SYNC_DIR/ 
+	rsync -rlptgodEui --backup --backup-dir "$SLAVE_DELETE_DIR" --delete --exclude "$OSYNC_DIR" --include-from "$STATE_DIR/slave-deleted-list" --exclude-from "$STATE_DIR/master-deleted-list" $SLAVE_SYNC_DIR/ $MASTER_SYNC_DIR/ 
 
         ## Create local file list
         Log "Creating new master file list"
