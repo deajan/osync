@@ -404,7 +404,7 @@ function LockSlave
 function sync_update_master
 {
 	Log "Updating slave replica."
-	rsync $DRY_OPTION -rlptgodEui --backup --backup-dir "$SLAVE_BACKUP_DIR" --exclude "$OSYNC_DIR" --exclude-from "$STATE_DIR/master-deleted-list" --exclude-from "$STATE_DIR/slave-deleted-list" $MASTER_SYNC_DIR/ $SLAVE_SYNC_DIR/ > /dev/shm/osync_update_slave_replica_$SCRIPT_PID 2>&1 &
+	rsync $DRY_OPTION -rlptgodEui $SLAVE_BACKUP --exclude "$OSYNC_DIR" --exclude-from "$STATE_DIR/master-deleted-list" --exclude-from "$STATE_DIR/slave-deleted-list" $MASTER_SYNC_DIR/ $SLAVE_SYNC_DIR/ > /dev/shm/osync_update_slave_replica_$SCRIPT_PID 2>&1 &
 	child_pid=$!
        	WaitForTaskCompletition $child_pid $SOFT_MAX_EXEC_TIME 0
         retval=$?
@@ -426,7 +426,7 @@ function sync_update_master
 function sync_update_slave
 {
 	Log "Updating master replica."
-	rsync $DRY_OPTION -rlptgodEui --backup --backup-dir "$MASTER_BACKUP_DIR" --exclude "$OSYNC_DIR" --exclude-from "$STATE_DIR/slave-deleted-list" --exclude-from "$STATE_DIR/master-deleted-list" $SLAVE_SYNC_DIR/ $MASTER_SYNC_DIR/ > /dev/shm/osync_update_master_replica_$SCRIPT_PID 2>&1 &
+	rsync $DRY_OPTION -rlptgodEui $MASTER_BACKUP --exclude "$OSYNC_DIR" --exclude-from "$STATE_DIR/slave-deleted-list" --exclude-from "$STATE_DIR/master-deleted-list" $SLAVE_SYNC_DIR/ $MASTER_SYNC_DIR/ > /dev/shm/osync_update_master_replica_$SCRIPT_PID 2>&1 &
 	child_pid=$!
         WaitForTaskCompletition $child_pid $SOFT_MAX_EXEC_TIME 0
         retval=$?
@@ -519,7 +519,7 @@ function Sync
 	fi
 
 	Log "Propagating deletitions to slave replica."
-	rsync $DRY_OPTION -rlptgodEui --backup --backup-dir "$SLAVE_DELETE_DIR" --delete --exclude "$OSYNC_DIR" --exclude-from "$STATE_DIR/slave-deleted-list" --include-from "$STATE_DIR/master-deleted-list" $MASTER_SYNC_DIR/ $SLAVE_SYNC_DIR/ > /dev/shm/osync_deletition_on_slave_$SCRIPT_PID 2>&1 &
+	rsync $DRY_OPTION -rlptgodEui $SLAVE_DELETE --delete --exclude "$OSYNC_DIR" --exclude-from "$STATE_DIR/slave-deleted-list" --include-from "$STATE_DIR/master-deleted-list" $MASTER_SYNC_DIR/ $SLAVE_SYNC_DIR/ > /dev/shm/osync_deletition_on_slave_$SCRIPT_PID 2>&1 &
 	child_pid=$!
 	WaitForTaskCompletition $child_pid $SOFT_MAX_EXEC_TIME 0
 	if [ $? != 0 ]
@@ -533,7 +533,7 @@ function Sync
 	fi
 	
 	Log "Propagating deletitions to master replica."
-	rsync $DRY_OPTION -rlptgodEui --backup --backup-dir "$MASTER_DELETE_DIR" --delete --exclude "$OSYNC_DIR" --exclude-from "$STATE_DIR/master-deleted-list" --include-from "$STATE_DIR/slave-deleted-list" $SLAVE_SYNC_DIR/ $MASTER_SYNC_DIR/ > /dev/shm/osync_deletition_on_master_$SCRIPT_PID 2>&1 &
+	rsync $DRY_OPTION -rlptgodEui $MASTER_DELETE --delete --exclude "$OSYNC_DIR" --exclude-from "$STATE_DIR/master-deleted-list" --include-from "$STATE_DIR/slave-deleted-list" $SLAVE_SYNC_DIR/ $MASTER_SYNC_DIR/ > /dev/shm/osync_deletition_on_master_$SCRIPT_PID 2>&1 &
 	child_pid=$!
 	WaitForTaskCompletition $child_pid $SOFT_MAX_EXEC_TIME 0
 	if [ $? != 0 ]
@@ -644,6 +644,31 @@ function Init
 	then
 		DRY_OPTION=--dry-run
 		DRY_WARNING="/!\ DRY RUN"
+	else
+		DRY_OPTION=
+	fi
+
+	## Rsync options
+	RSYNC_OPTS=rlptgodEui
+
+	## Conflict options
+	if [ "$CONFLICT_BACKUP" != "no" ]
+	then
+		MASTER_CONFLICT="--backup --backup-dir="$MASTER_BACKUP_DIR"
+		SLAVE_CONFLICT="--backup --backup-dir="$SLAVE_BACKUP_DIR"
+	else
+		MASTER_CONFLICT=
+		SLAVE_CONFLICT=
+	fi
+
+	## Soft delete options
+	if [ "$SOFT_DELETE" != "no" ]
+	then
+		MASTER_DELETE="--backup --backup-dir=$MASTER_DELETE_DIR"
+		SLAVE_DELETE="--backup --backup-dir=$SLAVE_DELETE_DIR"
+	else
+		MASTER_DELETE=
+		SLAVE_DELETE=
 	fi
 }
 
