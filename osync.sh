@@ -1,9 +1,19 @@
 #!/bin/bash
 
-#### Osyc 
-## Rsync based two way sync engine. Master/slave setup.
+###### Osync - Rsync based two way sync engine.
+###### (L) 2013 by Orsiris "Ozy" de Jong (www.netpower.fr) 
+
+
+## todo:
+# add dryrun
+# add logging
+# add resume on error
+# add master/slave prevalance
+# thread sync function
+# remote functionnality
+
 OSYNC_VERSION=0.4
-OSYNC_BUILD=1507201301
+OSYNC_BUILD=1607201302
 
 DEBUG=no
 SCRIPT_PID=$$
@@ -14,9 +24,8 @@ LOCAL_HOST=$(hostname)
 ## Default log file until config file is loaded
 LOG_FILE=/var/log/osync.log
 
-## Working directory on master
+## Working directory. Will keep current file states, backups and soft deleted files.
 OSYNC_DIR=".osync_workdir"
-
 
 ## Log a state message every $KEEP_LOGGING seconds. Should not be equal to soft or hard execution time so your log won't be unnecessary big.
 KEEP_LOGGING=1801
@@ -360,32 +369,44 @@ function CheckMasterSlaveDirs
 
 function LockMaster
 {
-	echo o
+	echo "Not implemented yet"
 }
 
 function LockSlave
 {
-	echo o
+	echo "Not implemented yet"
+}
+
+# Subfunction of Sync
+function sync_update_master
+{
+	Log "Updating slave replica."
+	rsync -rlptgodEui --backup --backup-dir "$MASTER_BACKUP_DIR" --exclude "$OSYNC_DIR" --exclude-from "$STATE_DIR/master-deleted-list" --exclude-from "$STATE_DIR/slave-deleted-list" $MASTER_SYNC_DIR/ $SLAVE_SYNC_DIR/
+}
+
+# Subfunction of Sync
+function sync_update_slave
+{
+	Log "Updating master replica."
+	rsync -rlptgodEui --backup --backup-dir "$SLAVE_BACKUP_DIR" --exclude "$OSYNC_DIR" --exclude-from "$STATE_DIR/slave-deleted-list" --exclude-from "$STATE_DIR/master-deleted-list" $SLAVE_SYNC_DIR/ $MASTER_SYNC_DIR/
 }
 
 function Sync
 {
-	## decide if local or remote prevalence
-
 	## Lock master dir
 	## Lock slave dir
 
 	Log "Starting synchronization task."
 
 	## Create local file list
-	Log "Creating current master file list"
+	Log "Creating master replica file list."
 	rsync -rlptgodE --exclude "$OSYNC_DIR" --list-only $MASTER_SYNC_DIR/ | grep "^-\|^d" | awk '{print $5}' | grep -v "^\.$" > $STATE_DIR/master-tree-current
-	Log "Creating current slave file list"
+	Log "Creating slave replica file list."
 	## Create distant file list
 	rsync -rlptgodE --exclude "$OSYNC_DIR" --list-only $SLAVE_SYNC_DIR/ | grep "^-\|^d" | awk '{print $5}' | grep -v "^\.$" > $STATE_DIR/slave-tree-current
 
 	## diff local file list and before file list except if before file list is empty >> deleted
-	Log "Creating master deleted file list"
+	Log "Creating master replica deleted file list."
 	if [ -f $STATE_DIR/master-tree-before ]
 	then
 		comm --nocheck-order -23 $STATE_DIR/master-tree-before $STATE_DIR/master-tree-current > $STATE_DIR/master-deleted-list
@@ -394,7 +415,7 @@ function Sync
 	fi
 
 	## diff local file list and before file list except if before file list is empty >> deleted
-	Log "Creating slave deleted file list"
+	Log "Creating slave replica deleted file list."
 	if [ -f $STATE_DIR/slave-tree-before ]
 	then
 		comm --nocheck-order -23 $STATE_DIR/slave-tree-before $STATE_DIR/slave-tree-current > $STATE_DIR/slave-deleted-list
@@ -402,23 +423,24 @@ function Sync
 		touch $STATE_DIR/slave-deleted-list
 	fi
 
+	if [ "$CONFLICT_PREVALANCE" != "master" ]
+	then
+		sync_update_slave
+		sync_update_master
+	else
+		sync_update_master
+		sync_update_slave
+	fi
 
-	## update local -> remote except deleted
-	Log "Updating slave replica"
-	rsync -rlptgodEui --backup --backup-dir "$MASTER_BACKUP_DIR" --exclude "$OSYNC_DIR" --exclude-from "$STATE_DIR/master-deleted-list" --exclude-from "$STATE_DIR/slave-deleted-list" $MASTER_SYNC_DIR/ $SLAVE_SYNC_DIR/
-	## update remote -> local except deleted
-	Log "Updating master replica"
-	rsync -rlptgodEui --backup --backup-dir "$SLAVE_BACKUP_DIR" --exclude "$OSYNC_DIR" --exclude-from "$STATE_DIR/slave-deleted-list" --exclude-from "$STATE_DIR/master-deleted-list" $SLAVE_SYNC_DIR/ $MASTER_SYNC_DIR/
-
-	Log "Propagating deletitions to slave"
+	Log "Propagating deletitions to slave replica."
 	rsync -rlptgodEui --backup --backup-dir "$MASTER_DELETE_DIR" --delete --exclude "$OSYNC_DIR" --include-from "$STATE_DIR/master-deleted-list" --exclude-from "$STATE_DIR/slave-deleted-list" $MASTER_SYNC_DIR/ $SLAVE_SYNC_DIR/ 
-	Log "Propagating deletitions to master"
+	Log "Propagating deletitions to master replica."
 	rsync -rlptgodEui --backup --backup-dir "$SLAVE_DELETE_DIR" --delete --exclude "$OSYNC_DIR" --include-from "$STATE_DIR/slave-deleted-list" --exclude-from "$STATE_DIR/master-deleted-list" $SLAVE_SYNC_DIR/ $MASTER_SYNC_DIR/ 
 
         ## Create local file list
-        Log "Creating new master file list"
+        Log "Creating new master replica file list."
         rsync -rlptgodE --exclude "$OSYNC_DIR" --list-only $MASTER_SYNC_DIR/ | grep "^-\|^d" | awk '{print $5}' | grep -v "^\.$" > $STATE_DIR/master-tree-before
-        Log "Creating new slave file list"
+        Log "Creating new slave replica file list."
         ## Create distant file list
         rsync -rlptgodE --exclude "$OSYNC_DIR" --list-only $SLAVE_SYNC_DIR/ | grep "^-\|^d" | awk '{print $5}' | grep -v "^\.$" > $STATE_DIR/slave-tree-before
 
@@ -428,7 +450,35 @@ function Sync
 
 function SoftDelete
 {
-	echo softd
+	if [ "$CONFLICT_BACKUP" != "no" ]
+	then
+		if [ -d $MASTER_BACKUP_DIR ]
+		then
+			Log "Removing backups older than $CONFLICT_BACKUP_DAYS days on master replica."
+			find $MASTER_BACKUP_DIR/ -ctime +$CONFLICT_BACKUP_DAYS | xargs rm -rf
+		fi
+		
+		if [ -d $SLAVE_BACKUP_DIR ]
+		then
+			Log "Removing backups older than $CONFLICT_BACKUP_DAYS days on slave replica."
+			find $SLAVE_BACKUP_DIR/ -ctime +$CONFLICT_BACKUP_DAYS | xargs rm -rf	
+		fi
+	fi
+
+	if [ "$SOFT_DELETE" != "no" ]
+	then
+		if [ -d $MASTER_DELETE_DIR ]
+		then
+			Log "Removing soft deleted items older than $SOFT_DELETE_DAYS days on master replica."
+			find $MASTER_DELETE_DIR/ -ctime +$SOFT_DELETE_DAYS | xargs rm -rf
+		fi
+
+		if [ -d $SLAVE_DELETE_DIR ]
+		then
+			Log "Removing soft deleted items older than $SOFT_DELETE_DAYS days on slave replica."
+			find $SLAVE_DELETE_DIR/ -ctime +$SOFT_DELETE_DAYS | xargs rm -rf
+		fi
+	fi
 }
 
 function Init
@@ -443,7 +493,7 @@ function Init
                 trap 'TrapError ${LINENO} $?' ERR
         fi
 
-        LOG_FILE=/var/log/osync_$osync_VERSION-$BACKUP_ID.log
+        LOG_FILE=/var/log/osync_$OSYNC_VERSION-$SYNC_ID.log
         MAIL_ALERT_MSG="Warning: Execution of osync instance $OSYNC_ID (pid $SCRIPT_PID) as $LOCAL_USER@$LOCAL_HOST produced errors."
 
 	STATE_DIR="$MASTER_SYNC_DIR/$OSYNC_DIR/state"
@@ -453,11 +503,14 @@ function Init
 	MASTER_DELETE_DIR="$MASTER_SYNC_DIR/$OSYNC_DIR/deleted"
 	SLAVE_BACKUP_DIR="$SLAVE_SYNC_DIR/$OSYNC_DIR/backups"
 	SLAVE_DELETE_DIR="$SLAVE_SYNC_DIR/$OSYNC_DIR/deleted"
-}
-
-function DryRun
-{
-	echo dry
+	
+	## Runner definition
+	if [ "$REMOTE_SYNC" == "yes" ]
+	then
+		RUNNER="$(which ssh) $SSH_COMP -i $SSH_RSA_PRIVATE_KEY $REMOTE_USER@$REMOTE_HOST -p $REMOTE_PORT"
+	else
+		RUNNER=""
+	fi
 }
 
 function Main
@@ -515,20 +568,16 @@ then
 		then
 			Init
 			DATE=$(date)
-			Log "---------------------------------------------------------"
+			Log "-----------------------------------------------------------"
 			Log "$DATE - Osync v$OSYNC_VERSION script begin."
-			Log "----------------------------------------------------------"
+			Log "-----------------------------------------------------------"
 			CheckMasterSlaveDirs
 			if [ $? == 0 ]
 			then
-				if [ $dryrun -eq 1 ]
-				then
-					DryRun
-				else
-					RunBeforeHook
-					Main
-					RunAfterHook
-				fi
+				RunBeforeHook
+				Main
+				SoftDelete
+				RunAfterHook
 				CleanUp
 			fi
 		else
