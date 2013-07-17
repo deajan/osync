@@ -11,7 +11,7 @@
 # remote functionnality
 
 OSYNC_VERSION=0.4
-OSYNC_BUILD=1607201305
+OSYNC_BUILD=1707201302
 
 DEBUG=no
 SCRIPT_PID=$$
@@ -56,20 +56,34 @@ function TrapError
 
 function TrapStop
 {
-        LogError " /!\ WARNING: Manual exit of osync is really not recommended. Sync will be in inconsistent state."
-	LogError " /!\ WARNING: If you are sure, please hit CTRL+C another time to quit."
 	if [ $soft_stop -eq 0 ]
 	then
+		LogError " /!\ WARNING: Manual exit of osync is really not recommended. Sync will be in inconsistent state."
+		LogError " /!\ WARNING: If you are sure, please hit CTRL+C another time to quit."
 		soft_stop=1
+		return 1
 	fi
 
-        if [ "$DEBUG" == "no" ] && [ $soft_stop -eq 1 ]
+        if [ $soft_stop -eq 1 ]
         then
-                CleanUp
+        	LogError " /!\ WARNING: CTRL+C hit twice. Quitting osync."
+		CleanUp
 		exit 1
         fi
 }
 
+function TrapQuit
+{
+	if [ $error_alert -ne 0 ]
+	then
+        	SendAlert
+        	LogError "Osync finished with errros."
+        	exit 1
+	else
+        	Log "Osync finished."
+        	exit 0
+	fi
+}
 
 function Spinner
 {
@@ -108,17 +122,20 @@ function Spinner
 
 function CleanUp
 {
-        rm -f /dev/shm/osync_config_$SCRIPT_PID
- 	rm -f /dev/shm/osync_run_local_$SCRIPT_PID
-	rm -f /dev/shm/osync_run_remote_$SCRIPT_PID
-	rm -f /dev/shm/osync_master-tree-current_$SCRIPT_PID
-	rm -f /dev/shm/osync_slave-tree-current_$SCRIPT_PID
-	rm -f /dev/shm/osync_master-tree-before_$SCRIPT_PID
-	rm -f /dev/shm/osync_slave-tree-before_$SCRIPT_PID
-	rm -f /dev/shm/osync_update_master_replica_$SCRIPT_PID
-	rm -f /dev/shm/osync_update_slave_replica_$SCRIPT_PID
-	rm -f /dev/shm/osync_deletition_on_master_$SCRIPT_PID
-	rm -f /dev/shm/osync_deletition_on_slave_$SCRIPT_PID
+	if [ "$DEBUG" != "yes" ]
+	then
+        	rm -f /dev/shm/osync_config_$SCRIPT_PID
+ 		rm -f /dev/shm/osync_run_local_$SCRIPT_PID
+		rm -f /dev/shm/osync_run_remote_$SCRIPT_PID
+		rm -f /dev/shm/osync_master-tree-current_$SCRIPT_PID
+		rm -f /dev/shm/osync_slave-tree-current_$SCRIPT_PID
+		rm -f /dev/shm/osync_master-tree-before_$SCRIPT_PID
+		rm -f /dev/shm/osync_slave-tree-before_$SCRIPT_PID
+		rm -f /dev/shm/osync_update_master_replica_$SCRIPT_PID
+		rm -f /dev/shm/osync_update_slave_replica_$SCRIPT_PID
+		rm -f /dev/shm/osync_deletition_on_master_$SCRIPT_PID
+		rm -f /dev/shm/osync_deletition_on_slave_$SCRIPT_PID
+	fi
 }
 
 function SendAlert
@@ -407,6 +424,7 @@ function sync_update_master
 	rsync $DRY_OPTION -rlptgodEui $SLAVE_BACKUP --exclude "$OSYNC_DIR" --exclude-from "$STATE_DIR/master-deleted-list" --exclude-from "$STATE_DIR/slave-deleted-list" $MASTER_SYNC_DIR/ $SLAVE_SYNC_DIR/ > /dev/shm/osync_update_slave_replica_$SCRIPT_PID 2>&1 &
 	child_pid=$!
        	WaitForTaskCompletition $child_pid $SOFT_MAX_EXEC_TIME 0
+	wait $child_pid
         retval=$?
         if [ $retval != 0 ]
         then
@@ -429,6 +447,7 @@ function sync_update_slave
 	rsync $DRY_OPTION -rlptgodEui $MASTER_BACKUP --exclude "$OSYNC_DIR" --exclude-from "$STATE_DIR/slave-deleted-list" --exclude-from "$STATE_DIR/master-deleted-list" $SLAVE_SYNC_DIR/ $MASTER_SYNC_DIR/ > /dev/shm/osync_update_master_replica_$SCRIPT_PID 2>&1 &
 	child_pid=$!
         WaitForTaskCompletition $child_pid $SOFT_MAX_EXEC_TIME 0
+	wait $child_pid
         retval=$?
         if [ $retval != 0 ]
         then
@@ -455,6 +474,7 @@ function Sync
 	rsync -rlptgodE --exclude "$OSYNC_DIR" --list-only $MASTER_SYNC_DIR/ | grep "^-\|^d" | awk '{print $5}' | grep -v "^\.$" > /dev/shm/osync_master-tree-current_$SCRIPT_PID &
 	child_pid=$!
 	WaitForTaskCompletition $child_pid $SOFT_MAX_EXEC_TIME $HARD_MAX_EXEC_TIME
+	wait $child_pid
 	retval=$?
 	if [ $retval == 0 ] && [ -f /dev/shm/osync_master-tree-current_$SCRIPT_PID ]
 	then
@@ -465,9 +485,10 @@ function Sync
 	fi
 
 	Log "Creating slave replica file list."
-	rsync -rlptgodE --exclude "$OSYNC_DIR" --list-only $SLAVE_SYNC_DIR/ | grep "^-\|^d" | awk '{print $5}' | grep -v "^\.$" > /dev/shm/osync_slave-tree-current_$SCRIPT_PID &
+	rsync -e $RUNNER -rlptgodE --exclude "$OSYNC_DIR" --list-only $SLAVE_SYNC_DIR/ | grep "^-\|^d" | awk '{print $5}' | grep -v "^\.$" > /dev/shm/osync_slave-tree-current_$SCRIPT_PID &
 	child_pid=$!
 	WaitForTaskCompletition $child_pid $SOFT_MAX_EXEC_TIME $HARD_MAX_EXEC_TIME
+	wait $child_pid
 	retval=$?
 	if [ $retval == 0 ] && [ -f /dev/shm/osync_slave-tree-current_$SCRIPT_PID ]
 	then
@@ -522,7 +543,9 @@ function Sync
 	rsync $DRY_OPTION -rlptgodEui $SLAVE_DELETE --delete --exclude "$OSYNC_DIR" --exclude-from "$STATE_DIR/slave-deleted-list" --include-from "$STATE_DIR/master-deleted-list" $MASTER_SYNC_DIR/ $SLAVE_SYNC_DIR/ > /dev/shm/osync_deletition_on_slave_$SCRIPT_PID 2>&1 &
 	child_pid=$!
 	WaitForTaskCompletition $child_pid $SOFT_MAX_EXEC_TIME 0
-	if [ $? != 0 ]
+	wait $child_pid
+	retval=$?
+	if [ $retval != 0 ]
 	then
 		LogError "Deletition on slave failed."
 		return 1
@@ -536,7 +559,9 @@ function Sync
 	rsync $DRY_OPTION -rlptgodEui $MASTER_DELETE --delete --exclude "$OSYNC_DIR" --exclude-from "$STATE_DIR/master-deleted-list" --include-from "$STATE_DIR/slave-deleted-list" $SLAVE_SYNC_DIR/ $MASTER_SYNC_DIR/ > /dev/shm/osync_deletition_on_master_$SCRIPT_PID 2>&1 &
 	child_pid=$!
 	WaitForTaskCompletition $child_pid $SOFT_MAX_EXEC_TIME 0
-	if [ $? != 0 ]
+	wait $child_pid
+	retval=$?
+	if [ $retval != 0 ]
 	then
 		LogError "Deletition on master failed."
 		return 1
@@ -550,6 +575,7 @@ function Sync
         rsync -rlptgodE --exclude "$OSYNC_DIR" --list-only $MASTER_SYNC_DIR/ | grep "^-\|^d" | awk '{print $5}' | grep -v "^\.$" > /dev/shm/osync_master-tree-before_$SCRIPT_PID &
 	child_pid=$!
         WaitForTaskCompletition $child_pid $SOFT_MAX_EXEC_TIME 0
+	wait $child_pid
         retval=$?
         if [ $retval == 0 ] && [ -f /dev/shm/osync_master-tree-before_$SCRIPT_PID ]
         then
@@ -563,6 +589,7 @@ function Sync
         rsync -rlptgodE --exclude "$OSYNC_DIR" --list-only $SLAVE_SYNC_DIR/ | grep "^-\|^d" | awk '{print $5}' | grep -v "^\.$" > /dev/shm/osync_slave-tree-before_$SCRIPT_PID &
 	child_pid=$!
         WaitForTaskCompletition $child_pid $SOFT_MAX_EXEC_TIME 0
+	wait $child_pid
         retval=$?
         if [ $retval == 0 ] && [ -f /dev/shm/osync_slave-tree-before_$SCRIPT_PID ]
         then
@@ -614,7 +641,8 @@ function Init
         set -o pipefail
         set -o errtrace
 
-        trap TrapStop SIGINT SIGQUIT
+        trap TrapStop SIGINT SIGKILL SIGHUP SIGTERM SIGQUIT
+	trap TrapQuit EXIT
         if [ "$DEBUG" == "yes" ]
         then
                 trap 'TrapError ${LINENO} $?' ERR
@@ -631,12 +659,22 @@ function Init
 	SLAVE_BACKUP_DIR="$SLAVE_SYNC_DIR/$OSYNC_DIR/backups"
 	SLAVE_DELETE_DIR="$SLAVE_SYNC_DIR/$OSYNC_DIR/deleted"
 	
+	## SSH compression
+	if [ "$SSH_COMPRESSION" == "yes" ]
+	then
+		SSH_COMP=-C
+	else
+		SSH_COMP=
+	fi
+
 	## Runner definition
 	if [ "$REMOTE_SYNC" == "yes" ]
 	then
 		RUNNER="$(which ssh) $SSH_COMP -i $SSH_RSA_PRIVATE_KEY $REMOTE_USER@$REMOTE_HOST -p $REMOTE_PORT"
+		RSYNC_RUNNER="$(which ssh) $SSH_COMP -i $SSH_RSA_PRIVATE_KEY -p $REMOTE_PORT"
 	else
-		RUNNER=""
+		RUNNER=
+		RSYNC_RUNNER=
 	fi
 
 	## Dryrun option
@@ -654,8 +692,8 @@ function Init
 	## Conflict options
 	if [ "$CONFLICT_BACKUP" != "no" ]
 	then
-		MASTER_CONFLICT="--backup --backup-dir="$MASTER_BACKUP_DIR"
-		SLAVE_CONFLICT="--backup --backup-dir="$SLAVE_BACKUP_DIR"
+		MASTER_CONFLICT="--backup --backup-dir=$MASTER_BACKUP_DIR"
+		SLAVE_CONFLICT="--backup --backup-dir=$SLAVE_BACKUP_DIR"
 	else
 		MASTER_CONFLICT=
 		SLAVE_CONFLICT=
@@ -736,7 +774,10 @@ then
 			then
 				RunBeforeHook
 				Main
-				SoftDelete
+				if [ $? == 0 ]
+				then
+					SoftDelete
+				fi
 				RunAfterHook
 				CleanUp
 			fi
@@ -750,14 +791,4 @@ then
 	fi
 else
 	LogError "Environment not suitable to run osync."
-fi
-
-if [ $error_alert -ne 0 ]
-then
-	SendAlert
-	LogError "Osync finished with errros."
-	exit 1
-else
-	Log "Osync script finished."
-	exit 0
 fi
