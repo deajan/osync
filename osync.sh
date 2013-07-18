@@ -698,31 +698,30 @@ function Sync
 		slave_delete_list
 		;&
 		slave-replica-deleted-list.success|update-master-replica.fail|update-slave-replica.fail)
-        if [ "$CONFLICT_PREVALANCE" != "master" ]
-        then
-                sync_update_master
-                if [ $? != 0 ]
-                then
-                        return 1
-                fi
-                sync_update_slave
-                if [ $? != 0 ]
-                then
-                        return 1
-                fi
-        else
-                sync_update_slave
-                if [ $? != 0 ]
-                then
-                        return 1
-                fi
-                sync_update_master
-                if [ $? != 0 ]
-                then
-                        return 1
-                fi
-        fi
-
+	        if [ "$CONFLICT_PREVALANCE" != "master" ]
+	        then
+        	        sync_update_master
+                	if [ $? != 0 ]
+                	then
+                        	return 1
+                	fi
+                	sync_update_slave
+                	if [ $? != 0 ]
+                	then
+                        	return 1
+                	fi
+        	else
+                	sync_update_slave
+                	if [ $? != 0 ]
+                	then
+                        	return 1
+                	fi
+                	sync_update_master
+                	if [ $? != 0 ]
+                	then
+                        	return 1
+                	fi
+        	fi
 		;&
 		update-slave-replica.success|update-master-replica.success|delete-propagation-slave.fail)
 		delete_on_slave
@@ -740,20 +739,6 @@ function Sync
 
 	Log "Finished synchronization task."
 	echo "sync.success" > $STATE_DIR/last-action
-}
-
-function DummySync
-{
-	# launches foo bar cuu in this order
-	
-	# get last function, if last was error set err=1
-
-	# if sync.success && err=1 boo bar cuu
-	# set err=0
-	# if sync.test && err=1 bar cuu
-	# set err=0
-	# if sync.e cuu
-	echo merde
 }
 
 function SoftDelete
