@@ -11,7 +11,7 @@
 # remote functionnality
 
 OSYNC_VERSION=0.4
-OSYNC_BUILD=1707201302
+OSYNC_BUILD=1807201301
 
 DEBUG=no
 SCRIPT_PID=$$
@@ -206,8 +206,9 @@ function CheckEnvironment
         fi
 }
 
-# Waits for pid $1 to complete. Will log an alert if $2 seconds exec time exceeded unless $2 equals 0. Will stop task and log alert if $3 seconds exec time exceeded.
-function WaitForTaskCompletition
+# Waits for pid $1 to complete. Will log an alert if $2 seconds passed since current task execution unless $2 equals 0.
+# Will stop task and log alert if $3 seconds passed since current task execution unless $3 equals 0.
+function WaitForTaskCompletion
 {
         soft_alert=0
         SECONDS_BEGIN=$SECONDS
@@ -230,10 +231,53 @@ function WaitForTaskCompletition
                         if [ $EXEC_TIME -gt $3 ] && [ $3 != 0 ]
                         then
                                 LogError "Max hard execution time exceeded for task. Stopping task execution."
+				kill -9 $1
+				if [ $? == 0 ]
+				then
+					LogError "Task stopped succesfully"
+				else
+					LogError "Could not stop task."
+				fi
                                 return 1
                         fi
                 fi
         done
+}
+
+# Waits for pid $1 to complete. Will log an alert if $2 seconds passed since script start unless $2 equals 0. 
+# Will stop task and log alert if $3 seconds passed since script start unless $3 equals 0.
+function WaitForCompletion
+{
+        soft_alert=0
+        while ps -p$1 > /dev/null
+        do
+                Spinner
+                sleep 1
+                if [ $(($SECONDS % $KEEP_LOGGING)) -eq 0 ]
+                then
+                        Log "Current task still running."
+                fi
+                if [ $SECONDS -gt $2 ]
+                then
+                        if [ $soft_alert -eq 0 ] && [ $2 != 0 ]
+                        then
+                                LogError "Max soft execution time exceeded for script."
+                                soft_alert=1
+                        fi
+                        if [ $SECONDS -gt $3 ] && [ $3 != 0 ]
+                        then
+                                LogError "Max hard execution time exceeded for script. Stopping current task execution."
+                                kill -9 $1
+                                if [ $? == 0 ]
+                                then
+                                        LogError "Task stopped succesfully"
+                                else
+                                        LogError "Could not stop task."
+                                fi
+                                return 1
+                        fi
+                fi
+	done
 }
 
 ## Runs local command $1 and waits for completition in $2 seconds
@@ -242,8 +286,7 @@ function RunLocalCommand
         CheckConnectivity3rdPartyHosts
         $1 > /dev/shm/osync_run_local_$SCRIPT_PID &
         child_pid=$!
-        WaitForTaskCompletition $child_pid 0 $2
-        wait $child_pid
+        WaitForTaskCompletion $child_pid 0 $2
         retval=$?
         if [ $retval -eq 0 ]
         then
@@ -271,8 +314,7 @@ function RunRemoteCommand
                         $(which ssh) $SSH_COMP -i $SSH_RSA_PRIVATE_KEY $REMOTE_USER@$REMOTE_HOST -p $REMOTE_PORT "$1" > /dev/shm/osync_run_remote_$SCRIPT_PID &
                 fi
                 child_pid=$!
-                WaitForTaskCompletition $child_pid 0 $2
-                wait $child_pid
+                WaitForTaskCompletion $child_pid 0 $2
                 retval=$?
                 if [ $retval -eq 0 ]
                 then
@@ -418,13 +460,12 @@ function LockSlave
 }
 
 # Subfunction of Sync
-function sync_update_master
+function sync_update_slave
 {
 	Log "Updating slave replica."
 	rsync $DRY_OPTION -rlptgodEui $SLAVE_BACKUP --exclude "$OSYNC_DIR" --exclude-from "$STATE_DIR/master-deleted-list" --exclude-from "$STATE_DIR/slave-deleted-list" $MASTER_SYNC_DIR/ $SLAVE_SYNC_DIR/ > /dev/shm/osync_update_slave_replica_$SCRIPT_PID 2>&1 &
 	child_pid=$!
-       	WaitForTaskCompletition $child_pid $SOFT_MAX_EXEC_TIME 0
-	wait $child_pid
+       	WaitForCompletion $child_pid $SOFT_MAX_EXEC_TIME $HARD_MAX_EXEC_TIME
         retval=$?
         if [ $retval != 0 ]
         then
@@ -441,13 +482,12 @@ function sync_update_master
 }
 
 # Subfunction of Sync
-function sync_update_slave
+function sync_update_master
 {
 	Log "Updating master replica."
 	rsync $DRY_OPTION -rlptgodEui $MASTER_BACKUP --exclude "$OSYNC_DIR" --exclude-from "$STATE_DIR/slave-deleted-list" --exclude-from "$STATE_DIR/master-deleted-list" $SLAVE_SYNC_DIR/ $MASTER_SYNC_DIR/ > /dev/shm/osync_update_master_replica_$SCRIPT_PID 2>&1 &
 	child_pid=$!
-        WaitForTaskCompletition $child_pid $SOFT_MAX_EXEC_TIME 0
-	wait $child_pid
+        WaitForCompletion $child_pid $SOFT_MAX_EXEC_TIME $HARD_MAX_EXEC_TIME
         retval=$?
         if [ $retval != 0 ]
         then
@@ -473,8 +513,7 @@ function Sync
 	Log "Creating master replica file list."
 	rsync -rlptgodE --exclude "$OSYNC_DIR" --list-only $MASTER_SYNC_DIR/ | grep "^-\|^d" | awk '{print $5}' | grep -v "^\.$" > /dev/shm/osync_master-tree-current_$SCRIPT_PID &
 	child_pid=$!
-	WaitForTaskCompletition $child_pid $SOFT_MAX_EXEC_TIME $HARD_MAX_EXEC_TIME
-	wait $child_pid
+	WaitForCompletion $child_pid $SOFT_MAX_EXEC_TIME $HARD_MAX_EXEC_TIME
 	retval=$?
 	if [ $retval == 0 ] && [ -f /dev/shm/osync_master-tree-current_$SCRIPT_PID ]
 	then
@@ -485,10 +524,9 @@ function Sync
 	fi
 
 	Log "Creating slave replica file list."
-	rsync -e $RUNNER -rlptgodE --exclude "$OSYNC_DIR" --list-only $SLAVE_SYNC_DIR/ | grep "^-\|^d" | awk '{print $5}' | grep -v "^\.$" > /dev/shm/osync_slave-tree-current_$SCRIPT_PID &
+	rsync -rlptgodE --exclude "$OSYNC_DIR" --list-only $SLAVE_SYNC_DIR/ | grep "^-\|^d" | awk '{print $5}' | grep -v "^\.$" > /dev/shm/osync_slave-tree-current_$SCRIPT_PID &
 	child_pid=$!
-	WaitForTaskCompletition $child_pid $SOFT_MAX_EXEC_TIME $HARD_MAX_EXEC_TIME
-	wait $child_pid
+	WaitForCompletion $child_pid $SOFT_MAX_EXEC_TIME $HARD_MAX_EXEC_TIME
 	retval=$?
 	if [ $retval == 0 ] && [ -f /dev/shm/osync_slave-tree-current_$SCRIPT_PID ]
 	then
@@ -516,23 +554,23 @@ function Sync
 
 	if [ "$CONFLICT_PREVALANCE" != "master" ]
 	then
-		sync_update_slave
+		sync_update_master
 		if [ $? != 0 ]
 		then
 			return 1
 		fi
-		sync_update_master
+		sync_update_slave
 		if [ $? != 0 ]
 		then
 			return 1
 		fi
 	else
-		sync_update_master
+		sync_update_slave
 		if [ $? != 0 ]
 		then
 			return 1
 		fi
-		sync_update_slave
+		sync_update_master
 		if [ $? != 0 ]
 		then
 			return 1
@@ -542,8 +580,7 @@ function Sync
 	Log "Propagating deletitions to slave replica."
 	rsync $DRY_OPTION -rlptgodEui $SLAVE_DELETE --delete --exclude "$OSYNC_DIR" --exclude-from "$STATE_DIR/slave-deleted-list" --include-from "$STATE_DIR/master-deleted-list" $MASTER_SYNC_DIR/ $SLAVE_SYNC_DIR/ > /dev/shm/osync_deletition_on_slave_$SCRIPT_PID 2>&1 &
 	child_pid=$!
-	WaitForTaskCompletition $child_pid $SOFT_MAX_EXEC_TIME 0
-	wait $child_pid
+	WaitForCompletion $child_pid $SOFT_MAX_EXEC_TIME 0
 	retval=$?
 	if [ $retval != 0 ]
 	then
@@ -558,8 +595,7 @@ function Sync
 	Log "Propagating deletitions to master replica."
 	rsync $DRY_OPTION -rlptgodEui $MASTER_DELETE --delete --exclude "$OSYNC_DIR" --exclude-from "$STATE_DIR/master-deleted-list" --include-from "$STATE_DIR/slave-deleted-list" $SLAVE_SYNC_DIR/ $MASTER_SYNC_DIR/ > /dev/shm/osync_deletition_on_master_$SCRIPT_PID 2>&1 &
 	child_pid=$!
-	WaitForTaskCompletition $child_pid $SOFT_MAX_EXEC_TIME 0
-	wait $child_pid
+	WaitForCompletion $child_pid $SOFT_MAX_EXEC_TIME 0
 	retval=$?
 	if [ $retval != 0 ]
 	then
@@ -574,8 +610,7 @@ function Sync
         Log "Creating new master replica file list."
         rsync -rlptgodE --exclude "$OSYNC_DIR" --list-only $MASTER_SYNC_DIR/ | grep "^-\|^d" | awk '{print $5}' | grep -v "^\.$" > /dev/shm/osync_master-tree-before_$SCRIPT_PID &
 	child_pid=$!
-        WaitForTaskCompletition $child_pid $SOFT_MAX_EXEC_TIME 0
-	wait $child_pid
+        WaitForCompletion $child_pid $SOFT_MAX_EXEC_TIME 0
         retval=$?
         if [ $retval == 0 ] && [ -f /dev/shm/osync_master-tree-before_$SCRIPT_PID ]
         then
@@ -588,8 +623,7 @@ function Sync
         Log "Creating new slave replica file list."
         rsync -rlptgodE --exclude "$OSYNC_DIR" --list-only $SLAVE_SYNC_DIR/ | grep "^-\|^d" | awk '{print $5}' | grep -v "^\.$" > /dev/shm/osync_slave-tree-before_$SCRIPT_PID &
 	child_pid=$!
-        WaitForTaskCompletition $child_pid $SOFT_MAX_EXEC_TIME 0
-	wait $child_pid
+        WaitForCompletion $child_pid $SOFT_MAX_EXEC_TIME 0
         retval=$?
         if [ $retval == 0 ] && [ -f /dev/shm/osync_slave-tree-before_$SCRIPT_PID ]
         then
