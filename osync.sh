@@ -5,9 +5,6 @@
 
 
 ## todo:
-# add dryrun, DOC: never run dry when already run real or you will lose your deleted file history
-# add logging
-# OK add resume on error, need max number of runs before stopping resume func
 # Need to check SIGHUP / SIGTERM should not be sent to rsync but to TrapStop
 # remote functionnality
 # multiple backups on conflicts
@@ -659,8 +656,7 @@ function slave_tree_new
         fi
 }
 
-###### Sync functions
-
+###### Sync function in 10 steps (functions above)
 function Sync
 {
         ## Lock master dir
@@ -668,13 +664,27 @@ function Sync
 
         Log "Starting synchronization task."
 
-	if [ -f $STATE_DIR/last-action ]
+	if [ -f $STATE_DIR/last-action ] && [ "$RESUME_SYNC" == "yes" ]
 	then
 		resume_sync=$(cat $STATE_DIR/last-action)
-		if [ "$resume_sync" != "sync.success" ]
+		if [ -f $STATE_DIR/resume-count ]
 		then
-			Log "WARNING: Trying to resume aborted osync execution on $(stat --format %y $STATE_DIR/last-action)  at task [$resume_sync]."
+			resume_count=$(cat $STATE_DIR/resume-count)
 		else
+			resume_count=0
+		fi
+
+		if [ $resume_count -lt $RESUME_TRY ]
+		then
+			if [ "$resume_sync" != "sync.success" ]
+			then
+				Log "WARNING: Trying to resume aborted osync execution on $(stat --format %y $STATE_DIR/last-action)  at task [$resume_sync]."
+				echo $(($resume_count+1)) > $STATE_DIR/resume-count
+			else
+				resume_sync=none
+			fi
+		else
+			LogError "Will not resume aborted osync execution. Too much resume tries [$resume_count]."
 			resume_sync=none
 		fi
 	else
@@ -700,27 +710,27 @@ function Sync
 		slave-replica-deleted-list.success|update-master-replica.fail|update-slave-replica.fail)
 	        if [ "$CONFLICT_PREVALANCE" != "master" ]
 	        then
-        	        sync_update_master
-                	if [ $? != 0 ]
-                	then
-                        	return 1
-                	fi
-                	sync_update_slave
-                	if [ $? != 0 ]
-                	then
-                        	return 1
-                	fi
+        	        case $resume_sync in
+				none)
+				;&
+				slave-replica-deleted-list.success|update-master-replica.fail)
+				sync_update_master
+				;&
+				update-master-replica.success|update-slave-replica.fail)
+				sync_update_master
+				;;
+			esac
         	else
-                	sync_update_slave
-                	if [ $? != 0 ]
-                	then
-                        	return 1
-                	fi
-                	sync_update_master
-                	if [ $? != 0 ]
-                	then
-                        	return 1
-                	fi
+                	case $resume_sync in
+				none)
+				;&
+				slave-replica-deleted-list.success|update-slave-replica.fail)
+				sync_update_slave
+				;&
+				update-slave-replica.success|update-master-replica.fail)
+	                	sync_update_master
+				;;
+			esac
         	fi
 		;&
 		update-slave-replica.success|update-master-replica.success|delete-propagation-slave.fail)
@@ -739,6 +749,7 @@ function Sync
 
 	Log "Finished synchronization task."
 	echo "sync.success" > $STATE_DIR/last-action
+	echo "0" > $STATE_DIR/resume-count
 }
 
 function SoftDelete
@@ -831,11 +842,16 @@ function Init
 	## Conflict options
 	if [ "$CONFLICT_BACKUP" != "no" ]
 	then
-		MASTER_CONFLICT="--backup --backup-dir=$MASTER_BACKUP_DIR"
-		SLAVE_CONFLICT="--backup --backup-dir=$SLAVE_BACKUP_DIR"
+		MASTER_BACKUP="--backup --backup-dir=$MASTER_BACKUP_DIR"
+		SLAVE_BACKUP="--backup --backup-dir=$SLAVE_BACKUP_DIR"
+       		if [ "$CONFLICT_BACKUP_MULTIPLE" == "yes" ]
+        	then
+                	MASTER_BACKUP="$MASTER_BACKUP --suffix .$(date +%Y.%m.%d-%H.%M.%S)"
+                	SLAVE_BACKUP="$SLAVE_BACKUP --suffix .$(date +%Y.%m.%d-%H.%M.%S)"
+        	fi
 	else
-		MASTER_CONFLICT=
-		SLAVE_CONFLICT=
+		MASTER_BACKUP=
+		SLAVE_BACKUP=
 	fi
 
 	## Soft delete options
