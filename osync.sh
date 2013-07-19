@@ -3,8 +3,8 @@
 ###### Osync - Rsync based two way sync engine.
 ###### (L) 2013 by Orsiris "Ozy" de Jong (www.netpower.fr) 
 
-OSYNC_VERSION=0.6
-OSYNC_BUILD=1907201302
+OSYNC_VERSION=0.7
+OSYNC_BUILD=2007201304
 
 DEBUG=no
 SCRIPT_PID=$$
@@ -60,6 +60,7 @@ function TrapStop
         if [ $soft_stop -eq 1 ]
         then
         	LogError " /!\ WARNING: CTRL+C hit twice. Quitting osync."
+		UnlockDirectories
 		CleanUp
 		exit 1
         fi
@@ -71,9 +72,11 @@ function TrapQuit
 	then
         	SendAlert
         	LogError "Osync finished with errros."
+		UnlockDirectories
         	exit 1
 	else
         	Log "Osync finished."
+		UnlockDirectories
         	exit 0
 	fi
 }
@@ -439,7 +442,7 @@ function CreateDirs
 	then
 		mkdir $STATE_DIR
 	fi
-	
+	if ! [ -d $SLAVE_SYNC_DIR/$OSYNC_DIR/state ]; then mkdir $SLAVE_SYNC_DIR/$OSYNC_DIR/state; fi
 }
 
 function CheckMasterSlaveDirs
@@ -473,14 +476,78 @@ function RsyncExcludePattern
         IFS=$OLD_IFS
 }
 
-function LockMaster
+function LockDirectories
 {
-	echo "Not implemented yet"
+	if [ -f $MASTER_SYNC_DIR/$OSYNC_DIR/state/lock ]
+	then
+		master_lock_pid=$(cat $MASTER_SYNC_DIR/$OSYNC_DIR/state/lock)
+		if [ ps -p$master_lock_pid ]
+		then
+			LogError "There is already an instance of osync that locks master. Cannot start. If your are sure this is an error, plaese kill instance $master_lock_pid of osync."
+			exit 1
+		else
+			Log "There is a dead osync lock on master. Instance $master_lock_pid no longer running. Resuming."
+		fi
+	elif [ -f $SLAVE_SYNC_DIR/$OSYNC_DIR/state/lock ]
+	then
+		slave_lock_pid=$(cat $SLAVE_SYNC_DIR/$OSYNC_DIR/state/lock)
+		if [ ps -p$slave_lock_pid ]
+		then
+			LogError "There is already an instance of osync that locks slave. Cannot start. If you are sure this is an error, please kill instance $slave_lock_pid of osync on master."
+			exit 1
+		else
+			if [ "$SLAVE_DEADLOCK_RESUME" != "no" ]
+			then
+				Log "There is a osync lock on slave without any osync process on this master. Killing lock."
+			else
+				LogError "There is a osync lock on slave without any osync process on this master. Cannot continue unless another master unlocks this slave or the slave is manually unlocked by removing lockfile."
+				exit
+			fi
+		fi
+	else
+		echo $SCRIPT_PID > $MASTER_SYNC_DIR/$OSYNC_DIR/state/lock
+		if [ $? == 0 ]
+		then
+			echo $SCRIPT_PID > $SLAVE_SYNC_DIR/$OSYNC_DIR/state/lock
+			if [ $? == 0 ]
+			then
+				Log "Locked master and slave replicas."
+			else
+				LogError "Couuld not get a lock on slave replica."
+				exit 1
+			fi
+		else
+			LogError "Could not get a lock on master replica."
+			exit 1
+		fi
+	fi
 }
 
-function LockSlave
+function UnlockDirectories
 {
-	echo "Not implemented yet"
+	if [ -f $SLAVE_SYNC_DIR/$OSYNC_DIR/state/lock ]
+	then
+		rm $SLAVE_SYNC_DIR/$OSYNC_DIR/state/lock
+		if [ $? == 0 ]
+		then
+			if [ -f $MASTER_SYNC_DIR/$OSYNC_DIR/state/lock ]
+			then
+				rm $MASTER_SYNC_DIR/$OSYNC_DIR/state/lock
+				if [ $? == 0 ]
+				then
+					Log "Unlocked master and slave replicas."
+				else
+					LogError "Could not unlock master replica."
+				fi
+			else
+				Log "No lock to remove on master replica."
+			fi
+		else
+			LogError "Could not unlock slave replica."
+		fi
+	else
+		Log "No lock on slave replica to remove"
+	fi
 }
 
 ###### Sync core functions
@@ -499,7 +566,7 @@ function master_tree_current
 	else
 		LogError "Cannot create master file list."
 		echo "master-replica-tree.fail" > $STATE_DIR/last-action
-		return 1
+		exit 1
 	fi
 }
 
@@ -517,7 +584,7 @@ function slave_tree_current
 	else
 		LogError "Cannot create slave file list."
 		echo "slave-replica-tree.fail" > $STATE_DIR/last-action
-		return 1
+		exit 1
 	fi
 }
 
@@ -554,20 +621,20 @@ function sync_update_slave
         child_pid=$!
         WaitForCompletion $child_pid $SOFT_MAX_EXEC_TIME $HARD_MAX_EXEC_TIME
         retval=$?
+	if [ "$VERBOSE_LOGS" == "yes" ]
+        then
+                Log "List:\n$(cat /dev/shm/osync_update_slave_replica_$SCRIPT_PID)"
+        fi
+
         if [ $retval != 0 ]
         then
                 LogError "Updating slave replica failed. Stopping execution."
                 echo "update-slave-replica.fail" > $STATE_DIR/last-action
+		exit 1
         else
                 Log "Updating slave replica succeded."
                 echo "update-slave-replica.success" > $STATE_DIR/last-action
         fi
-
-        if [ "$VERBOSE_LOGS" == "yes" ]
-        then
-                Log "List:\n$(cat /dev/shm/osync_update_slave_replica_$SCRIPT_PID)"
-        fi
-        return $retval
 }
 
 function sync_update_master
@@ -577,20 +644,20 @@ function sync_update_master
         child_pid=$!
         WaitForCompletion $child_pid $SOFT_MAX_EXEC_TIME $HARD_MAX_EXEC_TIME
         retval=$?
-        if [ $retval != 0 ]
-        then
-                LogError "Updating master replica failed. Stopping execution."
-                echo "update-master-replica.fail" > $STATE_DIR/last-action
-        else
-                Log "Updating master replica succeded."
-                echo "update-master-replica.success" > $STATE_DIR/last-action
-        fi
-
         if [ "$VERBOSE_LOGS" == "yes" ]
         then
                 Log "List:\n$(cat /dev/shm/osync_update_master_replica_$SCRIPT_PID)"
         fi
-        return $retval
+
+        if [ $retval != 0 ]
+        then
+                LogError "Updating master replica failed. Stopping execution."
+                echo "update-master-replica.fail" > $STATE_DIR/last-action
+		exit 1
+        else
+                Log "Updating master replica succeded."
+                echo "update-master-replica.success" > $STATE_DIR/last-action
+        fi
 }
 
 function delete_on_slave
@@ -600,17 +667,18 @@ function delete_on_slave
 	child_pid=$!
 	WaitForCompletion $child_pid $SOFT_MAX_EXEC_TIME 0
 	retval=$?
+        if [ "$VERBOSE_LOGS" == "yes" ]
+        then
+                Log "List:\n$(cat /dev/shm/osync_deletition_on_slave_$SCRIPT_PID)"
+        fi
+
 	if [ $retval != 0 ]
 	then
 		LogError "Deletition on slave failed."
 		echo "delete-propagation-slave.fail" > $STATE_DIR/last-action
-		return 1
+		exit 1
 	else
 		echo "delete-propagation-slave.success" > $STATE_DIR/last-action
-	fi
-	if [ "$VERBOSE_LOGS" == "yes" ]
-	then
-		Log "List:\n$(cat /dev/shm/osync_deletition_on_slave_$SCRIPT_PID)"
 	fi
 }
 
@@ -621,17 +689,18 @@ function delete_on_master
 	child_pid=$!
 	WaitForCompletion $child_pid $SOFT_MAX_EXEC_TIME 0
 	retval=$?
+        if [ "$VERBOSE_LOGS" == "yes" ]
+        then
+                Log "List:\n$(cat /dev/shm/osync_deletition_on_master_$SCRIPT_PID)"
+        fi
+
 	if [ $retval != 0 ]
 	then
 		LogError "Deletition on master failed."
 		echo "delete-propagation-master.fail" > $STATE_DIR/last-action
-		return 1
+		exit 1
 	else
 		echo "delete-propagation-master.success" > $STATE_DIR/last-action
-	fi
-	if [ "$VERBOSE_LOGS" == "yes" ]
-	then
-		Log "List:\n$(cat /dev/shm/osync_deletition_on_master_$SCRIPT_PID)"
 	fi
 }
 
@@ -649,7 +718,7 @@ function master_tree_new
         else
                 LogError "Cannot create slave file list."
 		echo "master-replica-tree-before.fail" > $STATE_DIR/last-action
-                return 1
+                exit 1
         fi
 }
 
@@ -667,7 +736,7 @@ function slave_tree_new
         else
                 LogError "Cannot create slave file list."
 		echo "slave-replica-tree-before.fail" > $STATE_DIR/last-action
-                return 1
+                exit 1
         fi
 }
 
@@ -699,7 +768,9 @@ function Sync
 				resume_sync=none
 			fi
 		else
-			LogError "Will not resume aborted osync execution. Too much resume tries [$resume_count]."
+			Log "Will not resume aborted osync execution. Too much resume tries [$resume_count]."
+			echo "noresume" > $STATE_DIR/last-action
+			echo "0" > $STATE_DIR/resume-count
 			resume_sync=none
 		fi
 	else
@@ -708,7 +779,7 @@ function Sync
 
 	## In this case statement, ;& means executing every command below regardless of conditions
 	case $resume_sync in
-		none)
+		none|noresume)
 		;&
 		master-replica-tree.fail)
 		master_tree_current
@@ -886,6 +957,7 @@ function Init
 function Main
 {
 	CreateDirs
+	LockDirectories
 	Sync
 }
 
