@@ -3,14 +3,8 @@
 ###### Osync - Rsync based two way sync engine.
 ###### (L) 2013 by Orsiris "Ozy" de Jong (www.netpower.fr) 
 
-
-## todo:
-# Need to check SIGHUP / SIGTERM should not be sent to rsync but to TrapStop
-# remote functionnality
-# multiple backups on conflicts
-
-OSYNC_VERSION=0.5
-OSYNC_BUILD=1807201302
+OSYNC_VERSION=0.6
+OSYNC_BUILD=1907201302
 
 DEBUG=no
 SCRIPT_PID=$$
@@ -117,6 +111,11 @@ function Spinner
         toggle="1"
         ;;
         esac
+}
+
+function EscapeSpaces
+{
+        echo $(echo $1 | sed 's/ /\\ /g')
 }
 
 function CleanUp
@@ -458,6 +457,22 @@ function CheckMasterSlaveDirs
 	fi
 }
 
+function RsyncExcludePattern
+{
+        OLD_IFS=$IFS
+        IFS=$PATH_SEPARATOR_CHAR
+        for excludedir in $RSYNC_EXCLUDE_PATTERN
+        do
+                if [ "$RSYNC_EXCLUDE" == "" ]
+                then
+                        RSYNC_EXCLUDE="--exclude=$(EscapeSpaces $excludedir)"
+                else
+                        RSYNC_EXCLUDE="$RSYNC_EXCLUDE --exclude=$(EscapeSpaces $excludedir)"
+                fi
+        done
+        IFS=$OLD_IFS
+}
+
 function LockMaster
 {
 	echo "Not implemented yet"
@@ -535,7 +550,7 @@ function slave_delete_list
 function sync_update_slave
 {
         Log "Updating slave replica."
-        rsync $DRY_OPTION -rlptgodEui $SLAVE_BACKUP --exclude "$OSYNC_DIR" --exclude-from "$STATE_DIR/master-deleted-list" --exclude-from "$STATE_DIR/slave-deleted-list" $MASTER_SYNC_DIR/ $SLAVE_SYNC_DIR/ > /dev/shm/osync_update_slave_replica_$SCRIPT_PID 2>&1 &
+        rsync $DRY_OPTION -rlptgodEui $SLAVE_BACKUP --exclude "$OSYNC_DIR" $RSYNC_EXCLUDE --exclude-from "$STATE_DIR/master-deleted-list" --exclude-from "$STATE_DIR/slave-deleted-list" $MASTER_SYNC_DIR/ $SLAVE_SYNC_DIR/ > /dev/shm/osync_update_slave_replica_$SCRIPT_PID 2>&1 &
         child_pid=$!
         WaitForCompletion $child_pid $SOFT_MAX_EXEC_TIME $HARD_MAX_EXEC_TIME
         retval=$?
@@ -558,7 +573,7 @@ function sync_update_slave
 function sync_update_master
 {
         Log "Updating master replica."
-        rsync $DRY_OPTION -rlptgodEui $MASTER_BACKUP --exclude "$OSYNC_DIR" --exclude-from "$STATE_DIR/slave-deleted-list" --exclude-from "$STATE_DIR/master-deleted-list" $SLAVE_SYNC_DIR/ $MASTER_SYNC_DIR/ > /dev/shm/osync_update_master_replica_$SCRIPT_PID 2>&1 &
+        rsync $DRY_OPTION -rlptgodEui $MASTER_BACKUP --exclude "$OSYNC_DIR" $RSYNC_EXCLUDE --exclude-from "$STATE_DIR/slave-deleted-list" --exclude-from "$STATE_DIR/master-deleted-list" $SLAVE_SYNC_DIR/ $MASTER_SYNC_DIR/ > /dev/shm/osync_update_master_replica_$SCRIPT_PID 2>&1 &
         child_pid=$!
         WaitForCompletion $child_pid $SOFT_MAX_EXEC_TIME $HARD_MAX_EXEC_TIME
         retval=$?
@@ -581,7 +596,7 @@ function sync_update_master
 function delete_on_slave
 {
 	Log "Propagating deletitions to slave replica."
-	rsync $DRY_OPTION -rlptgodEui $SLAVE_DELETE --delete --exclude "$OSYNC_DIR" --exclude-from "$STATE_DIR/slave-deleted-list" --include-from "$STATE_DIR/master-deleted-list" $MASTER_SYNC_DIR/ $SLAVE_SYNC_DIR/ > /dev/shm/osync_deletition_on_slave_$SCRIPT_PID 2>&1 &
+	rsync $DRY_OPTION -rlptgodEui $SLAVE_DELETE --delete --exclude "$OSYNC_DIR" $RSYNC_EXCLUDE --exclude-from "$STATE_DIR/slave-deleted-list" --include-from "$STATE_DIR/master-deleted-list" $MASTER_SYNC_DIR/ $SLAVE_SYNC_DIR/ > /dev/shm/osync_deletition_on_slave_$SCRIPT_PID 2>&1 &
 	child_pid=$!
 	WaitForCompletion $child_pid $SOFT_MAX_EXEC_TIME 0
 	retval=$?
@@ -602,7 +617,7 @@ function delete_on_slave
 function delete_on_master
 {	
 	Log "Propagating deletitions to master replica."
-	rsync $DRY_OPTION -rlptgodEui $MASTER_DELETE --delete --exclude "$OSYNC_DIR" --exclude-from "$STATE_DIR/master-deleted-list" --include-from "$STATE_DIR/slave-deleted-list" $SLAVE_SYNC_DIR/ $MASTER_SYNC_DIR/ > /dev/shm/osync_deletition_on_master_$SCRIPT_PID 2>&1 &
+	rsync $DRY_OPTION -rlptgodEui $MASTER_DELETE --delete --exclude "$OSYNC_DIR" $RSYNC_EXCLUDE --exclude-from "$STATE_DIR/master-deleted-list" --include-from "$STATE_DIR/slave-deleted-list" $SLAVE_SYNC_DIR/ $MASTER_SYNC_DIR/ > /dev/shm/osync_deletition_on_master_$SCRIPT_PID 2>&1 &
 	child_pid=$!
 	WaitForCompletion $child_pid $SOFT_MAX_EXEC_TIME 0
 	retval=$?
@@ -863,6 +878,9 @@ function Init
 		MASTER_DELETE=
 		SLAVE_DELETE=
 	fi
+
+	## Add Rsync exclude patterns
+	RsyncExcludePattern
 }
 
 function Main
