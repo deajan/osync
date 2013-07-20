@@ -1,6 +1,6 @@
 #!/bin/bash
 
-###### Osync - Rsync based two way sync engine.
+###### Osync - Rsync based two way sync engine with fault tolerance
 ###### (L) 2013 by Orsiris "Ozy" de Jong (www.netpower.fr) 
 
 OSYNC_VERSION=0.7
@@ -246,7 +246,9 @@ function WaitForTaskCompletion
 				fi
                                 return 1
                         fi
-                fi
+                wait $child_pid
+		return $?
+		fi
         done
 }
 
@@ -287,6 +289,8 @@ function WaitForCompletion
                                 fi
                                 return 1
                         fi
+		wait $child_pid
+		return $?
                 fi
 	done
 }
@@ -295,7 +299,7 @@ function WaitForCompletion
 function RunLocalCommand
 {
         CheckConnectivity3rdPartyHosts
-        $1 > /dev/shm/osync_run_local_$SCRIPT_PID &
+        $1 > /dev/shm/osync_run_local_$SCRIPT_PID 2>&1 &
         child_pid=$!
         WaitForTaskCompletion $child_pid 0 $2
         retval=$?
@@ -306,8 +310,10 @@ function RunLocalCommand
                 Log "Running command [$1] on local host failed."
         fi
 
-        Log "Command output:"
-        Log "$(cat /dev/shm/osync_run_local_$SCRIPT_PID)"
+	if [ $verbose -eq 1 ]
+	then
+        	Log "Command output:\n$(cat /dev/shm/osync_run_local_$SCRIPT_PID)"
+	fi
 }
 
 ## Runs remote command $1 and waits for completition in $2 seconds
@@ -322,7 +328,7 @@ function RunRemoteCommand
                         LogError "Connectivity test failed. Cannot run remote command."
                         return 1
                 else
-                        $(which ssh) $SSH_COMP -i $SSH_RSA_PRIVATE_KEY $REMOTE_USER@$REMOTE_HOST -p $REMOTE_PORT "$1" > /dev/shm/osync_run_remote_$SCRIPT_PID &
+                        $RUNNER "$1" > /dev/shm/osync_run_remote_$SCRIPT_PID 2>&1 &
                 fi
                 child_pid=$!
                 WaitForTaskCompletion $child_pid 0 $2
@@ -334,9 +340,9 @@ function RunRemoteCommand
                         LogError "Running command [$1] failed."
                 fi
 
-                if [ -f /dev/shm/osync_run_remote_$SCRIPT_PID ]
+                if [ -f /dev/shm/osync_run_remote_$SCRIPT_PID ] && [ $verbose -eq 1 ]
                 then
-                        Log "Command output: $(cat /dev/shm/osync_run_remote_$SCRIPT_PID)"
+                        Log "Command output:\n$(cat /dev/shm/osync_run_remote_$SCRIPT_PID)"
                 fi
         fi
 }
@@ -364,16 +370,6 @@ function RunAfterHook
         if [ "$REMOTE_RUN_AFTER_CMD" != "" ]
         then
                 RunRemoteCommand "$REMOTE_RUN_AFTER_CMD" $MAX_EXEC_TIME_PER_CMD_AFTER
-        fi
-}
-
-function SetCompressionOptions
-{
-        if [ "$SSH_COMPRESSION" == "yes" ]
-        then
-                SSH_COMP=-C
-        else
-                SSH_COMP=
         fi
 }
 
@@ -432,7 +428,7 @@ function CheckConnectivity3rdPartyHosts
 }
 
 
-function CreateDirs
+function CreateOsyncDirs
 {
 	if ! [ -d $MASTER_SYNC_DIR/$OSYNC_DIR ]
 	then
@@ -442,7 +438,14 @@ function CreateDirs
 	then
 		mkdir $STATE_DIR
 	fi
-	if ! [ -d $SLAVE_SYNC_DIR/$OSYNC_DIR/state ]; then mkdir $SLAVE_SYNC_DIR/$OSYNC_DIR/state; fi
+
+	if [ "$REMOTE_SYNC" == "yes" ]
+	then
+		$SSH_RUNNER "if ! [ -d $SLAVE_SYNC_DIR/$OSYNC_DIR/state ]; then mkdir $SLAVE_SYNC_DIR/$OSYNC_DIR/state; fi"
+	else
+		if ! [ -d $SLAVE_SYNC_DIR/$OSYNC_DIR/state ]; then mkdir $SLAVE_SYNC_DIR/$OSYNC_DIR/state; fi
+	fi
+		
 }
 
 function CheckMasterSlaveDirs
@@ -453,10 +456,20 @@ function CheckMasterSlaveDirs
 		return 1
 	fi
 
-	if ! [ -d $SLAVE_SYNC_DIR ]
+	if [ "$REMOTE_SYNC" == "yes" ]
 	then
-		LogError "Slave directory [$SLAVE_SYNC_DIR] does not exist."
-		return 1
+		$RUNNER "if ! [ -d $SLAVE_SYNC_DIR ]; then exit 1; fi"
+		if [ $? != 0 ]
+		then
+			LogError "Slave directory [$SLAVE_SYNC_DIR] does not exist."
+			return 1
+		fi
+	else
+		if ! [ -d $SLAVE_SYNC_DIR ]
+		then
+			LogError "Slave directory [$SLAVE_SYNC_DIR] does not exist."
+			return 1
+		fi
 	fi
 }
 
@@ -621,7 +634,7 @@ function sync_update_slave
         child_pid=$!
         WaitForCompletion $child_pid $SOFT_MAX_EXEC_TIME $HARD_MAX_EXEC_TIME
         retval=$?
-	if [ "$VERBOSE_LOGS" == "yes" ]
+	if [ $verbose -eq 1 ]
         then
                 Log "List:\n$(cat /dev/shm/osync_update_slave_replica_$SCRIPT_PID)"
         fi
@@ -644,7 +657,7 @@ function sync_update_master
         child_pid=$!
         WaitForCompletion $child_pid $SOFT_MAX_EXEC_TIME $HARD_MAX_EXEC_TIME
         retval=$?
-        if [ "$VERBOSE_LOGS" == "yes" ]
+        if [ $verbose -eq 1 ]
         then
                 Log "List:\n$(cat /dev/shm/osync_update_master_replica_$SCRIPT_PID)"
         fi
@@ -667,7 +680,7 @@ function delete_on_slave
 	child_pid=$!
 	WaitForCompletion $child_pid $SOFT_MAX_EXEC_TIME 0
 	retval=$?
-        if [ "$VERBOSE_LOGS" == "yes" ]
+        if [ $verbose -eq 1 ]
         then
                 Log "List:\n$(cat /dev/shm/osync_deletition_on_slave_$SCRIPT_PID)"
         fi
@@ -689,7 +702,7 @@ function delete_on_master
 	child_pid=$!
 	WaitForCompletion $child_pid $SOFT_MAX_EXEC_TIME 0
 	retval=$?
-        if [ "$VERBOSE_LOGS" == "yes" ]
+        if [ $verbose -eq 1 ]
         then
                 Log "List:\n$(cat /dev/shm/osync_deletition_on_master_$SCRIPT_PID)"
         fi
@@ -903,14 +916,14 @@ function Init
 		SSH_COMP=
 	fi
 
-	## Runner definition
+	## Define which runner (local bash or distant ssh) to use for standard commands and rsync commands
 	if [ "$REMOTE_SYNC" == "yes" ]
 	then
 		RUNNER="$(which ssh) $SSH_COMP -i $SSH_RSA_PRIVATE_KEY $REMOTE_USER@$REMOTE_HOST -p $REMOTE_PORT"
 		RSYNC_RUNNER="$(which ssh) $SSH_COMP -i $SSH_RSA_PRIVATE_KEY -p $REMOTE_PORT"
 	else
-		RUNNER=
-		RSYNC_RUNNER=
+		RUNNER=""
+		RSYNC_RUNNER=""
 	fi
 
 	## Dryrun option
@@ -921,9 +934,6 @@ function Init
 	else
 		DRY_OPTION=
 	fi
-
-	## Rsync options
-	RSYNC_OPTS=rlptgodEui
 
 	## Conflict options
 	if [ "$CONFLICT_BACKUP" != "no" ]
@@ -956,7 +966,8 @@ function Init
 
 function Main
 {
-	CreateDirs
+	CreateOsyncDirs
+	exit
 	LockDirectories
 	Sync
 }
@@ -975,6 +986,7 @@ function Usage
 # Comand line argument flags
 dryrun=0
 silent=0
+verbose=0
 # Alert flags
 soft_alert_total=0
 error_alert=0
@@ -995,7 +1007,10 @@ do
 		--silent)
 		silent=1
 		;;
-		--help|-h)
+		--verbose)
+		verbose=1
+		;;
+		--help|-h|--version|-v)
 		Usage
 		;;
 	esac
