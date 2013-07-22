@@ -1,7 +1,17 @@
-! Tag as v1.0RC1
-! verify spaces in sync dirs
-! Support for ACL and Xattr
+TODO LIST
+---------
 
+! Tag as v1.0 beta
+! verify spaces in sync dir names
+! sudo support for rsync and generic cmds
+! add osync support in ssh_filter.sh
+! minimum space checks
+! different rsync executable
+
+RECENT CHANGES
+--------------
+
+- Added support for ACL and xattr
 - Added --force-unlock parameter to bypass any existing locks on replicas
 - Added full remote support for slave replica
 - Improved error detection
