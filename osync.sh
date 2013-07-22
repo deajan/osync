@@ -3,10 +3,10 @@
 ###### Osync - Rsync based two way sync engine with fault tolerance
 ###### (L) 2013 by Orsiris "Ozy" de Jong (www.netpower.fr) 
 
-OSYNC_VERSION=0.8
-OSYNC_BUILD=2207201301
+OSYNC_VERSION=0.9
+OSYNC_BUILD=2207201303
 
-DEBUG=no
+DEBUG=yes
 SCRIPT_PID=$$
 
 LOCAL_USER=$(whoami)
@@ -44,14 +44,14 @@ function LogDebug
 	fi
 }
 
-function TrapError
-{
+function TrapError {
         local JOB="$0"
         local LINE="$1"
         local CODE="${2:-1}"
+	local CMD="$3"
         if [ $silent -eq 0 ]
         then
-                echo " /!\ Error in ${JOB}: Near line ${LINE}, exit code ${CODE}"
+                echo -e " /!\ Error in ${JOB}: Near line ${LINE}, exit code ${CODE}\nCommand $CMD"
         fi
 }
 
@@ -67,21 +67,36 @@ function TrapStop
 
         if [ $soft_stop -eq 1 ]
         then
-        	LogError " /!\ WARNING: CTRL+C hit twice. Quitting osync."
-		TrapQuit
+        	LogError " /!\ WARNING: CTRL+C hit twice. Quitting osync. Please wait..."
+		soft_stop=2
+		exit 1
         fi
+
+	if [ $soft_stop -eq 2 ]
+	then
+		LogError " /!\ WARNING: CTRL+C hit three times. Quitting osync right now without any trap execution."
+		soft_stop=3
+		exit
+	fi
 }
 
 function TrapQuit
 {
+	if [ $soft_stop -eq 3 ]
+	then
+		exit 1
+	fi
+
 	if [ $error_alert -ne 0 ]
 	then
         	SendAlert
 		UnlockDirectories
+		CleanUp
         	LogError "Osync finished with errros."
         	exit 1
 	else
 		UnlockDirectories
+		CleanUp
         	Log "Osync finished."
         	exit 0
 	fi
@@ -143,6 +158,7 @@ function CleanUp
 		rm -f /dev/shm/osync_deletition_on_master_$SCRIPT_PID
 		rm -f /dev/shm/osync_deletition_on_slave_$SCRIPT_PID
 		rm -f /dev/shm/osync_remote_slave_lock_$SCRIPT_PID
+		rm -f /dev/shm/osync_slave_space_$SCRIPT_PIDx
 	fi
 }
 
@@ -418,9 +434,9 @@ function CheckConnectivity3rdPartyHosts
 
 function CreateOsyncDirs
 {
-	if ! [ -d $MASTER_STATE_DIR ]
+	if ! [ -d "$MASTER_STATE_DIR" ]
 	then
-		mkdir --parents $MASTER_STATE_DIR
+		mkdir --parents "$MASTER_STATE_DIR"
 		if [ $? != 0 ]
 		then
 			LogError "Cannot create master replica state dir [$MASTER_STATE_DIR]."
@@ -430,10 +446,10 @@ function CreateOsyncDirs
 
 	if [ "$REMOTE_SYNC" == "yes" ]
 	then
-		eval "$SSH_CMD \"if ! [ -d $SLAVE_STATE_DIR ]; then mkdir --parents $SLAVE_STATE_DIR; fi\"" &
+		eval "$SSH_CMD \"if ! [ -d $SLAVE_STATE_DIR ]; then $COMMAND_SUDO mkdir --parents $SLAVE_STATE_DIR; fi\"" &
 		WaitForTaskCompletion $! 0 1800
 	else
-		if ! [ -d $SLAVE_STATE_DIR ]; then mkdir --parents $SLAVE_STATE_DIR; fi
+		if ! [ -d "$SLAVE_STATE_DIR" ]; then mkdir --parents "$SLAVE_STATE_DIR"; fi
 	fi
 
 	if [ $? != 0 ]
@@ -445,11 +461,11 @@ function CreateOsyncDirs
 
 function CheckMasterSlaveDirs
 {
-	if ! [ -d $MASTER_SYNC_DIR ]
+	if ! [ -d "$MASTER_SYNC_DIR" ]
 	then
 		if [ "$CREATE_DIRS" == "yes" ]
 		then
-			mkdir --parents $MASTER_SYNC_DIR
+			mkdir --parents "$MASTER_SYNC_DIR"
 			if [ $? != 0 ]
 			then
 				LogError "Cannot create master directory [$MASTER_SYNC_DIR]."
@@ -467,7 +483,7 @@ function CheckMasterSlaveDirs
 	then
 		if [ "$CREATE_DIRS" == "yes" ]
 		then
-			eval "$SSH_CMD \"if ! [ -d $SLAVE_SYNC_DIR ]; then mkdir --parents $SLAVE_SYNC_DIR; fi"\" &
+			eval "$SSH_CMD \"if ! [ -d $SLAVE_SYNC_DIR ]; then $COMMAND_SUDO mkdir --parents $SLAVE_SYNC_DIR; fi"\" &
 			WaitForTaskCompletion $! 0 1800
 			if [ $? != 0 ]
 			then
@@ -484,11 +500,11 @@ function CheckMasterSlaveDirs
 			fi
 		fi
 	else
-		if [ ! -d $SLAVE_SYNC_DIR ]
+		if [ ! -d "$SLAVE_SYNC_DIR" ]
 		then
 			if [ "$CREATE_DIRS" == "yes" ]
 			then
-				mkdir --parents $SLAVE_SYNC_DIR
+				mkdir --parents "$SLAVE_SYNC_DIR"
 				if [ $? != 0 ]
 				then
 					LogError "Cannot create slave directory [$SLAVE_SYNC_DIR]."
@@ -501,6 +517,31 @@ function CheckMasterSlaveDirs
 				exit 1
 			fi
 		fi
+	fi
+}
+
+function CheckMinimumSpace
+{
+	Log "Checking minimum disk space on master and slave."
+
+	MASTER_SPACE=$(df -P "$MASTER_SYNC_DIR" | tail -1 | awk '{print $4}')
+        if [ $MASTER_SPACE -lt $MINIMUM_SPACE ]
+        then
+                LogError "There is not enough free space on master [$MASTER_SPACE KB]."
+        fi
+	
+	if [ "$REMOTE_SYNC" == "yes" ]
+	then
+		eval "$SSH_CMD \"$COMMAND_SUDO df -P $SLAVE_SYNC_DIR\"" > /dev/shm/osync_slave_space_$SCRIPT_PID &
+		WaitForTaskCompletion $! 0 1800
+		SLAVE_SPACE=$(cat /dev/shm/osync_slave_space_$SCRIPT_PID | tail -1 | awk '{print $4}')
+	else
+		SLAVE_SPACE=$(df -P "$SLAVE_SYNC_DIR" | tail -1 | awk '{print $4}')
+	fi
+	
+	if [ $SLAVE_SPACE -lt $MINIMUM_SPACE ]
+	then
+		LogError "There is not enough free space on slave [$SLAVE_SPACE KB]."
 	fi
 }
 
@@ -522,7 +563,7 @@ function RsyncExcludePattern
 
 function WriteLockFiles
 {
-        echo $SCRIPT_PID > $MASTER_STATE_DIR/lock
+        echo $SCRIPT_PID > "$MASTER_STATE_DIR/lock"
         if [ $? != 0 ]
         then
                 LogError "Could not set lock on master replica."
@@ -533,7 +574,7 @@ function WriteLockFiles
 
         if [ "$REMOTE_SYNC" == "yes" ]
         then
-                eval "$SSH_CMD \"echo $SCRIPT_PID@$SYNC_ID > $SLAVE_STATE_DIR/lock\"" &
+                eval "$SSH_CMD \"$COMMAND_SUDO echo $SCRIPT_PID@$SYNC_ID > $SLAVE_STATE_DIR/lock\"" &
                 WaitForTaskCompletion $! 0 1800
                 if [ $? != 0 ]
                 then
@@ -543,7 +584,7 @@ function WriteLockFiles
                         Log "Locked remote slave replica."
                 fi
         else
-                echo "$SCRIPT_PID@$SYNC_ID" > $SLAVE_STATE_DIR/lock
+                echo "$SCRIPT_PID@$SYNC_ID" > "$SLAVE_STATE_DIR/lock"
                 if [ $? != 0 ]
                 then
                         LogError "Couuld not set lock on local slave replica."
@@ -567,7 +608,7 @@ function LockDirectories
 
 	Log "Checking for replica locks."
 
-	if [ -f $MASTER_STATE_DIR/lock ]
+	if [ -f "$MASTER_STATE_DIR/lock" ]
 	then
 		master_lock_pid=$(cat $MASTER_STATE_DIR/lock)
 		LogDebug "Master lock pid: $master_lock_pid"
@@ -588,10 +629,10 @@ function LockDirectories
 		slave_lock_pid=$(cat /dev/shm/osync_remote_slave_lock_$SCRIPT_PID | cut -d'@' -f1)
 		slave_lock_id=$(cat /dev/shm/osync_remote_slave_lock_$SCRIPT_PID | cut -d'@' -f2)
 	else
-		if [ -f $SLAVE_STATE_DIR/lock ]
+		if [ -f "$SLAVE_STATE_DIR/lock" ]
 		then
-			slave_lock_pid=$(cat $SLAVE_STATE_DIR/lock | cut -d'@' -f1)
-			slave_lock_id=$(cat $SLAVE_STATE_DIR/lock | cut -d'@' -f2)
+			slave_lock_pid=$(cat "$SLAVE_STATE_DIR/lock" | cut -d'@' -f1)
+			slave_lock_id=$(cat "$SLAVE_STATE_DIR/lock" | cut -d'@' -f2)
 		fi
 	fi
 
@@ -628,10 +669,10 @@ function UnlockDirectories
 {
 	if [ "$REMOTE_SYNC" == "yes" ]
 	then
-		eval "$SSH_CMD \"if [ -f $SLAVE_STATE_DIR/lock ]; then rm $SLAVE_STATE_DIR/lock; fi\"" &
+		eval "$SSH_CMD \"if [ -f $SLAVE_STATE_DIR/lock ]; then $COMMAND_SUDO rm $SLAVE_STATE_DIR/lock; fi\"" &
 		WaitForTaskCompletion $! 0 1800
 	else
-		if [ -f $SLAVE_STATE_DIR/lock ];then rm $SLAVE_STATE_DIR/lock; fi
+		if [ -f "$SLAVE_STATE_DIR/lock" ];then rm "$SLAVE_STATE_DIR/lock"; fi
 	fi
 
 	if [ $? != 0 ]
@@ -641,9 +682,9 @@ function UnlockDirectories
 		Log "Removed slave replica lock."
 	fi
 
-	if [ -f $MASTER_STATE_DIR/lock ]
+	if [ -f "$MASTER_STATE_DIR/lock" ]
 	then
-		rm $MASTER_STATE_DIR/lock
+		rm "$MASTER_STATE_DIR/lock"
 		if [ $? != 0 ]
 		then
 			LogError "Could not unlock master replica."
@@ -658,17 +699,16 @@ function UnlockDirectories
 function master_tree_current
 {
 	Log "Creating master replica file list."
-	rsync_cmd="$(which $RSYNC_EXECUTABLE) --rsync-path=\"$RSYNC_PATH\" -rlptgodE --exclude \"$OSYNC_DIR\" --list-only \"$MASTER_SYNC_DIR/\" | grep \"^-\|^d\" | awk '{print $5}' | (grep -v \"^\.$\" || :) > /dev/shm/osync_master-tree-current_$SCRIPT_PID &"
-	eval $rsync_cmd
+	$(which $RSYNC_EXECUTABLE) --rsync-path="$RSYNC_PATH" -rlptgodE --exclude "$OSYNC_DIR" --list-only "$MASTER_SYNC_DIR/" | grep "^-\|^d" | awk '{print $5}' | (grep -v "^\.$" || :) > /dev/shm/osync_master-tree-current_$SCRIPT_PID &
 	child_pid=$!
 	WaitForCompletion $child_pid $SOFT_MAX_EXEC_TIME $HARD_MAX_EXEC_TIME
 	if [ $? == 0 ] && [ -f /dev/shm/osync_master-tree-current_$SCRIPT_PID ]
 	then
-		mv /dev/shm/osync_master-tree-current_$SCRIPT_PID $MASTER_STATE_DIR/master-tree-current
-		echo "master-replica-tree.success" > $MASTER_STATE_DIR/last-action
+		mv /dev/shm/osync_master-tree-current_$SCRIPT_PID "$MASTER_STATE_DIR/master-tree-current"
+		echo "master-replica-tree.success" > "$MASTER_STATE_DIR/last-action"
 	else
 		LogError "Cannot create master file list."
-		echo "master-replica-tree.fail" > $MASTER_STATE_DIR/last-action
+		echo "master-replica-tree.fail" > "$MASTER_STATE_DIR/last-action"
 		exit 1
 	fi
 }
@@ -678,20 +718,20 @@ function slave_tree_current
 	Log "Creating slave replica file list."
 	if [ "$REMOTE_SYNC" == "yes" ]
 	then
-		$(which $RSYNC_EXECUTABLE) -rlptgodE --exclude "$OSYNC_DIR" -e "$RSYNC_SSH_CMD" --list-only $REMOTE_USER@$REMOTE_HOST:$SLAVE_SYNC_DIR/ | grep "^-\|^d" | awk '{print $5}' | (grep -v "^\.$" || :) > /dev/shm/osync_slave-tree-current_$SCRIPT_PID &
+		$(which $RSYNC_EXECUTABLE) --rsync-path="$RSYNC_PATH" -rlptgodE --exclude "$OSYNC_DIR" -e "$RSYNC_SSH_CMD" --list-only "$REMOTE_USER@$REMOTE_HOST:$SLAVE_SYNC_DIR/" | grep "^-\|^d" | awk '{print $5}' | (grep -v "^\.$" || :) > /dev/shm/osync_slave-tree-current_$SCRIPT_PID &
 	else
-		$(which $RSYNC_EXECUTABLe) -rlptgodE --exclude "$OSYNC_DIR" --list-only $SLAVE_SYNC_DIR/ | grep "^-\|^d" | awk '{print $5}' | (grep -v "^\.$" || :) > /dev/shm/osync_slave-tree-current_$SCRIPT_PID &
+		$(which $RSYNC_EXECUTABLE) --rsync-path="$RSYNC_PATH" -rlptgodE --exclude "$OSYNC_DIR" --list-only "$SLAVE_SYNC_DIR/" | grep "^-\|^d" | awk '{print $5}' | (grep -v "^\.$" || :) > /dev/shm/osync_slave-tree-current_$SCRIPT_PID &
 	fi
 	child_pid=$!
 	WaitForCompletion $child_pid $SOFT_MAX_EXEC_TIME $HARD_MAX_EXEC_TIME
 	retval=$?
 	if [ $retval == 0 ] && [ -f /dev/shm/osync_slave-tree-current_$SCRIPT_PID ]
 	then
-		mv /dev/shm/osync_slave-tree-current_$SCRIPT_PID $MASTER_STATE_DIR/slave-tree-current
-		echo "slave-replica-tree.-success" > $MASTER_STATE_DIR/last-action
+		mv /dev/shm/osync_slave-tree-current_$SCRIPT_PID "$MASTER_STATE_DIR/slave-tree-current"
+		echo "slave-replica-tree.-success" > "$MASTER_STATE_DIR/last-action"
 	else
 		LogError "Cannot create slave file list."
-		echo "slave-replica-tree.fail" > $MASTER_STATE_DIR/last-action
+		echo "slave-replica-tree.fail" > "$MASTER_STATE_DIR/last-action"
 		exit 1
 	fi
 }
@@ -699,26 +739,26 @@ function slave_tree_current
 function master_delete_list
 {
 	Log "Creating master replica deleted file list."
-	if [ -f $MASTER_STATE_DIR/master-tree-after ]
+	if [ -f "$MASTER_STATE_DIR/master-tree-after" ]
 	then
-		comm --nocheck-order -23 $MASTER_STATE_DIR/master-tree-after $MASTER_STATE_DIR/master-tree-current > $MASTER_STATE_DIR/master-deleted-list
-		echo "master-replica-deleted-list.success" > $MASTER_STATE_DIR/last-action
+		comm --nocheck-order -23 "$MASTER_STATE_DIR/master-tree-after" "$MASTER_STATE_DIR/master-tree-current" > "$MASTER_STATE_DIR/master-deleted-list"
+		echo "master-replica-deleted-list.success" > "$MASTER_STATE_DIR/last-action"
 	else
-		touch $MASTER_STATE_DIR/master-deleted-list
-		echo "master-replica-deleted-list.empty" > $MASTER_STATE_DIR/last-action
+		touch "$MASTER_STATE_DIR/master-deleted-list"
+		echo "master-replica-deleted-list.empty" > "$MASTER_STATE_DIR/last-action"
 	fi
 }
 
 function slave_delete_list
 {
 	Log "Creating slave replica deleted file list."
-	if [ -f $MASTER_STATE_DIR/slave-tree-after ]
+	if [ -f "$MASTER_STATE_DIR/slave-tree-after" ]
 	then
-		comm --nocheck-order -23 $MASTER_STATE_DIR/slave-tree-after $MASTER_STATE_DIR/slave-tree-current > $MASTER_STATE_DIR/slave-deleted-list
-		echo "slave-replica-deleted-list.success" > $MASTER_STATE_DIR/last-action
+		comm --nocheck-order -23 "$MASTER_STATE_DIR/slave-tree-after" "$MASTER_STATE_DIR/slave-tree-current" > "$MASTER_STATE_DIR/slave-deleted-list"
+		echo "slave-replica-deleted-list.success" > "$MASTER_STATE_DIR/last-action"
 	else
-		touch $MASTER_STATE_DIR/slave-deleted-list
-		echo "slave-replica-deleted-list.empty" > $MASTER_STATE_DIR/last-action
+		touch "$MASTER_STATE_DIR/slave-deleted-list"
+		echo "slave-replica-deleted-list.empty" > "$MASTER_STATE_DIR/last-action"
 	fi
 }
 
@@ -727,9 +767,9 @@ function sync_update_slave
         Log "Updating slave replica."
 	if [ "$REMOTE_SYNC" == "yes" ]
 	then
-        	rsync $RSYNC_ARGS -rlptgodEui -e "$RSYNC_SSH_CMD" $SLAVE_BACKUP --exclude "$OSYNC_DIR" $RSYNC_EXCLUDE --exclude-from "$MASTER_STATE_DIR/master-deleted-list" --exclude-from "$MASTER_STATE_DIR/slave-deleted-list" $MASTER_SYNC_DIR/ $REMOTE_USER@$REMOTE_HOST:$SLAVE_SYNC_DIR/ > /dev/shm/osync_update_slave_replica_$SCRIPT_PID 2>&1 &
+        	$(which $RSYNC_EXECUTABLE) --rsync-path="$RSYNC_PATH" $RSYNC_ARGS -rlptgodEui -e "$RSYNC_SSH_CMD" $SLAVE_BACKUP --exclude "$OSYNC_DIR" $RSYNC_EXCLUDE --exclude-from "$MASTER_STATE_DIR/master-deleted-list" --exclude-from "$MASTER_STATE_DIR/slave-deleted-list" "$MASTER_SYNC_DIR/" "$REMOTE_USER@$REMOTE_HOST:$SLAVE_SYNC_DIR/" > /dev/shm/osync_update_slave_replica_$SCRIPT_PID 2>&1 &
 	else
-        	rsync $RSYNC_ARGS -rlptgodEui $SLAVE_BACKUP --exclude "$OSYNC_DIR" $RSYNC_EXCLUDE --exclude-from "$MASTER_STATE_DIR/master-deleted-list" --exclude-from "$MASTER_STATE_DIR/slave-deleted-list" $MASTER_SYNC_DIR/ $SLAVE_SYNC_DIR/ > /dev/shm/osync_update_slave_replica_$SCRIPT_PID 2>&1 &
+        	$(which $RSYNC_EXECUTABLE) --rsync-path="$RSYNC_PATH" -rlptgodEui $SLAVE_BACKUP --exclude "$OSYNC_DIR" $RSYNC_EXCLUDE --exclude-from "$MASTER_STATE_DIR/master-deleted-list" --exclude-from "$MASTER_STATE_DIR/slave-deleted-list" "$MASTER_SYNC_DIR/" "$SLAVE_SYNC_DIR/" > /dev/shm/osync_update_slave_replica_$SCRIPT_PID 2>&1 &
 	fi
         child_pid=$!
         WaitForCompletion $child_pid $SOFT_MAX_EXEC_TIME $HARD_MAX_EXEC_TIME
@@ -742,11 +782,11 @@ function sync_update_slave
         if [ $retval != 0 ]
         then
                 LogError "Updating slave replica failed. Stopping execution."
-                echo "update-slave-replica.fail" > $MASTER_STATE_DIR/last-action
+                echo "update-slave-replica.fail" > "$MASTER_STATE_DIR/last-action"
 		exit 1
         else
                 Log "Updating slave replica succeded."
-                echo "update-slave-replica.success" > $MASTER_STATE_DIR/last-action
+                echo "update-slave-replica.success" > "$MASTER_STATE_DIR/last-action"
         fi
 }
 
@@ -755,9 +795,9 @@ function sync_update_master
         Log "Updating master replica."
 	if [ "$REMOTE_SYNC" == "yes" ]
 	then
-        	rsync $RSYNC_ARGS -rlptgodEui -e "$RSYNC_SSH_CMD" $MASTER_BACKUP --exclude "$OSYNC_DIR" $RSYNC_EXCLUDE --exclude-from "$MASTER_STATE_DIR/slave-deleted-list" --exclude-from "$MASTER_STATE_DIR/master-deleted-list" $REMOTE_USER@$REMOTE_HOST:$SLAVE_SYNC_DIR/ $MASTER_SYNC_DIR/ > /dev/shm/osync_update_master_replica_$SCRIPT_PID 2>&1 &
+        	$(which $RSYNC_EXECUTABLE) --rsync-path="$RSYNC_PATH" $RSYNC_ARGS -rlptgodEui -e "$RSYNC_SSH_CMD" $MASTER_BACKUP --exclude "$OSYNC_DIR" $RSYNC_EXCLUDE --exclude-from "$MASTER_STATE_DIR/slave-deleted-list" --exclude-from "$MASTER_STATE_DIR/master-deleted-list" "$REMOTE_USER@$REMOTE_HOST:$SLAVE_SYNC_DIR/" "$MASTER_SYNC_DIR/" > /dev/shm/osync_update_master_replica_$SCRIPT_PID 2>&1 &
 	else
-	        rsync $RSYNC_ARGS -rlptgodEui $MASTER_BACKUP --exclude "$OSYNC_DIR" $RSYNC_EXCLUDE --exclude-from "$MASTER_STATE_DIR/slave-deleted-list" --exclude-from "$MASTER_STATE_DIR/master-deleted-list" $REMOTE_USER@$REMOTE_HOST:$SLAVE_SYNC_DIR/ $MASTER_SYNC_DIR/ > /dev/shm/osync_update_master_replica_$SCRIPT_PID 2>&1 &
+	        $(which $RSYNC_EXECUTABLE) --rsync-path="$RSYNC_PATH" $RSYNC_ARGS -rlptgodEui $MASTER_BACKUP --exclude "$OSYNC_DIR" $RSYNC_EXCLUDE --exclude-from "$MASTER_STATE_DIR/slave-deleted-list" --exclude-from "$MASTER_STATE_DIR/master-deleted-list" "$SLAVE_SYNC_DIR/" "$MASTER_SYNC_DIR/" > /dev/shm/osync_update_master_replica_$SCRIPT_PID 2>&1 &
 	fi
         child_pid=$!
         WaitForCompletion $child_pid $SOFT_MAX_EXEC_TIME $HARD_MAX_EXEC_TIME
@@ -770,11 +810,11 @@ function sync_update_master
         if [ $retval != 0 ]
         then
                 LogError "Updating master replica failed. Stopping execution."
-                echo "update-master-replica.fail" > $MASTER_STATE_DIR/last-action
+                echo "update-master-replica.fail" > "$MASTER_STATE_DIR/last-action"
 		exit 1
         else
                 Log "Updating master replica succeded."
-                echo "update-master-replica.success" > $MASTER_STATE_DIR/last-action
+                echo "update-master-replica.success" > "$MASTER_STATE_DIR/last-action"
         fi
 }
 
@@ -783,9 +823,9 @@ function delete_on_slave
 	Log "Propagating deletitions to slave replica."
 	if [ "$REMOTE_SYNC" == "yes" ]
 	then
-		rsync $RSYNC_ARGS -rlptgodEui -e "$RSYNC_SSH_CMD" $SLAVE_DELETE --delete --exclude "$OSYNC_DIR" $RSYNC_EXCLUDE --exclude-from "$MASTER_STATE_DIR/slave-deleted-list" --include-from "$MASTER_STATE_DIR/master-deleted-list" $MASTER_SYNC_DIR/ $REMOTE_USER@$REMOTE_HOST:$SLAVE_SYNC_DIR/ > /dev/shm/osync_deletition_on_slave_$SCRIPT_PID 2>&1 &
+		$(which $RSYNC_EXECUTABLE) --rsync-path="$RSYNC_PATH" $RSYNC_ARGS -rlptgodEui -e "$RSYNC_SSH_CMD" $SLAVE_DELETE --delete --exclude "$OSYNC_DIR" $RSYNC_EXCLUDE --exclude-from "$MASTER_STATE_DIR/slave-deleted-list" --include-from "$MASTER_STATE_DIR/master-deleted-list" "$MASTER_SYNC_DIR/" "$REMOTE_USER@$REMOTE_HOST:$SLAVE_SYNC_DIR/" > /dev/shm/osync_deletition_on_slave_$SCRIPT_PID 2>&1 &
 	else
-		rsync $RSYNC_ARGS -rlptgodEui $SLAVE_DELETE --delete --exclude "$OSYNC_DIR" $RSYNC_EXCLUDE --exclude-from "$MASTER_STATE_DIR/slave-deleted-list" --include-from "$MASTER_STATE_DIR/master-deleted-list" $MASTER_SYNC_DIR/ $SLAVE_SYNC_DIR/ > /dev/shm/osync_deletition_on_slave_$SCRIPT_PID 2>&1 &
+		$(which $RSYNC_EXECUTABLE) --rsync-path="$RSYNC_PATH" $RSYNC_ARGS -rlptgodEui $SLAVE_DELETE --delete --exclude "$OSYNC_DIR" $RSYNC_EXCLUDE --exclude-from "$MASTER_STATE_DIR/slave-deleted-list" --include-from "$MASTER_STATE_DIR/master-deleted-list" "$MASTER_SYNC_DIR/" "$SLAVE_SYNC_DIR/" > /dev/shm/osync_deletition_on_slave_$SCRIPT_PID 2>&1 &
 	fi
 	child_pid=$!
 	WaitForCompletion $child_pid $SOFT_MAX_EXEC_TIME 0
@@ -798,10 +838,10 @@ function delete_on_slave
 	if [ $retval != 0 ]
 	then
 		LogError "Deletition on slave failed."
-		echo "delete-propagation-slave.fail" > $MASTER_STATE_DIR/last-action
+		echo "delete-propagation-slave.fail" > "$MASTER_STATE_DIR/last-action"
 		exit 1
 	else
-		echo "delete-propagation-slave.success" > $MASTER_STATE_DIR/last-action
+		echo "delete-propagation-slave.success" > "$MASTER_STATE_DIR/last-action"
 	fi
 }
 
@@ -810,9 +850,9 @@ function delete_on_master
 	Log "Propagating deletitions to master replica."
 	if [ "$REMOTE_SYNC" == "yes" ]
 	then
-		rsync $RSYNC_ARGS -rlptgodEui -e "$RSYNC_SSH_CMD" $MASTER_DELETE --delete --exclude "$OSYNC_DIR" $RSYNC_EXCLUDE --exclude-from "$MASTER_STATE_DIR/master-deleted-list" --include-from "$MASTER_STATE_DIR/slave-deleted-list" $REMOTE_USER@$REMOTE_HOST:$SLAVE_SYNC_DIR/ $MASTER_SYNC_DIR/ > /dev/shm/osync_deletition_on_master_$SCRIPT_PID 2>&1 &
+		$(which $RSYNC_EXECUTABLE) --rsync-path="$RSYNC_PATH" $RSYNC_ARGS -rlptgodEui -e "$RSYNC_SSH_CMD" $MASTER_DELETE --delete --exclude "$OSYNC_DIR" $RSYNC_EXCLUDE --exclude-from "$MASTER_STATE_DIR/master-deleted-list" --include-from "$MASTER_STATE_DIR/slave-deleted-list" "$REMOTE_USER@$REMOTE_HOST:$SLAVE_SYNC_DIR/" "$MASTER_SYNC_DIR/" > /dev/shm/osync_deletition_on_master_$SCRIPT_PID 2>&1 &
 	else
-		rsync $RSYNC_ARGS -rlptgodEui $MASTER_DELETE --delete --exclude "$OSYNC_DIR" $RSYNC_EXCLUDE --exclude-from "$MASTER_STATE_DIR/master-deleted-list" --include-from "$MASTER_STATE_DIR/slave-deleted-list" $SLAVE_SYNC_DIR/ $MASTER_SYNC_DIR/ > /dev/shm/osync_deletition_on_master_$SCRIPT_PID 2>&1 &
+		$(which $RSYNC_EXECUTABLE) --rsync-path="$RSYNC_PATH" $RSYNC_ARGS -rlptgodEui $MASTER_DELETE --delete --exclude "$OSYNC_DIR" $RSYNC_EXCLUDE --exclude-from "$MASTER_STATE_DIR/master-deleted-list" --include-from "$MASTER_STATE_DIR/slave-deleted-list" "$SLAVE_SYNC_DIR/" "$MASTER_SYNC_DIR/" > /dev/shm/osync_deletition_on_master_$SCRIPT_PID 2>&1 &
 	fi
 	child_pid=$!
 	WaitForCompletion $child_pid $SOFT_MAX_EXEC_TIME 0
@@ -825,27 +865,27 @@ function delete_on_master
 	if [ $retval != 0 ]
 	then
 		LogError "Deletition on master failed."
-		echo "delete-propagation-master.fail" > $MASTER_STATE_DIR/last-action
+		echo "delete-propagation-master.fail" > "$MASTER_STATE_DIR/last-action"
 		exit 1
 	else
-		echo "delete-propagation-master.success" > $MASTER_STATE_DIR/last-action
+		echo "delete-propagation-master.success" > "$MASTER_STATE_DIR/last-action"
 	fi
 }
 
 function master_tree_after
 {
         Log "Creating after run master replica file list."
-        rsync -rlptgodE --exclude "$OSYNC_DIR" --list-only $MASTER_SYNC_DIR/ | grep "^-\|^d" | awk '{print $5}' | (grep -v "^\.$" || :)> /dev/shm/osync_master-tree-after_$SCRIPT_PID &
+        $(which $RSYNC_EXECUTABLE) --rsync-path="$RSYNC_PATH" -rlptgodE --exclude "$OSYNC_DIR" --list-only "$MASTER_SYNC_DIR/" | grep "^-\|^d" | awk '{print $5}' | (grep -v "^\.$" || :)> /dev/shm/osync_master-tree-after_$SCRIPT_PID &
 	child_pid=$!
         WaitForCompletion $child_pid $SOFT_MAX_EXEC_TIME 0
         retval=$?
         if [ $retval == 0 ] && [ -f /dev/shm/osync_master-tree-after_$SCRIPT_PID ]
         then
-                mv /dev/shm/osync_master-tree-after_$SCRIPT_PID $MASTER_STATE_DIR/master-tree-after
-		echo "master-replica-tree-after.success" > $MASTER_STATE_DIR/last-action
+                mv /dev/shm/osync_master-tree-after_$SCRIPT_PID "$MASTER_STATE_DIR/master-tree-after"
+		echo "master-replica-tree-after.success" > "$MASTER_STATE_DIR/last-action"
         else
                 LogError "Cannot create slave file list."
-		echo "master-replica-tree-after.fail" > $MASTER_STATE_DIR/last-action
+		echo "master-replica-tree-after.fail" > "$MASTER_STATE_DIR/last-action"
                 exit 1
         fi
 }
@@ -855,20 +895,20 @@ function slave_tree_after
         Log "Creating after run slave replica file list."
 	if [ "$REMOTE_SYNC" == "yes" ]
 	then
-	        rsync -rlptgodE -e "$RSYNC_SSH_CMD" --exclude "$OSYNC_DIR" --list-only $REMOTE_USER@$REMOTE_HOST:$SLAVE_SYNC_DIR/ | grep "^-\|^d" | awk '{print $5}' | (grep -v "^\.$" || :) > /dev/shm/osync_slave-tree-after_$SCRIPT_PID &
+	        $(which $RSYNC_EXECUTABLE) --rsync-path="$RSYNC_PATH" -rlptgodE -e "$RSYNC_SSH_CMD" --exclude "$OSYNC_DIR" --list-only "$REMOTE_USER@$REMOTE_HOST:$SLAVE_SYNC_DIR/" | grep "^-\|^d" | awk '{print $5}' | (grep -v "^\.$" || :) > /dev/shm/osync_slave-tree-after_$SCRIPT_PID &
 	else
-	        rsync -rlptgodE --exclude "$OSYNC_DIR" --list-only $SLAVE_SYNC_DIR/ | grep "^-\|^d" | awk '{print $5}' | (grep -v "^\.$" || :) > /dev/shm/osync_slave-tree-after_$SCRIPT_PID &
+	        $(which $RSYNC_EXECUTABLE) --rsync-path="$RSYNC_PATH" -rlptgodE --exclude "$OSYNC_DIR" --list-only "$SLAVE_SYNC_DIR/" | grep "^-\|^d" | awk '{print $5}' | (grep -v "^\.$" || :) > /dev/shm/osync_slave-tree-after_$SCRIPT_PID &
 	fi
 	child_pid=$!
         WaitForCompletion $child_pid $SOFT_MAX_EXEC_TIME 0
         retval=$?
         if [ $retval == 0 ] && [ -f /dev/shm/osync_slave-tree-after_$SCRIPT_PID ]
         then
-                mv /dev/shm/osync_slave-tree-after_$SCRIPT_PID $MASTER_STATE_DIR/slave-tree-after
-		echo "slave-replica-tree-after.success" > $MASTER_STATE_DIR/last-action
+                mv /dev/shm/osync_slave-tree-after_$SCRIPT_PID "$MASTER_STATE_DIR/slave-tree-after"
+		echo "slave-replica-tree-after.success" > "$MASTER_STATE_DIR/last-action"
         else
                 LogError "Cannot create slave file list."
-		echo "slave-replica-tree-after.fail" > $MASTER_STATE_DIR/last-action
+		echo "slave-replica-tree-after.fail" > "$MASTER_STATE_DIR/last-action"
                 exit 1
         fi
 }
@@ -878,12 +918,12 @@ function Sync
 {
         Log "Starting synchronization task."
 
-	if [ -f $MASTER_STATE_DIR/last-action ] && [ "$RESUME_SYNC" == "yes" ]
+	if [ -f "$MASTER_STATE_DIR/last-action" ] && [ "$RESUME_SYNC" == "yes" ]
 	then
-		resume_sync=$(cat $MASTER_STATE_DIR/last-action)
-		if [ -f $MASTER_STATE_DIR/resume-count ]
+		resume_sync=$(cat "$MASTER_STATE_DIR/last-action")
+		if [ -f "$MASTER_STATE_DIR/resume-count" ]
 		then
-			resume_count=$(cat $MASTER_STATE_DIR/resume-count)
+			resume_count=$(cat "$MASTER_STATE_DIR/resume-count")
 		else
 			resume_count=0
 		fi
@@ -893,14 +933,14 @@ function Sync
 			if [ "$resume_sync" != "sync.success" ]
 			then
 				Log "WARNING: Trying to resume aborted osync execution on $(stat --format %y $MASTER_STATE_DIR/last-action)  at task [$resume_sync]."
-				echo $(($resume_count+1)) > $MASTER_STATE_DIR/resume-count
+				echo $(($resume_count+1)) > "$MASTER_STATE_DIR/resume-count"
 			else
 				resume_sync=none
 			fi
 		else
 			Log "Will not resume aborted osync execution. Too much resume tries [$resume_count]."
-			echo "noresume" > $MASTER_STATE_DIR/last-action
-			echo "0" > $MASTER_STATE_DIR/resume-count
+			echo "noresume" > "$MASTER_STATE_DIR/last-action"
+			echo "0" > "$MASTER_STATE_DIR/resume-count"
 			resume_sync=none
 		fi
 	else
@@ -964,50 +1004,50 @@ function Sync
 	esac
 
 	Log "Finished synchronization task."
-	echo "sync.success" > $MASTER_STATE_DIR/last-action
-	echo "0" > $MASTER_STATE_DIR/resume-count
+	echo "sync.success" > "$MASTER_STATE_DIR/last-action"
+	echo "0" > "$MASTER_STATE_DIR/resume-count"
 }
 
 function SoftDelete
 {
 	if [ "$CONFLICT_BACKUP" != "no" ]
 	then
-		if [ -d $MASTER_BACKUP_DIR ]
+		if [ -d "$MASTER_BACKUP_DIR" ]
 		then
 			Log "Removing backups older than $CONFLICT_BACKUP_DAYS days on master replica."
-			find $MASTER_BACKUP_DIR/ -ctime +$CONFLICT_BACKUP_DAYS | xargs rm -rf
+			find "$MASTER_BACKUP_DIR/" -ctime +$CONFLICT_BACKUP_DAYS | xargs rm -rf
 		fi
 		
 		if [ "$REMOTE_SYNC" == "yes" ]
 		then
 			Log "Removing backups older than $CONFLICT_BACKUP_DAYS days on remote slave replica."
-			eval "$SSH_CMD \"if [ -d $SLAVE_BACKUP_DIR ]; then find $SLAVE_BACKUP_DIR/ -ctime +$CONFLICT_BACKUP_DAYS | xargs rm -rf; fi\""
+			eval "$SSH_CMD \"if [ -d \"$SLAVE_BACKUP_DIR\" ]; then $COMMAND_SUDO find \"$SLAVE_BACKUP_DIR/\" -ctime +$CONFLICT_BACKUP_DAYS | xargs rm -rf; fi\""
 		else
-			if [ -d $SLAVE_BACKUP_DIR ]
+			if [ -d "$SLAVE_BACKUP_DIR" ]
 			then
 				Log "Removing backups older than $CONFLICT_BACKUP_DAYS days on slave replica."
-				find $SLAVE_BACKUP_DIR/ -ctime +$CONFLICT_BACKUP_DAYS | xargs rm -rf	
+				find "$SLAVE_BACKUP_DIR/" -ctime +$CONFLICT_BACKUP_DAYS | xargs rm -rf	
 			fi
 		fi
 	fi
 
 	if [ "$SOFT_DELETE" != "no" ]
 	then
-		if [ -d $MASTER_DELETE_DIR ]
+		if [ -d "$MASTER_DELETE_DIR" ]
 		then
 			Log "Removing soft deleted items older than $SOFT_DELETE_DAYS days on master replica."
-			find $MASTER_DELETE_DIR/ -ctime +$SOFT_DELETE_DAYS | xargs rm -rf
+			find "$MASTER_DELETE_DIR/" -ctime +$SOFT_DELETE_DAYS | xargs rm -rf
 		fi
 
 		if [ "$REMOTE_SYNC" == "yes" ]
 		then
 			Log "Removing soft deleted items older than $SOFT_DELETE_DAYS days on remote slave replica."
-			eval "$SSH_CMD \"if [ -d $SLAVE_DELETE_DIR ]; then find $SLAVE_DELETE_DIR/ -ctime +$SOFT_DELETE_DAYS | xargs rm -rf; fi\""
+			eval "$SSH_CMD \"if [ -d \"$SLAVE_DELETE_DIR\" ]; then $COMMAND_SUDO find \"$SLAVE_DELETE_DIR/\" -ctime +$SOFT_DELETE_DAYS | xargs rm -rf; fi\""
 		else
-			if [ -d $SLAVE_DELETE_DIR ]
+			if [ -d "$SLAVE_DELETE_DIR" ]
 			then
 				Log "Removing soft deleted items older than $SOFT_DELETE_DAYS days on slave replica."
-				find $SLAVE_DELETE_DIR/ -ctime +$SOFT_DELETE_DAYS | xargs rm -rf
+				find "$SLAVE_DELETE_DIR/" -ctime +$SOFT_DELETE_DAYS | xargs rm -rf
 			fi
 		fi
 	fi
@@ -1023,7 +1063,7 @@ function Init
 	trap TrapQuit EXIT
         if [ "$DEBUG" == "yes" ]
         then
-                trap 'TrapError ${LINENO} $?' ERR
+                trap 'TrapError ${LINENO} $? $BASH_COMMAND' ERR
         fi
 
         LOG_FILE=/var/log/osync_$OSYNC_VERSION-$SYNC_ID.log
@@ -1198,6 +1238,7 @@ then
 			Log " $DRY_WARNING $DATE - Osync v$OSYNC_VERSION script begin."
 			Log "-------------------------------------------------------------"
 			CheckMasterSlaveDirs
+			CheckMinimumSpace
 			if [ $? == 0 ]
 			then
 				RunBeforeHook
@@ -1207,7 +1248,6 @@ then
 					SoftDelete
 				fi
 				RunAfterHook
-				CleanUp
 			fi
 		else
 			LogError "Configuration file could not be loaded."

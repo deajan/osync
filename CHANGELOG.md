@@ -3,14 +3,16 @@ TODO LIST
 
 ! Tag as v1.0 beta
 ! verify spaces in sync dir names
-! sudo support for rsync and generic cmds
-! add osync support in ssh_filter.sh
-! minimum space checks
-! different rsync executable
+! exit code line 627
 
 RECENT CHANGES
 --------------
 
+- Added minimum disk space checks
+- Added osync support in ssh_filter.sh
+- Added support for sudo exec on remote slave
+- Added support for alternative rsync executable
+- Added support for spaces in sync directories names
 - Added support for ACL and xattr
 - Added --force-unlock parameter to bypass any existing locks on replicas
 - Added full remote support for slave replica
