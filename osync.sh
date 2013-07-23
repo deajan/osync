@@ -2,9 +2,8 @@
 
 ###### Osync - Rsync based two way sync engine with fault tolerance
 ###### (L) 2013 by Orsiris "Ozy" de Jong (www.netpower.fr) 
-
 OSYNC_VERSION=0.9
-OSYNC_BUILD=2207201303
+OSYNC_BUILD=2307201302
 
 DEBUG=yes
 SCRIPT_PID=$$
@@ -20,6 +19,8 @@ OSYNC_DIR=".osync_workdir"
 
 ## Log a state message every $KEEP_LOGGING seconds. Should not be equal to soft or hard execution time so your log won't be unnecessary big.
 KEEP_LOGGING=1801
+
+#set -o history -o histexpand
 
 function Log
 {
@@ -446,7 +447,7 @@ function CreateOsyncDirs
 
 	if [ "$REMOTE_SYNC" == "yes" ]
 	then
-		eval "$SSH_CMD \"if ! [ -d $SLAVE_STATE_DIR ]; then $COMMAND_SUDO mkdir --parents $SLAVE_STATE_DIR; fi\"" &
+		eval "$SSH_CMD \"if ! [ -d \\\"$SLAVE_STATE_DIR\\\" ]; then $COMMAND_SUDO mkdir --parents \\\"$SLAVE_STATE_DIR\\\"; fi\"" &
 		WaitForTaskCompletion $! 0 1800
 	else
 		if ! [ -d "$SLAVE_STATE_DIR" ]; then mkdir --parents "$SLAVE_STATE_DIR"; fi
@@ -483,7 +484,7 @@ function CheckMasterSlaveDirs
 	then
 		if [ "$CREATE_DIRS" == "yes" ]
 		then
-			eval "$SSH_CMD \"if ! [ -d $SLAVE_SYNC_DIR ]; then $COMMAND_SUDO mkdir --parents $SLAVE_SYNC_DIR; fi"\" &
+			eval "$SSH_CMD \"if ! [ -d \\\"$SLAVE_SYNC_DIR\\\" ]; then $COMMAND_SUDO mkdir --parents \\\"$SLAVE_SYNC_DIR\\\"; fi"\" &
 			WaitForTaskCompletion $! 0 1800
 			if [ $? != 0 ]
 			then
@@ -491,7 +492,7 @@ function CheckMasterSlaveDirs
 				exit 1
 			fi
 		else
-			eval "$SSH_CMD \"if ! [ -d $SLAVE_SYNC_DIR ]; then exit 1; fi"\" &	
+			eval "$SSH_CMD \"if ! [ -d \\\"$SLAVE_SYNC_DIR\\\" ]; then exit 1; fi"\" &	
 			WaitForTaskCompletion $! 0 1800
 			if [ $? != 0 ]
 			then
@@ -532,7 +533,7 @@ function CheckMinimumSpace
 	
 	if [ "$REMOTE_SYNC" == "yes" ]
 	then
-		eval "$SSH_CMD \"$COMMAND_SUDO df -P $SLAVE_SYNC_DIR\"" > /dev/shm/osync_slave_space_$SCRIPT_PID &
+		eval "$SSH_CMD \"$COMMAND_SUDO df -P \\\"$SLAVE_SYNC_DIR\\\"\"" > /dev/shm/osync_slave_space_$SCRIPT_PID &
 		WaitForTaskCompletion $! 0 1800
 		SLAVE_SPACE=$(cat /dev/shm/osync_slave_space_$SCRIPT_PID | tail -1 | awk '{print $4}')
 	else
@@ -553,9 +554,9 @@ function RsyncExcludePattern
         do
                 if [ "$RSYNC_EXCLUDE" == "" ]
                 then
-                        RSYNC_EXCLUDE="--exclude=$(EscapeSpaces $excludedir)"
+                        RSYNC_EXCLUDE="--exclude=\"$excludedir\""
                 else
-                        RSYNC_EXCLUDE="$RSYNC_EXCLUDE --exclude=$(EscapeSpaces $excludedir)"
+                        RSYNC_EXCLUDE="$RSYNC_EXCLUDE --exclude=\"$excludedir\""
                 fi
         done
         IFS=$OLD_IFS
@@ -574,7 +575,7 @@ function WriteLockFiles
 
         if [ "$REMOTE_SYNC" == "yes" ]
         then
-                eval "$SSH_CMD \"$COMMAND_SUDO echo $SCRIPT_PID@$SYNC_ID > $SLAVE_STATE_DIR/lock\"" &
+                eval "$SSH_CMD \"$COMMAND_SUDO echo $SCRIPT_PID@$SYNC_ID > \\\"$SLAVE_STATE_DIR/lock\\\"\"" &
                 WaitForTaskCompletion $! 0 1800
                 if [ $? != 0 ]
                 then
@@ -624,10 +625,13 @@ function LockDirectories
 	
 	if [ "$REMOTE_SYNC" == "yes" ]
 	then
-		eval "$SSH_CMD \"if [ -f $SLAVE_STATE_DIR/lock ]; then cat $SLAVE_STATE_DIR/lock; else exit 1; fi\" > /dev/shm/osync_remote_slave_lock_$SCRIPT_PID" &
+		eval "$SSH_CMD \"if [ -f \\\"$SLAVE_STATE_DIR/lock\\\" ]; then cat \\\"$SLAVE_STATE_DIR/lock\\\"; fi\" > /dev/shm/osync_remote_slave_lock_$SCRIPT_PID" &
 		WaitForTaskCompletion $! 0 1800
-		slave_lock_pid=$(cat /dev/shm/osync_remote_slave_lock_$SCRIPT_PID | cut -d'@' -f1)
-		slave_lock_id=$(cat /dev/shm/osync_remote_slave_lock_$SCRIPT_PID | cut -d'@' -f2)
+		if [ -d /dev/shm/osync_remote_slave_lock_$SCRIPT_PID ]
+		then
+			slave_lock_pid=$(cat /dev/shm/osync_remote_slave_lock_$SCRIPT_PID | cut -d'@' -f1)
+			slave_lock_id=$(cat /dev/shm/osync_remote_slave_lock_$SCRIPT_PID | cut -d'@' -f2)
+		fi
 	else
 		if [ -f "$SLAVE_STATE_DIR/lock" ]
 		then
@@ -669,7 +673,7 @@ function UnlockDirectories
 {
 	if [ "$REMOTE_SYNC" == "yes" ]
 	then
-		eval "$SSH_CMD \"if [ -f $SLAVE_STATE_DIR/lock ]; then $COMMAND_SUDO rm $SLAVE_STATE_DIR/lock; fi\"" &
+		eval "$SSH_CMD \"if [ -f \\\"$SLAVE_STATE_DIR/lock\\\" ]; then $COMMAND_SUDO rm \\\"$SLAVE_STATE_DIR/lock\\\"; fi\"" &
 		WaitForTaskCompletion $! 0 1800
 	else
 		if [ -f "$SLAVE_STATE_DIR/lock" ];then rm "$SLAVE_STATE_DIR/lock"; fi
@@ -718,7 +722,7 @@ function slave_tree_current
 	Log "Creating slave replica file list."
 	if [ "$REMOTE_SYNC" == "yes" ]
 	then
-		$(which $RSYNC_EXECUTABLE) --rsync-path="$RSYNC_PATH" -rlptgodE --exclude "$OSYNC_DIR" -e "$RSYNC_SSH_CMD" --list-only "$REMOTE_USER@$REMOTE_HOST:$SLAVE_SYNC_DIR/" | grep "^-\|^d" | awk '{print $5}' | (grep -v "^\.$" || :) > /dev/shm/osync_slave-tree-current_$SCRIPT_PID &
+		$(which $RSYNC_EXECUTABLE) --rsync-path="$RSYNC_PATH" -rlptgodE --exclude "$OSYNC_DIR" -e "$RSYNC_SSH_CMD" --list-only $REMOTE_USER@$REMOTE_HOST:"$SLAVE_SYNC_DIR/" | grep "^-\|^d" | awk '{print $5}' | (grep -v "^\.$" || :) > /dev/shm/osync_slave-tree-current_$SCRIPT_PID &
 	else
 		$(which $RSYNC_EXECUTABLE) --rsync-path="$RSYNC_PATH" -rlptgodE --exclude "$OSYNC_DIR" --list-only "$SLAVE_SYNC_DIR/" | grep "^-\|^d" | awk '{print $5}' | (grep -v "^\.$" || :) > /dev/shm/osync_slave-tree-current_$SCRIPT_PID &
 	fi
@@ -767,10 +771,15 @@ function sync_update_slave
         Log "Updating slave replica."
 	if [ "$REMOTE_SYNC" == "yes" ]
 	then
-        	$(which $RSYNC_EXECUTABLE) --rsync-path="$RSYNC_PATH" $RSYNC_ARGS -rlptgodEui -e "$RSYNC_SSH_CMD" $SLAVE_BACKUP --exclude "$OSYNC_DIR" $RSYNC_EXCLUDE --exclude-from "$MASTER_STATE_DIR/master-deleted-list" --exclude-from "$MASTER_STATE_DIR/slave-deleted-list" "$MASTER_SYNC_DIR/" "$REMOTE_USER@$REMOTE_HOST:$SLAVE_SYNC_DIR/" > /dev/shm/osync_update_slave_replica_$SCRIPT_PID 2>&1 &
+        	rsync_cmd="$(which $RSYNC_EXECUTABLE) --rsync-path=\"$RSYNC_PATH\" $RSYNC_ARGS -rlptgodEui -e \"$RSYNC_SSH_CMD\" $SLAVE_BACKUP --exclude \"$OSYNC_DIR\" $RSYNC_EXCLUDE --exclude-from \"$MASTER_STATE_DIR/master-deleted-list\" --exclude-from \"$MASTER_STATE_DIR/slave-deleted-list\" \"$MASTER_SYNC_DIR/\" $REMOTE_USER@$REMOTE_HOST:\"$SLAVE_SYNC_DIR/\" > /dev/shm/osync_update_slave_replica_$SCRIPT_PID 2>&1 &"
 	else
-        	$(which $RSYNC_EXECUTABLE) --rsync-path="$RSYNC_PATH" -rlptgodEui $SLAVE_BACKUP --exclude "$OSYNC_DIR" $RSYNC_EXCLUDE --exclude-from "$MASTER_STATE_DIR/master-deleted-list" --exclude-from "$MASTER_STATE_DIR/slave-deleted-list" "$MASTER_SYNC_DIR/" "$SLAVE_SYNC_DIR/" > /dev/shm/osync_update_slave_replica_$SCRIPT_PID 2>&1 &
+        	rsync_cmd="$(which $RSYNC_EXECUTABLE) --rsync-path=\"$RSYNC_PATH\" -rlptgodEui $SLAVE_BACKUP --exclude \"$OSYNC_DIR\" $RSYNC_EXCLUDE --exclude-from \"$MASTER_STATE_DIR/master-deleted-list\" --exclude-from \"$MASTER_STATE_DIR/slave-deleted-list\" \"$MASTER_SYNC_DIR/\" \"$SLAVE_SYNC_DIR/\" > /dev/shm/osync_update_slave_replica_$SCRIPT_PID 2>&1 &"
 	fi
+	if [ "$DEBUG" == "yes" ]
+	then
+		Log "RSYNC_CMD: $rsync_cmd"
+	fi
+	eval $rsync_cmd
         child_pid=$!
         WaitForCompletion $child_pid $SOFT_MAX_EXEC_TIME $HARD_MAX_EXEC_TIME
         retval=$?
@@ -795,10 +804,15 @@ function sync_update_master
         Log "Updating master replica."
 	if [ "$REMOTE_SYNC" == "yes" ]
 	then
-        	$(which $RSYNC_EXECUTABLE) --rsync-path="$RSYNC_PATH" $RSYNC_ARGS -rlptgodEui -e "$RSYNC_SSH_CMD" $MASTER_BACKUP --exclude "$OSYNC_DIR" $RSYNC_EXCLUDE --exclude-from "$MASTER_STATE_DIR/slave-deleted-list" --exclude-from "$MASTER_STATE_DIR/master-deleted-list" "$REMOTE_USER@$REMOTE_HOST:$SLAVE_SYNC_DIR/" "$MASTER_SYNC_DIR/" > /dev/shm/osync_update_master_replica_$SCRIPT_PID 2>&1 &
+        	rsync_cmd="$(which $RSYNC_EXECUTABLE) --rsync-path=\"$RSYNC_PATH\" $RSYNC_ARGS -rlptgodEui -e \"$RSYNC_SSH_CMD\" $MASTER_BACKUP --exclude \"$OSYNC_DIR\" $RSYNC_EXCLUDE --exclude-from \"$MASTER_STATE_DIR/slave-deleted-list\" --exclude-from \"$MASTER_STATE_DIR/master-deleted-list\" \"$REMOTE_USER@$REMOTE_HOST:$SLAVE_SYNC_DIR/\" \"$MASTER_SYNC_DIR/\" > /dev/shm/osync_update_master_replica_$SCRIPT_PID 2>&1 &"
 	else
-	        $(which $RSYNC_EXECUTABLE) --rsync-path="$RSYNC_PATH" $RSYNC_ARGS -rlptgodEui $MASTER_BACKUP --exclude "$OSYNC_DIR" $RSYNC_EXCLUDE --exclude-from "$MASTER_STATE_DIR/slave-deleted-list" --exclude-from "$MASTER_STATE_DIR/master-deleted-list" "$SLAVE_SYNC_DIR/" "$MASTER_SYNC_DIR/" > /dev/shm/osync_update_master_replica_$SCRIPT_PID 2>&1 &
+	        rsync_cmd="$(which $RSYNC_EXECUTABLE) --rsync-path=\"$RSYNC_PATH\" $RSYNC_ARGS -rlptgodEui $MASTER_BACKUP --exclude \"$OSYNC_DIR\" $RSYNC_EXCLUDE --exclude-from \"$MASTER_STATE_DIR/slave-deleted-list\" --exclude-from \"$MASTER_STATE_DIR/master-deleted-list\" \"$SLAVE_SYNC_DIR/\" \"$MASTER_SYNC_DIR/\" > /dev/shm/osync_update_master_replica_$SCRIPT_PID 2>&1 &"
 	fi
+	if [ "$DEBUG" == "yes" ]
+	then
+		Log "RSYNC_CMD: $rsync_cmd"
+	fi
+	eval $rsync_cmd
         child_pid=$!
         WaitForCompletion $child_pid $SOFT_MAX_EXEC_TIME $HARD_MAX_EXEC_TIME
         retval=$?
@@ -823,10 +837,15 @@ function delete_on_slave
 	Log "Propagating deletitions to slave replica."
 	if [ "$REMOTE_SYNC" == "yes" ]
 	then
-		$(which $RSYNC_EXECUTABLE) --rsync-path="$RSYNC_PATH" $RSYNC_ARGS -rlptgodEui -e "$RSYNC_SSH_CMD" $SLAVE_DELETE --delete --exclude "$OSYNC_DIR" $RSYNC_EXCLUDE --exclude-from "$MASTER_STATE_DIR/slave-deleted-list" --include-from "$MASTER_STATE_DIR/master-deleted-list" "$MASTER_SYNC_DIR/" "$REMOTE_USER@$REMOTE_HOST:$SLAVE_SYNC_DIR/" > /dev/shm/osync_deletition_on_slave_$SCRIPT_PID 2>&1 &
+		rsync_cmd="$(which $RSYNC_EXECUTABLE) --rsync-path=\"$RSYNC_PATH\" $RSYNC_ARGS -rlptgodEui -e \"$RSYNC_SSH_CMD\" $SLAVE_DELETE --delete --exclude \"$OSYNC_DIR\" $RSYNC_EXCLUDE --exclude-from \"$MASTER_STATE_DIR/slave-deleted-list\" --include-from \"$MASTER_STATE_DIR/master-deleted-list\" \"$MASTER_SYNC_DIR/\" $REMOTE_USER@$REMOTE_HOST:\"$SLAVE_SYNC_DIR/\" > /dev/shm/osync_deletition_on_slave_$SCRIPT_PID 2>&1 &"
 	else
-		$(which $RSYNC_EXECUTABLE) --rsync-path="$RSYNC_PATH" $RSYNC_ARGS -rlptgodEui $SLAVE_DELETE --delete --exclude "$OSYNC_DIR" $RSYNC_EXCLUDE --exclude-from "$MASTER_STATE_DIR/slave-deleted-list" --include-from "$MASTER_STATE_DIR/master-deleted-list" "$MASTER_SYNC_DIR/" "$SLAVE_SYNC_DIR/" > /dev/shm/osync_deletition_on_slave_$SCRIPT_PID 2>&1 &
+		rsync_cmd="$(which $RSYNC_EXECUTABLE) --rsync-path=\"$RSYNC_PATH\" $RSYNC_ARGS -rlptgodEui $SLAVE_DELETE --delete --exclude \"$OSYNC_DIR\" $RSYNC_EXCLUDE --exclude-from \"$MASTER_STATE_DIR/slave-deleted-list\" --include-from \"$MASTER_STATE_DIR/master-deleted-list\" \"$MASTER_SYNC_DIR/\" \"$SLAVE_SYNC_DIR/\" > /dev/shm/osync_deletition_on_slave_$SCRIPT_PID 2>&1 &"
 	fi
+	if [ "$DEBUG" == "yes" ]
+	then
+		Log "RSYNC_CMD: $rsync_cmd"
+	fi
+	eval $rsync_cmd
 	child_pid=$!
 	WaitForCompletion $child_pid $SOFT_MAX_EXEC_TIME 0
 	retval=$?
@@ -850,10 +869,15 @@ function delete_on_master
 	Log "Propagating deletitions to master replica."
 	if [ "$REMOTE_SYNC" == "yes" ]
 	then
-		$(which $RSYNC_EXECUTABLE) --rsync-path="$RSYNC_PATH" $RSYNC_ARGS -rlptgodEui -e "$RSYNC_SSH_CMD" $MASTER_DELETE --delete --exclude "$OSYNC_DIR" $RSYNC_EXCLUDE --exclude-from "$MASTER_STATE_DIR/master-deleted-list" --include-from "$MASTER_STATE_DIR/slave-deleted-list" "$REMOTE_USER@$REMOTE_HOST:$SLAVE_SYNC_DIR/" "$MASTER_SYNC_DIR/" > /dev/shm/osync_deletition_on_master_$SCRIPT_PID 2>&1 &
+		rsync_cmd="$(which $RSYNC_EXECUTABLE) --rsync-path=\"$RSYNC_PATH\" $RSYNC_ARGS -rlptgodEui -e \"$RSYNC_SSH_CMD\" $MASTER_DELETE --delete --exclude \"$OSYNC_DIR\" $RSYNC_EXCLUDE --exclude-from \"$MASTER_STATE_DIR/master-deleted-list\" --include-from \"$MASTER_STATE_DIR/slave-deleted-list\" $REMOTE_USER@$REMOTE_HOST:\"$SLAVE_SYNC_DIR/\" \"$MASTER_SYNC_DIR/\" > /dev/shm/osync_deletition_on_master_$SCRIPT_PID 2>&1 &"
 	else
-		$(which $RSYNC_EXECUTABLE) --rsync-path="$RSYNC_PATH" $RSYNC_ARGS -rlptgodEui $MASTER_DELETE --delete --exclude "$OSYNC_DIR" $RSYNC_EXCLUDE --exclude-from "$MASTER_STATE_DIR/master-deleted-list" --include-from "$MASTER_STATE_DIR/slave-deleted-list" "$SLAVE_SYNC_DIR/" "$MASTER_SYNC_DIR/" > /dev/shm/osync_deletition_on_master_$SCRIPT_PID 2>&1 &
+		rsync_cmd="$(which $RSYNC_EXECUTABLE) --rsync-path=\"$RSYNC_PATH\" $RSYNC_ARGS -rlptgodEui $MASTER_DELETE --delete --exclude \"$OSYNC_DIR\" $RSYNC_EXCLUDE --exclude-from \"$MASTER_STATE_DIR/master-deleted-list\" --include-from \"$MASTER_STATE_DIR/slave-deleted-list\" \"$SLAVE_SYNC_DIR/\" \"$MASTER_SYNC_DIR/\" > /dev/shm/osync_deletition_on_master_$SCRIPT_PID 2>&1 &"
 	fi
+	if [ "$DEBUG" == "yes" ]
+	then
+		Log "RSYNC_CMD: $rsync_cmd"
+	fi
+	eval $rsync_cmd
 	child_pid=$!
 	WaitForCompletion $child_pid $SOFT_MAX_EXEC_TIME 0
 	retval=$?
@@ -932,7 +956,7 @@ function Sync
 		then
 			if [ "$resume_sync" != "sync.success" ]
 			then
-				Log "WARNING: Trying to resume aborted osync execution on $(stat --format %y $MASTER_STATE_DIR/last-action)  at task [$resume_sync]."
+				Log "WARNING: Trying to resume aborted osync execution on $(stat --format %y "$MASTER_STATE_DIR/last-action") at task [$resume_sync]. Try=$resume_count"
 				echo $(($resume_count+1)) > "$MASTER_STATE_DIR/resume-count"
 			else
 				resume_sync=none
@@ -1021,7 +1045,7 @@ function SoftDelete
 		if [ "$REMOTE_SYNC" == "yes" ]
 		then
 			Log "Removing backups older than $CONFLICT_BACKUP_DAYS days on remote slave replica."
-			eval "$SSH_CMD \"if [ -d \"$SLAVE_BACKUP_DIR\" ]; then $COMMAND_SUDO find \"$SLAVE_BACKUP_DIR/\" -ctime +$CONFLICT_BACKUP_DAYS | xargs rm -rf; fi\""
+			eval "$SSH_CMD \"if [ -d \\\"$SLAVE_BACKUP_DIR\\\" ]; then $COMMAND_SUDO find \\\"$SLAVE_BACKUP_DIR/\\\" -ctime +$CONFLICT_BACKUP_DAYS | xargs rm -rf; fi\""
 		else
 			if [ -d "$SLAVE_BACKUP_DIR" ]
 			then
@@ -1042,7 +1066,7 @@ function SoftDelete
 		if [ "$REMOTE_SYNC" == "yes" ]
 		then
 			Log "Removing soft deleted items older than $SOFT_DELETE_DAYS days on remote slave replica."
-			eval "$SSH_CMD \"if [ -d \"$SLAVE_DELETE_DIR\" ]; then $COMMAND_SUDO find \"$SLAVE_DELETE_DIR/\" -ctime +$SOFT_DELETE_DAYS | xargs rm -rf; fi\""
+			eval "$SSH_CMD \"if [ -d \\\"$SLAVE_DELETE_DIR\\\" ]; then $COMMAND_SUDO find \\\"$SLAVE_DELETE_DIR/\\\" -ctime +$SOFT_DELETE_DAYS | xargs rm -rf; fi\""
 		else
 			if [ -d "$SLAVE_DELETE_DIR" ]
 			then
@@ -1063,7 +1087,8 @@ function Init
 	trap TrapQuit EXIT
         if [ "$DEBUG" == "yes" ]
         then
-                trap 'TrapError ${LINENO} $? $BASH_COMMAND' ERR
+		set -o history -o histexpand
+                trap 'TrapError ${LINENO} $? !!' ERR
         fi
 
         LOG_FILE=/var/log/osync_$OSYNC_VERSION-$SYNC_ID.log
@@ -1136,8 +1161,8 @@ function Init
 	## Conflict options
 	if [ "$CONFLICT_BACKUP" != "no" ]
 	then
-		MASTER_BACKUP="--backup --backup-dir=$MASTER_BACKUP_DIR"
-		SLAVE_BACKUP="--backup --backup-dir=$SLAVE_BACKUP_DIR"
+		MASTER_BACKUP="--backup --backup-dir=\"$MASTER_BACKUP_DIR\""
+		SLAVE_BACKUP="--backup --backup-dir=\"$SLAVE_BACKUP_DIR\""
        		if [ "$CONFLICT_BACKUP_MULTIPLE" == "yes" ]
         	then
                 	MASTER_BACKUP="$MASTER_BACKUP --suffix .$(date +%Y.%m.%d-%H.%M.%S)"
@@ -1151,8 +1176,8 @@ function Init
 	## Soft delete options
 	if [ "$SOFT_DELETE" != "no" ]
 	then
-		MASTER_DELETE="--backup --backup-dir=$MASTER_DELETE_DIR"
-		SLAVE_DELETE="--backup --backup-dir=$SLAVE_DELETE_DIR"
+		MASTER_DELETE="--backup --backup-dir=\"$MASTER_DELETE_DIR\""
+		SLAVE_DELETE="--backup --backup-dir=\"$SLAVE_DELETE_DIR\""
 	else
 		MASTER_DELETE=
 		SLAVE_DELETE=
