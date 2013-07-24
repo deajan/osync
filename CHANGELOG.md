@@ -1,13 +1,16 @@
-TODO LIST
----------
+KNOWN BUGS
+----------
 
-! Tag as v1.0 beta
-! verify spaces in sync dir names
-! exit code line 627
+- Cannot write pidlock on remote slave with SUDO_EXEC=yes but insufficient rights (sudo does not work for command echo)
+- If master and remote slave aren't the same distros and rsync binary isn't in the same path, execution may fail (RSYNC_PATH should be configurable)
 
 RECENT CHANGES
 --------------
 
+24 Jul. 2013: beta milestone
+- Fixed some bad error handling in CheckMasterSlaveDirs and LockDirectories
+- Added support for spaces in sync dirs and exclude lists
+- Fixed false exit code if no remote slave lock present
 - Added minimum disk space checks
 - Added osync support in ssh_filter.sh
 - Added support for sudo exec on remote slave
@@ -33,6 +36,5 @@ RECENT CHANGES
 - Added master/slave conflict prevalance option
 - Added soft-deleted items
 - Added backup items in case of conflict
-
 19 Jun. 2013: Project begin
 

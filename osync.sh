@@ -2,10 +2,10 @@
 
 ###### Osync - Rsync based two way sync engine with fault tolerance
 ###### (L) 2013 by Orsiris "Ozy" de Jong (www.netpower.fr) 
-OSYNC_VERSION=0.92
-OSYNC_BUILD=2407201303
+OSYNC_VERSION=0.95
+OSYNC_BUILD=2407201304
 
-DEBUG=yes
+DEBUG=no
 SCRIPT_PID=$$
 
 LOCAL_USER=$(whoami)
@@ -433,7 +433,8 @@ function CreateOsyncDirs
 	if [ "$REMOTE_SYNC" == "yes" ]
 	then
 		eval "$SSH_CMD \"if ! [ -d \\\"$SLAVE_STATE_DIR\\\" ]; then $COMMAND_SUDO mkdir --parents \\\"$SLAVE_STATE_DIR\\\"; fi\"" &
-		WaitForTaskCompletion $! 0 1800
+		child_pid=$!
+		WaitForTaskCompletion $child_pid 0 1800
 	else
 		if ! [ -d "$SLAVE_STATE_DIR" ]; then mkdir --parents "$SLAVE_STATE_DIR"; fi
 	fi
@@ -468,19 +469,24 @@ function CheckMasterSlaveDirs
 		if [ "$CREATE_DIRS" == "yes" ]
 		then
 			eval "$SSH_CMD \"if ! [ -d \\\"$SLAVE_SYNC_DIR\\\" ]; then $COMMAND_SUDO mkdir --parents \\\"$SLAVE_SYNC_DIR\\\"; fi"\" &
-			WaitForTaskCompletion $! 0 1800
+			child_pid=$!
+			WaitForTaskCompletion $child_pid 0 1800
 			if [ $? != 0 ]
 			then
 				LogError "Cannot create slave directory [$SLAVE_SYNC_DIR]."
 				exit 1
 			fi
 		else
-			eval "$SSH_CMD \"if ! [ -d \\\"$SLAVE_SYNC_DIR\\\" ]; then exit 1; fi"\" &	
-			WaitForTaskCompletion $! 0 1800
-			if [ $? != 0 ]
+			eval "$SSH_CMD \"if ! [ -d \\\"$SLAVE_SYNC_DIR\\\" ]; then exit 1; fi"\" &
+			child_pid=$!
+			WaitForTaskCompletion $child_pid 0 1800
+			res=$?
+			if [ $res != 0 ]
 			then
 				LogError "Slave directory [$SLAVE_SYNC_DIR] does not exist."
 				exit 1
+			else
+				LogError "dafuck"
 			fi
 		fi
 	else
@@ -517,7 +523,8 @@ function CheckMinimumSpace
 	if [ "$REMOTE_SYNC" == "yes" ]
 	then
 		eval "$SSH_CMD \"$COMMAND_SUDO df -P \\\"$SLAVE_SYNC_DIR\\\"\"" > /dev/shm/osync_slave_space_$SCRIPT_PID &
-		WaitForTaskCompletion $! 0 1800
+		child_pid=$!
+		WaitForTaskCompletion $child_pid 0 1800
 		SLAVE_SPACE=$(cat /dev/shm/osync_slave_space_$SCRIPT_PID | tail -1 | awk '{print $4}')
 	else
 		SLAVE_SPACE=$(df -P "$SLAVE_SYNC_DIR" | tail -1 | awk '{print $4}')
@@ -559,7 +566,8 @@ function WriteLockFiles
         if [ "$REMOTE_SYNC" == "yes" ]
         then
                 eval "$SSH_CMD \"$COMMAND_SUDO echo $SCRIPT_PID@$SYNC_ID > \\\"$SLAVE_STATE_DIR/lock\\\"\"" &
-                WaitForTaskCompletion $! 0 1800
+                child_pid=$!
+		WaitForTaskCompletion $child_pid 0 1800
                 if [ $? != 0 ]
                 then
                         LogError "Could not set lock on remote slave replica."
@@ -609,7 +617,8 @@ function LockDirectories
 	if [ "$REMOTE_SYNC" == "yes" ]
 	then
 		eval "$SSH_CMD \"if [ -f \\\"$SLAVE_STATE_DIR/lock\\\" ]; then cat \\\"$SLAVE_STATE_DIR/lock\\\"; fi\" > /dev/shm/osync_remote_slave_lock_$SCRIPT_PID" &
-		WaitForTaskCompletion $! 0 1800
+		child_pid=$!
+		WaitForTaskCompletion $child_pid 0 1800
 		if [ -d /dev/shm/osync_remote_slave_lock_$SCRIPT_PID ]
 		then
 			slave_lock_pid=$(cat /dev/shm/osync_remote_slave_lock_$SCRIPT_PID | cut -d'@' -f1)
@@ -657,7 +666,8 @@ function UnlockDirectories
 	if [ "$REMOTE_SYNC" == "yes" ]
 	then
 		eval "$SSH_CMD \"if [ -f \\\"$SLAVE_STATE_DIR/lock\\\" ]; then $COMMAND_SUDO rm \\\"$SLAVE_STATE_DIR/lock\\\"; fi\"" &
-		WaitForTaskCompletion $! 0 1800
+		child_pid=$!
+		WaitForTaskCompletion $child_pid 0 1800
 	else
 		if [ -f "$SLAVE_STATE_DIR/lock" ];then rm "$SLAVE_STATE_DIR/lock"; fi
 	fi
