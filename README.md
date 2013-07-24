@@ -6,13 +6,17 @@ A two way sync script based that adds script fault tolerance from obackup projec
 ## About
 
 Having created obackup script in order to make reliable quick backups, i searched for a nice tool to handle two (or more) way sync scenarios in a reliable way.
+
 While unison handles these scenarios, it's pretty messy to configure, slow, won't handle ACLs and won't resume if something bad happened.
+
 Then i read about bitpocket, a nice script provided by sickill https://github.com/sickill/bitpocket.git
+
 Bitpocked inspired me to write my own implementation of a two way sync script, implementing features i wanted among:
-	- Fault tolerance with resume scenarios
-	- Email alerts
-	- Logging facility
-	- Soft deletition and multiple backups handling
+	
+- Fault tolerance with resume scenarios	
+- Email alerts	
+- Logging facility
+- Soft deletition and multiple backups handling
 
 Osync uses a master / slave sync schema. It can sync local or remote directories. By definition, master replica should always be a local directory on the system osync runs on.
 Also, osync uses pidlocks to prevent multiple concurrent sync processes on/to the same master / slave replica. Be sure a sync process is finished before launching next one.
@@ -25,6 +29,7 @@ Keep in mind that Osync has been designed to not delete any data, but rather mak
 Nevertheless, as we're still in beta stage, please make a backup of your data before using Osync.
 
 First, grab a fresh copy of osync and make it executable:
+
 	$ git clone https://github.com/deajan/osync
 	$ chmod +x ./osync.sh
 
