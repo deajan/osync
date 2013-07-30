@@ -1,13 +1,15 @@
-KNOWN BUGS
-----------
+KNOWN ISSUES
+------------
 
 - Cannot write pidlock on remote slave with SUDO_EXEC=yes but insufficient rights (sudo does not work for command echo)
 - If master and remote slave aren't the same distros and rsync binary isn't in the same path, execution may fail (RSYNC_PATH should be configurable)
+- Possible non delete status for a file with space in name on master replica from slave remote replica
 
 RECENT CHANGES
 --------------
 
-24 Jul. 2013: beta milestone
+- Revamped a bit code to add bash 3.2 compatibility
+- 24 Jul. 2013: beta milestone
 - Fixed some bad error handling in CheckMasterSlaveDirs and LockDirectories
 - Added support for spaces in sync dirs and exclude lists
 - Fixed false exit code if no remote slave lock present

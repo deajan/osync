@@ -2,8 +2,8 @@
 
 ###### Osync - Rsync based two way sync engine with fault tolerance
 ###### (L) 2013 by Orsiris "Ozy" de Jong (www.netpower.fr) 
-OSYNC_VERSION=0.95
-OSYNC_BUILD=2407201304
+OSYNC_VERSION=0.96
+OSYNC_BUILD=3107201301
 
 DEBUG=no
 SCRIPT_PID=$$
@@ -975,61 +975,133 @@ function Sync
 		resume_sync=none
 	fi
 
-	## In this case statement, ;& means executing every command below regardless of conditions
-	case $resume_sync in
-		none|noresume)
-		;&
-		master-replica-tree.fail)
+
+	################################################################################################################################################# Actual sync begins here
+
+	## This replaces the case statement below because ;& operator is not supported in bash 3.2... Code is more messy than case :(
+	if [ "$resume_sync" == "none" ] || [ "$resume_sync" == "noresume" ]
+	then
 		master_tree_current
-		;&
-		master-replica-tree.success|slave-replica-tree.fail)
+		resume_sync="resumed"
+	fi
+	if [ "$resume_sync" == "resumed" ] || [ "$resume_sync" == "master-replica-tree.success" ] || [ "$resume_sync" == "slave-replica-tree.fail" ]
+	then
 		slave_tree_current
-		;&
-		slave-replica-tree.success|master-replica-deleted-list.fail)
+		resume_sync="resumed"
+	fi
+	if [ "$resume_sync" == "resumed" ] || [ "$resume_sync" == "slave-replica-tree.success" ] || [ "$resume_sync" == "master-replica-deleted-list.fail" ]
+	then
 		master_delete_list
-		;&
-		master-replica-deleted-list.success|slave-replica-deleted-list.fail)
+		resume_sync="resumed"
+	fi
+	if [ "$resume_sync" == "resumed" ] || [ "$resume_sync" == "master-replica-deleted-list.success" ] || [ "$resume_sync" == "slave-replica-deleted-list.fail" ]
+	then
 		slave_delete_list
-		;&
-		slave-replica-deleted-list.success|update-master-replica.fail|update-slave-replica.fail)
-	        if [ "$CONFLICT_PREVALANCE" != "master" ]
-	        then
-        	        case $resume_sync in
-				none)
-				;&
-				slave-replica-deleted-list.success|update-master-replica.fail)
+		resume_sync="resumed"
+ 	fi
+	if [ "$resume_sync" == "resumed" ] || [ "$resume_sync" == "slave-replica-deleted-list.success" ] || [ "$resume_sync" == "update-master-replica.fail" ] || [ "$resume_sync" == "update-slave-replica.fail" ]
+	then
+		if [ "$CONFLICT_PREVALANCE" != "master" ]
+		then
+			if [ "$resume_sync" == "resumed" ] || [ "$resume_sync" == "slave-replica-deleted-list.success" ] || [ "$resume_sync" == "update-master-replica.fail" ]
+			then
 				sync_update_master
-				;&
-				update-master-replica.success|update-slave-replica.fail)
-				sync_update_master
-				;;
-			esac
-        	else
-                	case $resume_sync in
-				none)
-				;&
-				slave-replica-deleted-list.success|update-slave-replica.fail)
+				resume_sync="resumed"
+			fi
+			if [ "$resume_sync" == "resumed" ] || [ "$resume_sync" == "update-master-replica.success" ] || [ "$resume_sync" == "update-slave-replica.fail" ]
+			then
 				sync_update_slave
-				;&
-				update-slave-replica.success|update-master-replica.fail)
-	                	sync_update_master
-				;;
-			esac
-        	fi
-		;&
-		update-slave-replica.success|update-master-replica.success|delete-propagation-slave.fail)
+				resume_sync="resumed"
+			fi
+		else
+			if [ "$resume_sync" == "resumed" ] || [ "$resume_sync" == "slave-replica-deleted-list.success" ] || [ "$resume_sync" == "update-slave-replica.fail" ]
+                        then
+                                sync_update_slave
+                                resume_sync="resumed"
+                        fi
+                        if [ "$resume_sync" == "resumed" ] || [ "$resume_sync" == "update-slave-replica.success" ] || [ "$resume_sync" == "update-master-replica.fail" ]
+                        then
+                                sync_update_master
+                                resume_sync="resumed"
+                        fi
+		fi
+	fi
+	if [ "$resume_sync" == "resumed" ] || [ "$resume_sync" == "update-slave-replica.success" ] || [ "$resume_sync" == "update-master-replica.success" ] || [ "$resume_sync" == "delete-propagation-slave.fail" ]
+	then
 		delete_on_slave
-		;&
-		delete-propagation-slave.success|delete-propagation-master.fail)
+		resume_sync="resumed"
+	fi
+	if [ "$resume_sync" == "resumed" ] || [ "$resume_sync" == "delete-propagation-slave.success" ] || [ "$resume_sync" == "delete-propagation-master.fail" ]
+	then
 		delete_on_master
-		;&
-		delete-propagation-master.success|master-replica-tree-after.fail)
+		resume_sync="resumed"
+	fi
+	if [ "$resume_sync" == "resumed" ] || [ "$resume_sync" == "delete-propagation-master.success" ] || [ "$resume_sync" == "master-replica-tree-after.fail" ]
+	then
 		master_tree_after
-		;&
-		master-replica-tree-after.success|slave-replica-tree-after.fail)
+		resume_sync="resumed"
+	fi
+	if [ "$resume_sync" == "resumed" ] || [ "$resume_sync" == "master-replica-tree-after.success" ] || [ "$resume_sync" == "slave-replica-tree-after.fail" ]
+	then
 		slave_tree_after
-		;;
-	esac
+		resume_sync="resumed"
+	fi
+
+#	## In this case statement, ;& means executing every command below regardless of conditions. Only works with bash v4
+#	case $resume_sync in
+#		none|noresume)
+#		;&
+#		master-replica-tree.fail)
+#		master_tree_current
+#		;&
+#		master-replica-tree.success|slave-replica-tree.fail)
+#		slave_tree_current
+#		;&
+#		slave-replica-tree.success|master-replica-deleted-list.fail)
+#		master_delete_list
+#		;&
+#		master-replica-deleted-list.success|slave-replica-deleted-list.fail)
+#		slave_delete_list
+#		;&
+#		slave-replica-deleted-list.success|update-master-replica.fail|update-slave-replica.fail)
+#	        if [ "$CONFLICT_PREVALANCE" != "master" ]
+#	        then
+#       	        case $resume_sync in
+#				none)
+#				;&
+#				slave-replica-deleted-list.success|update-master-replica.fail)
+#				sync_update_master
+#				;&
+#				update-master-replica.success|update-slave-replica.fail)
+#				sync_update_master
+#				;;
+#			esac
+#       	else
+#	              	case $resume_sync in
+#				none)
+#				;&
+#				slave-replica-deleted-list.success|update-slave-replica.fail)
+#				sync_update_slave
+#				;&
+#				update-slave-replica.success|update-master-replica.fail)
+#	                	sync_update_master
+#				;;
+#			esac
+#       	fi
+#		;&
+#		update-slave-replica.success|update-master-replica.success|delete-propagation-slave.fail)
+#		delete_on_slave
+#		;&
+#		delete-propagation-slave.success|delete-propagation-master.fail)
+#		delete_on_master
+#		;&
+#		delete-propagation-master.success|master-replica-tree-after.fail)
+#		master_tree_after
+#		;&
+#		master-replica-tree-after.success|slave-replica-tree-after.fail)
+#		slave_tree_after
+#		;;
+#	esac
 
 	Log "Finished synchronization task."
 	echo "sync.success" > "$MASTER_STATE_DIR/last-action"
@@ -1213,7 +1285,7 @@ function Usage
 	echo "--dry: will run osync without actuallyv doing anything; just testing"
 	echo "--silent: will run osync without any output to stdout, usefull for cron jobs"
 	echo "--verbose: adds command outputs"
-	ecoh "--force-unlock: will override any existing active or dead locks on master and slave replica"
+	echo "--force-unlock: will override any existing active or dead locks on master and slave replica"
 	exit 128
 }
 
