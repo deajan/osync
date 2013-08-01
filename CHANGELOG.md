@@ -3,11 +3,17 @@ KNOWN ISSUES
 
 - Cannot write pidlock on remote slave with SUDO_EXEC=yes but insufficient rights (sudo does not work for command echo)
 - If master and remote slave aren't the same distros and rsync binary isn't in the same path, execution may fail (RSYNC_PATH should be configurable)
-- Possible non delete status for a file with space in name on master replica from slave remote replica
+- Possible non deleted file with space in name on master replica from slave remote replica
+- Tree functions do not use RSYNC_ARGS
+- Tree functions execute piped commands (grep, awk) on master when launched on remote slave
+- comm v5.97 (as on CentOS 5) does not know option --nocheckorder 
 
 RECENT CHANGES
 --------------
 
+- 01 Aug. 2013: beta 2 milestone
+- Fixed an issue with spaces in directory trees
+- Fixed an issue with recursive directory trees
 - Revamped a bit code to add bash 3.2 compatibility
 - 24 Jul. 2013: beta milestone
 - Fixed some bad error handling in CheckMasterSlaveDirs and LockDirectories
