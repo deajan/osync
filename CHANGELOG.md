@@ -1,16 +1,28 @@
+FUTURE IMPROVEMENTS
+-------------------
+
+- Merge master and slave functions
+- Merge tree current and after functions
+- Tree functions execute piped commands (grep, awk) on master when launched on remote slave, can cause more bandwith usage
+
 KNOWN ISSUES
 ------------
 
-- Cannot write pidlock on remote slave with SUDO_EXEC=yes but insufficient rights (sudo does not work for command echo)
+(v?)- Cannot write pidlock on remote slave with SUDO_EXEC=yes but insufficient rights (sudo does not work for command echo)
 - If master and remote slave aren't the same distros and rsync binary isn't in the same path, execution may fail (RSYNC_PATH should be configurable)
 - Possible non deleted file with space in name on master replica from slave remote replica
-- Tree functions do not use RSYNC_ARGS
-- Tree functions execute piped commands (grep, awk) on master when launched on remote slave
-- comm v5.97 (as on CentOS 5) does not know option --nocheckorder 
+- can load configuration files that don't have .conf extension...
 
 RECENT CHANGES
 --------------
 
+- 03 Aug. 2013: beta 3 milestone
+- Softdelete functions do now honor --dry switch
+- Simplified sync delete functions
+- Enhanced compatibility with different charsets in filenames
+- Added CentOS 5 compatibility (comm v5.97 without --nocheck-order function replaced by sort)
+- Tree functions now honor supplementary rsync arguments
+- Tree functions now honor exclusion lists
 - 01 Aug. 2013: beta 2 milestone
 - Fixed an issue with spaces in directory trees
 - Fixed an issue with recursive directory trees
