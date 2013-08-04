@@ -12,10 +12,14 @@ KNOWN ISSUES
 - If master and remote slave aren't the same distros and rsync binary isn't in the same path, execution may fail (RSYNC_PATH should be configurable)
 - Possible non deleted file with space in name on master replica from slave remote replica
 - can load configuration files that don't have .conf extension...
+- Softdelete functions do not honor maximum execution time
 
 RECENT CHANGES
 --------------
 
+- Fixed LoadConfigFile function will not warn on wrong config file
+- Without --verbose parameter, last sync details are still logged to /tmp/osync_(pid)
+- Added --no-maxtime parameter for sync big changes without enforcing execution time checks
 - 03 Aug. 2013: beta 3 milestone
 - Softdelete functions do now honor --dry switch
 - Simplified sync delete functions

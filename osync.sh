@@ -3,7 +3,7 @@
 ###### Osync - Rsync based two way sync engine with fault tolerance
 ###### (L) 2013 by Orsiris "Ozy" de Jong (www.netpower.fr) 
 OSYNC_VERSION=0.98
-OSYNC_BUILD=0308201303
+OSYNC_BUILD=0408201301
 
 DEBUG=no
 SCRIPT_PID=$$
@@ -144,8 +144,8 @@ function CleanUp
 		rm -f /dev/shm/osync_slave-tree-after_$SCRIPT_PID
 		rm -f /dev/shm/osync_update_master_replica_$SCRIPT_PID
 		rm -f /dev/shm/osync_update_slave_replica_$SCRIPT_PID
-		rm -f /dev/shm/osync_deletition_on_master_$SCRIPT_PID
-		rm -f /dev/shm/osync_deletition_on_slave_$SCRIPT_PID
+		rm -f /dev/shm/osync_deletion_on_master_$SCRIPT_PID
+		rm -f /dev/shm/osync_deletion_on_slave_$SCRIPT_PID
 		rm -f /dev/shm/osync_remote_slave_lock_$SCRIPT_PID
 		rm -f /dev/shm/osync_slave_space_$SCRIPT_PIDx
 	fi
@@ -193,9 +193,10 @@ function LoadConfigFile
         then
                 LogError "Cannot load configuration file [$1]. Sync cannot start."
                 return 1
-        elif [[ $1 != *.conf ]]
+        elif [[ "$1" != *".conf" ]]
         then
                 LogError "Wrong configuration file supplied [$1]. Sync cannot start."
+		return 1
         else
                 egrep '^#|^[^ ]*=[^;&]*'  "$1" > "/dev/shm/osync_config_$SCRIPT_PID"
                 source "/dev/shm/osync_config_$SCRIPT_PID"
@@ -786,6 +787,9 @@ function sync_update_slave
 	if [ $verbose -eq 1 ]
         then
                 Log "List:\n$(cat /dev/shm/osync_update_slave_replica_$SCRIPT_PID)"
+	else
+		echo "#### Update slave result" >> /tmp/osync_$SCRIPT_PID
+		cat /dev/shm/osync_update_slave_replica_$SCRIPT_PID >> /tmp/osync_$SCRIPT_PID
         fi
 
         if [ $retval != 0 ]
@@ -820,6 +824,9 @@ function sync_update_master
         if [ $verbose -eq 1 ]
         then
                 Log "List:\n$(cat /dev/shm/osync_update_master_replica_$SCRIPT_PID)"
+	else
+		echo "#### Update master result" >> /tmp/osync_$SCRIPT_PID
+        	cat /dev/shm/osync_update_master_replica_$SCRIPT_PID >> /tmp/osync_$SCRIPT_PID
         fi
 
         if [ $retval != 0 ]
@@ -835,13 +842,13 @@ function sync_update_master
 
 function delete_on_slave
 {
-	Log "Propagating deletitions to slave replica."
+	Log "Propagating deletions to slave replica."
 	if [ "$REMOTE_SYNC" == "yes" ]
 	then
-		rsync_cmd="$(which $RSYNC_EXECUTABLE) --rsync-path=\"$RSYNC_PATH\" $RSYNC_ARGS -rlptgoDEui -e \"$RSYNC_SSH_CMD\" $SLAVE_DELETE --delete --exclude \"$OSYNC_DIR\" --include-from \"$MASTER_STATE_DIR/master-deleted-list\" --exclude=\"*\" \"$MASTER_SYNC_DIR/\" $REMOTE_USER@$REMOTE_HOST:\"$ESC_SLAVE_SYNC_DIR/\" > /dev/shm/osync_deletition_on_slave_$SCRIPT_PID 2>&1 &"
+		rsync_cmd="$(which $RSYNC_EXECUTABLE) --rsync-path=\"$RSYNC_PATH\" $RSYNC_ARGS -rlptgoDEui -e \"$RSYNC_SSH_CMD\" $SLAVE_DELETE --delete --exclude \"$OSYNC_DIR\" --include-from \"$MASTER_STATE_DIR/master-deleted-list\" --exclude=\"*\" \"$MASTER_SYNC_DIR/\" $REMOTE_USER@$REMOTE_HOST:\"$ESC_SLAVE_SYNC_DIR/\" > /dev/shm/osync_deletion_on_slave_$SCRIPT_PID 2>&1 &"
 	else
-		#rsync_cmd="$(which $RSYNC_EXECUTABLE) --rsync-path=\"$RSYNC_PATH\" $RSYNC_ARGS -rlptgoDEui $SLAVE_DELETE --delete --exclude \"$OSYNC_DIR\" $RSYNC_EXCLUDE --exclude-from \"$MASTER_STATE_DIR/slave-deleted-list\" --include-from \"$MASTER_STATE_DIR/master-deleted-list\" \"$MASTER_SYNC_DIR/\" \"$SLAVE_SYNC_DIR/\" > /dev/shm/osync_deletition_on_slave_$SCRIPT_PID 2>&1 &"
-		rsync_cmd="$(which $RSYNC_EXECUTABLE) --rsync-path=\"$RSYNC_PATH\" $RSYNC_ARGS -rlptgoDEui $SLAVE_DELETE --delete --exclude \"$OSYNC_DIR\" --include-from \"$MASTER_STATE_DIR/master-deleted-list\" --exclude=\"*\" \"$MASTER_SYNC_DIR/\" \"$SLAVE_SYNC_DIR/\" > /dev/shm/osync_deletition_on_slave_$SCRIPT_PID 2>&1 &"
+		#rsync_cmd="$(which $RSYNC_EXECUTABLE) --rsync-path=\"$RSYNC_PATH\" $RSYNC_ARGS -rlptgoDEui $SLAVE_DELETE --delete --exclude \"$OSYNC_DIR\" $RSYNC_EXCLUDE --exclude-from \"$MASTER_STATE_DIR/slave-deleted-list\" --include-from \"$MASTER_STATE_DIR/master-deleted-list\" \"$MASTER_SYNC_DIR/\" \"$SLAVE_SYNC_DIR/\" > /dev/shm/osync_deletion_on_slave_$SCRIPT_PID 2>&1 &"
+		rsync_cmd="$(which $RSYNC_EXECUTABLE) --rsync-path=\"$RSYNC_PATH\" $RSYNC_ARGS -rlptgoDEui $SLAVE_DELETE --delete --exclude \"$OSYNC_DIR\" --include-from \"$MASTER_STATE_DIR/master-deleted-list\" --exclude=\"*\" \"$MASTER_SYNC_DIR/\" \"$SLAVE_SYNC_DIR/\" > /dev/shm/osync_deletion_on_slave_$SCRIPT_PID 2>&1 &"
 	fi
 	if [ "$DEBUG" == "yes" ]
 	then
@@ -853,12 +860,15 @@ function delete_on_slave
 	retval=$?
         if [ $verbose -eq 1 ]
         then
-                Log "List:\n$(cat /dev/shm/osync_deletition_on_slave_$SCRIPT_PID)"
+                Log "List:\n$(cat /dev/shm/osync_deletion_on_slave_$SCRIPT_PID)"
+	else
+		echo "#### Deletion on slave result" >> /tmp/osync_$SCRIPT_PID
+        	cat /dev/shm/osync_deletion_on_slave_$SCRIPT_PID >> /tmp/osync_$SCRIPT_PID
         fi
 
 	if [ $retval != 0 ]
 	then
-		LogError "Deletition on slave failed."
+		LogError "Deletion on slave failed."
 		echo "delete-propagation-slave.fail" > "$MASTER_STATE_DIR/last-action"
 		exit 1
 	else
@@ -868,13 +878,13 @@ function delete_on_slave
 
 function delete_on_master
 {	
-	Log "Propagating deletitions to master replica."
+	Log "Propagating deletions to master replica."
 	if [ "$REMOTE_SYNC" == "yes" ]
 	then
-		rsync_cmd="$(which $RSYNC_EXECUTABLE) --rsync-path=\"$RSYNC_PATH\" $RSYNC_ARGS -rlptgoDEui -e \"$RSYNC_SSH_CMD\" $MASTER_DELETE --delete --exclude \"$OSYNC_DIR\" --include-from \"$MASTER_STATE_DIR/slave-deleted-list\" --exclude=\"*\" $REMOTE_USER@$REMOTE_HOST:\"$ESC_SLAVE_SYNC_DIR/\" \"$MASTER_SYNC_DIR/\" > /dev/shm/osync_deletition_on_master_$SCRIPT_PID 2>&1 &"
+		rsync_cmd="$(which $RSYNC_EXECUTABLE) --rsync-path=\"$RSYNC_PATH\" $RSYNC_ARGS -rlptgoDEui -e \"$RSYNC_SSH_CMD\" $MASTER_DELETE --delete --exclude \"$OSYNC_DIR\" --include-from \"$MASTER_STATE_DIR/slave-deleted-list\" --exclude=\"*\" $REMOTE_USER@$REMOTE_HOST:\"$ESC_SLAVE_SYNC_DIR/\" \"$MASTER_SYNC_DIR/\" > /dev/shm/osync_deletion_on_master_$SCRIPT_PID 2>&1 &"
 	else
-		#rsync_cmd="$(which $RSYNC_EXECUTABLE) --rsync-path=\"$RSYNC_PATH\" $RSYNC_ARGS -rlptgoDEui $MASTER_DELETE --delete --exclude \"$OSYNC_DIR\" $RSYNC_EXCLUDE --exclude-from \"$MASTER_STATE_DIR/master-deleted-list\" --include-from \"$MASTER_STATE_DIR/slave-deleted-list\" \"$SLAVE_SYNC_DIR/\" \"$MASTER_SYNC_DIR/\" > /dev/shm/osync_deletition_on_master_$SCRIPT_PID 2>&1 &"
-		rsync_cmd="$(which $RSYNC_EXECUTABLE) --rsync-path=\"$RSYNC_PATH\" $RSYNC_ARGS -rlptgoDEui $MASTER_DELETE --delete --exclude \"$OSYNC_DIR\" --include-from \"$MASTER_STATE_DIR/slave-deleted-list\" --exclude=\"*\" \"$SLAVE_SYNC_DIR/\" \"$MASTER_SYNC_DIR/\" > /dev/shm/osync_deletition_on_master_$SCRIPT_PID 2>&1 &"
+		#rsync_cmd="$(which $RSYNC_EXECUTABLE) --rsync-path=\"$RSYNC_PATH\" $RSYNC_ARGS -rlptgoDEui $MASTER_DELETE --delete --exclude \"$OSYNC_DIR\" $RSYNC_EXCLUDE --exclude-from \"$MASTER_STATE_DIR/master-deleted-list\" --include-from \"$MASTER_STATE_DIR/slave-deleted-list\" \"$SLAVE_SYNC_DIR/\" \"$MASTER_SYNC_DIR/\" > /dev/shm/osync_deletion_on_master_$SCRIPT_PID 2>&1 &"
+		rsync_cmd="$(which $RSYNC_EXECUTABLE) --rsync-path=\"$RSYNC_PATH\" $RSYNC_ARGS -rlptgoDEui $MASTER_DELETE --delete --exclude \"$OSYNC_DIR\" --include-from \"$MASTER_STATE_DIR/slave-deleted-list\" --exclude=\"*\" \"$SLAVE_SYNC_DIR/\" \"$MASTER_SYNC_DIR/\" > /dev/shm/osync_deletion_on_master_$SCRIPT_PID 2>&1 &"
 	fi
 	if [ "$DEBUG" == "yes" ]
 	then
@@ -886,12 +896,15 @@ function delete_on_master
 	retval=$?
         if [ $verbose -eq 1 ]
         then
-                Log "List:\n$(cat /dev/shm/osync_deletition_on_master_$SCRIPT_PID)"
+                Log "List:\n$(cat /dev/shm/osync_deletion_on_master_$SCRIPT_PID)"
+	else
+		echo "#### Deletion on master result" >> /tmp/osync_$SCRIPT_PID
+        	cat /dev/shm/osync_deletion_on_master_$SCRIPT_PID >> /tmp/osync_$SCRIPT_PID
         fi
 
 	if [ $retval != 0 ]
 	then
-		LogError "Deletition on master failed."
+		LogError "Deletion on master failed."
 		echo "delete-propagation-master.fail" > "$MASTER_STATE_DIR/last-action"
 		exit 1
 	else
@@ -1077,7 +1090,7 @@ function Sync
 #				sync_update_master
 #				;&
 #				update-master-replica.success|update-slave-replica.fail)
-#				sync_update_master
+#				sync_update_slave
 #				;;
 #			esac
 #       	else
@@ -1327,6 +1340,7 @@ function Usage
 dryrun=0
 silent=0
 force_unlock=0
+no_maxtime=0
 if [ "$DEBUG" == "yes" ]
 then
 	verbose=1
@@ -1359,6 +1373,9 @@ do
 		--force-unlock)
 		force_unlock=1
 		;;
+		--no-maxtime)
+		no_maxtime=1
+		;;
 		--help|-h|--version|-v)
 		Usage
 		;;
@@ -1378,6 +1395,11 @@ then
 			Log "-------------------------------------------------------------"
 			Log " $DRY_WARNING $DATE - Osync v$OSYNC_VERSION script begin."
 			Log "-------------------------------------------------------------"
+			if [ $no_maxtime -eq 1 ]
+			then
+				SOFT_MAX_EXEC_TIME=0
+				HARD_MAX_EXEC_TIME=0
+			fi
 			CheckMasterSlaveDirs
 			CheckMinimumSpace
 			if [ $? == 0 ]
