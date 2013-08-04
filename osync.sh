@@ -1,11 +1,11 @@
-*#!/bin/bash
+#!/bin/bash
 
 ###### Osync - Rsync based two way sync engine with fault tolerance
 ###### (L) 2013 by Orsiris "Ozy" de Jong (www.netpower.fr) 
-OSYNC_VERSION=0.98
-OSYNC_BUILD=0408201305
+OSYNC_VERSION=0.99
+OSYNC_BUILD=0408201306
 
-DEBUG=no
+DEBUG=yes
 SCRIPT_PID=$$
 
 LOCAL_USER=$(whoami)
@@ -605,8 +605,8 @@ function LockDirectories
 	if [ -f "$MASTER_STATE_DIR/lock" ]
 	then
 		master_lock_pid=$(cat $MASTER_STATE_DIR/lock)
-		LogDebug "Master lock pid: $master_lock_pid"
-		ps -p$master_lock_pid > /dev/null
+		LogDebug "Master lock pid present: $master_lock_pid"
+		ps -p$master_lock_pid > /dev/null 2>&1
 		if [ $? != 0 ]
 		then
 			Log "There is a dead osync lock on master. Instance $master_lock_pid no longer running. Resuming."
@@ -699,7 +699,12 @@ function master_tree_current
 {
 	Log "Creating master replica file list."
 	## Tree listing function: list | remove everything not file or directory | remove first 4 columns | remove empty leading spaces | remove "." dir (or return true if not exist)
-	$(which $RSYNC_EXECUTABLE) --rsync-path="$RSYNC_PATH" -rlptgoDE8 $RSYNC_ARGS --exclude "$OSYNC_DIR" $RSYNC_EXCLUDE --list-only "$MASTER_SYNC_DIR/" | grep "^-\|^d" | awk '{$1=$2=$3=$4="" ;print}' | awk '{$1=$1 ;print}' | (grep -v "^\.$" || :) | sort > /dev/shm/osync_master-tree-current_$SCRIPT_PID &
+	rsync_cmd="$(which $RSYNC_EXECUTABLE) --rsync-path=\"$RSYNC_PATH\" -rlptgoDE8 $RSYNC_ARGS --exclude \"$OSYNC_DIR\" $RSYNC_EXCLUDE --list-only \"$MASTER_SYNC_DIR/\" | grep \"^-\|^d\" | awk '{\$1=\$2=\$3=\$4=\"\" ;print}' | awk '{\$1=\$1 ;print}' | (grep -v \"^\.$\" || :) | sort > /dev/shm/osync_master-tree-current_$SCRIPT_PID &"
+	if [ "$DEBUG" == "yes" ]
+	then
+		Log "RSYNC_CMD: $rsync_cmd"	
+	fi
+	eval $rsync_cmd
 	child_pid=$!
 	WaitForCompletion $child_pid $SOFT_MAX_EXEC_TIME $HARD_MAX_EXEC_TIME
 	if [ $? == 0 ] && [ -f /dev/shm/osync_master-tree-current_$SCRIPT_PID ]
@@ -920,7 +925,12 @@ function master_tree_after
 		return 0
 	fi
         Log "Creating after run master replica file list."
-        $(which $RSYNC_EXECUTABLE) --rsync-path="$RSYNC_PATH" -rlptgoDE8 $RSYNC_ARGS --exclude "$OSYNC_DIR" $RSYNC_EXCLUDE --list-only "$MASTER_SYNC_DIR/" | grep "^-\|^d" | awk '{$1=$2=$3=$4="" ;print}' | awk '{$1=$1 ;print}' | (grep -v "^\.$" || :) | sort > /dev/shm/osync_master-tree-after_$SCRIPT_PID &
+        rsync_cmd="$(which $RSYNC_EXECUTABLE) --rsync-path=\"$RSYNC_PATH\" -rlptgoDE8 $RSYNC_ARGS --exclude \"$OSYNC_DIR\" $RSYNC_EXCLUDE --list-only \"$MASTER_SYNC_DIR/\" | grep \"^-\|^d\" | awk '{\$1=\$2=\$3=\$4=\"\" ;print}' | awk '{\$1=\$1 ;print}' | (grep -v \"^\.$\" || :) | sort > /dev/shm/osync_master-tree-after_$SCRIPT_PID &"
+	if [ "$DEBUG" == "yes" ]
+	then
+		Log "RSYNC_CMD: $rsync_cmd"
+	fi
+	eval $rsync_cmd
 	child_pid=$!
         WaitForCompletion $child_pid $SOFT_MAX_EXEC_TIME 0
         retval=$?
@@ -1006,7 +1016,7 @@ function Sync
 	################################################################################################################################################# Actual sync begins here
 
 	## This replaces the case statement below because ;& operator is not supported in bash 3.2... Code is more messy than case :(
-	if [ "$resume_sync" == "none" ] || [ "$resume_sync" == "noresume" ]
+	if [ "$resume_sync" == "none" ] || [ "$resume_sync" == "noresume" ] || [ "$resume_sync" == "master-replica-tree.fail" ]
 	then
 		master_tree_current
 		resume_sync="resumed"
