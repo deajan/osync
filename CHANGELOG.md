@@ -1,22 +1,24 @@
 FUTURE IMPROVEMENTS
 -------------------
 
-- Merge master and slave functions
-- Merge tree current and after functions
-- Tree functions execute piped commands (grep, awk) on master when launched on remote slave, can cause more bandwith usage
+- Sync function merge (master and slave functions are more more or less the same)
+- Tree function merge (current and after tree functions are the same except for output filename and logging)
+- Tree functions execute piped commands (grep, awk) on master when launched on remote slave which can cause more bandwith usage
 
 KNOWN ISSUES
 ------------
 
-(v?)- Cannot write pidlock on remote slave with SUDO_EXEC=yes but insufficient rights (sudo does not work for command echo)
-- If master and remote slave aren't the same distros and rsync binary isn't in the same path, execution may fail (RSYNC_PATH should be configurable)
-- Possible non deleted file with space in name on master replica from slave remote replica
-- can load configuration files that don't have .conf extension...
-- Softdelete functions do not honor maximum execution time
+- If master and remote slave systems don't have rsync in the same path, execution may fail (RSYNC_PATH is configured on master but also executed on slave)
 
 RECENT CHANGES
 --------------
 
+- Fixed a possible error upon master replica lock check
+- Fixed exclude directorires with spaces in names generate errros on master replica tree functions
+- Dryruns won't create after run tree lists and therefore not prevent building real run delete lists
+- Softdelete and conflict backup functions are now time controlled
+- Added bandwidth limit
+- Update and delete functions now run rsync with --stats parameter
 - Fixed LoadConfigFile function will not warn on wrong config file
 - Without --verbose parameter, last sync details are still logged to /tmp/osync_(pid)
 - Added --no-maxtime parameter for sync big changes without enforcing execution time checks

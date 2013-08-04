@@ -1,9 +1,9 @@
-#!/bin/bash
+*#!/bin/bash
 
 ###### Osync - Rsync based two way sync engine with fault tolerance
 ###### (L) 2013 by Orsiris "Ozy" de Jong (www.netpower.fr) 
 OSYNC_VERSION=0.98
-OSYNC_BUILD=0408201302
+OSYNC_BUILD=0408201305
 
 DEBUG=no
 SCRIPT_PID=$$
@@ -914,6 +914,11 @@ function delete_on_master
 
 function master_tree_after
 {
+	if [ $dryrun -eq 1 ]
+	then
+		Log "No need to create after run master replica file list, nothing should have changed."
+		return 0
+	fi
         Log "Creating after run master replica file list."
         $(which $RSYNC_EXECUTABLE) --rsync-path="$RSYNC_PATH" -rlptgoDE8 $RSYNC_ARGS --exclude "$OSYNC_DIR" $RSYNC_EXCLUDE --list-only "$MASTER_SYNC_DIR/" | grep "^-\|^d" | awk '{$1=$2=$3=$4="" ;print}' | awk '{$1=$1 ;print}' | (grep -v "^\.$" || :) | sort > /dev/shm/osync_master-tree-after_$SCRIPT_PID &
 	child_pid=$!
@@ -932,6 +937,11 @@ function master_tree_after
 
 function slave_tree_after
 {
+	if [ $dryrun -eq 1 ]
+	then
+		Log "No need to create after frun slave replica file list, nothing should have changed."
+		return 0
+	fi
         Log "Creating after run slave replica file list."
 	if [ "$REMOTE_SYNC" == "yes" ]
 	then
@@ -1134,9 +1144,18 @@ function SoftDelete
 			Log "Removing backups older than $CONFLICT_BACKUP_DAYS days on master replica."
 			if [ $dryrun -eq 1 ]
 			then
-				find "$MASTER_BACKUP_DIR/" -ctime +$CONFLICT_BACKUP_DAYS
+				find "$MASTER_BACKUP_DIR/" -ctime +$CONFLICT_BACKUP_DAYS &
 			else
-				find "$MASTER_BACKUP_DIR/" -ctime +$CONFLICT_BACKUP_DAYS | xargs rm -rf
+				find "$MASTER_BACKUP_DIR/" -ctime +$CONFLICT_BACKUP_DAYS | xargs rm -rf &
+			fi
+			child_pid=$!
+        		WaitForCompletion $child_pid $SOFT_MAX_EXEC_TIME 0
+        		retval=$?
+			if [ $retval -ne 0 ]
+			then
+				LogError "Error while executing conflict backup cleanup on master replica."
+			else
+				Log "Conflict backup cleanup complete on master replica."
 			fi
 		fi
 		
@@ -1149,6 +1168,15 @@ function SoftDelete
 			else
 				eval "$SSH_CMD \"if [ -d \\\"$SLAVE_BACKUP_DIR\\\" ]; then $COMMAND_SUDO find \\\"$SLAVE_BACKUP_DIR/\\\" -ctime +$CONFLICT_BACKUP_DAYS | xargs rm -rf; fi\""
 			fi
+			child_pid=$!
+                        WaitForCompletion $child_pid $SOFT_MAX_EXEC_TIME 0
+                        retval=$?
+                        if [ $retval -ne 0 ]
+                        then
+                                LogError "Error while executing conflict backup cleanup on slave replica."
+                        else
+                                Log "Conflict backup cleanup complete on slave replica."
+                        fi
 		else
 			if [ -d "$SLAVE_BACKUP_DIR" ]
 			then
@@ -1159,6 +1187,15 @@ function SoftDelete
 				else
 					find "$SLAVE_BACKUP_DIR/" -ctime +$CONFLICT_BACKUP_DAYS | xargs rm -rf
 				fi
+				child_pid=$!
+	                        WaitForCompletion $child_pid $SOFT_MAX_EXEC_TIME 0
+        	                retval=$?
+                	        if [ $retval -ne 0 ]
+                        	then
+                                	LogError "Error while executing conflict backup cleanup on slave replica."
+                        	else
+                                	Log "Conflict backup cleanup complete on slave replica."
+                        	fi
 			fi
 		fi
 	fi
@@ -1174,6 +1211,15 @@ function SoftDelete
 			else
 				find "$MASTER_DELETE_DIR/" -ctime +$SOFT_DELETE_DAYS | xargs rm -rf
 			fi
+			child_pid=$!
+                        WaitForCompletion $child_pid $SOFT_MAX_EXEC_TIME 0
+                        retval=$?
+                        if [ $retval -ne 0 ]
+                        then
+                                LogError "Error while executing soft delete cleanup on master replica."
+                        else
+                                Log "Soft delete cleanup complete on master replica."
+                        fi
 		fi
 
 		if [ "$REMOTE_SYNC" == "yes" ]
@@ -1185,6 +1231,16 @@ function SoftDelete
 			else
 				eval "$SSH_CMD \"if [ -d \\\"$SLAVE_DELETE_DIR\\\" ]; then $COMMAND_SUDO find \\\"$SLAVE_DELETE_DIR/\\\" -ctime +$SOFT_DELETE_DAYS | xargs rm -rf; fi\""
 			fi
+			child_pid=$!
+                        WaitForCompletion $child_pid $SOFT_MAX_EXEC_TIME 0
+                        retval=$?
+                        if [ $retval -ne 0 ]
+                        then
+                                LogError "Error while executing soft delete cleanup on slave replica."
+                        else
+                                Log "Soft delete cleanup complete on slave replica."
+                        fi
+
 		else
 			if [ -d "$SLAVE_DELETE_DIR" ]
 			then
@@ -1195,6 +1251,15 @@ function SoftDelete
 				else
 					find "$SLAVE_DELETE_DIR/" -ctime +$SOFT_DELETE_DAYS | xargs rm -rf
 				fi
+				child_pid=$!
+                       		WaitForCompletion $child_pid $SOFT_MAX_EXEC_TIME 0
+                        	retval=$?
+                        	if [ $retval -ne 0 ]
+                        	then
+                               		LogError "Error while executing soft delete cleanup on slave replica."
+                        	else
+                                	Log "Soft delete cleanup complete on slave replica."
+                        	fi
 			fi
 		fi
 	fi
@@ -1285,6 +1350,11 @@ function Init
 	if [ "$RSYNC_ARGS" == "-" ]
 	then
 		RSYNC_ARGS=""
+	fi
+
+	if [ "$BANDWIDTH" != "0" ]
+	then
+		RSYNC_ARGS=$RSYNC_ARGS" --bwlimit=$BANDWIDTH"
 	fi
 
 	## Conflict options
