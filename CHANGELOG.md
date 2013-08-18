@@ -8,11 +8,13 @@ FUTURE IMPROVEMENTS
 KNOWN ISSUES
 ------------
 
-- If master and remote slave systems don't have rsync in the same path, execution may fail (RSYNC_PATH is configured on master but also executed on slave)
+- If master and remote slave systems don't have rsync in the same path, execution may fail (RSYNC_PATH is always configured on master, even when executed on slave)
 
 RECENT CHANGES
 --------------
 
+- 18 Aug. 2013: Osync 0.99 RC1
+- Added possibility to change default logfile
 - Fixed a possible error upon master replica lock check
 - Fixed exclude directorires with spaces in names generate errros on master replica tree functions
 - Dryruns won't create after run tree lists and therefore not prevent building real run delete lists

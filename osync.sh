@@ -3,9 +3,9 @@
 ###### Osync - Rsync based two way sync engine with fault tolerance
 ###### (L) 2013 by Orsiris "Ozy" de Jong (www.netpower.fr) 
 OSYNC_VERSION=0.99
-OSYNC_BUILD=0408201306
+OSYNC_BUILD=1808201302
 
-DEBUG=yes
+DEBUG=no
 SCRIPT_PID=$$
 
 LOCAL_USER=$(whoami)
@@ -1288,7 +1288,13 @@ function Init
                 trap 'TrapError ${LINENO} $?' ERR
         fi
 
-        LOG_FILE=/var/log/osync_$OSYNC_VERSION-$SYNC_ID.log
+        if [ "$LOGFILE" == "" ]
+        then
+                LOG_FILE=/var/log/osync_$OSYNC_VERSION-$SYNC_ID.log
+        else
+                LOG_FILE="$LOGFILE"
+        fi
+
         MAIL_ALERT_MSG="Warning: Execution of osync instance $OSYNC_ID (pid $SCRIPT_PID) as $LOCAL_USER@$LOCAL_HOST produced errors."
 
 	## Rsync does not like spaces in directory names, considering it as two different directories. Handling this schema by escaping space
@@ -1407,11 +1413,12 @@ function Usage
 {
 	echo "Osync $OSYNC_VERSION $OSYNC_BUILD"
 	echo ""
-	echo "usage: osync /path/to/conf.file [--dry] [--silent] [--verbose] [--force-unlock]"
+	echo "usage: osync /path/to/conf.file [--dry] [--silent] [--verbose] [--no-maxtime] [--force-unlock]"
 	echo ""
 	echo "--dry: will run osync without actuallyv doing anything; just testing"
 	echo "--silent: will run osync without any output to stdout, usefull for cron jobs"
 	echo "--verbose: adds command outputs"
+	echo "--no-maxtime: disables any soft and hard execution time checks"
 	echo "--force-unlock: will override any existing active or dead locks on master and slave replica"
 	exit 128
 }
@@ -1473,8 +1480,9 @@ then
 			Init
 			DATE=$(date)
 			Log "-------------------------------------------------------------"
-			Log " $DRY_WARNING $DATE - Osync v$OSYNC_VERSION script begin."
+			Log "$DRY_WARNING $DATE - Osync v$OSYNC_VERSION script begin."
 			Log "-------------------------------------------------------------"
+			Log "Backup task [$BACKUP_ID] launched as $LOCAL_USER@$LOCAL_HOST (PID $SCRIPT_PID)"
 			if [ $no_maxtime -eq 1 ]
 			then
 				SOFT_MAX_EXEC_TIME=0
