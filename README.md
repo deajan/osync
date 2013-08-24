@@ -23,6 +23,8 @@ Osync uses a master / slave sync schema. It can sync local or remote directories
 Also, osync uses pidlocks to prevent multiple concurrent sync processes on/to the same master / slave replica. Be sure a sync process is finished before launching next one.
 You may launch concurrent sync processes on the same system but only for different master replicas.
 
+Currently, it has been tested on CentOS 5, CentOS 6, Debian 6.0.7, Linux Mint 14 and Ubuntu 12.
+
 ## Installation
 
 Osync developpment is still not finished. It's currently at beta stage. Please read CHANGELOG.md for a list of known bugs.

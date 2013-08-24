@@ -4,6 +4,8 @@ FUTURE IMPROVEMENTS
 - Sync function merge (master and slave functions are more more or less the same)
 - Tree function merge (current and after tree functions are the same except for output filename and logging)
 - Tree functions execute piped commands (grep, awk) on master when launched on remote slave which can cause more bandwith usage
+- Exit trap function must also kill child processes
+- Make osync run on Cygwin for Windows compatibility
 
 KNOWN ISSUES
 ------------
@@ -13,6 +15,8 @@ KNOWN ISSUES
 RECENT CHANGES
 --------------
 
+- Fixed various typos
+- Enforced CheckConnectivityRemoteHost and CheckConnectivity3rdPartyHosts checks (if one of these fails, osync is stopped)
 - 18 Aug. 2013: Osync 0.99 RC1
 - Added possibility to change default logfile
 - Fixed a possible error upon master replica lock check
@@ -64,5 +68,6 @@ RECENT CHANGES
 - Added master/slave conflict prevalance option
 - Added soft-deleted items
 - Added backup items in case of conflict
-19 Jun. 2013: Project begin
+
+19 Jun. 2013: Project begin as Obackup fork
 
