@@ -4,7 +4,7 @@
 ###### Osync - Rsync based two way sync engine with fault tolerance
 ###### (L) 2013 by Orsiris "Ozy" de Jong (www.netpower.fr) 
 OSYNC_VERSION=0.99preRC2
-OSYNC_BUILD=2408201301
+OSYNC_BUILD=2508201301
 
 DEBUG=no
 SCRIPT_PID=$$
@@ -399,7 +399,7 @@ function CheckConnectivity3rdPartyHosts
                         ping $i -c 2 > /dev/null 2>&1
                         if [ $? != 0 ]
                         then
-                                LogError "Cannot ping 3rd party host $i"
+                                Log "Cannot ping 3rd party host $i"
                         else
                                 remote_3rd_party_success=1
                         fi
@@ -795,17 +795,18 @@ function sync_update_slave
         child_pid=$!
         WaitForCompletion $child_pid $SOFT_MAX_EXEC_TIME $HARD_MAX_EXEC_TIME
         retval=$?
-	if [ $verbose -eq 1 ]
+	if [ $verbose -eq 1 ] && [ -f /dev/shm/osync_update_slave_replica_$SCRIPT_PID ]
         then
                 Log "List:\n$(cat /dev/shm/osync_update_slave_replica_$SCRIPT_PID)"
-	else
-		echo "#### Update slave result" >> /tmp/osync_$SCRIPT_PID
-		cat /dev/shm/osync_update_slave_replica_$SCRIPT_PID >> /tmp/osync_$SCRIPT_PID
         fi
 
         if [ $retval != 0 ]
         then
                 LogError "Updating slave replica failed. Stopping execution."
+		if [ $verbose -eq 0 ] && [ -f /dev/shm/osync_update_slave_replica_$SCRIPT_PID ]
+		then
+			LogError "Rsync output:\n$(cat /dev/shm/osync_update_slave_replica_$SCRIPT_PID)"
+		fi
                 echo "update-slave-replica.fail" > "$MASTER_STATE_DIR/last-action"
 		exit 1
         else
@@ -833,16 +834,17 @@ function sync_update_master
         child_pid=$!
         WaitForCompletion $child_pid $SOFT_MAX_EXEC_TIME $HARD_MAX_EXEC_TIME
         retval=$?
-        if [ $verbose -eq 1 ]
+        if [ $verbose -eq 1 ] && [ -f /dev/shm/osync_update_master_replica_$SCRIPT_PID ]
         then
                 Log "List:\n$(cat /dev/shm/osync_update_master_replica_$SCRIPT_PID)"
-	else
-		echo "#### Update master result" >> /tmp/osync_$SCRIPT_PID
-        	cat /dev/shm/osync_update_master_replica_$SCRIPT_PID >> /tmp/osync_$SCRIPT_PID
         fi
 
         if [ $retval != 0 ]
         then
+                if [ $verbose -eq 0 ] && [ -f /dev/shm/osync_update_slave_replica_$SCRIPT_PID ]
+                then
+                        LogError "Rsync output:\n$(cat /dev/shm/osync_update_slave_replica_$SCRIPT_PID)"
+                fi
                 LogError "Updating master replica failed. Stopping execution."
                 echo "update-master-replica.fail" > "$MASTER_STATE_DIR/last-action"
 		exit 1
@@ -872,16 +874,17 @@ function delete_on_slave
 	child_pid=$!
 	WaitForCompletion $child_pid $SOFT_MAX_EXEC_TIME 0
 	retval=$?
-        if [ $verbose -eq 1 ]
+        if [ $verbose -eq 1 ] && [ -f /dev/shm/osync_deletion_on_slave_$SCRIPT_PID ]
         then
                 Log "List:\n$(cat /dev/shm/osync_deletion_on_slave_$SCRIPT_PID)"
-	else
-		echo "#### Deletion on slave result" >> /tmp/osync_$SCRIPT_PID
-        	cat /dev/shm/osync_deletion_on_slave_$SCRIPT_PID >> /tmp/osync_$SCRIPT_PID
         fi
 
 	if [ $retval != 0 ]
 	then
+                if [ $verbose -eq 0 ] && [ -f /dev/shm/osync_deletion_on_slave_$SCRIPT_PID ]
+                then
+                        LogError "Rsync output:\n$(cat /dev/shm/osync_deletion_on_slave_$SCRIPT_PID)"
+                fi 
 		LogError "Deletion on slave failed."
 		echo "delete-propagation-slave.fail" > "$MASTER_STATE_DIR/last-action"
 		exit 1
@@ -909,16 +912,17 @@ function delete_on_master
 	child_pid=$!
 	WaitForCompletion $child_pid $SOFT_MAX_EXEC_TIME 0
 	retval=$?
-        if [ $verbose -eq 1 ]
+        if [ $verbose -eq 1 ] && [ -f /dev/shm/osync_deletion_on_master_$SCRIPT_PID ]
         then
                 Log "List:\n$(cat /dev/shm/osync_deletion_on_master_$SCRIPT_PID)"
-	else
-		echo "#### Deletion on master result" >> /tmp/osync_$SCRIPT_PID
-        	cat /dev/shm/osync_deletion_on_master_$SCRIPT_PID >> /tmp/osync_$SCRIPT_PID
         fi
 
 	if [ $retval != 0 ]
 	then
+                if [ $verbose -eq 0 ] && [ -f /dev/shm/osync_deletion_on_master_$SCRIPT_PID ]
+                then
+                        LogError "Rsync output:\n$(cat /dev/shm/osync_deletion_on_master_$SCRIPT_PID)"
+                fi
 		LogError "Deletion on master failed."
 		echo "delete-propagation-master.fail" > "$MASTER_STATE_DIR/last-action"
 		exit 1

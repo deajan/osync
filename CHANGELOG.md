@@ -15,6 +15,7 @@ KNOWN ISSUES
 RECENT CHANGES
 --------------
 
+- Improved verbose output
 - Fixed various typos
 - Enforced CheckConnectivityRemoteHost and CheckConnectivity3rdPartyHosts checks (if one of these fails, osync is stopped)
 - 18 Aug. 2013: Osync 0.99 RC1
@@ -26,7 +27,6 @@ RECENT CHANGES
 - Added bandwidth limit
 - Update and delete functions now run rsync with --stats parameter
 - Fixed LoadConfigFile function will not warn on wrong config file
-- Without --verbose parameter, last sync details are still logged to /tmp/osync_(pid)
 - Added --no-maxtime parameter for sync big changes without enforcing execution time checks
 - 03 Aug. 2013: beta 3 milestone
 - Softdelete functions do now honor --dry switch
