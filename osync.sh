@@ -77,6 +77,9 @@ function TrapStop
 
 function TrapQuit
 {
+	## Stopping all running child processes
+	pkill -TERM -P $$
+
 	if [ $error_alert -ne 0 ]
 	then
         	SendAlert
@@ -310,7 +313,11 @@ function WaitForCompletion
 ## Runs local command $1 and waits for completition in $2 seconds
 function RunLocalCommand
 {
-        CheckConnectivity3rdPartyHosts
+        if [ $dryrun -ne 0 ]
+        then
+                Log "Dryrun: Local command [$1] not run."
+                return 1
+        fi
         $1 > /dev/shm/osync_run_local_$SCRIPT_PID 2>&1 &
         child_pid=$!
         WaitForTaskCompletion $child_pid 0 $2
@@ -333,6 +340,11 @@ function RunRemoteCommand
 {
         CheckConnectivity3rdPartyHosts
         CheckConnectivityRemoteHost
+        if [ $dryrun -ne 0 ]
+        then
+                Log "Dryrun: Local command [$1] not run."
+                return 1
+        fi
         eval "$SSH_CMD \"$1\" > /dev/shm/osync_run_remote_$SCRIPT_PID 2>&1 &"
         child_pid=$!
         WaitForTaskCompletion $child_pid 0 $2

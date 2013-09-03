@@ -15,6 +15,8 @@ KNOWN ISSUES
 RECENT CHANGES
 --------------
 
+- Improved forced quit command by killing all child processes
+- Before / after commands are now ignored on dryruns
 - Improved verbose output
 - Fixed various typos
 - Enforced CheckConnectivityRemoteHost and CheckConnectivity3rdPartyHosts checks (if one of these fails, osync is stopped)
