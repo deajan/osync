@@ -1,10 +1,9 @@
-
 #!/bin/bash
 
 ###### Osync - Rsync based two way sync engine with fault tolerance
 ###### (L) 2013 by Orsiris "Ozy" de Jong (www.netpower.fr) 
 OSYNC_VERSION=0.99preRC2
-OSYNC_BUILD=2508201301
+OSYNC_BUILD=1009201301
 
 DEBUG=no
 SCRIPT_PID=$$
@@ -1380,7 +1379,7 @@ function Init
 
 	## Set rsync options
 	RSYNC_ARGS="-"
-        if [ "$PRESERVE_ACLS" == "yes" ]
+        if [ "$PRESERVE_ACL" == "yes" ]
         then
                 RSYNC_ARGS=$RSYNC_ARGS"A"
         fi
