@@ -15,6 +15,7 @@ KNOWN ISSUES
 RECENT CHANGES
 --------------
 
+- Fixed an issue with CheckConnectivity3rdPartyHosts
 - Added an option to stop execution if a local / remote command fails
 - Improved forced quit command by killing all child processes
 - Before / after commands are now ignored on dryruns
