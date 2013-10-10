@@ -1455,21 +1455,31 @@ function Init
 		RSYNC_SSH_CMD="$(type -p ssh) $SSH_COMP -i $SSH_RSA_PRIVATE_KEY -p $REMOTE_PORT"
 	fi
 
-        ## Set rsync executable and rsync path (for remote sudo rsync)
+	## Support for older config files without RSYNC_EXECUTABLE option
         if [ "$RSYNC_EXECUTABLE" == "" ]
         then
                 RSYNC_EXECUTABLE=rsync
         fi
 
+        ## Sudo execution option
         if [ "$SUDO_EXEC" == "yes" ]
         then
-                RSYNC_PATH="sudo $(type -p $RSYNC_EXECUTABLE)"
+                if [ "$RSYNC_REMOTE_PATH" != "" ]
+                then
+                        RSYNC_PATH="sudo $(type -p $RSYNC_REMOTE_PATH)/$RSYNC_EXECUTABLE)"
+                else
+                        RSYNC_PATH="sudo $RSYNC_EXECUTABLE"
+                fi
                 COMMAND_SUDO="sudo"
         else
-                RSYNC_PATH="$(type -p $RSYNC_EXECUTABLE)"
+                if [ "$RSYNC_REMOTE_PATH" != "" ]
+                        then
+                                RSYNC_PATH="$(type -p $RSYNC_REMOTE_PATH)/$RSYNC_EXECUTABLE)"
+                        else
+                                RSYNC_PATH="$RSYNC_EXECUTABLE"
+                        fi
                 COMMAND_SUDO=""
         fi
-
 
 	## Set rsync options
 	RSYNC_ARGS="-"

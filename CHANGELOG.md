@@ -5,16 +5,26 @@ FUTURE IMPROVEMENTS
 - Tree function merge (current and after tree functions are the same except for output filename and logging)
 - Tree functions execute piped commands (grep, awk) on master when launched on remote slave which can cause more bandwith usage
 - Exit trap function must also kill child processes
-- Make osync run on Cygwin for Windows compatibility
+- Make osync run on MSYS for Windows compatibility ?
 
 KNOWN ISSUES
 ------------
 
 - If master and remote slave systems don't have rsync in the same path, execution may fail (RSYNC_PATH is always configured on master, even when executed on slave)
+- When remote system is Msys, Windows' find.exe is used instead of MSYS find
 
 RECENT CHANGES
 --------------
 
+- Merged MSYS (MinGW minimal system) bash compatibility under Windows from Obackup
+	- Added check for /var/log directory
+	- Added check for shared memory directory
+	- Added alternative way to kill child processes for other OSes and especially for MSYS (which is a very odd way)
+	- Added Sendemail.exe support for windows Alerting
+	- Replaced which commend by type -p, as it is more portable
+	- Added support for ping.exe from windows
+	- Forced usage of MSYS find instead of Windows' find.exe on master
+       - Added an optionnal remote rsync executable path parameter
 - Fixed an issue with CheckConnectivity3rdPartyHosts
 - Added an option to stop execution if a local / remote command fails
 - Improved forced quit command by killing all child processes
