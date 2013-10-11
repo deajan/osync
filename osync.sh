@@ -2,8 +2,8 @@
 
 ###### Osync - Rsync based two way sync engine with fault tolerance
 ###### (L) 2013 by Orsiris "Ozy" de Jong (www.netpower.fr) 
-OSYNC_VERSION=0.99preRC2
-OSYNC_BUILD=1010201301
+OSYNC_VERSION=0.99preRC2-MSYS-compatible
+OSYNC_BUILD=1110201301
 
 DEBUG=no
 SCRIPT_PID=$$
@@ -100,7 +100,7 @@ function TrapQuit
 	if type -p pkill > /dev/null 2>&1
 	then
 		pkill -TERM -P $$
-	elif [ "$OSTYPE" == "msys" ]
+	elif [ "$LOCAL_OS" == "msys" ]
 	then
 		## This is not really a clean way to get child process pids, especially the tail -n +2 which resolves a strange char apparition in msys bash
 		for pid in $(ps -a | awk '{$1=$1}$1' | awk '{print $1" "$2}' | grep " $$$" | awk '{print $1}' | tail -n +2)
@@ -174,6 +174,7 @@ function CleanUp
 	if [ "$DEBUG" != "yes" ]
 	then
         	rm -f $RUN_DIR/osync_config_$SCRIPT_PID
+		rm -f $RUN_DIR/osync_remote_os_$SCRIPT_PID
  		rm -f $RUN_DIR/osync_run_local_$SCRIPT_PID
 		rm -f $RUN_DIR/osync_run_remote_$SCRIPT_PID
 		rm -f $RUN_DIR/osync_master-tree-current_$SCRIPT_PID
@@ -265,13 +266,56 @@ function CheckEnvironment
         fi
 }
 
+function GetOperatingSystem
+{
+	LOCAL_OS_VAR=$(uname -spio)
+	if [ "$REMOTE_SYNC" == "yes" ]
+	then
+		eval "$SSH_CMD uname -spio > $RUN_DIR/osync_remote_os_$SCRIPT_PID 2>&1 &"
+		REMOTE_OS_VAR=$(cat $RUN_DIR/osync_remote_os_$SCRIPT_PID)
+	fi
+
+	case $LOCAL_OS_VAR in
+		"Linux"*)
+		LOCAL_OS="Linux"
+		;;
+		"FreeBSD"*)
+		LOCAL_OS="FreeBSD"
+		;;
+		"MINGW32"*)
+		LOCAL_OS="msys"
+		;;
+		*)
+		LogError "Running on >> $LOCAL_OS_VAR << not supported. Please report to the author."
+		exit 1
+		;;
+	esac
+
+	case $REMOTE_OS_VAR in
+		"Linux"*)
+		REMOTE_OS="Linux"
+		;;
+		"FreeBSD"*)
+		REMOTE_OS="FreeBSD"
+		;;
+		"MINGW32"*)
+		REMOTE_OS="msys"
+		;;
+		"")
+		;;
+		*)
+		LogError "Running on remote >> $REMOTE_OS_VAR << not supported. Please report to the author."
+		exit 1
+	esac
+}
+
 # Waits for pid $1 to complete. Will log an alert if $2 seconds passed since current task execution unless $2 equals 0.
 # Will stop task and log alert if $3 seconds passed since current task execution unless $3 equals 0.
 function WaitForTaskCompletion
 {
         soft_alert=0
         SECONDS_BEGIN=$SECONDS
-	if [ "$OSTYPE" == "msys" ]
+	if [ "$LOCAL_OS" == "msys" ]
 	then
 		PROCESS_TEST="ps -a | awk '{\$1=\$1}\$1' | awk '{print \$1}' | grep $1"
 	else
@@ -321,7 +365,7 @@ function WaitForTaskCompletion
 function WaitForCompletion
 {
         soft_alert=0
-	if [ "$OSTYPE" == "msys" ]
+	if [ "$LOCAL_OS" == "msys" ]
 	then
 		PROCESS_TEST="ps -a | awk '{\$1=\$1}\$1' | awk '{print \$1}' | grep $1"
 	else
@@ -457,7 +501,7 @@ function CheckConnectivityRemoteHost
 {
         if [ "$REMOTE_HOST_PING" != "no" ] && [ "$REMOTE_SYNC" != "no" ]
         then
-		if [ "$OSTYPE" == "msys" ]
+		if [ "$LOCAL_OS" == "msys" ]
 		then
 			ping $REMOTE_HOST -n 2 > /dev/null 2>&1
 		else
@@ -480,7 +524,7 @@ function CheckConnectivity3rdPartyHosts
                 IFS=$' \t\n'
                 for i in $REMOTE_3RD_PARTY_HOSTS
                 do
-			if [ "$OSTYPE" == "msys" ]
+			if [ "$LOCAL_OS" == "msys" ]
 			then
 				ping $i -n 2 > /dev/null 2>&1
 			else
@@ -1389,6 +1433,8 @@ function SoftDelete
 
 function Init
 {
+	GetOperatingSystem
+
         # Set error exit code if a piped command fails
         set -o pipefail
         set -o errtrace
@@ -1415,14 +1461,19 @@ function Init
         MAIL_ALERT_MSG="Warning: Execution of osync instance $OSYNC_ID (pid $SCRIPT_PID) as $LOCAL_USER@$LOCAL_HOST produced errors."
 
 	## If running Msys, find command of windows is used instead of msys one
-	if [ "$OSTYPE" == "msys" ]
+	if [ "$LOCAL_OS" == "msys" ]
 	then
 		FIND_CMD=$(dirname $BASH)/find
 	else
 		FIND_CMD=find
 	fi
-	## Not elegant... waiting for a good idea on how to detect remote system
-	REMOTE_FIND_CMD=$FIND_CMD
+	
+	if [ "$REMOTE_OS" == "msys" ]
+	then
+		REMOTE_FIND_CMD=$(dirname $BASH)/find
+	else
+		REMOTE_FIND_CMD=find
+	fi
 
 	## Rsync does not like spaces in directory names, considering it as two different directories. Handling this schema by escaping space
 	## It seems this only happens when trying to execute an rsync command through eval $rsync_cmd... on a remote host. This is freaking unholy to find a workaround...
