@@ -2,8 +2,8 @@
 
 ###### Osync - Rsync based two way sync engine with fault tolerance
 ###### (L) 2013 by Orsiris "Ozy" de Jong (www.netpower.fr) 
-OSYNC_VERSION=0.99preRC2-MSYS-compatible
-OSYNC_BUILD=1110201301
+OSYNC_VERSION=0.99preRC2-MSYS-FreeBSD-compatible
+OSYNC_BUILD=1110201302
 
 DEBUG=no
 SCRIPT_PID=$$
@@ -503,9 +503,9 @@ function CheckConnectivityRemoteHost
         then
 		if [ "$LOCAL_OS" == "msys" ]
 		then
-			ping $REMOTE_HOST -n 2 > /dev/null 2>&1
+			ping -n 2 $REMOTE_HOST > /dev/null 2>&1
 		else
-			ping $REMOTE_HOST -c 2 > /dev/null 2>&1
+			ping -c 2 $REMOTE_HOST > /dev/null 2>&1
 		fi
                 if [ $? != 0 ]
                 then
@@ -526,9 +526,9 @@ function CheckConnectivity3rdPartyHosts
                 do
 			if [ "$LOCAL_OS" == "msys" ]
 			then
-				ping $i -n 2 > /dev/null 2>&1
+				ping -n 2 $i > /dev/null 2>&1
 			else
-				ping $i -c 2 > /dev/null 2>&1
+				ping -c 2 $i > /dev/null 2>&1
 			fi
                         if [ $? != 0 ]
                         then
@@ -550,7 +550,7 @@ function CreateOsyncDirs
 {
 	if ! [ -d "$MASTER_STATE_DIR" ]
 	then
-		mkdir --parents "$MASTER_STATE_DIR"
+		mkdir -p "$MASTER_STATE_DIR"
 		if [ $? != 0 ]
 		then
 			LogError "Cannot create master replica state dir [$MASTER_STATE_DIR]."
@@ -562,11 +562,11 @@ function CreateOsyncDirs
 	then
 		CheckConnectivity3rdPartyHosts
         	CheckConnectivityRemoteHost
-		eval "$SSH_CMD \"if ! [ -d \\\"$SLAVE_STATE_DIR\\\" ]; then $COMMAND_SUDO mkdir --parents \\\"$SLAVE_STATE_DIR\\\"; fi\"" &
+		eval "$SSH_CMD \"if ! [ -d \\\"$SLAVE_STATE_DIR\\\" ]; then $COMMAND_SUDO mkdir -p \\\"$SLAVE_STATE_DIR\\\"; fi\"" &
 		child_pid=$!
 		WaitForTaskCompletion $child_pid 0 1800
 	else
-		if ! [ -d "$SLAVE_STATE_DIR" ]; then mkdir --parents "$SLAVE_STATE_DIR"; fi
+		if ! [ -d "$SLAVE_STATE_DIR" ]; then mkdir -p "$SLAVE_STATE_DIR"; fi
 	fi
 
 	if [ $? != 0 ]
@@ -582,7 +582,7 @@ function CheckMasterSlaveDirs
 	then
 		if [ "$CREATE_DIRS" == "yes" ]
 		then
-			mkdir --parents "$MASTER_SYNC_DIR"
+			mkdir -p "$MASTER_SYNC_DIR"
 			if [ $? != 0 ]
 			then
 				LogError "Cannot create master directory [$MASTER_SYNC_DIR]."
@@ -600,7 +600,7 @@ function CheckMasterSlaveDirs
         	CheckConnectivityRemoteHost
 		if [ "$CREATE_DIRS" == "yes" ]
 		then
-			eval "$SSH_CMD \"if ! [ -d \\\"$SLAVE_SYNC_DIR\\\" ]; then $COMMAND_SUDO mkdir --parents \\\"$SLAVE_SYNC_DIR\\\"; fi"\" &
+			eval "$SSH_CMD \"if ! [ -d \\\"$SLAVE_SYNC_DIR\\\" ]; then $COMMAND_SUDO mkdir -p \\\"$SLAVE_SYNC_DIR\\\"; fi"\" &
 			child_pid=$!
 			WaitForTaskCompletion $child_pid 0 1800
 			if [ $? != 0 ]
@@ -624,7 +624,7 @@ function CheckMasterSlaveDirs
 		then
 			if [ "$CREATE_DIRS" == "yes" ]
 			then
-				mkdir --parents "$SLAVE_SYNC_DIR"
+				mkdir -p "$SLAVE_SYNC_DIR"
 				if [ $? != 0 ]
 				then
 					LogError "Cannot create slave directory [$SLAVE_SYNC_DIR]."

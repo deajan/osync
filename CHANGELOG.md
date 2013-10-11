@@ -9,10 +9,12 @@ KNOWN ISSUES
 ------------
 
 - If master and remote slave systems don't have rsync in the same path, execution may fail (RSYNC_PATH is always configured on master, even when executed on slave)
+- On MSYS, osync does not propagate deletions
 
 RECENT CHANGES
 --------------
 
+- Made more portability improvements (mostly for FreeBSD, must be run with bash shell)
 - Added local and remote operating system detection
 	- Added forced usage of MSYS find on remote MSYS hosts
 	- Updated MSYS handling
