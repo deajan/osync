@@ -2,8 +2,8 @@
 
 ###### Osync - Rsync based two way sync engine with fault tolerance
 ###### (L) 2013 by Orsiris "Ozy" de Jong (www.netpower.fr) 
-OSYNC_VERSION=0.99preRC2-MSYS-FreeBSD-compatible
-OSYNC_BUILD=1110201302
+OSYNC_VERSION=0.99RC2
+OSYNC_BUILD=0211201301
 
 DEBUG=no
 SCRIPT_PID=$$
@@ -12,8 +12,7 @@ LOCAL_USER=$(whoami)
 LOCAL_HOST=$(hostname)
 
 ## Default log file until config file is loaded
-LOG_FILE=/var/log/osync.log
-if [ -d /var/log ]
+if [ -w /var/log ]
 then
 	LOG_FILE=/var/log/osync.log
 else
@@ -21,13 +20,13 @@ else
 fi
 
 ## Default directory where to store run files
-if [ -d /dev/shm ]
+if [ -w /dev/shm ]
 then
 	RUN_DIR=/dev/shm
-elif [ -d /tmp ]
+elif [ -w /tmp ]
 then
 	RUN_DIR=/tmp
-elif [ -d /var/tmp ]
+elif [ -w /var/tmp ]
 then
 	RUN_DIR=/var/tmp
 else
@@ -100,7 +99,7 @@ function TrapQuit
 	if type -p pkill > /dev/null 2>&1
 	then
 		pkill -TERM -P $$
-	elif [ "$LOCAL_OS" == "msys" ]
+	elif [ "$LOCAL_OS" == "msys" ] || [ "$OSTYPE" == "msys" ]
 	then
 		## This is not really a clean way to get child process pids, especially the tail -n +2 which resolves a strange char apparition in msys bash
 		for pid in $(ps -a | awk '{$1=$1}$1' | awk '{print $1" "$2}' | grep " $$$" | awk '{print $1}' | tail -n +2)
@@ -271,8 +270,13 @@ function GetOperatingSystem
 	LOCAL_OS_VAR=$(uname -spio)
 	if [ "$REMOTE_SYNC" == "yes" ]
 	then
-		eval "$SSH_CMD uname -spio > $RUN_DIR/osync_remote_os_$SCRIPT_PID 2>&1 &"
-		REMOTE_OS_VAR=$(cat $RUN_DIR/osync_remote_os_$SCRIPT_PID)
+		eval "$SSH_CMD \"uname -spio\" > $RUN_DIR/osync_remote_os_$SCRIPT_PID 2>&1"
+		 if [ $? != 0 ]
+                then
+                        LogError "Cannot Get remote OS type."
+                else
+                        REMOTE_OS_VAR=$(cat $RUN_DIR/osync_remote_os_$SCRIPT_PID)
+                fi
 	fi
 
 	case $LOCAL_OS_VAR in
@@ -307,6 +311,15 @@ function GetOperatingSystem
 		LogError "Running on remote >> $REMOTE_OS_VAR << not supported. Please report to the author."
 		exit 1
 	esac
+
+        if [ "$DEBUG" == "yes" ]
+        then
+                Log "Local OS: [$LOCAL_OS_VAR]."
+                if [ "$REMOTE_BACKUP" == "yes" ]
+                then
+                        Log "Remote OS: [$REMOTE_OS_VAR]."
+                fi
+        fi
 }
 
 # Waits for pid $1 to complete. Will log an alert if $2 seconds passed since current task execution unless $2 equals 0.
@@ -417,15 +430,16 @@ function RunLocalCommand
                 Log "Dryrun: Local command [$1] not run."
                 return 1
         fi
-        $1 > $RUN_DIR/osync_run_local_$SCRIPT_PID 2>&1 &
+	Log "Running command [$1] on local host."
+        eval "$1" > $RUN_DIR/osync_run_local_$SCRIPT_PID 2>&1 &
         child_pid=$!
         WaitForTaskCompletion $child_pid 0 $2
         retval=$?
         if [ $retval -eq 0 ]
         then
-                Log "Running command [$1] on local host succeded."
+                Log "Command succeded."
         else
-                LogError "Running command [$1] on local host failed."
+                LogError "Command failed."
         fi
 
 	if [ $verbose -eq 1 ]
@@ -433,7 +447,7 @@ function RunLocalCommand
         	Log "Command output:\n$(cat $RUN_DIR/osync_run_local_$SCRIPT_PID)"
 	fi
 	
-        if [ "$STOP_ON_CMD_ERROR" == "yes" ]
+        if [ "$STOP_ON_CMD_ERROR" == "yes" ] && [ $retval -ne 0 ]
         then
                 exit 1
         fi
@@ -449,15 +463,16 @@ function RunRemoteCommand
                 Log "Dryrun: Local command [$1] not run."
                 return 1
         fi
+	Log "Running command [$1] on remote host."
         eval "$SSH_CMD \"$1\" > $RUN_DIR/osync_run_remote_$SCRIPT_PID 2>&1 &"
         child_pid=$!
         WaitForTaskCompletion $child_pid 0 $2
         retval=$?
         if [ $retval -eq 0 ]
         then
-                Log "Running command [$1] succeded."
+                Log "Command succeded."
         else
-                LogError "Running command [$1] failed."
+                LogError "Command failed."
         fi
 
         if [ -f $RUN_DIR/osync_run_remote_$SCRIPT_PID ] && [ $verbose -eq 1 ]
@@ -465,7 +480,7 @@ function RunRemoteCommand
                 Log "Command output:\n$(cat $RUN_DIR/osync_run_remote_$SCRIPT_PID)"
         fi
 
-        if [ "$STOP_ON_CMD_ERROR" == "yes" ]
+        if [ "$STOP_ON_CMD_ERROR" == "yes" ] && [ $retval -ne 0 ]
         then
                 exit 1
         fi
@@ -755,7 +770,7 @@ function LockDirectories
 		eval "$SSH_CMD \"if [ -f \\\"$SLAVE_STATE_DIR/lock\\\" ]; then cat \\\"$SLAVE_STATE_DIR/lock\\\"; fi\" > $RUN_DIR/osync_remote_slave_lock_$SCRIPT_PID" &
 		child_pid=$!
 		WaitForTaskCompletion $child_pid 0 1800
-		if [ -d $RUN_DIR/osync_remote_slave_lock_$SCRIPT_PID ]
+		if [ -f $RUN_DIR/osync_remote_slave_lock_$SCRIPT_PID ]
 		then
 			slave_lock_pid=$(cat $RUN_DIR/osync_remote_slave_lock_$SCRIPT_PID | cut -d'@' -f1)
 			slave_lock_id=$(cat $RUN_DIR/osync_remote_slave_lock_$SCRIPT_PID | cut -d'@' -f2)
@@ -1319,6 +1334,9 @@ function SoftDelete
 			else
 				Log "Conflict backup cleanup complete on master replica."
 			fi
+		elif [ -d "$MASTER_BACKUP_DIR" ] && ! [ -w "$MASTER_BACKUP_DIR" ]
+		then
+			LogError "Warning: Master replica conflict backup dir [$MASTER_BACKUP_DIR] isn't writable. Cannot clean old files."
 		fi
 		
 		if [ "$REMOTE_SYNC" == "yes" ]
@@ -1328,9 +1346,9 @@ function SoftDelete
 			Log "Removing backups older than $CONFLICT_BACKUP_DAYS days on remote slave replica."
 			if [ $dryrun -eq 1 ]
 			then
-				eval "$SSH_CMD \"if [ -d \\\"$SLAVE_BACKUP_DIR\\\" ]; then $COMMAND_SUDO $REMOTE_FIND_CMD \\\"$SLAVE_BACKUP_DIR/\\\" -ctime +$CONFLICT_BACKUP_DAYS; fi\""
+				eval "$SSH_CMD \"if [ -w \\\"$SLAVE_BACKUP_DIR\\\" ]; then $COMMAND_SUDO $REMOTE_FIND_CMD \\\"$SLAVE_BACKUP_DIR/\\\" -ctime +$CONFLICT_BACKUP_DAYS; fi\""
 			else
-				eval "$SSH_CMD \"if [ -d \\\"$SLAVE_BACKUP_DIR\\\" ]; then $COMMAND_SUDO $REMOTE_FIND_CMD \\\"$SLAVE_BACKUP_DIR/\\\" -ctime +$CONFLICT_BACKUP_DAYS | xargs rm -rf; fi\""
+				eval "$SSH_CMD \"if [ -w \\\"$SLAVE_BACKUP_DIR\\\" ]; then $COMMAND_SUDO $REMOTE_FIND_CMD \\\"$SLAVE_BACKUP_DIR/\\\" -ctime +$CONFLICT_BACKUP_DAYS | xargs rm -rf; fi\""
 			fi
 			child_pid=$!
                         WaitForCompletion $child_pid $SOFT_MAX_EXEC_TIME 0
@@ -1342,7 +1360,7 @@ function SoftDelete
                                 Log "Conflict backup cleanup complete on slave replica."
                         fi
 		else
-			if [ -d "$SLAVE_BACKUP_DIR" ]
+			if [ -w "$SLAVE_BACKUP_DIR" ]
 			then
 				Log "Removing backups older than $CONFLICT_BACKUP_DAYS days on slave replica."
 				if [ $dryrun -eq 1 ]
@@ -1360,13 +1378,16 @@ function SoftDelete
                         	else
                                 	Log "Conflict backup cleanup complete on slave replica."
                         	fi
+			elif [ -d "$SLAVE_BACKUP_DIR" ] && ! [ -w "$SLAVE_BACKUP_DIR" ]
+			then
+				LogError "Warning: Slave replica conflict backup dir [$SLAVE_BACKUP_DIR] isn't writable. Cannot clean old files."
 			fi
 		fi
 	fi
 
 	if [ "$SOFT_DELETE" != "no" ]
 	then
-		if [ -d "$MASTER_DELETE_DIR" ]
+		if [ -w "$MASTER_DELETE_DIR" ]
 		then
 			Log "Removing soft deleted items older than $SOFT_DELETE_DAYS days on master replica."
 			if [ $dryrun -eq 1 ]
@@ -1384,6 +1405,9 @@ function SoftDelete
                         else
                                 Log "Soft delete cleanup complete on master replica."
                         fi
+		elif [ -d "$MASTER_DELETE_DIR" ] && ! [ -w $MASTER_DELETE_DIR ]
+		then
+			LogError "Warning: Master replica deletion backup dir [$MASTER_DELETE_DIR] isn't writable. Cannot clean old files."
 		fi
 
 		if [ "$REMOTE_SYNC" == "yes" ]
@@ -1393,9 +1417,9 @@ function SoftDelete
 			Log "Removing soft deleted items older than $SOFT_DELETE_DAYS days on remote slave replica."
 			if [ $dryrun -eq 1 ]
 			then
-				eval "$SSH_CMD \"if [ -d \\\"$SLAVE_DELETE_DIR\\\" ]; then $COMMAND_SUDO $REMOTE_FIND_CMD \\\"$SLAVE_DELETE_DIR/\\\" -ctime +$SOFT_DELETE_DAYS; fi\""
+				eval "$SSH_CMD \"if [ -w \\\"$SLAVE_DELETE_DIR\\\" ]; then $COMMAND_SUDO $REMOTE_FIND_CMD \\\"$SLAVE_DELETE_DIR/\\\" -ctime +$SOFT_DELETE_DAYS; fi\""
 			else
-				eval "$SSH_CMD \"if [ -d \\\"$SLAVE_DELETE_DIR\\\" ]; then $COMMAND_SUDO $REMOTE_FIND_CMD \\\"$SLAVE_DELETE_DIR/\\\" -ctime +$SOFT_DELETE_DAYS | xargs rm -rf; fi\""
+				eval "$SSH_CMD \"if [ -w \\\"$SLAVE_DELETE_DIR\\\" ]; then $COMMAND_SUDO $REMOTE_FIND_CMD \\\"$SLAVE_DELETE_DIR/\\\" -ctime +$SOFT_DELETE_DAYS | xargs rm -rf; fi\""
 			fi
 			child_pid=$!
                         WaitForCompletion $child_pid $SOFT_MAX_EXEC_TIME 0
@@ -1408,7 +1432,7 @@ function SoftDelete
                         fi
 
 		else
-			if [ -d "$SLAVE_DELETE_DIR" ]
+			if [ -w "$SLAVE_DELETE_DIR" ]
 			then
 				Log "Removing soft deleted items older than $SOFT_DELETE_DAYS days on slave replica."
 				if [ $dryrun -eq 1 ]
@@ -1426,6 +1450,9 @@ function SoftDelete
                         	else
                                 	Log "Soft delete cleanup complete on slave replica."
                         	fi
+			elif [ -d "$SLAVE_DELETE_DIR" ] && ! [ -w "$SLAVE_DELETE_DIR" ]
+			then
+				LogError "Warning: Slave replica deletion backup dir [$SLAVE_DELETE_DIR] isn't writable. Cannot clean old files."
 			fi
 		fi
 	fi
@@ -1433,8 +1460,6 @@ function SoftDelete
 
 function Init
 {
-	GetOperatingSystem
-
         # Set error exit code if a piped command fails
         set -o pipefail
         set -o errtrace
@@ -1448,7 +1473,7 @@ function Init
 
         if [ "$LOGFILE" == "" ]
         then
-                if [ -d /var/log ]
+                if [ -w /var/log ]
 		then
 			LOG_FILE=/var/log/osync_$OSYNC_VERSION-$SYNC_ID.log
 		else
@@ -1556,7 +1581,7 @@ function Init
 		RSYNC_ARGS=""
 	fi
 
-	if [ "$BANDWIDTH" != "0" ]
+	if [ "$BANDWIDTH" != "" ] && [ "$BANDWIDTH" != "0" ]
 	then
 		RSYNC_ARGS=$RSYNC_ARGS" --bwlimit=$BANDWIDTH"
 	fi
@@ -1665,6 +1690,7 @@ then
 		if [ $? == 0 ]
 		then
 			Init
+			GetOperatingSystem
 			DATE=$(date)
 			Log "-------------------------------------------------------------"
 			Log "$DRY_WARNING $DATE - Osync v$OSYNC_VERSION script begin."

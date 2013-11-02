@@ -1,19 +1,29 @@
-FUTURE IMPROVEMENTS
--------------------
+SHORT FUTURE IMPROVEMENTS (post v1.0)
+-------------------------------------
 
-- Sync function merge (master and slave functions are more more or less the same)
-- Tree function merge (current and after tree functions are the same except for output filename and logging)
+- Sync function merge (master and slave functions are the same, reduces code size and maintain effort)
+- Tree function merge (current and after tree functions are the same except for output filename and logging, reduces code size and maintain effort)
 - Tree functions execute piped commands (grep, awk) on master when launched on remote slave which can cause more bandwith usage
+- Fast sync mode (without config file, directly via command line by specifying two directories)
+
+FAR FUTURE IMPROVEMENTS
+-----------------------
+
+- Rethink of .osync_workdir/state/* files with PIDs, Host and Task Names to better identify multiple instances on the same fileset
+- Improve Master / Slave schema to Multimaster schema
 
 KNOWN ISSUES
 ------------
 
-- If master and remote slave systems don't have rsync in the same path, execution may fail (RSYNC_PATH is always configured on master, even when executed on slave)
-- On MSYS, osync does not propagate deletions
+- None yet, need more testing on MSYS environment
 
 RECENT CHANGES
 --------------
 
+- 02 Nov. 2013: Osync 0.99 RC2
+- Minor improvement on operating system detection
+- Improved RunLocalCommand execution hook
+- Minor improvements on permission checks
 - Made more portability improvements (mostly for FreeBSD, must be run with bash shell)
 - Added local and remote operating system detection
 	- Added forced usage of MSYS find on remote MSYS hosts
