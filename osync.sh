@@ -3,7 +3,7 @@
 ###### Osync - Rsync based two way sync engine with fault tolerance
 ###### (L) 2013 by Orsiris "Ozy" de Jong (www.netpower.fr) 
 OSYNC_VERSION=0.99RC2
-OSYNC_BUILD=0211201301
+OSYNC_BUILD=0211201302
 
 DEBUG=no
 SCRIPT_PID=$$
@@ -1314,7 +1314,7 @@ function Sync
 
 function SoftDelete
 {
-	if [ "$CONFLICT_BACKUP" != "no" ]
+	if [ "$CONFLICT_BACKUP" != "no" ] && [ $CONFLICT_BACKUP_DAYS -ne 0 ]
 	then
 		if [ -d "$MASTER_BACKUP_DIR" ]
 		then
@@ -1385,7 +1385,7 @@ function SoftDelete
 		fi
 	fi
 
-	if [ "$SOFT_DELETE" != "no" ]
+	if [ "$SOFT_DELETE" != "no" ] && [ $SOFT_DELETE_DAYS -ne 0 ]
 	then
 		if [ -w "$MASTER_DELETE_DIR" ]
 		then
