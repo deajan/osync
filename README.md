@@ -36,14 +36,22 @@ First, grab a fresh copy of osync and make it executable:
 	$ chmod +x ./osync.sh
 
 Osync needs to run with bash shell. Using any other shell will most probably result in lots of errors.
-There is no need to intialize anything. You can begin sync with two already filled directories.
-You only have to customize the sync.conf file according to your needs.
-Osync needs a pair of private / public RSA keys to perform remote SSH connections.
-Also, running sync as superuser requires to configure /etc/sudoers file.
-Please read the documentation on author's site.
 
 ## Usage
 
+Osync can work with in two flavors: Quick sync mode and configuration file mode.
+While quick sync mode is convenient to do fast sync sceanrios, a configuration file gives much more functionnality.
+
+QuickSync example:
+
+	$ ./osync.sh --master=/path/to/dir1 --slave=/path/to/dir2
+
+Configuration files example:
+
+You'll have to customize the sync.conf file according to your needs.
+Osync needs a pair of private / public RSA keys to perform remote SSH connections.
+Also, running sync as superuser requires to configure /etc/sudoers file.
+Please read the documentation on author's site.
 Once you've customized a sync.conf file, you may run osync with the following test run:
 
 	$ ./osync.sh /path/to/your.conf --dry

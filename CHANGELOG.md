@@ -1,10 +1,10 @@
 SHORT FUTURE IMPROVEMENTS (post v1.0)
 -------------------------------------
 
-- Sync function merge (master and slave functions are the same, reduces code size and maintain effort)
+- Sync and delete propagation function merge (master and slave functions are the same, reduces code size and maintain effort)
 - Tree function merge (current and after tree functions are the same except for output filename and logging, reduces code size and maintain effort)
 - Tree functions execute piped commands (grep, awk) on master when launched on remote slave which can cause more bandwith usage
-- Fast sync mode (without config file, directly via command line by specifying two directories)
+- Fast sync mode should also work with remote systems
 
 FAR FUTURE IMPROVEMENTS
 -----------------------
@@ -20,6 +20,8 @@ KNOWN ISSUES
 RECENT CHANGES
 --------------
 
+- Added possibility to quick sync two local directories without any prior configuration
+- Added time control on OS detection
 - 02 Nov. 2013: Osync 0.99 RC2
 - Minor improvement on operating system detection
 - Improved RunLocalCommand execution hook

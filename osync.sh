@@ -191,6 +191,11 @@ function CleanUp
 
 function SendAlert
 {
+	if [ "$quick_sync" == "2" ]
+	then
+		Log "Current task is a quicksync task. Will not send any alert."
+		return 0
+	fi
         cat "$LOG_FILE" | gzip -9 > /tmp/osync_lastlog.gz
         if type -p mutt > /dev/null 2>&1
         then
@@ -237,11 +242,11 @@ function LoadConfigFile
         if [ ! -f "$1" ]
         then
                 LogError "Cannot load configuration file [$1]. Sync cannot start."
-                return 1
+                exit 1
         elif [[ "$1" != *".conf" ]]
         then
                 LogError "Wrong configuration file supplied [$1]. Sync cannot start."
-		return 1
+		exit 1
         else
                 egrep '^#|^[^ ]*=[^;&]*'  "$1" > "$RUN_DIR/osync_config_$SCRIPT_PID"
                 source "$RUN_DIR/osync_config_$SCRIPT_PID"
@@ -271,7 +276,10 @@ function GetOperatingSystem
 	if [ "$REMOTE_SYNC" == "yes" ]
 	then
 		eval "$SSH_CMD \"uname -spio\" > $RUN_DIR/osync_remote_os_$SCRIPT_PID 2>&1"
-		 if [ $? != 0 ]
+		child_pid=$!
+        	WaitForTaskCompletion $child_pid 120 240
+        	retval=$?
+		if [ $retval != 0 ]
                 then
                         LogError "Cannot Get remote OS type."
                 else
@@ -1517,7 +1525,7 @@ function Init
 	SLAVE_DELETE_DIR="$OSYNC_DIR/deleted"
 	
 	## SSH compression
-	if [ "$SSH_COMPRESSION" == "yes" ]
+	if [ "$SSH_COMPRESSION" != "no" ]
 	then
 		SSH_COMP=-C
 	else
@@ -1626,13 +1634,19 @@ function Usage
 {
 	echo "Osync $OSYNC_VERSION $OSYNC_BUILD"
 	echo ""
-	echo "usage: osync /path/to/conf.file [--dry] [--silent] [--verbose] [--no-maxtime] [--force-unlock]"
+	echo "You may use Osync with a configuration file, or use its default options for quick command line sync."
+	echo "Normal usage: osync /path/to/conf.file [--dry] [--silent] [--verbose] [--no-maxtime] [--force-unlock]"
+	echo "Quick  usage: osync --master=/path/to/master/replica --slave=/path/to/slave/replica [--dry] [--silent] [--verbose] [--no-max-time] [--force-unlock]"
 	echo ""
-	echo "--dry: will run osync without actuallyv doing anything; just testing"
+	echo "--dry: will run osync without actually doing anything; just testing"
 	echo "--silent: will run osync without any output to stdout, usefull for cron jobs"
 	echo "--verbose: adds command outputs"
 	echo "--no-maxtime: disables any soft and hard execution time checks"
 	echo "--force-unlock: will override any existing active or dead locks on master and slave replica"
+	echo ""
+	echo "Quick usage:"
+	echo "--master= : Specify master replica path. Will contain state directory."
+	echo "--slave= : Spacift slave replica path. Will contain state directory."
 	exit 128
 }
 
@@ -1651,6 +1665,7 @@ fi
 soft_alert_total=0
 error_alert=0
 soft_stop=0
+quick_sync=0
 
 if [ $# -eq 0 ]
 then
@@ -1678,48 +1693,55 @@ do
 		--help|-h|--version|-v)
 		Usage
 		;;
+		--master=*)
+		quick_sync=$(($quick_sync + 1))
+		no_maxtime=1
+		MASTER_SYNC_DIR=${i##*=}
+		;;
+		--slave=*)
+		quick_sync=$(($quick_sync + 1))
+		SLAVE_SYNC_DIR=${i##*=}
+		no_maxtime=1
+		;;
 	esac
 done
 
 CheckEnvironment
 if [ $? == 0 ]
 then
-	if [ "$1" != "" ]
+	if [ $quick_sync -eq 2 ]
 	then
-		LoadConfigFile $1
+		SYNC_ID="quicksync task"
+		MINIMUM_SPACE=1024
+		REMOTE_SYNC=no
+		CONFLICT_BACKUP_DAYS=30
+		SOFT_DELETE_DAYS=30
+	else
+		LoadConfigFile "$1"
+	fi
+	Init
+	DATE=$(date)
+	Log "-------------------------------------------------------------"
+	Log "$DRY_WARNING $DATE - Osync v$OSYNC_VERSION script begin."
+	Log "-------------------------------------------------------------"
+	Log "Sync task [$SYNC_ID] launched as $LOCAL_USER@$LOCAL_HOST (PID $SCRIPT_PID)"
+	GetOperatingSystem
+	if [ $no_maxtime -eq 1 ]
+	then
+		SOFT_MAX_EXEC_TIME=0
+		HARD_MAX_EXEC_TIME=0
+	fi
+	CheckMasterSlaveDirs
+	CheckMinimumSpace
+	if [ $? == 0 ]
+	then
+		RunBeforeHook
+		Main
 		if [ $? == 0 ]
 		then
-			Init
-			GetOperatingSystem
-			DATE=$(date)
-			Log "-------------------------------------------------------------"
-			Log "$DRY_WARNING $DATE - Osync v$OSYNC_VERSION script begin."
-			Log "-------------------------------------------------------------"
-			Log "Sync task [$SYNC_ID] launched as $LOCAL_USER@$LOCAL_HOST (PID $SCRIPT_PID)"
-			if [ $no_maxtime -eq 1 ]
-			then
-				SOFT_MAX_EXEC_TIME=0
-				HARD_MAX_EXEC_TIME=0
-			fi
-			CheckMasterSlaveDirs
-			CheckMinimumSpace
-			if [ $? == 0 ]
-			then
-				RunBeforeHook
-				Main
-				if [ $? == 0 ]
-				then
-					SoftDelete
-				fi
-				RunAfterHook
-			fi
-		else
-			LogError "Configuration file could not be loaded."
-			exit 1
+			SoftDelete
 		fi
-	else
-		LogError "No configuration file provided."
-		exit 1
+		RunAfterHook
 	fi
 else
 	LogError "Environment not suitable to run osync."
