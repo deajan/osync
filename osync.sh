@@ -3,7 +3,7 @@
 ###### Osync - Rsync based two way sync engine with fault tolerance
 ###### (L) 2013 by Orsiris "Ozy" de Jong (www.netpower.fr) 
 OSYNC_VERSION=0.99RC2
-OSYNC_BUILD=0211201302
+OSYNC_BUILD=0411201301
 
 DEBUG=no
 SCRIPT_PID=$$
@@ -854,6 +854,37 @@ function UnlockDirectories
 
 ###### Sync core functions
 
+## tree_list(replica_path, tree_file, current_action) Creates a list (tree_file) of files in replica_path and stores it's action in $STATE_DIR/last-action
+function tree_list
+{
+	Log "Creating replica file list [$1]."
+	if [ "$REMOTE_SYNC" == "yes" ]
+	then
+        	CheckConnectivity3rdPartyHosts
+	        CheckConnectivityRemoteHost
+		ESC=$(EscapeSpaces "$1")
+		rsync_cmd="$(type -p $RSYNC_EXECUTABLE) --rsync-path=\"$RSYNC_PATH\" -rlptgoDE8 $RSYNC_ARGS --exclude \"$OSYNC_DIR\" $RSYNC_EXCLUDE -e \"$RSYNC_SSH_CMD\" --list-only $REMOTE_USER@$REMOTE_HOST:\"$ESC/\" | grep \"^-\|^d\" | awk '{\$1=\$2=\$3=\$4=\"\" ;print}' | awk '{\$1=\$1 ;print}' | (grep -v \"^\.$\" || :) | sort > \"$RUN_DIR/$2_$SCRIPT_PID\" &"
+	else
+		rsync_cmd="$(type -p $RSYNC_EXECUTABLE) --rsync-path=\"$RSYNC_PATH\" -rlptgoDE8 $RSYNC_ARGS --exclude \"$OSYNC_DIR\" $RSNYC_EXCLUDE --list-only \"$1/\" | grep \"^-\|^d\" | awk '{\$1=\$2=\$3=\$4=\"\" ;print}' | awk '{\$1=\$1 ;print}' | (grep -v \"^\.$\" || :) | sort > $RUN_DIR/$2_$SCRIPT_PID &"
+	fi
+	if [ "$DEBUG" == "yes" ]
+	then
+		Log "RSYNC_CMD: $rsync_cmd"
+	fi
+	eval $rsync_cmd
+	child_pid=$!
+	WaitForCompletion $child_pid $SOFT_MAX_EXEC_TIME $HARD_MAX_EXEC_TIME
+	retval=$?
+	if [ $retval == 0 ] && [ -f $RUN_DIR/$2_$SCRIPT_PID ]
+	then
+		mv $RUN_DIR/$2_$SCRIPT_PID "$MASTER_SYNC_DIR/$STATE_DIR/$2"
+		echo "$3.success" > "$MASTER_SYNC_DIR/$STATE_DIR/last-action"
+	else
+		LogError "Cannot create replica file list."
+		echo "$3.fail" > "$MASTER_SYNC_DIR/$STATE_DIR/last-action"
+		exit 1
+	fi
+}
 function master_tree_current
 {
 	Log "Creating master replica file list."
@@ -1193,12 +1224,14 @@ function Sync
 	## This replaces the case statement below because ;& operator is not supported in bash 3.2... Code is more messy than case :(
 	if [ "$resume_sync" == "none" ] || [ "$resume_sync" == "noresume" ] || [ "$resume_sync" == "master-replica-tree.fail" ]
 	then
-		master_tree_current
+		#master_tree_current
+		tree_list $MASTER_SYNC_DIR master-tree-current master-replica-tree
 		resume_sync="resumed"
 	fi
 	if [ "$resume_sync" == "resumed" ] || [ "$resume_sync" == "master-replica-tree.success" ] || [ "$resume_sync" == "slave-replica-tree.fail" ]
 	then
-		slave_tree_current
+		#slave_tree_current
+		tree_list $SLAVE_SYNC_DIR slave-tree-current slave-replica-tree
 		resume_sync="resumed"
 	fi
 	if [ "$resume_sync" == "resumed" ] || [ "$resume_sync" == "slave-replica-tree.success" ] || [ "$resume_sync" == "master-replica-deleted-list.fail" ]
@@ -1250,12 +1283,14 @@ function Sync
 	fi
 	if [ "$resume_sync" == "resumed" ] || [ "$resume_sync" == "delete-propagation-master.success" ] || [ "$resume_sync" == "master-replica-tree-after.fail" ]
 	then
-		master_tree_after
+		#master_tree_after
+		tree_list $MASTER_SYNC_DIR master-tree-after master-replica-tree-after
 		resume_sync="resumed"
 	fi
 	if [ "$resume_sync" == "resumed" ] || [ "$resume_sync" == "master-replica-tree-after.success" ] || [ "$resume_sync" == "slave-replica-tree-after.fail" ]
 	then
-		slave_tree_after
+		#slave_tree_after
+		tree_list $SLAVE_SYNC_DIR slave-tree-after slave-replica-tree-after
 		resume_sync="resumed"
 	fi
 
@@ -1517,6 +1552,7 @@ function Init
 
 	MASTER_STATE_DIR="$MASTER_SYNC_DIR/$OSYNC_DIR/state"
 	SLAVE_STATE_DIR="$SLAVE_SYNC_DIR/$OSYNC_DIR/state"
+	STATE_DIR="$OSYNC_DIR/state"
 
 	## Working directories to keep backups of updated / deleted files
 	MASTER_BACKUP_DIR="$OSYNC_DIR/backups"
