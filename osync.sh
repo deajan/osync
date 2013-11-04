@@ -841,7 +841,7 @@ function UnlockDirectories
 
 ###### Sync core functions
 
-## tree_list(replica_path, tree_file, current_action) Creates a list (tree_file) of files in replica_path and stores it's action in $STATE_DIR/last-action
+## tree_list(replica_path, tree_file, current_action) Creates a list of files in replica_path and stores it's action in $STATE_DIR/last-action
 function tree_list
 {
 	Log "Creating replica file list [$1]."
@@ -862,7 +862,7 @@ function tree_list
 	child_pid=$!
 	WaitForCompletion $child_pid $SOFT_MAX_EXEC_TIME $HARD_MAX_EXEC_TIME
 	retval=$?
-	if [ $retval == 0 ] && [ -f $RUN_DIR/$2_$SCRIPT_PID ]
+	if [ $retval == 0 ] && [ -f $RUN_DIR/osync_$2_$SCRIPT_PID ]
 	then
 		mv $RUN_DIR/osync_$2_$SCRIPT_PID "$MASTER_SYNC_DIR/$STATE_DIR/$2"
 		echo "$3.success" > "$MASTER_SYNC_DIR/$STATE_DIR/last-action"
