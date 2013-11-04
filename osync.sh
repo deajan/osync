@@ -3,7 +3,7 @@
 ###### Osync - Rsync based two way sync engine with fault tolerance
 ###### (L) 2013 by Orsiris "Ozy" de Jong (www.netpower.fr) 
 OSYNC_VERSION=0.99RC2
-OSYNC_BUILD=0411201301
+OSYNC_BUILD=0411201302
 
 DEBUG=no
 SCRIPT_PID=$$
@@ -172,20 +172,7 @@ function CleanUp
 {
 	if [ "$DEBUG" != "yes" ]
 	then
-        	rm -f $RUN_DIR/osync_config_$SCRIPT_PID
-		rm -f $RUN_DIR/osync_remote_os_$SCRIPT_PID
- 		rm -f $RUN_DIR/osync_run_local_$SCRIPT_PID
-		rm -f $RUN_DIR/osync_run_remote_$SCRIPT_PID
-		rm -f $RUN_DIR/osync_master-tree-current_$SCRIPT_PID
-		rm -f $RUN_DIR/osync_slave-tree-current_$SCRIPT_PID
-		rm -f $RUN_DIR/osync_master-tree-after_$SCRIPT_PID
-		rm -f $RUN_DIR/osync_slave-tree-after_$SCRIPT_PID
-		rm -f $RUN_DIR/osync_update_master_replica_$SCRIPT_PID
-		rm -f $RUN_DIR/osync_update_slave_replica_$SCRIPT_PID
-		rm -f $RUN_DIR/osync_deletion_on_master_$SCRIPT_PID
-		rm -f $RUN_DIR/osync_deletion_on_slave_$SCRIPT_PID
-		rm -f $RUN_DIR/osync_remote_slave_lock_$SCRIPT_PID
-		rm -f $RUN_DIR/osync_slave_space_$SCRIPT_PID
+        	rm -f $RUN_DIR/osync_*_$SCRIPT_PID
 	fi
 }
 
@@ -863,9 +850,9 @@ function tree_list
         	CheckConnectivity3rdPartyHosts
 	        CheckConnectivityRemoteHost
 		ESC=$(EscapeSpaces "$1")
-		rsync_cmd="$(type -p $RSYNC_EXECUTABLE) --rsync-path=\"$RSYNC_PATH\" -rlptgoDE8 $RSYNC_ARGS --exclude \"$OSYNC_DIR\" $RSYNC_EXCLUDE -e \"$RSYNC_SSH_CMD\" --list-only $REMOTE_USER@$REMOTE_HOST:\"$ESC/\" | grep \"^-\|^d\" | awk '{\$1=\$2=\$3=\$4=\"\" ;print}' | awk '{\$1=\$1 ;print}' | (grep -v \"^\.$\" || :) | sort > \"$RUN_DIR/$2_$SCRIPT_PID\" &"
+		rsync_cmd="$(type -p $RSYNC_EXECUTABLE) --rsync-path=\"$RSYNC_PATH\" -rlptgoDE8 $RSYNC_ARGS --exclude \"$OSYNC_DIR\" $RSYNC_EXCLUDE -e \"$RSYNC_SSH_CMD\" --list-only $REMOTE_USER@$REMOTE_HOST:\"$ESC/\" | grep \"^-\|^d\" | awk '{\$1=\$2=\$3=\$4=\"\" ;print}' | awk '{\$1=\$1 ;print}' | (grep -v \"^\.$\" || :) | sort > \"$RUN_DIR/osync_$2_$SCRIPT_PID\" &"
 	else
-		rsync_cmd="$(type -p $RSYNC_EXECUTABLE) --rsync-path=\"$RSYNC_PATH\" -rlptgoDE8 $RSYNC_ARGS --exclude \"$OSYNC_DIR\" $RSNYC_EXCLUDE --list-only \"$1/\" | grep \"^-\|^d\" | awk '{\$1=\$2=\$3=\$4=\"\" ;print}' | awk '{\$1=\$1 ;print}' | (grep -v \"^\.$\" || :) | sort > $RUN_DIR/$2_$SCRIPT_PID &"
+		rsync_cmd="$(type -p $RSYNC_EXECUTABLE) --rsync-path=\"$RSYNC_PATH\" -rlptgoDE8 $RSYNC_ARGS --exclude \"$OSYNC_DIR\" $RSNYC_EXCLUDE --list-only \"$1/\" | grep \"^-\|^d\" | awk '{\$1=\$2=\$3=\$4=\"\" ;print}' | awk '{\$1=\$1 ;print}' | (grep -v \"^\.$\" || :) | sort > $RUN_DIR/osync_$2_$SCRIPT_PID &"
 	fi
 	if [ "$DEBUG" == "yes" ]
 	then
@@ -877,7 +864,7 @@ function tree_list
 	retval=$?
 	if [ $retval == 0 ] && [ -f $RUN_DIR/$2_$SCRIPT_PID ]
 	then
-		mv $RUN_DIR/$2_$SCRIPT_PID "$MASTER_SYNC_DIR/$STATE_DIR/$2"
+		mv $RUN_DIR/osync_$2_$SCRIPT_PID "$MASTER_SYNC_DIR/$STATE_DIR/$2"
 		echo "$3.success" > "$MASTER_SYNC_DIR/$STATE_DIR/last-action"
 	else
 		LogError "Cannot create replica file list."
