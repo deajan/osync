@@ -33,6 +33,7 @@ Nevertheless, still consider making backups of your data before trying a sync to
 First, grab a fresh copy of osync and make it executable:
 
 	$ git clone https://github.com/deajan/osync
+	$ cd osync
 	$ chmod +x ./osync.sh
 
 Osync needs to run with bash shell. Using any other shell will most probably result in lots of errors.
