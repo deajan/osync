@@ -3,7 +3,7 @@
 ###### Osync - Rsync based two way sync engine with fault tolerance
 ###### (L) 2013 by Orsiris "Ozy" de Jong (www.netpower.fr) 
 OSYNC_VERSION=0.99RC2
-OSYNC_BUILD=0411201302
+OSYNC_BUILD=1311201301
 
 DEBUG=no
 SCRIPT_PID=$$
@@ -259,7 +259,11 @@ function CheckEnvironment
 
 function GetOperatingSystem
 {
-	LOCAL_OS_VAR=$(uname -spio)
+	LOCAL_OS_VAR=$(uname -spio > /dev/null 2>&1)
+	if [ $? != 0 ]
+	then
+		LOCAL_OS_VAR=$(uname -v)
+	fi
 	if [ "$REMOTE_SYNC" == "yes" ]
 	then
 		eval "$SSH_CMD \"uname -spio\" > $RUN_DIR/osync_remote_os_$SCRIPT_PID 2>&1"
@@ -283,6 +287,9 @@ function GetOperatingSystem
 		;;
 		"MINGW32"*)
 		LOCAL_OS="msys"
+		;;
+		"Darwin"*)
+		LOCAL_OS="MacOSX"
 		;;
 		*)
 		LogError "Running on >> $LOCAL_OS_VAR << not supported. Please report to the author."
