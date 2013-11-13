@@ -259,10 +259,10 @@ function CheckEnvironment
 
 function GetOperatingSystem
 {
-	LOCAL_OS_VAR=$(uname -spio > /dev/null 2>&1)
+	LOCAL_OS_VAR=$(uname -spio 2>&1)
 	if [ $? != 0 ]
 	then
-		LOCAL_OS_VAR=$(uname -v)
+		LOCAL_OS_VAR=$(uname -v 2>&1)
 	fi
 	if [ "$REMOTE_SYNC" == "yes" ]
 	then
