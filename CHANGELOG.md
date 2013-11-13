@@ -20,6 +20,7 @@ KNOWN ISSUES
 RECENT CHANGES
 --------------
 
+- Added basic MacOS X support (yet not fully tested)
 - Added possibility to quick sync two local directories without any prior configuration
 - Added time control on OS detection
 - 02 Nov. 2013: Osync 0.99 RC2
