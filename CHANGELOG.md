@@ -11,16 +11,19 @@ FAR FUTURE IMPROVEMENTS
 
 - Rethink of .osync_workdir/state/* files with PIDs, Host and Task Names to better identify multiple instances on the same fileset
 - Improve Master / Slave schema to Multimaster schema
+- State files should exist per replica for Multimaster schema
 
 KNOWN ISSUES
 ------------
 
-- None yet, need more testing on MSYS environment
+- None yet, need more testing on MSYS environment and MacOS X
 
 RECENT CHANGES
 --------------
 
+- Various bugfixes introduced with function merge
 - Added basic MacOS X support (yet not fully tested)
+- Merged tree list functions into one
 - Added possibility to quick sync two local directories without any prior configuration
 - Added time control on OS detection
 - 02 Nov. 2013: Osync 0.99 RC2

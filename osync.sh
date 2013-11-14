@@ -3,7 +3,7 @@
 ###### Osync - Rsync based two way sync engine with fault tolerance
 ###### (L) 2013 by Orsiris "Ozy" de Jong (www.netpower.fr) 
 OSYNC_VERSION=0.99RC2
-OSYNC_BUILD=1311201301
+OSYNC_BUILD=1411201302
 
 DEBUG=no
 SCRIPT_PID=$$
@@ -263,6 +263,10 @@ function GetOperatingSystem
 	if [ $? != 0 ]
 	then
 		LOCAL_OS_VAR=$(uname -v 2>&1)
+		if [ $! != 0 ]
+		then
+			LOCAL_OS_VAR=($uname)
+		fi
 	fi
 	if [ "$REMOTE_SYNC" == "yes" ]
 	then
@@ -869,7 +873,7 @@ function UnlockDirectories
 function tree_list
 {
 	Log "Creating replica file list [$1]."
-	if [ "$REMOTE_SYNC" == "yes" ]
+	if [ "$REMOTE_SYNC" == "yes" ] && [[ "$2" == "slave"* ]]
 	then
         	CheckConnectivity3rdPartyHosts
 	        CheckConnectivityRemoteHost
@@ -1236,13 +1240,13 @@ function Sync
 	if [ "$resume_sync" == "none" ] || [ "$resume_sync" == "noresume" ] || [ "$resume_sync" == "master-replica-tree.fail" ]
 	then
 		#master_tree_current
-		tree_list $MASTER_SYNC_DIR master-tree-current master-replica-tree
+		tree_list "$MASTER_SYNC_DIR" master-tree-current master-replica-tree
 		resume_sync="resumed"
 	fi
 	if [ "$resume_sync" == "resumed" ] || [ "$resume_sync" == "master-replica-tree.success" ] || [ "$resume_sync" == "slave-replica-tree.fail" ]
 	then
 		#slave_tree_current
-		tree_list $SLAVE_SYNC_DIR slave-tree-current slave-replica-tree
+		tree_list "$SLAVE_SYNC_DIR" slave-tree-current slave-replica-tree
 		resume_sync="resumed"
 	fi
 	if [ "$resume_sync" == "resumed" ] || [ "$resume_sync" == "slave-replica-tree.success" ] || [ "$resume_sync" == "master-replica-deleted-list.fail" ]
@@ -1295,71 +1299,15 @@ function Sync
 	if [ "$resume_sync" == "resumed" ] || [ "$resume_sync" == "delete-propagation-master.success" ] || [ "$resume_sync" == "master-replica-tree-after.fail" ]
 	then
 		#master_tree_after
-		tree_list $MASTER_SYNC_DIR master-tree-after master-replica-tree-after
+		tree_list "$MASTER_SYNC_DIR" master-tree-after master-replica-tree-after
 		resume_sync="resumed"
 	fi
 	if [ "$resume_sync" == "resumed" ] || [ "$resume_sync" == "master-replica-tree-after.success" ] || [ "$resume_sync" == "slave-replica-tree-after.fail" ]
 	then
 		#slave_tree_after
-		tree_list $SLAVE_SYNC_DIR slave-tree-after slave-replica-tree-after
+		tree_list "$SLAVE_SYNC_DIR" slave-tree-after slave-replica-tree-after
 		resume_sync="resumed"
 	fi
-
-#	## In this case statement, ;& means executing every command below regardless of conditions. Only works with bash v4
-#	case $resume_sync in
-#		none|noresume)
-#		;&
-#		master-replica-tree.fail)
-#		master_tree_current
-#		;&
-#		master-replica-tree.success|slave-replica-tree.fail)
-#		slave_tree_current
-#		;&
-#		slave-replica-tree.success|master-replica-deleted-list.fail)
-#		master_delete_list
-#		;&
-#		master-replica-deleted-list.success|slave-replica-deleted-list.fail)
-#		slave_delete_list
-#		;&
-#		slave-replica-deleted-list.success|update-master-replica.fail|update-slave-replica.fail)
-#	        if [ "$CONFLICT_PREVALANCE" != "master" ]
-#	        then
-#       	        case $resume_sync in
-#				none)
-#				;&
-#				slave-replica-deleted-list.success|update-master-replica.fail)
-#				sync_update_master
-#				;&
-#				update-master-replica.success|update-slave-replica.fail)
-#				sync_update_slave
-#				;;
-#			esac
-#       	else
-#	              	case $resume_sync in
-#				none)
-#				;&
-#				slave-replica-deleted-list.success|update-slave-replica.fail)
-#				sync_update_slave
-#				;&
-#				update-slave-replica.success|update-master-replica.fail)
-#	                	sync_update_master
-#				;;
-#			esac
-#       	fi
-#		;&
-#		update-slave-replica.success|update-master-replica.success|delete-propagation-slave.fail)
-#		delete_on_slave
-#		;&
-#		delete-propagation-slave.success|delete-propagation-master.fail)
-#		delete_on_master
-#		;&
-#		delete-propagation-master.success|master-replica-tree-after.fail)
-#		master_tree_after
-#		;&
-#		master-replica-tree-after.success|slave-replica-tree-after.fail)
-#		slave_tree_after
-#		;;
-#	esac
 
 	Log "Finished synchronization task."
 	echo "sync.success" > "$MASTER_STATE_DIR/last-action"
@@ -1554,6 +1502,25 @@ function Init
 		REMOTE_FIND_CMD=find
 	fi
 
+	## Test if slave dir is a ssh uri, and if yes, break it down it its values
+        if [ "${SLAVE_SYNC_DIR:0:6}" == "ssh://" ]
+        then
+                slave_is_remote=1
+
+                # remove leadng 'ssh://'
+                uri=${SLAVE_SYNC_DIR#ssh://*}
+                # remove everything after '@'
+                uri2=${uri%@*}
+                user=${uri2%;*}
+                fingerprint=${uri2#*fingerprint=}
+                # remove everything before '@'
+                uri3=${uri#*@}
+                host=${uri3%%:*}
+                REMOTE_USER=${SLAVE_SYNC_DIR}
+                REMOTE_HOST=${SLAVE_SYNC_DIR}
+                REMOTE_PORT=${SLAVE_SYNC_DIR}
+        fi
+
 	## Rsync does not like spaces in directory names, considering it as two different directories. Handling this schema by escaping space
 	## It seems this only happens when trying to execute an rsync command through eval $rsync_cmd... on a remote host. This is freaking unholy to find a workaround...
 	## So actually use $MASTER_SYNC_DIR for local rsync calls and $ESC_MASTER_SYNC_DIR for remote rsync calls like user@host:$ESC_MASTER_SYNC_DIR
@@ -1681,7 +1648,7 @@ function Usage
 {
 	echo "Osync $OSYNC_VERSION $OSYNC_BUILD"
 	echo ""
-	echo "You may use Osync with a configuration file, or use its default options for quick command line sync."
+	echo "You may use Osync with a full blown configuration file, or use its default options for quick command line sync."
 	echo "Normal usage: osync /path/to/conf.file [--dry] [--silent] [--verbose] [--no-maxtime] [--force-unlock]"
 	echo "Quick  usage: osync --master=/path/to/master/replica --slave=/path/to/slave/replica [--dry] [--silent] [--verbose] [--no-max-time] [--force-unlock]"
 	echo ""
@@ -1691,9 +1658,9 @@ function Usage
 	echo "--no-maxtime: disables any soft and hard execution time checks"
 	echo "--force-unlock: will override any existing active or dead locks on master and slave replica"
 	echo ""
-	echo "Quick usage:"
-	echo "--master= : Specify master replica path. Will contain state directory."
-	echo "--slave= : Spacift slave replica path. Will contain state directory."
+	echo "Quick usage only:"
+	echo "--master= : Specify master replica path. Will contain state and backup directory."
+	echo "--slave= : Spacift slave replica path. Will contain backup directory."
 	exit 128
 }
 
@@ -1763,6 +1730,7 @@ then
 		REMOTE_SYNC=no
 		CONFLICT_BACKUP_DAYS=30
 		SOFT_DELETE_DAYS=30
+		RESUME_TRY=1
 	else
 		LoadConfigFile "$1"
 	fi
