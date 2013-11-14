@@ -272,12 +272,25 @@ function GetOperatingSystem
         	retval=$?
 		if [ $retval != 0 ]
                 then
-                        LogError "Cannot Get remote OS type."
-                else
-                        REMOTE_OS_VAR=$(cat $RUN_DIR/osync_remote_os_$SCRIPT_PID)
+                	eval "$SSH_CMD \"uname -v\" > $RUN_DIR/osync_remote_os_$SCRIPT_PID 2>&1"
+			child_pid=$!
+        		WaitForTaskCompletion $child_pid 120 240
+        		retval=$?
+			if [ $retval != 0 ]
+                	then
+                		eval "$SSH_CMD \"uname\" > $RUN_DIR/osync_remote_os_$SCRIPT_PID 2>&1"
+				child_pid=$!
+        			WaitForTaskCompletion $child_pid 120 240
+        			retval=$?
+				if [ $retval != 0 ]
+                		then
+                			LogError "Cannot Get remote OS type."
+                		fi
+                	fi
                 fi
+        REMOTE_OS_VAR=$(cat $RUN_DIR/osync_remote_os_$SCRIPT_PID)
 	fi
-
+	
 	case $LOCAL_OS_VAR in
 		"Linux"*)
 		LOCAL_OS="Linux"
@@ -297,22 +310,26 @@ function GetOperatingSystem
 		;;
 	esac
 
-	case $REMOTE_OS_VAR in
-		"Linux"*)
-		REMOTE_OS="Linux"
-		;;
-		"FreeBSD"*)
-		REMOTE_OS="FreeBSD"
-		;;
-		"MINGW32"*)
-		REMOTE_OS="msys"
-		;;
-		"")
-		;;
-		*)
-		LogError "Running on remote >> $REMOTE_OS_VAR << not supported. Please report to the author."
-		exit 1
-	esac
+	if [ "$REMOTE_SYNC" == "yes" ]
+	then
+		case $REMOTE_OS_VAR in
+			"Linux"*)
+			REMOTE_OS="Linux"
+			;;
+			"FreeBSD"*)
+			REMOTE_OS="FreeBSD"
+			;;
+			"MINGW32"*)
+			REMOTE_OS="msys"
+			;;
+			"Darwin"*)
+			REMOTE_OS="MacOSX"
+			;;
+			*)
+			LogError "Running on remote >> $REMOTE_OS_VAR << not supported. Please report to the author."
+			exit 1
+		esac
+	fi
 
         if [ "$DEBUG" == "yes" ]
         then
