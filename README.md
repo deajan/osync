@@ -24,6 +24,7 @@ You may launch concurrent sync processes on the same system but only for differe
 
 Currently, it has been tested on CentOS 5, CentOS 6, Debian 6.0.7, Linux Mint 14, Ubuntu 12.
 Osync also runs on FreeBSD and Windows MSYS environment, altough it is not fully tested yet.
+Basic MacOS X tests have also been done, but a lot of tests are still needed.
 
 ## Installation
 
