@@ -3,7 +3,7 @@
 ###### Osync - Rsync based two way sync engine with fault tolerance
 ###### (L) 2013 by Orsiris "Ozy" de Jong (www.netpower.fr) 
 OSYNC_VERSION=0.99RC2
-OSYNC_BUILD=1411201302
+OSYNC_BUILD=1611201301
 
 DEBUG=no
 SCRIPT_PID=$$
@@ -465,7 +465,7 @@ function RunLocalCommand
                 LogError "Command failed."
         fi
 
-	if [ $verbose -eq 1 ]
+	if [ $verbose -eq 1 ] || [ $retval -ne 0 ]
 	then
         	Log "Command output:\n$(cat $RUN_DIR/osync_run_local_$SCRIPT_PID)"
 	fi
@@ -498,7 +498,7 @@ function RunRemoteCommand
                 LogError "Command failed."
         fi
 
-        if [ -f $RUN_DIR/osync_run_remote_$SCRIPT_PID ] && [ $verbose -eq 1 ]
+        if [ -f $RUN_DIR/osync_run_remote_$SCRIPT_PID ] && ([ $verbose -eq 1 ] || [ $retval -ne 0 ])
         then
                 Log "Command output:\n$(cat $RUN_DIR/osync_run_remote_$SCRIPT_PID)"
         fi

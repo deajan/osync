@@ -21,6 +21,7 @@ KNOWN ISSUES
 RECENT CHANGES
 --------------
 
+- Improved execution hooks logs
 - Various bugfixes introduced with function merge
 - Added basic MacOS X support (yet not fully tested)
 - Merged tree list functions into one
