@@ -74,8 +74,11 @@ Once you're confident about your fist runs, you may add osync as cron task with:
 	$ ./osync.sh /path/to/your.conf --silent
 
 Additionnaly, you may run osync in monitor mode, which means it will perform a sync upon file operations on master replica.
+File monitor mode can also be launched in daemon mode.
 
 	$ ./osync.sh /path/to/your.conf --on-changes
+	$ ./osync.sh /path/to/your.conf --on-changes --daemon
+
 
 You may then find osync output in /var/log/osync-*.log (or current directory if /var/log is not writable).
 
