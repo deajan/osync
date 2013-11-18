@@ -2,8 +2,8 @@
 
 ###### Osync - Rsync based two way sync engine with fault tolerance
 ###### (L) 2013 by Orsiris "Ozy" de Jong (www.netpower.fr) 
-OSYNC_VERSION=0.99RC2
-OSYNC_BUILD=1611201301
+OSYNC_VERSION=0.99RC2-qs
+OSYNC_BUILD=1811201301
 
 DEBUG=no
 SCRIPT_PID=$$
@@ -1505,20 +1505,30 @@ function Init
 	## Test if slave dir is a ssh uri, and if yes, break it down it its values
         if [ "${SLAVE_SYNC_DIR:0:6}" == "ssh://" ]
         then
-                slave_is_remote=1
+                REMOTE_SYNC="yes"
 
                 # remove leadng 'ssh://'
                 uri=${SLAVE_SYNC_DIR#ssh://*}
                 # remove everything after '@'
-                uri2=${uri%@*}
-                user=${uri2%;*}
-                fingerprint=${uri2#*fingerprint=}
+                _first_part=${uri%@*}
+                REMOTE_USER=${_first_part%;*}
+                #fingerprint=${_first_part#*fingerprint=}
+		if [ "$SSH_RSA_PRIVATE_KEY" == "" ]
+		then
+			SSH_RSA_PRIVATE_KEY=~/.ssh/id_rsa
+		fi
                 # remove everything before '@'
-                uri3=${uri#*@}
-                host=${uri3%%:*}
-                REMOTE_USER=${SLAVE_SYNC_DIR}
-                REMOTE_HOST=${SLAVE_SYNC_DIR}
-                REMOTE_PORT=${SLAVE_SYNC_DIR}
+                _last_part=${uri#*@}
+                _last_part2=${_last_part%%/*}
+		# remove last part if no port defined
+		REMOTE_HOST=${_last_part2%%:*}
+		if [[ "$_last_part2" == *":"* ]]
+		then
+			REMOTE_PORT=${_last_part2##*:}
+		else
+			REMOTE_PORT=22
+		fi
+		SLAVE_SYNC_DIR=${_last_part#*/}
         fi
 
 	## Rsync does not like spaces in directory names, considering it as two different directories. Handling this schema by escaping space
@@ -1650,7 +1660,7 @@ function Usage
 	echo ""
 	echo "You may use Osync with a full blown configuration file, or use its default options for quick command line sync."
 	echo "Normal usage: osync /path/to/conf.file [--dry] [--silent] [--verbose] [--no-maxtime] [--force-unlock]"
-	echo "Quick  usage: osync --master=/path/to/master/replica --slave=/path/to/slave/replica [--dry] [--silent] [--verbose] [--no-max-time] [--force-unlock]"
+	echo "Quick  usage: osync --master=/path/to/master/replica --slave=/path/to/slave/replica [--rsakey=/path/to/id_rsa] [--dry] [--silent] [--verbose] [--no-max-time] [--force-unlock]"
 	echo ""
 	echo "--dry: will run osync without actually doing anything; just testing"
 	echo "--silent: will run osync without any output to stdout, usefull for cron jobs"
@@ -1660,7 +1670,8 @@ function Usage
 	echo ""
 	echo "Quick usage only:"
 	echo "--master= : Specify master replica path. Will contain state and backup directory."
-	echo "--slave= : Spacift slave replica path. Will contain backup directory."
+	echo "--slave= : Specify local or remote path for slave replica. Can be a ssh uri like ssh://user@host.com:22//path/to/slave/replica"
+	echo "--rsakey= : Specify alternative path to rsa private key for ssh connection to slave replica."
 	exit 128
 }
 
@@ -1716,6 +1727,9 @@ do
 		quick_sync=$(($quick_sync + 1))
 		SLAVE_SYNC_DIR=${i##*=}
 		no_maxtime=1
+		;;
+		--rsakey=*)
+		SSH_RSA_PRIVATE_KEY=${i##*=}
 		;;
 	esac
 done

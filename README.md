@@ -47,6 +47,7 @@ While quick sync mode is convenient to do fast sync sceanrios, a configuration f
 QuickSync example:
 
 	$ ./osync.sh --master=/path/to/dir1 --slave=/path/to/dir2
+	$ ./osync.sh --master=/path/to/dir1 --slave=ssh://user@host.com:22//path/to/dir2 --rsakey=/home/user/.ssh/id_rsa
 
 Configuration files example:
 

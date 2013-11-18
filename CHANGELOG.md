@@ -4,7 +4,6 @@ SHORT FUTURE IMPROVEMENTS (post v1.0)
 - Sync and delete propagation function merge (master and slave functions are the same, reduces code size and maintain effort)
 - Tree function merge (current and after tree functions are the same except for output filename and logging, reduces code size and maintain effort)
 - Tree functions execute piped commands (grep, awk) on master when launched on remote slave which can cause more bandwith usage
-- Fast sync mode should also work with remote systems
 
 FAR FUTURE IMPROVEMENTS
 -----------------------
@@ -21,6 +20,8 @@ KNOWN ISSUES
 RECENT CHANGES
 --------------
 
+- Changed conf file default format for ssh uri (old format is still compatible)
+- Added ssh uri support for slave replicas
 - Improved execution hooks logs
 - Various bugfixes introduced with function merge
 - Added basic MacOS X support (yet not fully tested)
