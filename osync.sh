@@ -51,7 +51,13 @@ export LC_ALL=C
 
 function Log
 {
-        echo -e "TIME: $SECONDS - $1" >> "$LOG_FILE"
+	if [ $daemonize -eq 1 ]
+	then
+		echo -e "$(date) - $1" >> "$LOG_FILE"
+	else
+		echo -e "TIME: $SECONDS - $1" >> "$LOG_FILE"
+	fi
+
         if [ $silent -eq 0 ]
         then
                 echo -e "TIME: $SECONDS - $1"
@@ -1706,7 +1712,7 @@ function SyncOnChanges
 	while true
 	do
         	inotifywait --exclude $OSYNC_DIR $RSYNC_EXCLUDE -qq -r -e create -e modify -e delete -e move -e attrib "$MASTER_SYNC_DIR/" 
-        	$osync_cmd "$ConfigFile"
+        	$osync_cmd "$ConfigFile" $opts
 	done
 
 }
@@ -1723,6 +1729,7 @@ else
 	verbose=0
 fi
 # Alert flags
+opts=""
 soft_alert_total=0
 error_alert=0
 soft_stop=0
@@ -1741,18 +1748,23 @@ do
 	case $i in
 		--dry)
 		dryrun=1
+		opts=$opts" --dry"
 		;;
 		--silent)
 		silent=1
+		opts=$opts" --silent"
 		;;
 		--verbose)
 		verbose=1
+		opts=$opts" --verbose"
 		;;
 		--force-unlock)
 		force_unlock=1
+		opts=$opts" --force-unlock"
 		;;
 		--no-maxtime)
 		no_maxtime=1
+		opts=$opts" --no-maxtime"
 		;;
 		--help|-h|--version|-v)
 		Usage
