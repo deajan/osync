@@ -17,6 +17,7 @@ Bitpocked inspired me to write my own implementation of a two way sync script, i
 - Soft deletition and multiple backups handling
 - Before / after command execution
 - Time control
+- Sync on changes
 
 Osync uses a master / slave sync schema. It can sync local and local or local and remote directories. By definition, master replica should always be a local directory on the system osync runs on.
 Also, osync uses pidlocks to prevent multiple concurrent sync processes on/to the same master / slave replica. Be sure a sync process is finished before launching next one.
@@ -71,6 +72,10 @@ No-Maxtime option will disable execution time checks, which is usefull for big i
 Once you're confident about your fist runs, you may add osync as cron task with:
 
 	$ ./osync.sh /path/to/your.conf --silent
+
+Additionnaly, you may run osync in monitor mode, which means it will perform a sync upon file operations on master replica.
+
+	$ ./osync.sh /path/to/your.conf --on-changes
 
 You may then find osync output in /var/log/osync-*.log (or current directory if /var/log is not writable).
 

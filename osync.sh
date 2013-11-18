@@ -1466,8 +1466,13 @@ function Init
         set -o pipefail
         set -o errtrace
 
-        trap TrapStop SIGINT SIGKILL SIGHUP SIGTERM SIGQUIT
-	trap TrapQuit EXIT
+	# Do not use exit and quit traps if osync runs in monitor mode
+	if [ $sync_on_changes -eq 0 ]
+	then
+	        trap TrapStop SIGINT SIGKILL SIGHUP SIGTERM SIGQUIT
+		trap TrapQuit EXIT
+	fi
+
         if [ "$DEBUG" == "yes" ]
         then
                 trap 'TrapError ${LINENO} $?' ERR
@@ -1667,12 +1672,29 @@ function Usage
 	echo "--verbose: adds command outputs"
 	echo "--no-maxtime: disables any soft and hard execution time checks"
 	echo "--force-unlock: will override any existing active or dead locks on master and slave replica"
+	echo "--on-changes: will launch a sync as soon as there is some file activity on master replica."
 	echo ""
 	echo "Quick usage only:"
 	echo "--master= : Specify master replica path. Will contain state and backup directory."
 	echo "--slave= : Specify local or remote path for slave replica. Can be a ssh uri like ssh://user@host.com:22//path/to/slave/replica"
 	echo "--rsakey= : Specify alternative path to rsa private key for ssh connection to slave replica."
 	exit 128
+}
+
+function SyncOnChanges
+{
+	if ! type -p inotifywait > /dev/null 2>&1
+	then
+        	LogError "No inotifywait command found."
+        	exit 1
+	fi
+
+	while true
+	do
+        	inotifywait --exclude $OSYNC_DIR $RSYNC_EXCLUDE -qq -r -e create -e modify -e delete -e move -e attrib "$MASTER_SYNC_DIR/" 
+        	$osync_cmd "$ConfigFile"
+	done
+
 }
 
 # Comand line argument flags
@@ -1691,6 +1713,8 @@ soft_alert_total=0
 error_alert=0
 soft_stop=0
 quick_sync=0
+sync_on_changes=0
+osync_cmd=$0
 
 if [ $# -eq 0 ]
 then
@@ -1731,6 +1755,9 @@ do
 		--rsakey=*)
 		SSH_RSA_PRIVATE_KEY=${i##*=}
 		;;
+		--on-changes)
+		sync_on_changes=1
+		;;
 	esac
 done
 
@@ -1746,9 +1773,15 @@ then
 		SOFT_DELETE_DAYS=30
 		RESUME_TRY=1
 	else
-		LoadConfigFile "$1"
+		ConfigFile="$1"
+		LoadConfigFile "$ConfigFile"
 	fi
 	Init
+	if [ $sync_on_changes -eq 1 ]
+	then
+		SyncOnChanges
+		exit
+	fi
 	DATE=$(date)
 	Log "-------------------------------------------------------------"
 	Log "$DRY_WARNING $DATE - Osync v$OSYNC_VERSION script begin."
