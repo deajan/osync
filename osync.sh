@@ -3,7 +3,7 @@
 ###### Osync - Rsync based two way sync engine with fault tolerance
 ###### (L) 2013 by Orsiris "Ozy" de Jong (www.netpower.fr) 
 OSYNC_VERSION=0.99RC2-qs
-OSYNC_BUILD=1811201301
+OSYNC_BUILD=1811201303
 
 DEBUG=no
 SCRIPT_PID=$$
@@ -1688,6 +1688,8 @@ function SyncOnChanges
         	LogError "No inotifywait command found."
         	exit 1
 	fi
+
+	Log "Running Osync in file monitor mode."
 
 	while true
 	do
