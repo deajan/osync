@@ -3,13 +3,20 @@
 ###### Osync - Rsync based two way sync engine with fault tolerance
 ###### (L) 2013 by Orsiris "Ozy" de Jong (www.netpower.fr) 
 OSYNC_VERSION=0.99RC2-qs
-OSYNC_BUILD=1811201303
+OSYNC_BUILD=1811201304
 
 DEBUG=no
 SCRIPT_PID=$$
 
 LOCAL_USER=$(whoami)
 LOCAL_HOST=$(hostname)
+
+if [ -w /var/run ]
+then
+	PID_FILE=/var/run/osync_$SCRIPT_PID.run
+else
+	PID_FILE=./osync_$SCRIPT_PID.run
+fi
 
 ## Default log file until config file is loaded
 if [ -w /var/log ]
@@ -1662,22 +1669,27 @@ function Main
 function Usage
 {
 	echo "Osync $OSYNC_VERSION $OSYNC_BUILD"
+	echo "(C) 2013 by Orsiris \"Ozy\" de Jong"
+	echo "http://www.netpower.fr/osync"
 	echo ""
 	echo "You may use Osync with a full blown configuration file, or use its default options for quick command line sync."
-	echo "Normal usage: osync /path/to/conf.file [--dry] [--silent] [--verbose] [--no-maxtime] [--force-unlock]"
-	echo "Quick  usage: osync --master=/path/to/master/replica --slave=/path/to/slave/replica [--rsakey=/path/to/id_rsa] [--dry] [--silent] [--verbose] [--no-max-time] [--force-unlock]"
+	echo "Usage: osync /path/to/config/file [GENERAL OPTIONS]"
+	echo "or     osync --master=/path/to/master/replica --slave=/path/to/slave/replica [QUICKSYNC OPTIONS] [GENERAL OPTIONS]"
+	echo "or     osync --master=/path/to/master/replica --slave=ssh://backupuser@remotehost.com[:portnumber]//path/to/slave/replica [QUICKSYNC OPTIONS] [GENERAL OPTIONS]"
 	echo ""
-	echo "--dry: will run osync without actually doing anything; just testing"
-	echo "--silent: will run osync without any output to stdout, usefull for cron jobs"
-	echo "--verbose: adds command outputs"
-	echo "--no-maxtime: disables any soft and hard execution time checks"
-	echo "--force-unlock: will override any existing active or dead locks on master and slave replica"
-	echo "--on-changes: will launch a sync as soon as there is some file activity on master replica."
+	echo "[GENERAL OPTIONS]"
+	echo "--dry             Will run osync without actually doing anything; just testing"
+	echo "--silent          Will run osync without any output to stdout, used for cron jobs"
+	echo "--verbose         Increases output"
+	echo "--no-maxtime      Disables any soft and hard execution time checks"
+	echo "--force-unlock    Will override any existing active or dead locks on master and slave replica"
+	echo "--on-changes      Will launch a sync as soon as there is some file activity on master replica"
+	echo "--daemon          When used with --on-changes, will launch osync as daemon."
 	echo ""
-	echo "Quick usage only:"
-	echo "--master= : Specify master replica path. Will contain state and backup directory."
-	echo "--slave= : Specify local or remote path for slave replica. Can be a ssh uri like ssh://user@host.com:22//path/to/slave/replica"
-	echo "--rsakey= : Specify alternative path to rsa private key for ssh connection to slave replica."
+	echo "[QUICKSYNC OPTIONS]"
+	echo "--master=\"\"	Master replica path. Will contain state and backup directory"
+	echo "--slave=\"\" 	Local or remote slave replica path. Can be a ssh uri like ssh://user@host.com:22//path/to/slave/replica"
+	echo "--rsakey=\"\"	Alternative path to rsa private key for ssh connection to slave replica"
 	exit 128
 }
 
@@ -1716,6 +1728,7 @@ error_alert=0
 soft_stop=0
 quick_sync=0
 sync_on_changes=0
+daemonize=0
 osync_cmd=$0
 
 if [ $# -eq 0 ]
@@ -1760,6 +1773,9 @@ do
 		--on-changes)
 		sync_on_changes=1
 		;;
+		--daemon)
+		daemonize=1
+		;;
 	esac
 done
 
@@ -1781,7 +1797,13 @@ then
 	Init
 	if [ $sync_on_changes -eq 1 ]
 	then
-		SyncOnChanges
+		if [ $daemonize -eq 1 ]
+		then
+			echo $SCRIPT_PID > $PID_FILE
+			silent=1
+			exec > /dev/null 2>&1
+		fi
+		SyncOnChanges &
 		exit
 	fi
 	DATE=$(date)

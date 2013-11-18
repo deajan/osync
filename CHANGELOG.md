@@ -21,6 +21,7 @@ KNOWN ISSUES
 RECENT CHANGES
 --------------
 
+- Added possibility to daemonize osync in monitor mode
 - Added monitor mode, which will launch a sync task upon file operations on master replica
 - Changed conf file default format for ssh uri (old format is still compatible)
 - Added ssh uri support for slave replicas
