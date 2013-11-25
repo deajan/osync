@@ -1703,7 +1703,7 @@ function SyncOnChanges
 {
 	if ! type -p inotifywait > /dev/null 2>&1
 	then
-        	LogError "No inotifywait command found."
+        	LogError "No inotifywait command found. Cannot monitor changes."
         	exit 1
 	fi
 
@@ -1811,7 +1811,7 @@ then
 	then
 		if [ $daemonize -eq 1 ]
 		then
-			echo $SCRIPT_PID > $PID_FILE
+			## echo $SCRIPT_PID > $PID_FILE
 			silent=1
 			exec > /dev/null 2>&1
 		fi
