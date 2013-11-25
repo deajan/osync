@@ -3,7 +3,7 @@
 ###### Osync - Rsync based two way sync engine with fault tolerance
 ###### (L) 2013 by Orsiris "Ozy" de Jong (www.netpower.fr) 
 OSYNC_VERSION=0.99RC2-qs
-OSYNC_BUILD=2511201301
+OSYNC_BUILD=2511201302
 
 DEBUG=no
 SCRIPT_PID=$$
@@ -774,6 +774,11 @@ function WriteLockFiles
 
 function LockDirectories
 {
+	if [ $nolocks -eq 1 ]
+	then
+		return 0
+	fi
+
 	if [ $force_unlock -eq 1 ]
 	then
 		WriteLockFiles
@@ -850,6 +855,11 @@ function LockDirectories
 
 function UnlockDirectories
 {
+	if [ $nolocks -eq 1 ]
+	then
+		return 0
+	fi
+
 	if [ "$REMOTE_SYNC" == "yes" ]
 	then
 		CheckConnectivity3rdPartyHosts
@@ -1712,7 +1722,13 @@ function SyncOnChanges
 	while true
 	do
         	inotifywait --exclude $OSYNC_DIR $RSYNC_EXCLUDE -qq -r -e create -e modify -e delete -e move -e attrib "$MASTER_SYNC_DIR/" 
-        	$osync_cmd "$ConfigFile" $opts
+		if [ "$ConfigFile" != "" ]
+		then
+        		cmd="bash $osync_cmd \"$ConfigFile\" $opts --no-locks"
+		else
+			cmd="bash $osync_cmd $opts --no-locks"
+		fi
+		eval $cmd
 	done
 
 }
@@ -1736,6 +1752,7 @@ soft_stop=0
 quick_sync=0
 sync_on_changes=0
 daemonize=0
+nolocks=0
 osync_cmd=$0
 
 if [ $# -eq 0 ]
@@ -1773,14 +1790,17 @@ do
 		quick_sync=$(($quick_sync + 1))
 		no_maxtime=1
 		MASTER_SYNC_DIR=${i##*=}
+		opts=$opts" --master=\"$MASTER_SYNC_DIR\""
 		;;
 		--slave=*)
 		quick_sync=$(($quick_sync + 1))
 		SLAVE_SYNC_DIR=${i##*=}
+		opts=$opts" --slave=\"$SLAVE_SYNC_DIR\""
 		no_maxtime=1
 		;;
 		--rsakey=*)
 		SSH_RSA_PRIVATE_KEY=${i##*=}
+		opts=$opts" --rsakey=\"$SSH_RSA_PRIVATE_KEY\""
 		;;
 		--on-changes)
 		sync_on_changes=1
@@ -1788,8 +1808,14 @@ do
 		--daemon)
 		daemonize=1
 		;;
+		--no-locks)
+		nolocks=1
+		;;
 	esac
 done
+
+# Remove leading space if there is one
+opts="${opts# *}"
 
 CheckEnvironment
 if [ $? == 0 ]
@@ -1811,17 +1837,23 @@ then
 	then
 		if [ $daemonize -eq 1 ]
 		then
-			echo $SCRIPT_PID > $PID_FILE
+			## echo $SCRIPT_PID > $PID_FILE
 			silent=1
 			exec > /dev/null 2>&1
+			SyncOnChanges &
+			exit
+		else
+			SyncOnChanges
 		fi
-		SyncOnChanges &
-		exit
 	fi
 	DATE=$(date)
 	Log "-------------------------------------------------------------"
 	Log "$DRY_WARNING $DATE - Osync v$OSYNC_VERSION script begin."
 	Log "-------------------------------------------------------------"
+	if [ $daemonize -eq 1 ]
+	then
+		Log "Running as daemon"
+	fi
 	Log "Sync task [$SYNC_ID] launched as $LOCAL_USER@$LOCAL_HOST (PID $SCRIPT_PID)"
 	GetOperatingSystem
 	if [ $no_maxtime -eq 1 ]
