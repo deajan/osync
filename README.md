@@ -17,7 +17,7 @@ Bitpocked inspired me to write my own implementation of a two way sync script, i
 - Soft deletition and multiple backups handling
 - Before / after command execution
 - Time control
-- Sync on changes
+- Sync on changes, as a deamon
 
 Osync uses a master / slave sync schema. It can sync local and local or local and remote directories. By definition, master replica should always be a local directory on the system osync runs on.
 Also, osync uses pidlocks to prevent multiple concurrent sync processes on/to the same master / slave replica. Be sure a sync process is finished before launching next one.
@@ -75,6 +75,8 @@ Once you're confident about your fist runs, you may add osync as cron task with:
 
 Additionnaly, you may run osync in monitor mode, which means it will perform a sync upon file operations on master replica.
 File monitor mode can also be launched in daemon mode.
+Note that monitoring changes requires inotifywait command (inotify-tools package for most Linux distributions).
+BSD, MacOS X and Windows are not yet supported for this operation mode.
 
 	$ ./osync.sh /path/to/your.conf --on-changes
 	$ ./osync.sh /path/to/your.conf --on-changes --daemon

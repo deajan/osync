@@ -1713,7 +1713,7 @@ function SyncOnChanges
 {
 	if ! type -p inotifywait > /dev/null 2>&1
 	then
-        	LogError "No inotifywait command found."
+        	LogError "No inotifywait command found. Cannot monitor changes."
         	exit 1
 	fi
 
