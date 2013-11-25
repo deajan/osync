@@ -3,7 +3,7 @@
 ###### Osync - Rsync based two way sync engine with fault tolerance
 ###### (L) 2013 by Orsiris "Ozy" de Jong (www.netpower.fr) 
 OSYNC_VERSION=0.99RC2-qs
-OSYNC_BUILD=1811201304
+OSYNC_BUILD=2511201301
 
 DEBUG=no
 SCRIPT_PID=$$
@@ -276,7 +276,7 @@ function GetOperatingSystem
 	if [ $? != 0 ]
 	then
 		LOCAL_OS_VAR=$(uname -v 2>&1)
-		if [ $! != 0 ]
+		if [ $? != 0 ]
 		then
 			LOCAL_OS_VAR=($uname)
 		fi
