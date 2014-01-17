@@ -3,9 +3,9 @@
 ###### Osync - Rsync based two way sync engine with fault tolerance
 ###### (L) 2013-2014 by Orsiris "Ozy" de Jong (www.netpower.fr) 
 OSYNC_VERSION=0.99preRC3
-OSYNC_BUILD=1701201401
+OSYNC_BUILD=1701201403
 
-DEBUG=no
+DEBUG=yes
 SCRIPT_PID=$$
 
 LOCAL_USER=$(whoami)
@@ -348,13 +348,10 @@ function GetOperatingSystem
 		esac
 	fi
 
-        if [ "$DEBUG" == "yes" ]
+        LogDebug "Local OS: [$LOCAL_OS_VAR]."
+        if [ "$REMOTE_BACKUP" == "yes" ]
         then
-                Log "Local OS: [$LOCAL_OS_VAR]."
-                if [ "$REMOTE_BACKUP" == "yes" ]
-                then
-                        Log "Remote OS: [$REMOTE_OS_VAR]."
-                fi
+                LogDebug "Remote OS: [$REMOTE_OS_VAR]."
         fi
 }
 
@@ -905,10 +902,7 @@ function tree_list
 	else
 		rsync_cmd="$(type -p $RSYNC_EXECUTABLE) --rsync-path=\"$RSYNC_PATH\" -rlptgoDE8 $RSYNC_ARGS --exclude \"$OSYNC_DIR\" $RSNYC_EXCLUDE --list-only \"$1/\" | grep \"^-\|^d\" | awk '{\$1=\$2=\$3=\$4=\"\" ;print}' | awk '{\$1=\$1 ;print}' | (grep -v \"^\.$\" || :) | sort > $RUN_DIR/osync_$2_$SCRIPT_PID &"
 	fi
-	if [ "$DEBUG" == "yes" ]
-	then
-		Log "RSYNC_CMD: $rsync_cmd"
-	fi
+	LogDebug "RSYNC_CMD: $rsync_cmd"
 	eval $rsync_cmd
 	child_pid=$!
 	WaitForCompletion $child_pid $SOFT_MAX_EXEC_TIME $HARD_MAX_EXEC_TIME
@@ -950,12 +944,11 @@ function delete_list
                 	echo "$1-replica-deleted-list.success" > "$MASTER_STATE_DIR/last-action"
 		fi
         else
+		touch "$MASTER_STATE_DIR/$1-deleted-list"
 		if [ $dryrun -eq 1 ]
 		then
-                	touch "$MASTER_STATE_DIR/dry-$1-deleted-list"
                 	echo "$1-replica-deleted-list.empty" > "$MASTER_STATE_DIR/dry-last-action"
 		else
-                	touch "$MASTER_STATE_DIR/$1-deleted-list"
                 	echo "$1-replica-deleted-list.empty" > "$MASTER_STATE_DIR/last-action"
 		fi
         fi
@@ -972,10 +965,7 @@ function sync_update_slave
 	else
         	rsync_cmd="$(type -p $RSYNC_EXECUTABLE) --rsync-path=\"$RSYNC_PATH\" $RSYNC_ARGS -rlptgoDEui --stats $SLAVE_BACKUP --exclude \"$OSYNC_DIR\" $RSYNC_EXCLUDE --exclude-from \"$MASTER_STATE_DIR/master-deleted-list\" --exclude-from \"$MASTER_STATE_DIR/slave-deleted-list\" \"$MASTER_SYNC_DIR/\" \"$SLAVE_SYNC_DIR/\" > $RUN_DIR/osync_update_slave_replica_$SCRIPT_PID 2>&1 &"
 	fi
-	if [ "$DEBUG" == "yes" ]
-	then
-		Log "RSYNC_CMD: $rsync_cmd"
-	fi
+	LogDebug "RSYNC_CMD: $rsync_cmd"
 	eval "$rsync_cmd"
         child_pid=$!
         WaitForCompletion $child_pid $SOFT_MAX_EXEC_TIME $HARD_MAX_EXEC_TIME
@@ -1021,10 +1011,7 @@ function sync_update_master
 	else
 	        rsync_cmd="$(type -p $RSYNC_EXECUTABLE) --rsync-path=\"$RSYNC_PATH\" $RSYNC_ARGS -rlptgoDEui --stats $MASTER_BACKUP --exclude \"$OSYNC_DIR\" $RSYNC_EXCLUDE --exclude-from \"$MASTER_STATE_DIR/slave-deleted-list\" --exclude-from \"$MASTER_STATE_DIR/master-deleted-list\" \"$SLAVE_SYNC_DIR/\" \"$MASTER_SYNC_DIR/\" > $RUN_DIR/osync_update_master_replica_$SCRIPT_PID 2>&1 &"
 	fi
-	if [ "$DEBUG" == "yes" ]
-	then
-		Log "RSYNC_CMD: $rsync_cmd"
-	fi
+	LogDebug "RSYNC_CMD: $rsync_cmd"
 	eval "$rsync_cmd"
         child_pid=$!
         WaitForCompletion $child_pid $SOFT_MAX_EXEC_TIME $HARD_MAX_EXEC_TIME
@@ -1066,15 +1053,11 @@ function delete_on_slave
 	then
 	        CheckConnectivity3rdPartyHosts
 	        CheckConnectivityRemoteHost
-		rsync_cmd="$(type -p $RSYNC_EXECUTABLE) --rsync-path=\"$RSYNC_PATH\" $RSYNC_ARGS -rlptgoDEui --stats -e \"$RSYNC_SSH_CMD\" $SLAVE_DELETE --delete --exclude \"$OSYNC_DIR\" --include-from \"$MASTER_STATE_DIR/master-deleted-list\" --exclude=\"*\" \"$MASTER_SYNC_DIR/\" $REMOTE_USER@$REMOTE_HOST:\"$ESC_SLAVE_SYNC_DIR/\" > $RUN_DIR/osync_deletion_on_slave_$SCRIPT_PID 2>&1 &"
+		rsync_cmd="$(type -p $RSYNC_EXECUTABLE) --rsync-path=\"$RSYNC_PATH\" $RSYNC_ARGS -rlptgoDEui --stats -e \"$RSYNC_SSH_CMD\" $SLAVE_DELETE --delete --exclude \"$OSYNC_DIR\" --include-from \"$MASTER_STATE_DIR/master-deleted-list\" --filter=\"-! */\" \"$MASTER_SYNC_DIR/\" $REMOTE_USER@$REMOTE_HOST:\"$ESC_SLAVE_SYNC_DIR/\" > $RUN_DIR/osync_deletion_on_slave_$SCRIPT_PID 2>&1 &"
 	else
-		#rsync_cmd="$(type -p $RSYNC_EXECUTABLE) --rsync-path=\"$RSYNC_PATH\" $RSYNC_ARGS -rlptgoDEui --stats $SLAVE_DELETE --delete --exclude \"$OSYNC_DIR\" $RSYNC_EXCLUDE --exclude-from \"$MASTER_STATE_DIR/slave-deleted-list\" --include-from \"$MASTER_STATE_DIR/master-deleted-list\" \"$MASTER_SYNC_DIR/\" \"$SLAVE_SYNC_DIR/\" > $RUN_DIR/osync_deletion_on_slave_$SCRIPT_PID 2>&1 &"
-		rsync_cmd="$(type -p $RSYNC_EXECUTABLE) --rsync-path=\"$RSYNC_PATH\" $RSYNC_ARGS -rlptgoDEui --stats $SLAVE_DELETE --delete --exclude \"$OSYNC_DIR\" --include-from \"$MASTER_STATE_DIR/master-deleted-list\" --exclude=\"*\" \"$MASTER_SYNC_DIR/\" \"$SLAVE_SYNC_DIR/\" > $RUN_DIR/osync_deletion_on_slave_$SCRIPT_PID 2>&1 &"
+		rsync_cmd="$(type -p $RSYNC_EXECUTABLE) --rsync-path=\"$RSYNC_PATH\" $RSYNC_ARGS -rlptgoDEui --stats $SLAVE_DELETE --delete --exclude \"$OSYNC_DIR\" --include-from \"$MASTER_STATE_DIR/master-deleted-list\" --filter=\"-! */\" \"$MASTER_SYNC_DIR/\" \"$SLAVE_SYNC_DIR/\" > $RUN_DIR/osync_deletion_on_slave_$SCRIPT_PID 2>&1 &"
 	fi
-	if [ "$DEBUG" == "yes" ]
-	then
-		Log "RSYNC_CMD: $rsync_cmd"
-	fi
+	LogDebug "RSYNC_CMD: $rsync_cmd"
 	eval "$rsync_cmd"
 	child_pid=$!
 	WaitForCompletion $child_pid $SOFT_MAX_EXEC_TIME 0
@@ -1115,14 +1098,11 @@ function delete_on_master
 	then
 	        CheckConnectivity3rdPartyHosts
         	CheckConnectivityRemoteHost
-		rsync_cmd="$(type -p $RSYNC_EXECUTABLE) --rsync-path=\"$RSYNC_PATH\" $RSYNC_ARGS -rlptgoDEui --stats -e \"$RSYNC_SSH_CMD\" $MASTER_DELETE --delete --exclude \"$OSYNC_DIR\" --include-from \"$MASTER_STATE_DIR/slave-deleted-list\" --exclude=\"*\" $REMOTE_USER@$REMOTE_HOST:\"$ESC_SLAVE_SYNC_DIR/\" \"$MASTER_SYNC_DIR/\" > $RUN_DIR/osync_deletion_on_master_$SCRIPT_PID 2>&1 &"
+		rsync_cmd="$(type -p $RSYNC_EXECUTABLE) --rsync-path=\"$RSYNC_PATH\" $RSYNC_ARGS -rlptgoDEui --stats -e \"$RSYNC_SSH_CMD\" $MASTER_DELETE --delete --exclude \"$OSYNC_DIR\" --include-from \"$MASTER_STATE_DIR/slave-deleted-list\" --filter=\"-! */\" $REMOTE_USER@$REMOTE_HOST:\"$ESC_SLAVE_SYNC_DIR/\" \"$MASTER_SYNC_DIR/\" > $RUN_DIR/osync_deletion_on_master_$SCRIPT_PID 2>&1 &"
 	else
-		rsync_cmd="$(type -p $RSYNC_EXECUTABLE) --rsync-path=\"$RSYNC_PATH\" $RSYNC_ARGS -rlptgoDEui --stats $MASTER_DELETE --delete --exclude \"$OSYNC_DIR\" --include-from \"$MASTER_STATE_DIR/slave-deleted-list\" --exclude=\"*\" \"$SLAVE_SYNC_DIR/\" \"$MASTER_SYNC_DIR/\" > $RUN_DIR/osync_deletion_on_master_$SCRIPT_PID 2>&1 &"
+		rsync_cmd="$(type -p $RSYNC_EXECUTABLE) --rsync-path=\"$RSYNC_PATH\" $RSYNC_ARGS -rlptgoDEui --stats $MASTER_DELETE --delete --exclude \"$OSYNC_DIR\" --include-from \"$MASTER_STATE_DIR/slave-deleted-list\" --filter=\"-! */\" \"$SLAVE_SYNC_DIR/\" \"$MASTER_SYNC_DIR/\" > $RUN_DIR/osync_deletion_on_master_$SCRIPT_PID 2>&1 &"
 	fi
-	if [ "$DEBUG" == "yes" ]
-	then
-		Log "RSYNC_CMD: $rsync_cmd"
-	fi
+	LogDebug "RSYNC_CMD: $rsync_cmd"
 	eval "$rsync_cmd"
 	child_pid=$!
 	WaitForCompletion $child_pid $SOFT_MAX_EXEC_TIME 0
@@ -1683,14 +1663,9 @@ function SyncOnChanges
 # Comand line argument flags
 dryrun=0
 silent=0
+verbose=0
 force_unlock=0
 no_maxtime=0
-if [ "$DEBUG" == "yes" ]
-then
-	verbose=1
-else
-	verbose=0
-fi
 # Alert flags
 opts=""
 soft_alert_total=0

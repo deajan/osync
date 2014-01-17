@@ -20,6 +20,7 @@ KNOWN ISSUES
 RECENT CHANGES
 --------------
 
+- Fixed a bug preventing deleted files in subdirectories propagation (Thanks to Richard Faasen for pointing that out)
 - Some more function merge in sync process
 - Dry mode won't create or modifiy state files anymore and will use dry-state files instead
 - Improved file monitor mode
