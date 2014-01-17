@@ -1,9 +1,9 @@
 #!/bin/bash
 
 ###### Osync - Rsync based two way sync engine with fault tolerance
-###### (L) 2013 by Orsiris "Ozy" de Jong (www.netpower.fr) 
-OSYNC_VERSION=0.99RC2-qs
-OSYNC_BUILD=2511201302
+###### (L) 2013-2014 by Orsiris "Ozy" de Jong (www.netpower.fr) 
+OSYNC_VERSION=0.99preRC3
+OSYNC_BUILD=1701201401
 
 DEBUG=no
 SCRIPT_PID=$$
@@ -915,91 +915,50 @@ function tree_list
 	retval=$?
 	if [ $retval == 0 ] && [ -f $RUN_DIR/osync_$2_$SCRIPT_PID ]
 	then
-		mv $RUN_DIR/osync_$2_$SCRIPT_PID "$MASTER_SYNC_DIR/$STATE_DIR/$2"
-		echo "$3.success" > "$MASTER_SYNC_DIR/$STATE_DIR/last-action"
+		if [ $dryrun -eq 1 ]
+		then			
+			mv $RUN_DIR/osync_$2_$SCRIPT_PID "$MASTER_STATE_DIR/dry-$2"
+			echo "$3.success" > "$MASTER_STATE_DIR/dry-last-action"
+		else	
+			mv $RUN_DIR/osync_$2_$SCRIPT_PID "$MASTER_STATE_DIR/$2"
+			echo "$3.success" > "$MASTER_STATE_DIR/last-action"
+		fi
 	else
 		LogError "Cannot create replica file list."
-		echo "$3.fail" > "$MASTER_SYNC_DIR/$STATE_DIR/last-action"
-		exit 1
-	fi
-}
-function master_tree_current
-{
-	Log "Creating master replica file list."
-	## Tree listing function: list | remove everything not file or directory | remove first 4 columns | remove empty leading spaces | remove "." dir (or return true if not exist)
-	rsync_cmd="$(type -p $RSYNC_EXECUTABLE) --rsync-path=\"$RSYNC_PATH\" -rlptgoDE8 $RSYNC_ARGS --exclude \"$OSYNC_DIR\" $RSYNC_EXCLUDE --list-only \"$MASTER_SYNC_DIR/\" | grep \"^-\|^d\" | awk '{\$1=\$2=\$3=\$4=\"\" ;print}' | awk '{\$1=\$1 ;print}' | (grep -v \"^\.$\" || :) | sort > $RUN_DIR/osync_master-tree-current_$SCRIPT_PID &"
-	if [ "$DEBUG" == "yes" ]
-	then
-		Log "RSYNC_CMD: $rsync_cmd"	
-	fi
-	eval $rsync_cmd
-	child_pid=$!
-	WaitForCompletion $child_pid $SOFT_MAX_EXEC_TIME $HARD_MAX_EXEC_TIME
-	if [ $? == 0 ] && [ -f $RUN_DIR/osync_master-tree-current_$SCRIPT_PID ]
-	then
-		mv $RUN_DIR/osync_master-tree-current_$SCRIPT_PID "$MASTER_STATE_DIR/master-tree-current"
-		echo "master-replica-tree.success" > "$MASTER_STATE_DIR/last-action"
-	else
-		LogError "Cannot create master file list."
-		echo "master-replica-tree.fail" > "$MASTER_STATE_DIR/last-action"
+		if [ $dryrun -eq 1 ]
+		then
+			echo "$3.fail" > "$MASTER_STATE_DIR/dry-last-action"
+		else
+			echo "$3.fail" > "$MASTER_STATE_DIR/last-action"
+		fi
 		exit 1
 	fi
 }
 
-function slave_tree_current
+# delete_list(replica): Creates a list of files vanished from last run on replica $1
+function delete_list
 {
-	Log "Creating slave replica file list."
-	if [ "$REMOTE_SYNC" == "yes" ]
-	then
-        	CheckConnectivity3rdPartyHosts
-	        CheckConnectivityRemoteHost
-		rsync_cmd="$(type -p $RSYNC_EXECUTABLE) --rsync-path=\"$RSYNC_PATH\" -rlptgoDE8 $RSYNC_ARGS --exclude \"$OSYNC_DIR\" $RSYNC_EXCLUDE -e \"$RSYNC_SSH_CMD\" --list-only $REMOTE_USER@$REMOTE_HOST:\"$ESC_SLAVE_SYNC_DIR/\" | grep \"^-\|^d\" | awk '{\$1=\$2=\$3=\$4=\"\" ;print}' | awk '{\$1=\$1 ;print}' | (grep -v \"^\.$\" || :) | sort > $RUN_DIR/osync_slave-tree-current_$SCRIPT_PID &"
-	else
-		rsync_cmd="$(type -p $RSYNC_EXECUTABLE) --rsync-path=\"$RSYNC_PATH\" -rlptgoDE8 $RSYNC_ARGS --exclude \"$OSYNC_DIR\" $RSNYC_EXCLUDE --list-only \"$SLAVE_SYNC_DIR/\" | grep \"^-\|^d\" | awk '{\$1=\$2=\$3=\$4=\"\" ;print}' | awk '{\$1=\$1 ;print}' | (grep -v \"^\.$\" || :) | sort > $RUN_DIR/osync_slave-tree-current_$SCRIPT_PID &"
-	fi
-	if [ "$DEBUG" == "yes" ]
-	then
-		Log "RSYNC_CMD: $rsync_cmd"
-	fi
-	eval $rsync_cmd
-	child_pid=$!
-	WaitForCompletion $child_pid $SOFT_MAX_EXEC_TIME $HARD_MAX_EXEC_TIME
-	retval=$?
-	if [ $retval == 0 ] && [ -f $RUN_DIR/osync_slave-tree-current_$SCRIPT_PID ]
-	then
-		mv $RUN_DIR/osync_slave-tree-current_$SCRIPT_PID "$MASTER_STATE_DIR/slave-tree-current"
-		echo "slave-replica-tree.-success" > "$MASTER_STATE_DIR/last-action"
-	else
-		LogError "Cannot create slave file list."
-		echo "slave-replica-tree.fail" > "$MASTER_STATE_DIR/last-action"
-		exit 1
-	fi
-}
-
-function master_delete_list
-{
-	Log "Creating master replica deleted file list."
-	if [ -f "$MASTER_STATE_DIR/master-tree-after" ]
-	then
-		comm -23 "$MASTER_STATE_DIR/master-tree-after" "$MASTER_STATE_DIR/master-tree-current" > "$MASTER_STATE_DIR/master-deleted-list"
-		echo "master-replica-deleted-list.success" > "$MASTER_STATE_DIR/last-action"
-	else
-		touch "$MASTER_STATE_DIR/master-deleted-list"
-		echo "master-replica-deleted-list.empty" > "$MASTER_STATE_DIR/last-action"
-	fi
-}
-
-function slave_delete_list
-{
-	Log "Creating slave replica deleted file list."
-	if [ -f "$MASTER_STATE_DIR/slave-tree-after" ]
-	then
-		comm -23 "$MASTER_STATE_DIR/slave-tree-after" "$MASTER_STATE_DIR/slave-tree-current" > "$MASTER_STATE_DIR/slave-deleted-list"
-		echo "slave-replica-deleted-list.success" > "$MASTER_STATE_DIR/last-action"
-	else
-		touch "$MASTER_STATE_DIR/slave-deleted-list"
-		echo "slave-replica-deleted-list.empty" > "$MASTER_STATE_DIR/last-action"
-	fi
+        Log "Creating $1 replica deleted file list."
+        if [ -f "$MASTER_STATE_DIR/$1-tree-after" ]
+        then
+                if [ $dryrun -eq 1 ]
+		then
+			comm -23 "$MASTER_STATE_DIR/$1-tree-after" "$MASTER_STATE_DIR/dry-$1-tree-current" > "$MASTER_STATE_DIR/dry-$1-deleted-list"
+                	echo "$1-replica-deleted-list.success" > "$MASTER_STATE_DIR/dry-last-action"
+		else
+			comm -23 "$MASTER_STATE_DIR/$1-tree-after" "$MASTER_STATE_DIR/$1-tree-current" > "$MASTER_STATE_DIR/$1-deleted-list"
+                	echo "$1-replica-deleted-list.success" > "$MASTER_STATE_DIR/last-action"
+		fi
+        else
+		if [ $dryrun -eq 1 ]
+		then
+                	touch "$MASTER_STATE_DIR/dry-$1-deleted-list"
+                	echo "$1-replica-deleted-list.empty" > "$MASTER_STATE_DIR/dry-last-action"
+		else
+                	touch "$MASTER_STATE_DIR/$1-deleted-list"
+                	echo "$1-replica-deleted-list.empty" > "$MASTER_STATE_DIR/last-action"
+		fi
+        fi
 }
 
 function sync_update_slave
@@ -1033,11 +992,21 @@ function sync_update_slave
 		then
 			LogError "Rsync output:\n$(cat $RUN_DIR/osync_update_slave_replica_$SCRIPT_PID)"
 		fi
-                echo "update-slave-replica.fail" > "$MASTER_STATE_DIR/last-action"
+		if [ $dryrun -eq 1 ]
+		then
+                	echo "update-slave-replica.fail" > "$MASTER_STATE_DIR/dry-last-action"
+		else
+                	echo "update-slave-replica.fail" > "$MASTER_STATE_DIR/last-action"
+		fi
 		exit 1
         else
                 Log "Updating slave replica succeded."
-                echo "update-slave-replica.success" > "$MASTER_STATE_DIR/last-action"
+		if [ $dryrun -eq 1 ]
+		then
+			echo "update-slave-replica.success" > "$MASTER_STATE_DIR/dry-last-action"
+		else
+			echo "update-slave-replica.success" > "$MASTER_STATE_DIR/last-action"
+		fi
         fi
 }
 
@@ -1072,11 +1041,21 @@ function sync_update_master
                         LogError "Rsync output:\n$(cat $RUN_DIR/osync_update_slave_replica_$SCRIPT_PID)"
                 fi
                 LogError "Updating master replica failed. Stopping execution."
-                echo "update-master-replica.fail" > "$MASTER_STATE_DIR/last-action"
+		if [ $dryrun -eq 1 ]
+		then
+	                echo "update-master-replica.fail" > "$MASTER_STATE_DIR/dry-last-action"
+		else
+	                echo "update-master-replica.fail" > "$MASTER_STATE_DIR/last-action"
+		fi
 		exit 1
         else
                 Log "Updating master replica succeded."
-                echo "update-master-replica.success" > "$MASTER_STATE_DIR/last-action"
+		if [ $dryrun -eq 1 ]
+		then
+                	echo "update-master-replica.success" > "$MASTER_STATE_DIR/dry-last-action"
+		else
+	                echo "update-master-replica.success" > "$MASTER_STATE_DIR/last-action"
+		fi
         fi
 }
 
@@ -1112,10 +1091,20 @@ function delete_on_slave
                         LogError "Rsync output:\n$(cat $RUN_DIR/osync_deletion_on_slave_$SCRIPT_PID)"
                 fi 
 		LogError "Deletion on slave failed."
-		echo "delete-propagation-slave.fail" > "$MASTER_STATE_DIR/last-action"
+		if [ $dryrun -eq 1 ]
+		then
+			echo "delete-propagation-slave.fail" > "$MASTER_STATE_DIR/dry-last-action"
+		else
+			echo "delete-propagation-slave.fail" > "$MASTER_STATE_DIR/last-action"
+		fi
 		exit 1
 	else
-		echo "delete-propagation-slave.success" > "$MASTER_STATE_DIR/last-action"
+		if [ $dryrun -eq 1 ]
+		then
+			echo "delete-propagation-slave.success" > "$MASTER_STATE_DIR/dry-last-action"
+		else
+			echo "delete-propagation-slave.success" > "$MASTER_STATE_DIR/last-action"
+		fi
 	fi
 }
 
@@ -1150,74 +1139,21 @@ function delete_on_master
                         LogError "Rsync output:\n$(cat $RUN_DIR/osync_deletion_on_master_$SCRIPT_PID)"
                 fi
 		LogError "Deletion on master failed."
-		echo "delete-propagation-master.fail" > "$MASTER_STATE_DIR/last-action"
+		if [ $dryrun -eq 1 ]
+		then
+			echo "delete-propagation-master.fail" > "$MASTER_STATE_DIR/dry-last-action"
+		else
+			echo "delete-propagation-master.fail" > "$MASTER_STATE_DIR/last-action"		
+		fi
 		exit 1
 	else
-		echo "delete-propagation-master.success" > "$MASTER_STATE_DIR/last-action"
+		if [ $dryrun -eq 1 ]
+		then
+			echo "delete-propagation-master.success" > "$MASTER_STATE_DIR/dry-last-action"
+		else
+			echo "delete-propagation-master.success" > "$MASTER_STATE_DIR/last-action"
+		fi
 	fi
-}
-
-function master_tree_after
-{
-	if [ $dryrun -eq 1 ]
-	then
-		Log "No need to create after run master replica file list, nothing should have changed."
-		return 0
-	fi
-        Log "Creating after run master replica file list."
-        rsync_cmd="$(type -p $RSYNC_EXECUTABLE) --rsync-path=\"$RSYNC_PATH\" -rlptgoDE8 $RSYNC_ARGS --exclude \"$OSYNC_DIR\" $RSYNC_EXCLUDE --list-only \"$MASTER_SYNC_DIR/\" | grep \"^-\|^d\" | awk '{\$1=\$2=\$3=\$4=\"\" ;print}' | awk '{\$1=\$1 ;print}' | (grep -v \"^\.$\" || :) | sort > $RUN_DIR/osync_master-tree-after_$SCRIPT_PID &"
-	if [ "$DEBUG" == "yes" ]
-	then
-		Log "RSYNC_CMD: $rsync_cmd"
-	fi
-	eval $rsync_cmd
-	child_pid=$!
-        WaitForCompletion $child_pid $SOFT_MAX_EXEC_TIME 0
-        retval=$?
-        if [ $retval == 0 ] && [ -f $RUN_DIR/osync_master-tree-after_$SCRIPT_PID ]
-        then
-                mv $RUN_DIR/osync_master-tree-after_$SCRIPT_PID "$MASTER_STATE_DIR/master-tree-after"
-		echo "master-replica-tree-after.success" > "$MASTER_STATE_DIR/last-action"
-        else
-                LogError "Cannot create slave file list."
-		echo "master-replica-tree-after.fail" > "$MASTER_STATE_DIR/last-action"
-                exit 1
-        fi
-}
-
-function slave_tree_after
-{
-	if [ $dryrun -eq 1 ]
-	then
-		Log "No need to create after frun slave replica file list, nothing should have changed."
-		return 0
-	fi
-        Log "Creating after run slave replica file list."
-	if [ "$REMOTE_SYNC" == "yes" ]
-	then
-	        CheckConnectivity3rdPartyHosts
-	        CheckConnectivityRemoteHost
-	        rsync_cmd="$(type -p $RSYNC_EXECUTABLE) --rsync-path=\"$RSYNC_PATH\" -rlptgoDE8 $RSYNC_ARGS -e \"$RSYNC_SSH_CMD\" --exclude \"$OSYNC_DIR\" $RSYNC_EXCLUDE --list-only $REMOTE_USER@$REMOTE_HOST:\"$ESC_SLAVE_SYNC_DIR/\" | grep \"^-\|^d\" | awk '{\$1=\$2=\$3=\$4=\"\" ;print}' | awk '{\$1=\$1 ;print}' | (grep -v \"^\.$\" || :) | sort > $RUN_DIR/osync_slave-tree-after_$SCRIPT_PID &"
-	else
-	        rsync_cmd="$(type -p $RSYNC_EXECUTABLE) --rsync-path=\"$RSYNC_PATH\" -rlptgoDE8 $RSYNC_ARGS --exclude \"$OSYNC_DIR\" $RSYNC_EXCLUDE --list-only \"$SLAVE_SYNC_DIR/\" | grep \"^-\|^d\" | awk '{\$1=\$2=\$3=\$4=\"\" ;print}' | awk '{\$1=\$1 ;print}' | (grep -v \"^\.$\" || :) | sort > $RUN_DIR/osync_slave-tree-after_$SCRIPT_PID &"
-	fi
-	if [ "$DEBUG" == "yes" ]
-	then
-		Log "RSYNC_CMD: $rsync_cmd"
-	fi
-	eval $rsync_cmd
-	child_pid=$!
-        WaitForCompletion $child_pid $SOFT_MAX_EXEC_TIME 0
-        retval=$?
-        if [ $retval == 0 ] && [ -f $RUN_DIR/osync_slave-tree-after_$SCRIPT_PID ]
-        then
-                mv $RUN_DIR/osync_slave-tree-after_$SCRIPT_PID "$MASTER_STATE_DIR/slave-tree-after"
-		echo "slave-replica-tree-after.success" > "$MASTER_STATE_DIR/last-action"
-        else
-                LogError "Cannot create slave file list."
-		echo "slave-replica-tree-after.fail" > "$MASTER_STATE_DIR/last-action"
-                exit 1
-        fi
 }
 
 ###### Sync function in 10 steps (functions above)
@@ -1242,14 +1178,20 @@ function Sync
 			if [ "$resume_sync" != "sync.success" ]
 			then
 				Log "WARNING: Trying to resume aborted osync execution on $(stat --format %y "$MASTER_STATE_DIR/last-action") at task [$resume_sync]. [$resume_count] previous tries."
-				echo $(($resume_count+1)) > "$MASTER_STATE_DIR/resume-count"
+				if [ $dryrun -ne 1 ]
+				then
+					echo $(($resume_count+1)) > "$MASTER_STATE_DIR/resume-count"
+				fi
 			else
 				resume_sync=none
 			fi
 		else
 			Log "Will not resume aborted osync execution. Too much resume tries [$resume_count]."
-			echo "noresume" > "$MASTER_STATE_DIR/last-action"
-			echo "0" > "$MASTER_STATE_DIR/resume-count"
+			if [ $dryrun -ne 1 ]
+			then
+				echo "noresume" > "$MASTER_STATE_DIR/last-action"
+				echo "0" > "$MASTER_STATE_DIR/resume-count"
+			fi
 			resume_sync=none
 		fi
 	else
@@ -1274,12 +1216,12 @@ function Sync
 	fi
 	if [ "$resume_sync" == "resumed" ] || [ "$resume_sync" == "slave-replica-tree.success" ] || [ "$resume_sync" == "master-replica-deleted-list.fail" ]
 	then
-		master_delete_list
+		delete_list master
 		resume_sync="resumed"
 	fi
 	if [ "$resume_sync" == "resumed" ] || [ "$resume_sync" == "master-replica-deleted-list.success" ] || [ "$resume_sync" == "slave-replica-deleted-list.fail" ]
 	then
-		slave_delete_list
+		delete_list slave
 		resume_sync="resumed"
  	fi
 	if [ "$resume_sync" == "resumed" ] || [ "$resume_sync" == "slave-replica-deleted-list.success" ] || [ "$resume_sync" == "update-master-replica.fail" ] || [ "$resume_sync" == "update-slave-replica.fail" ]
@@ -1333,8 +1275,13 @@ function Sync
 	fi
 
 	Log "Finished synchronization task."
-	echo "sync.success" > "$MASTER_STATE_DIR/last-action"
-	echo "0" > "$MASTER_STATE_DIR/resume-count"
+	if [ $dryrun -eq 1 ]
+	then
+		echo "sync.success" > "$MASTER_STATE_DIR/dry-last-action"
+	else
+		echo "sync.success" > "$MASTER_STATE_DIR/last-action"
+		echo "0" > "$MASTER_STATE_DIR/resume-count"
+	fi	
 }
 
 function SoftDelete

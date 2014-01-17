@@ -2,7 +2,6 @@ SHORT FUTURE IMPROVEMENTS (post v1.0)
 -------------------------------------
 
 - Sync and delete propagation function merge (master and slave functions are the same, reduces code size and maintain effort)
-- Tree function merge (current and after tree functions are the same except for output filename and logging, reduces code size and maintain effort)
 - Tree functions execute piped commands (grep, awk) on master when launched on remote slave which can cause more bandwith usage
 - Daemonize osync --on-changes mode
 
@@ -21,6 +20,8 @@ KNOWN ISSUES
 RECENT CHANGES
 --------------
 
+- Some more function merge in sync process
+- Dry mode won't create or modifiy state files anymore and will use dry-state files instead
 - Improved file monitor mode
 - Added possibility to daemonize osync in monitor mode
 - Added monitor mode, which will launch a sync task upon file operations on master replica
