@@ -1,9 +1,8 @@
 SHORT FUTURE IMPROVEMENTS (post v1.0)
 -------------------------------------
 
-- Sync and delete propagation function merge (master and slave functions are the same, reduces code size and maintain effort)
 - Tree functions execute piped commands (grep, awk) on master when launched on remote slave which can cause more bandwith usage
-- Daemonize osync --on-changes mode
+- SysV init script for RHEL / CentOS
 
 FAR FUTURE IMPROVEMENTS
 -----------------------
@@ -20,6 +19,13 @@ KNOWN ISSUES
 RECENT CHANGES
 --------------
 
+- Fixed a bug with double trailing slashes in certain sceanrios
+- Sync execution don't fails anymore if files vanish during execution, also vanished files get logged
+- Add eventual "comm -23" replacement by "grep -F -x -v -f" to enhance compatibility with other platforms (comm is still much faster than grep, so we keep it)
+- Replaced xargs rm with find -exec rm to better handle file names in soft deletion
+- Fixed soft deletion not happening with relative paths
+- Improved process termination behavior
+- More code merging and cleanup
 - Fixed a bug preventing deleted files in subdirectories propagation (Thanks to Richard Faasen for pointing that out)
 - Some more function merge in sync process
 - Dry mode won't create or modifiy state files anymore and will use dry-state files instead

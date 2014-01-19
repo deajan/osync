@@ -17,14 +17,15 @@ Bitpocked inspired me to write my own implementation of a two way sync script, i
 - Soft deletition and multiple backups handling
 - Before / after command execution
 - Time control
-- Sync on changes, as a deamon
+- Directory monitoring
+- Running on schedule or as daemon
 
-Osync uses a master / slave sync schema. It can sync local and local or local and remote directories. By definition, master replica should always be a local directory on the system osync runs on.
+Osync uses a master / slave sync schema. It can sync local to local or local to remote directories. By definition, master replica should always be a local directory on the system osync runs on.
 Also, osync uses pidlocks to prevent multiple concurrent sync processes on/to the same master / slave replica. Be sure a sync process is finished before launching next one.
 You may launch concurrent sync processes on the same system but only for different master replicas.
 
-Currently, it has been tested on CentOS 5, CentOS 6, Debian 6.0.7, Linux Mint 14, Ubuntu 12.
-Osync also runs on FreeBSD and Windows MSYS environment, altough it is not fully tested yet.
+Currently, it has been tested on CentOS 5, CentOS 6, Debian 6.0.7, Linux Mint 14, 15 and 16, Ubuntu 12.04 and Ubuntu 12.10.
+Windows is supported via MSYS environment. FreeBSD has also been tested.
 Basic MacOS X tests have also been done, but a lot of tests are still needed.
 
 ## Installation
@@ -39,16 +40,20 @@ First, grab a fresh copy of osync and make it executable:
 	$ chmod +x ./osync.sh
 
 Osync needs to run with bash shell. Using any other shell will most probably result in lots of errors.
+If bash is not your default shell, invoke it using
+
+	$ bash osync.sh [options]
 
 ## Usage
 
 Osync can work with in two flavors: Quick sync mode and configuration file mode.
 While quick sync mode is convenient to do fast sync sceanrios, a configuration file gives much more functionnality.
+Please use double quotes if directoires contain spaces. Do not use escaped spaces.
 
 QuickSync example:
 
-	$ ./osync.sh --master=/path/to/dir1 --slave=/path/to/dir2
-	$ ./osync.sh --master=/path/to/dir1 --slave=ssh://user@host.com:22//path/to/dir2 --rsakey=/home/user/.ssh/id_rsa
+	$ ./osync.sh --master="/path/to/dir1" --slave="/path/to/remote dir2"
+	$ ./osync.sh --master="/path/to/another dir" --slave="ssh://user@host.com:22//path/to/dir2" --rsakey=/home/user/.ssh/id_rsa
 
 Configuration files example:
 
@@ -69,11 +74,12 @@ If everything went well, you may run the actual configuration with one of the fo
 Verbose option will display which files and attrs are actually synchronized.
 No-Maxtime option will disable execution time checks, which is usefull for big initial sync tasks that might take long time. Next runs should then only propagate changes and take much less time.
 
-Once you're confident about your fist runs, you may add osync as cron task with:
+Once you're confident about your fist runs, you may add osync as cron task like the following in /etc/crontab which would run osync every 5 minutes:
 
-	$ ./osync.sh /path/to/your.conf --silent
+	*/5 * * * * root /usr/local/bin/osync.sh /path/to/your.conf --silent
 
 Additionnaly, you may run osync in monitor mode, which means it will perform a sync upon file operations on master replica.
+This can be a drawback on functionnality versus scheduled mode because it won't launch a sync task if there are only file modifications on slave replica.
 File monitor mode can also be launched in daemon mode.
 Note that monitoring changes requires inotifywait command (inotify-tools package for most Linux distributions).
 BSD, MacOS X and Windows are not yet supported for this operation mode.
