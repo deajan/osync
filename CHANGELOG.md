@@ -1,24 +1,26 @@
-SHORT FUTURE IMPROVEMENTS (post v1.0)
--------------------------------------
+SHORT FUTURE IMPROVEMENTS
+-------------------------
 
-- Tree functions execute piped commands (grep, awk) on master when launched on remote slave which can cause more bandwith usage
-- SysV init script for RHEL / CentOS
+- Tree functions execute piped commands (grep, awk) on local system  when launched on remote slave which can cause more bandwith usage
 
 FAR FUTURE IMPROVEMENTS
 -----------------------
 
-- Rethink of .osync_workdir/state/* files with PIDs, Host and Task Names to better identify multiple instances on the same fileset
-- Improve Master / Slave schema to Multimaster schema
-- State files should exist per replica for Multimaster schema
+- MultiMaster support
+	- Rethink of .osync_workdir/state/* files with PIDs, Host and Task Names to better identify multiple instances on the same fileset
+	- Improve Master / Slave schema to Multimaster schema
+	- State files should exist per replica for Multimaster schema
 
 KNOWN ISSUES
 ------------
 
-- None yet, need more testing on MSYS environment and MacOS X
+- Still need more testing on BSD, MacOSX and Windows MSYS
 
 RECENT CHANGES
 --------------
 
+- Fixed some typos (thanks to Pavel Kiryukhin)
+- Added a simple RHEL / CentOS compatible init script
 - Fixed a bug with double trailing slashes in certain sceanrios
 - Sync execution don't fails anymore if files vanish during execution, also vanished files get logged
 - Add eventual "comm -23" replacement by "grep -F -x -v -f" to enhance compatibility with other platforms (comm is still much faster than grep, so we keep it)

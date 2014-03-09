@@ -4,7 +4,7 @@ PROGRAM="Osync" # Rsync based two way sync engine with fault tolerance
 AUTHOR="(L) 2013-2014 by Orsiris \"Ozy\" de Jong"
 CONTACT="http://www.netpower.fr/osync - ozy@netpower.fr"
 PROGRAM_VERSION=0.99preRC3
-PROGRAM_BUILD=1901201409
+PROGRAM_BUILD=0903201401
 
 DEBUG=no
 SCRIPT_PID=$$
@@ -74,7 +74,8 @@ function LogDebug
 	fi
 }
 
-function TrapError {
+function TrapError
+{
         local JOB="$0"
         local LINE="$1"
         local CODE="${2:-1}"
@@ -82,6 +83,11 @@ function TrapError {
         then
                 echo -e " /!\ ERROR in ${JOB}: Near line ${LINE}, exit code ${CODE}"
         fi
+}
+
+function TrapUsr1
+{
+	echo "Still doing stuff"
 }
 
 function TrapStop
@@ -1466,18 +1472,18 @@ function Init
         then
                 if [ "$RSYNC_REMOTE_PATH" != "" ]
                 then
-                        RSYNC_PATH="sudo $(type -p $RSYNC_REMOTE_PATH)/$RSYNC_EXECUTABLE)"
+                        RSYNC_PATH="sudo $RSYNC_REMOTE_PATH/$RSYNC_EXECUTABLE"
                 else
                         RSYNC_PATH="sudo $RSYNC_EXECUTABLE"
                 fi
                 COMMAND_SUDO="sudo"
         else
                 if [ "$RSYNC_REMOTE_PATH" != "" ]
-                        then
-                                RSYNC_PATH="$(type -p $RSYNC_REMOTE_PATH)/$RSYNC_EXECUTABLE)"
-                        else
-                                RSYNC_PATH="$RSYNC_EXECUTABLE"
-                        fi
+                then
+                        RSYNC_PATH="$RSYNC_REMOTE_PATH/$RSYNC_EXECUTABLE"
+                else
+                        RSYNC_PATH="$RSYNC_EXECUTABLE"
+                fi
                 COMMAND_SUDO=""
         fi
 
@@ -1711,37 +1717,39 @@ then
 			silent=1
 			exec > /dev/null 2>&1
 			SyncOnChanges &
-			exit
+			disown
+			exit 0
 		else
 			SyncOnChanges
 		fi
-	fi
-	DATE=$(date)
-	Log "-------------------------------------------------------------"
-	Log "$DRY_WARNING $DATE - $PROGRAM $PROGRAM_VERSION script begin."
-	Log "-------------------------------------------------------------"
-	if [ $daemonize -eq 1 ]
-	then
-		Log "Running as daemon"
-	fi
-	Log "Sync task [$SYNC_ID] launched as $LOCAL_USER@$LOCAL_HOST (PID $SCRIPT_PID)"
-	GetOperatingSystem
-	if [ $no_maxtime -eq 1 ]
-	then
-		SOFT_MAX_EXEC_TIME=0
-		HARD_MAX_EXEC_TIME=0
-	fi
-	CheckMasterSlaveDirs
-	CheckMinimumSpace
-	if [ $? == 0 ]
-	then
-		RunBeforeHook
-		Main
+	else
+		DATE=$(date)
+		Log "-------------------------------------------------------------"
+		Log "$DRY_WARNING $DATE - $PROGRAM $PROGRAM_VERSION script begin."
+		Log "-------------------------------------------------------------"
+		if [ $daemonize -eq 1 ]
+		then
+			Log "Running as daemon"
+		fi
+		Log "Sync task [$SYNC_ID] launched as $LOCAL_USER@$LOCAL_HOST (PID $SCRIPT_PID)"
+		GetOperatingSystem
+		if [ $no_maxtime -eq 1 ]
+		then
+			SOFT_MAX_EXEC_TIME=0
+			HARD_MAX_EXEC_TIME=0
+		fi
+		CheckMasterSlaveDirs
+		CheckMinimumSpace
 		if [ $? == 0 ]
 		then
-			SoftDelete
+			RunBeforeHook
+			Main
+			if [ $? == 0 ]
+			then
+				SoftDelete
+			fi
+			RunAfterHook
 		fi
-		RunAfterHook
 	fi
 else
 	LogError "Environment not suitable to run osync."
