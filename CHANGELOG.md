@@ -19,6 +19,7 @@ KNOWN ISSUES
 RECENT CHANGES
 --------------
 
+- Gzipped logs are now deleted once sent
 - Fixed some typos (thanks to Pavel Kiryukhin)
 - Added a simple RHEL / CentOS compatible init script
 - Fixed a bug with double trailing slashes in certain sceanrios

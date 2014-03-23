@@ -4,7 +4,7 @@ PROGRAM="Osync" # Rsync based two way sync engine with fault tolerance
 AUTHOR="(L) 2013-2014 by Orsiris \"Ozy\" de Jong"
 CONTACT="http://www.netpower.fr/osync - ozy@netpower.fr"
 PROGRAM_VERSION=0.99preRC3
-PROGRAM_BUILD=0903201401
+PROGRAM_BUILD=2303201401
 
 DEBUG=no
 SCRIPT_PID=$$
@@ -192,10 +192,10 @@ function SendAlert
 		Log "Current task is a quicksync task. Will not send any alert."
 		return 0
 	fi
-        cat "$LOG_FILE" | gzip -9 > /tmp/osync_lastlog.gz
+        cat "$LOG_FILE" | gzip -9 > $RUN_DIR/osync_lastlog.gz
         if type -p mutt > /dev/null 2>&1
         then
-                echo $MAIL_ALERT_MSG | $(type -p mutt) -x -s "Sync alert for $SYNC_ID" $DESTINATION_MAILS -a /tmp/osync_lastlog.gz
+                echo $MAIL_ALERT_MSG | $(type -p mutt) -x -s "Sync alert for $SYNC_ID" $DESTINATION_MAILS -a $RUN_DIR/osync_lastlog.gz
                 if [ $? != 0 ]
                 then
                         Log "WARNING: Cannot send alert email via $(type -p mutt) !!!"
@@ -204,7 +204,7 @@ function SendAlert
                 fi
         elif type -p mail > /dev/null 2>&1
         then
-                echo $MAIL_ALERT_MSG | $(type -p mail) -a /tmp/osync_lastlog.gz -s "Sync alert for $SYNC_ID" $DESTINATION_MAILS
+                echo $MAIL_ALERT_MSG | $(type -p mail) -a $RUN_DIR/osync_lastlog.gz -s "Sync alert for $SYNC_ID" $DESTINATION_MAILS
                 if [ $? != 0 ]
                 then
                         Log "WARNING: Cannot send alert email via $(type -p mail) with attachments !!!"
@@ -231,6 +231,11 @@ function SendAlert
                 Log "WARNING: Cannot send alert email (no mutt / mail present) !!!"
                 return 1
         fi
+
+	if -f $RUN_DIR/osync_lastlog.gz
+	then
+		rm $RUN_DIR/osync_lastlog.gz
+	fi
 }
 
 function LoadConfigFile
