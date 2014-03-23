@@ -19,6 +19,8 @@ KNOWN ISSUES
 RECENT CHANGES
 --------------
 
+- Fixed a bug preventing propagation of empty directory deletions
+- Fixed a nasty bug preventing writing lock files on remote system as superuser
 - Gzipped logs are now deleted once sent
 - Fixed some typos (thanks to Pavel Kiryukhin)
 - Added a simple RHEL / CentOS compatible init script
