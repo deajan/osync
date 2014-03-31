@@ -4,7 +4,7 @@ PROGRAM="Osync" # Rsync based two way sync engine with fault tolerance
 AUTHOR="(L) 2013-2014 by Orsiris \"Ozy\" de Jong"
 CONTACT="http://www.netpower.fr/osync - ozy@netpower.fr"
 PROGRAM_VERSION=0.99preRC3
-PROGRAM_BUILD=2303201403
+PROGRAM_BUILD=3103201402
 
 DEBUG=no
 SCRIPT_PID=$$
@@ -901,7 +901,7 @@ function UnlockDirectories
 ## tree_list(replica_path, tree_file, current_action) Creates a list of files in replica_path and stores it's action in $STATE_DIR/last-action
 function tree_list
 {
-	Log "Creating replica file list [$1]."
+	Log "Creating $2 replica file list [$1]."
 	if [ "$REMOTE_SYNC" == "yes" ] && [[ "$2" == "slave"* ]]
 	then
         	CheckConnectivity3rdPartyHosts
@@ -1215,11 +1215,12 @@ function SoftDelete
 	then
 		if [ -d "$MASTER_SYNC_DIR$MASTER_BACKUP_DIR" ]
 		then
-			Log "Removing backups older than $CONFLICT_BACKUP_DAYS days on master replica."
 			if [ $dryrun -eq 1 ]
 			then
+				Log "Listing backups older than $CONFLICT_BACKUP_DAYS days on master replica. Won't remove anything."
 				$FIND_CMD "$MASTER_SYNC_DIR$MASTER_BACKUP_DIR/" -ctime +$CONFLICT_BACKUP_DAYS &
 			else
+				Log "Removing backups older than $CONFLICT_BACKUP_DAYS days on master replica."
 				$FIND_CMD "$MASTER_SYNC_DIR$MASTER_BACKUP_DIR/" -ctime +$CONFLICT_BACKUP_DAYS -exec rm -rf '{}' \; &
 			fi
 			child_pid=$!
@@ -1240,11 +1241,12 @@ function SoftDelete
 		then
         		CheckConnectivity3rdPartyHosts
 	        	CheckConnectivityRemoteHost
-			Log "Removing backups older than $CONFLICT_BACKUP_DAYS days on remote slave replica."
 			if [ $dryrun -eq 1 ]
 			then
+				Log "Listing backups older than $CONFLICT_BACKUP_DAYS days on slave replica. Won't remove anything."
 				eval "$SSH_CMD \"if [ -w \\\"$SLAVE_SYNC_DIR$SLAVE_BACKUP_DIR\\\" ]; then $COMMAND_SUDO $REMOTE_FIND_CMD \\\"$SLAVE_SYNC_DIR$SLAVE_BACKUP_DIR/\\\" -ctime +$CONFLICT_BACKUP_DAYS; fi\""
 			else
+				Log "Removing backups older than $CONFLICT_BACKUP_DAYS days on remote slave replica."
 				eval "$SSH_CMD \"if [ -w \\\"$SLAVE_SYNC_DIR$SLAVE_BACKUP_DIR\\\" ]; then $COMMAND_SUDO $REMOTE_FIND_CMD \\\"$SLAVE_SYNC_DIR$SLAVE_BACKUP_DIR/\\\" -ctime +$CONFLICT_BACKUP_DAYS -exec rm -rf '{}' \;; fi\""
 			fi
 			child_pid=$!
@@ -1259,11 +1261,12 @@ function SoftDelete
 		else
 			if [ -w "$SLAVE_SYNC_DIR$SLAVE_BACKUP_DIR" ]
 			then
-				Log "Removing backups older than $CONFLICT_BACKUP_DAYS days on slave replica."
 				if [ $dryrun -eq 1 ]
 				then
+					Log "Listing backups older than $CONFLICT_BACKUP_DAYS days on slave replica. Won't remove anything."
 					$FIND_CMD "$SLAVE_SYNC_DIR$SLAVE_BACKUP_DIR/" -ctime +$CONFLICT_BACKUP_DAYS
 				else
+					Log "Removing backups older than $CONFLICT_BACKUP_DAYS days on slave replica."
 					$FIND_CMD "$SLAVE_SYNC_DIR$SLAVE_BACKUP_DIR/" -ctime +$CONFLICT_BACKUP_DAYS -exec rm -rf '{}' \;
 				fi
 				child_pid=$!
@@ -1286,11 +1289,12 @@ function SoftDelete
 	then
 		if [ -w "$MASTER_SYNC_DIR$MASTER_DELETE_DIR" ]
 		then
-			Log "Removing soft deleted items older than $SOFT_DELETE_DAYS days on master replica."
 			if [ $dryrun -eq 1 ]
 			then
+				Log "Listing soft deleted items older than $SOFT_DELETE_DAYS days on master replica. Won't remove anything."
 				$FIND_CMD "$MASTER_SYNC_DIR$MASTER_DELETE_DIR/" -ctime +$SOFT_DELETE_DAYS
 			else
+				Log "Removing soft deleted items older than $SOFT_DELETE_DAYS days on master replica."
 				$FIND_CMD "$MASTER_SYNC_DIR$MASTER_DELETE_DIR/" -ctime +$SOFT_DELETE_DAYS -exec rm -rf '{}' \;
 			fi
 			child_pid=$!
@@ -1311,11 +1315,12 @@ function SoftDelete
 		then
 			CheckConnectivity3rdPartyHosts
         		CheckConnectivityRemoteHost
-			Log "Removing soft deleted items older than $SOFT_DELETE_DAYS days on remote slave replica."
 			if [ $dryrun -eq 1 ]
 			then
+				Log "Listing soft deleted items older than $SOFT_DELETE_DAYS days on slave replica. Won't remove anything."
 				eval "$SSH_CMD \"if [ -w \\\"$SLAVE_SYNC_DIR$SLAVE_DELETE_DIR\\\" ]; then $COMMAND_SUDO $REMOTE_FIND_CMD \\\"$SLAVE_SYNC_DIR$SLAVE_DELETE_DIR/\\\" -ctime +$SOFT_DELETE_DAYS; fi\""
 			else
+				Log "Removing soft deleted items older than $SOFT_DELETE_DAYS days on remote slave replica."
 				eval "$SSH_CMD \"if [ -w \\\"$SLAVE_SYNC_DIR$SLAVE_DELETE_DIR\\\" ]; then $COMMAND_SUDO $REMOTE_FIND_CMD \\\"$SLAVE_SYNC_DIR$SLAVE_DELETE_DIR/\\\" -ctime +$SOFT_DELETE_DAYS -exec rm -rf '{}' \;; fi\""
 			fi
 			child_pid=$!
@@ -1331,11 +1336,12 @@ function SoftDelete
 		else
 			if [ -w "$SLAVE_SYNC_DIR$SLAVE_DELETE_DIR" ]
 			then
-				Log "Removing soft deleted items older than $SOFT_DELETE_DAYS days on slave replica."
 				if [ $dryrun -eq 1 ]
 				then
+					Log "Listing soft deleted items older than $SOFT_DELETE_DAYS days on slave replica. Won't remove anything."
 					$FIND_CMD "$SLAVE_SYNC_DIR$SLAVE_DELETE_DIR/" -ctime +$SOFT_DELETE_DAYS
 				else
+					Log "Removing soft deleted items older than $SOFT_DELETE_DAYS days on slave replica."
 					$FIND_CMD "$SLAVE_SYNC_DIR$SLAVE_DELETE_DIR/" -ctime +$SOFT_DELETE_DAYS -exec rm -rf '{}' \;
 				fi
 				child_pid=$!
@@ -1379,9 +1385,9 @@ function Init
         then
                 if [ -w /var/log ]
 		then
-			LOG_FILE=/var/log/osync_$OSYNC_VERSION-$SYNC_ID.log
+			LOG_FILE=/var/log/osync_$PROGRAM_VERSION-$SYNC_ID.log
 		else
-			LOG_FILE=./osync_$OSYNC_VERSION-$SYNC_ID.log
+			LOG_FILE=./osync_$PROGRAM_VERSION-$SYNC_ID.log
 		fi
         else
                 LOG_FILE="$LOGFILE"
