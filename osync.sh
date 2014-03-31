@@ -1387,7 +1387,7 @@ function Init
                 LOG_FILE="$LOGFILE"
         fi
 
-        MAIL_ALERT_MSG="Warning: Execution of osync instance $OSYNC_ID (pid $SCRIPT_PID) as $LOCAL_USER@$LOCAL_HOST produced errors."
+        MAIL_ALERT_MSG="Warning: Execution of osync instance $OSYNC_ID (pid $SCRIPT_PID) as $LOCAL_USER@$LOCAL_HOST produced errors on $(date)."
 
 	## If running Msys, find command of windows is used instead of msys one
 	if [ "$LOCAL_OS" == "msys" ]
