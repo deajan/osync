@@ -193,6 +193,8 @@ function SendAlert
 		return 0
 	fi
         cat "$LOG_FILE" | gzip -9 > $RUN_DIR/osync_lastlog.gz
+    if [ ! -z $DESTINATION_MAILS ]
+    then
         if type -p mutt > /dev/null 2>&1
         then
                 echo $MAIL_ALERT_MSG | $(type -p mutt) -x -s "Sync alert for $SYNC_ID" $DESTINATION_MAILS -a $RUN_DIR/osync_lastlog.gz
@@ -218,19 +220,20 @@ function SendAlert
                 else
                         Log "Sent alert mail using mail command."
                 fi
-	elif type -p sendemail > /dev/null 2>&1
-	then
-		$(type -p sendemail) -f $SENDER_MAIL -t $DESTINATION_MAILS -u "Backup alert for $BACKUP_ID" -m "$MAIL_ALERT_MSG" -s $SMTP_SERVER -o username $SMTP_USER -p password $SMTP_PASSWORD > /dev/null 2>&1
-		if [ $? != 0 ]
-		then
-			Log "WARNING: Cannot send alert email via $(type -p sendemail) !!!"
-		else
-			Log "Sent alert mail using sendemail command without attachment."
-		fi
-        else
-                Log "WARNING: Cannot send alert email (no mutt / mail present) !!!"
-                return 1
-        fi
+    	elif type -p sendemail > /dev/null 2>&1
+    	then
+    		$(type -p sendemail) -f $SENDER_MAIL -t $DESTINATION_MAILS -u "Backup alert for $BACKUP_ID" -m "$MAIL_ALERT_MSG" -s $SMTP_SERVER -o username $SMTP_USER -p password $SMTP_PASSWORD > /dev/null 2>&1
+    		if [ $? != 0 ]
+    		then
+    			Log "WARNING: Cannot send alert email via $(type -p sendemail) !!!"
+    		else
+    			Log "Sent alert mail using sendemail command without attachment."
+    		fi
+            else
+                    Log "WARNING: Cannot send alert email (no mutt / mail present) !!!"
+                    return 1
+            fi
+    fi
 
 	if [ -f $RUN_DIR/osync_lastlog.gz ]
 	then
@@ -915,9 +918,9 @@ function tree_list
         	CheckConnectivity3rdPartyHosts
 	        CheckConnectivityRemoteHost
 		ESC=$(EscapeSpaces "$1")
-		rsync_cmd="$(type -p $RSYNC_EXECUTABLE) --rsync-path=\"$RSYNC_PATH\" -rlptgoDE8 $RSYNC_ARGS --exclude \"$OSYNC_DIR\" $RSYNC_EXCLUDE -e \"$RSYNC_SSH_CMD\" --list-only $REMOTE_USER@$REMOTE_HOST:\"$ESC/\" | grep \"^-\|^d\" | awk '{\$1=\$2=\$3=\$4=\"\" ;print}' | awk '{\$1=\$1 ;print}' | (grep -v \"^\.$\" || :) | sort > \"$RUN_DIR/osync_$2_$SCRIPT_PID\" &"
+		rsync_cmd="$(type -p $RSYNC_EXECUTABLE) --rsync-path=\"$RSYNC_PATH\" -rlptgoD8 $RSYNC_ARGS --exclude \"$OSYNC_DIR\" $RSYNC_EXCLUDE -e \"$RSYNC_SSH_CMD\" --list-only $REMOTE_USER@$REMOTE_HOST:\"$ESC/\" | grep \"^-\|^d\" | awk '{\$1=\$2=\$3=\$4=\"\" ;print}' | awk '{\$1=\$1 ;print}' | (grep -v \"^\.$\" || :) | sort > \"$RUN_DIR/osync_$2_$SCRIPT_PID\" &"
 	else
-		rsync_cmd="$(type -p $RSYNC_EXECUTABLE) --rsync-path=\"$RSYNC_PATH\" -rlptgoDE8 $RSYNC_ARGS --exclude \"$OSYNC_DIR\" $RSYNC_EXCLUDE --list-only \"$1/\" | grep \"^-\|^d\" | awk '{\$1=\$2=\$3=\$4=\"\" ;print}' | awk '{\$1=\$1 ;print}' | (grep -v \"^\.$\" || :) | sort > \"$RUN_DIR/osync_$2_$SCRIPT_PID\" &"
+		rsync_cmd="$(type -p $RSYNC_EXECUTABLE) --rsync-path=\"$RSYNC_PATH\" -rlptgoD8 $RSYNC_ARGS --exclude \"$OSYNC_DIR\" $RSYNC_EXCLUDE --list-only \"$1/\" | grep \"^-\|^d\" | awk '{\$1=\$2=\$3=\$4=\"\" ;print}' | awk '{\$1=\$1 ;print}' | (grep -v \"^\.$\" || :) | sort > \"$RUN_DIR/osync_$2_$SCRIPT_PID\" &"
 	fi
 	LogDebug "RSYNC_CMD: $rsync_cmd"
 	## Redirect commands stderr here to get rsync stderr output in logfile
@@ -1002,12 +1005,12 @@ function sync_update
 	        CheckConnectivityRemoteHost
 		if [ "$1" == "master" ]
 		then
-        		rsync_cmd="$(type -p $RSYNC_EXECUTABLE) --rsync-path=\"$RSYNC_PATH\" $RSYNC_ARGS -rlptgoDEui --stats -e \"$RSYNC_SSH_CMD\" $BACKUP_DIR --exclude \"$OSYNC_DIR\" $RSYNC_EXCLUDE --exclude-from=\"$MASTER_STATE_DIR/$1-deleted-list\" --exclude-from=\"$MASTER_STATE_DIR/$2-deleted-list\" \"$SOURCE_DIR/\" $REMOTE_USER@$REMOTE_HOST:\"$ESC_DEST_DIR/\" > $RUN_DIR/osync_update_$2_replica_$SCRIPT_PID 2>&1 &"
+        		rsync_cmd="$(type -p $RSYNC_EXECUTABLE) --rsync-path=\"$RSYNC_PATH\" $RSYNC_ARGS -rlptgoDui --stats -e \"$RSYNC_SSH_CMD\" $BACKUP_DIR --exclude \"$OSYNC_DIR\" $RSYNC_EXCLUDE --exclude-from=\"$MASTER_STATE_DIR/$1-deleted-list\" --exclude-from=\"$MASTER_STATE_DIR/$2-deleted-list\" \"$SOURCE_DIR/\" $REMOTE_USER@$REMOTE_HOST:\"$ESC_DEST_DIR/\" > $RUN_DIR/osync_update_$2_replica_$SCRIPT_PID 2>&1 &"
 		else
-        		rsync_cmd="$(type -p $RSYNC_EXECUTABLE) --rsync-path=\"$RSYNC_PATH\" $RSYNC_ARGS -rlptgoDEui --stats -e \"$RSYNC_SSH_CMD\" $BACKUP_DIR --exclude \"$OSYNC_DIR\" $RSYNC_EXCLUDE --exclude-from=\"$MASTER_STATE_DIR/$1-deleted-list\" --exclude-from=\"$MASTER_STATE_DIR/$2-deleted-list\" $REMOTE_USER@$REMOTE_HOST:\"$ESC_SOURCE_DIR/\" \"$DEST_DIR/\" > $RUN_DIR/osync_update_$2_replica_$SCRIPT_PID 2>&1 &"
+        		rsync_cmd="$(type -p $RSYNC_EXECUTABLE) --rsync-path=\"$RSYNC_PATH\" $RSYNC_ARGS -rlptgoDui --stats -e \"$RSYNC_SSH_CMD\" $BACKUP_DIR --exclude \"$OSYNC_DIR\" $RSYNC_EXCLUDE --exclude-from=\"$MASTER_STATE_DIR/$1-deleted-list\" --exclude-from=\"$MASTER_STATE_DIR/$2-deleted-list\" $REMOTE_USER@$REMOTE_HOST:\"$ESC_SOURCE_DIR/\" \"$DEST_DIR/\" > $RUN_DIR/osync_update_$2_replica_$SCRIPT_PID 2>&1 &"
 		fi
 	else
-        	rsync_cmd="$(type -p $RSYNC_EXECUTABLE) --rsync-path=\"$RSYNC_PATH\" $RSYNC_ARGS -rlptgoDEui --stats $BACKUP_DIR --exclude \"$OSYNC_DIR\" $RSYNC_EXCLUDE --exclude-from=\"$MASTER_STATE_DIR/$1-deleted-list\" --exclude-from=\"$MASTER_STATE_DIR/$2-deleted-list\" \"$SOURCE_DIR/\" \"$DEST_DIR/\" > $RUN_DIR/osync_update_$2_replica_$SCRIPT_PID 2>&1 &"
+        	rsync_cmd="$(type -p $RSYNC_EXECUTABLE) --rsync-path=\"$RSYNC_PATH\" $RSYNC_ARGS -rlptgoDui --stats $BACKUP_DIR --exclude \"$OSYNC_DIR\" $RSYNC_EXCLUDE --exclude-from=\"$MASTER_STATE_DIR/$1-deleted-list\" --exclude-from=\"$MASTER_STATE_DIR/$2-deleted-list\" \"$SOURCE_DIR/\" \"$DEST_DIR/\" > $RUN_DIR/osync_update_$2_replica_$SCRIPT_PID 2>&1 &"
 	fi
 	LogDebug "RSYNC_CMD: $rsync_cmd"
 	eval "$rsync_cmd"
@@ -1058,13 +1061,13 @@ function deletion_propagation
 	        CheckConnectivityRemoteHost
 		if [ "$1" == "master" ]
 		then
-			#rsync_cmd="$(type -p $RSYNC_EXECUTABLE) --rsync-path=\"$RSYNC_PATH\" $RSYNC_ARGS -rlptgoDEui --stats -e \"$RSYNC_SSH_CMD\" $DELETE_DIR --delete --exclude \"$OSYNC_DIR\" --include-from=\"$MASTER_STATE_DIR/$1-deleted-list\" --filter=\"-! */\" \"$SOURCE_DIR/\" $REMOTE_USER@$REMOTE_HOST:\"$ESC_DEST_DIR/\" > $RUN_DIR/osync_deletion_on_$2_$SCRIPT_PID 2>&1 &"
-			rsync_cmd="$(type -p $RSYNC_EXECUTABLE) --rsync-path=\"$RSYNC_PATH\" $RSYNC_ARGS -rlptgoDEui --stats -e \"$RSYNC_SSH_CMD\" $DELETE_DIR --delete --exclude \"$OSYNC_DIR\" --include-from=\"$MASTER_STATE_DIR/$1-deleted-list\" --filter=\"- *\" \"$SOURCE_DIR/\" $REMOTE_USER@$REMOTE_HOST:\"$ESC_DEST_DIR/\" > $RUN_DIR/osync_deletion_on_$2_$SCRIPT_PID 2>&1 &"
+			#rsync_cmd="$(type -p $RSYNC_EXECUTABLE) --rsync-path=\"$RSYNC_PATH\" $RSYNC_ARGS -rlptgoDui --stats -e \"$RSYNC_SSH_CMD\" $DELETE_DIR --delete --exclude \"$OSYNC_DIR\" --include-from=\"$MASTER_STATE_DIR/$1-deleted-list\" --filter=\"-! */\" \"$SOURCE_DIR/\" $REMOTE_USER@$REMOTE_HOST:\"$ESC_DEST_DIR/\" > $RUN_DIR/osync_deletion_on_$2_$SCRIPT_PID 2>&1 &"
+			rsync_cmd="$(type -p $RSYNC_EXECUTABLE) --rsync-path=\"$RSYNC_PATH\" $RSYNC_ARGS -rlptgoDui --stats -e \"$RSYNC_SSH_CMD\" $DELETE_DIR --delete --exclude \"$OSYNC_DIR\" --include-from=\"$MASTER_STATE_DIR/$1-deleted-list\" --filter=\"- *\" \"$SOURCE_DIR/\" $REMOTE_USER@$REMOTE_HOST:\"$ESC_DEST_DIR/\" > $RUN_DIR/osync_deletion_on_$2_$SCRIPT_PID 2>&1 &"
 		else
-			rsync_cmd="$(type -p $RSYNC_EXECUTABLE) --rsync-path=\"$RSYNC_PATH\" $RSYNC_ARGS -rlptgoDEui --stats -e \"$RSYNC_SSH_CMD\" $DELETE_DIR --delete --exclude \"$OSYNC_DIR\" --include-from=\"$MASTER_STATE_DIR/$1-deleted-list\" --filter=\"- *\" $REMOTE_USER@$REMOTE_HOST:\"$ESC_SOURCE_DIR/\" \"$DEST_DIR/\"> $RUN_DIR/osync_deletion_on_$2_$SCRIPT_PID 2>&1 &"
+			rsync_cmd="$(type -p $RSYNC_EXECUTABLE) --rsync-path=\"$RSYNC_PATH\" $RSYNC_ARGS -rlptgoDui --stats -e \"$RSYNC_SSH_CMD\" $DELETE_DIR --delete --exclude \"$OSYNC_DIR\" --include-from=\"$MASTER_STATE_DIR/$1-deleted-list\" --filter=\"- *\" $REMOTE_USER@$REMOTE_HOST:\"$ESC_SOURCE_DIR/\" \"$DEST_DIR/\"> $RUN_DIR/osync_deletion_on_$2_$SCRIPT_PID 2>&1 &"
 		fi
 	else
-		rsync_cmd="$(type -p $RSYNC_EXECUTABLE) --rsync-path=\"$RSYNC_PATH\" $RSYNC_ARGS -rlptgoDEui --stats $DELETE_DIR --delete --exclude \"$OSYNC_DIR\" --include-from=\"$MASTER_STATE_DIR/$1-deleted-list\" --filter=\"- *\" \"$SOURCE_DIR/\" \"$DEST_DIR/\" > $RUN_DIR/osync_deletion_on_$2_$SCRIPT_PID 2>&1 &"
+		rsync_cmd="$(type -p $RSYNC_EXECUTABLE) --rsync-path=\"$RSYNC_PATH\" $RSYNC_ARGS -rlptgoDui --stats $DELETE_DIR --delete --exclude \"$OSYNC_DIR\" --include-from=\"$MASTER_STATE_DIR/$1-deleted-list\" --filter=\"- *\" \"$SOURCE_DIR/\" \"$DEST_DIR/\" > $RUN_DIR/osync_deletion_on_$2_$SCRIPT_PID 2>&1 &"
 	fi
 	LogDebug "RSYNC_CMD: $rsync_cmd"
 	eval "$rsync_cmd"
