@@ -735,6 +735,14 @@ function RsyncExcludePattern
         IFS=$OLD_IFS
 }
 
+function RsyncExcludeFrom
+{
+        if [ ! -z $RSYNC_EXCLUDE_FROM ] && [ -e $RSYNC_EXCLUDE_FROM ]
+        then
+                RSYNC_EXCLUDE="$RSYNC_EXCLUDE --exclude-from=\"$RSYNC_EXCLUDE_FROM\""
+        fi
+}
+
 function WriteLockFiles
 {
         echo $SCRIPT_PID > "$MASTER_LOCK"
@@ -909,7 +917,7 @@ function tree_list
 		ESC=$(EscapeSpaces "$1")
 		rsync_cmd="$(type -p $RSYNC_EXECUTABLE) --rsync-path=\"$RSYNC_PATH\" -rlptgoDE8 $RSYNC_ARGS --exclude \"$OSYNC_DIR\" $RSYNC_EXCLUDE -e \"$RSYNC_SSH_CMD\" --list-only $REMOTE_USER@$REMOTE_HOST:\"$ESC/\" | grep \"^-\|^d\" | awk '{\$1=\$2=\$3=\$4=\"\" ;print}' | awk '{\$1=\$1 ;print}' | (grep -v \"^\.$\" || :) | sort > \"$RUN_DIR/osync_$2_$SCRIPT_PID\" &"
 	else
-		rsync_cmd="$(type -p $RSYNC_EXECUTABLE) --rsync-path=\"$RSYNC_PATH\" -rlptgoDE8 $RSYNC_ARGS --exclude \"$OSYNC_DIR\" $RSNYC_EXCLUDE --list-only \"$1/\" | grep \"^-\|^d\" | awk '{\$1=\$2=\$3=\$4=\"\" ;print}' | awk '{\$1=\$1 ;print}' | (grep -v \"^\.$\" || :) | sort > \"$RUN_DIR/osync_$2_$SCRIPT_PID\" &"
+		rsync_cmd="$(type -p $RSYNC_EXECUTABLE) --rsync-path=\"$RSYNC_PATH\" -rlptgoDE8 $RSYNC_ARGS --exclude \"$OSYNC_DIR\" $RSYNC_EXCLUDE --list-only \"$1/\" | grep \"^-\|^d\" | awk '{\$1=\$2=\$3=\$4=\"\" ;print}' | awk '{\$1=\$1 ;print}' | (grep -v \"^\.$\" || :) | sort > \"$RUN_DIR/osync_$2_$SCRIPT_PID\" &"
 	fi
 	LogDebug "RSYNC_CMD: $rsync_cmd"
 	## Redirect commands stderr here to get rsync stderr output in logfile
@@ -1558,7 +1566,9 @@ function Init
 	fi
 
 	## Add Rsync exclude patterns
-	RsyncExcludePattern
+    RsyncExcludePattern
+    ## Add Rsync exclude from file
+    RsyncExcludeFrom
 }
 
 function Main
