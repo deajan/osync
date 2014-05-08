@@ -4,7 +4,7 @@ PROGRAM="Osync" # Rsync based two way sync engine with fault tolerance
 AUTHOR="(L) 2013-2014 by Orsiris \"Ozy\" de Jong"
 CONTACT="http://www.netpower.fr/osync - ozy@netpower.fr"
 PROGRAM_VERSION=0.99preRC3
-PROGRAM_BUILD=0805201403
+PROGRAM_BUILD=0805201404
 
 ## allow debugging from command line with preceding ocsync with DEBUG=yes
 if [ ! "$DEBUG" == "yes" ]
@@ -935,9 +935,9 @@ function tree_list
 	then
 		if [ $dryrun -eq 1 ]
 		then			
-			mv $RUN_DIR/osync_$2_$SCRIPT_PID "$MASTER_STATE_DIR/dry-$2"
+			mv $RUN_DIR/osync_$2_$SCRIPT_PID "$MASTER_STATE_DIR/dry-$2-$SYNC_ID"
 		else	
-			mv $RUN_DIR/osync_$2_$SCRIPT_PID "$MASTER_STATE_DIR/$2"
+			mv $RUN_DIR/osync_$2_$SCRIPT_PID "$MASTER_STATE_DIR/$2-$SYNC_ID"
 		fi
 		echo "$3.success" > "$MASTER_LAST_ACTION"
 
@@ -952,24 +952,24 @@ function tree_list
 function delete_list
 {
         Log "Creating $1 replica deleted file list."
-        if [ -f "$MASTER_STATE_DIR/$1-tree-after" ]
+        if [ -f "$MASTER_STATE_DIR/$1-tree-after-$SYNC_ID" ]
         then
                 if [ $dryrun -eq 1 ]
 		then
 			## Same functionnality, comm is much faster than grep but is not available on every platform
 			if type -p comm > /dev/null 2>&1
 			then
-				cmd="comm -23 \"$MASTER_STATE_DIR/$1-tree-after\" \"$MASTER_STATE_DIR/dry-$1-tree-current\" > \"$MASTER_STATE_DIR/dry-$1-deleted-list\""
+				cmd="comm -23 \"$MASTER_STATE_DIR/$1-tree-after-$SYNC_ID\" \"$MASTER_STATE_DIR/dry-$1-tree-current-$SYNC_ID\" > \"$MASTER_STATE_DIR/dry-$1-deleted-list-$SYNC_ID\""
 			else
 				## The || : forces the command to have a good result
-				cmd="grep -F -x -v -f \"$MASTER_STATE_DIR/dry-$1-tree-current\" \"$MASTER_STATE_DIR/$1-tree-after\" || : > \"$MASTER_STATE_DIR/dry-$1-deleted-list\""
+				cmd="grep -F -x -v -f \"$MASTER_STATE_DIR/dry-$1-tree-current-$SYNC_ID\" \"$MASTER_STATE_DIR/$1-tree-after-$SYNC_ID\" || : > \"$MASTER_STATE_DIR/dry-$1-deleted-list-$SYNC_ID\""
 			fi
 		else
 			if type -p comm > /dev/null 2>&1
 			then
-				cmd="comm -23 \"$MASTER_STATE_DIR/$1-tree-after\" \"$MASTER_STATE_DIR/$1-tree-current\" > \"$MASTER_STATE_DIR/$1-deleted-list\""
+				cmd="comm -23 \"$MASTER_STATE_DIR/$1-tree-after-$SYNC_ID\" \"$MASTER_STATE_DIR/$1-tree-current-$SYNC_ID\" > \"$MASTER_STATE_DIR/$1-deleted-list-$SYNC_ID\""
 			else
-				cmd="grep -F -x -v -f \"$MASTER_STATE_DIR/$1-tree-current\" \"$MASTER_STATE_DIR/$1-tree-after\" || : > \"$MASTER_STATE_DIR/$1-deleted-list\""
+				cmd="grep -F -x -v -f \"$MASTER_STATE_DIR/$1-tree-current-$SYNC_ID\" \"$MASTER_STATE_DIR/$1-tree-after-$SYNC_ID\" || : > \"$MASTER_STATE_DIR/$1-deleted-list-$SYNC_ID\""
 			fi
 		fi
 
@@ -977,7 +977,7 @@ function delete_list
 		eval $cmd
                	echo "$1-replica-deleted-list.success" > "$MASTER_LAST_ACTION"
         else
-		touch "$MASTER_STATE_DIR/$1-deleted-list"
+		touch "$MASTER_STATE_DIR/$1-deleted-list-$SYNC_ID"
                	echo "$1-replica-deleted-list.empty" > "$MASTER_LAST_ACTION"
         fi
 }
@@ -1007,12 +1007,12 @@ function sync_update
 	        CheckConnectivityRemoteHost
 		if [ "$1" == "master" ]
 		then
-        		rsync_cmd="$(type -p $RSYNC_EXECUTABLE) --rsync-path=\"$RSYNC_PATH\" $RSYNC_ARGS -rlptgoDEui --stats -e \"$RSYNC_SSH_CMD\" $BACKUP_DIR --exclude \"$OSYNC_DIR\" $RSYNC_EXCLUDE --exclude-from=\"$MASTER_STATE_DIR/$1-deleted-list\" --exclude-from=\"$MASTER_STATE_DIR/$2-deleted-list\" \"$SOURCE_DIR/\" $REMOTE_USER@$REMOTE_HOST:\"$ESC_DEST_DIR/\" > $RUN_DIR/osync_update_$2_replica_$SCRIPT_PID 2>&1 &"
+        		rsync_cmd="$(type -p $RSYNC_EXECUTABLE) --rsync-path=\"$RSYNC_PATH\" $RSYNC_ARGS -rlptgoDEui --stats -e \"$RSYNC_SSH_CMD\" $BACKUP_DIR --exclude \"$OSYNC_DIR\" $RSYNC_EXCLUDE --exclude-from=\"$MASTER_STATE_DIR/$1-deleted-list-$SYNC_ID\" --exclude-from=\"$MASTER_STATE_DIR/$2-deleted-list-$SYNC_ID\" \"$SOURCE_DIR/\" $REMOTE_USER@$REMOTE_HOST:\"$ESC_DEST_DIR/\" > $RUN_DIR/osync_update_$2_replica_$SCRIPT_PID 2>&1 &"
 		else
-        		rsync_cmd="$(type -p $RSYNC_EXECUTABLE) --rsync-path=\"$RSYNC_PATH\" $RSYNC_ARGS -rlptgoDEui --stats -e \"$RSYNC_SSH_CMD\" $BACKUP_DIR --exclude \"$OSYNC_DIR\" $RSYNC_EXCLUDE --exclude-from=\"$MASTER_STATE_DIR/$1-deleted-list\" --exclude-from=\"$MASTER_STATE_DIR/$2-deleted-list\" $REMOTE_USER@$REMOTE_HOST:\"$ESC_SOURCE_DIR/\" \"$DEST_DIR/\" > $RUN_DIR/osync_update_$2_replica_$SCRIPT_PID 2>&1 &"
+        		rsync_cmd="$(type -p $RSYNC_EXECUTABLE) --rsync-path=\"$RSYNC_PATH\" $RSYNC_ARGS -rlptgoDEui --stats -e \"$RSYNC_SSH_CMD\" $BACKUP_DIR --exclude \"$OSYNC_DIR\" $RSYNC_EXCLUDE --exclude-from=\"$MASTER_STATE_DIR/$1-deleted-list-$SYNC_ID\" --exclude-from=\"$MASTER_STATE_DIR/$2-deleted-list-$SYNC_ID\" $REMOTE_USER@$REMOTE_HOST:\"$ESC_SOURCE_DIR/\" \"$DEST_DIR/\" > $RUN_DIR/osync_update_$2_replica_$SCRIPT_PID 2>&1 &"
 		fi
 	else
-        	rsync_cmd="$(type -p $RSYNC_EXECUTABLE) --rsync-path=\"$RSYNC_PATH\" $RSYNC_ARGS -rlptgoDEui --stats $BACKUP_DIR --exclude \"$OSYNC_DIR\" $RSYNC_EXCLUDE --exclude-from=\"$MASTER_STATE_DIR/$1-deleted-list\" --exclude-from=\"$MASTER_STATE_DIR/$2-deleted-list\" \"$SOURCE_DIR/\" \"$DEST_DIR/\" > $RUN_DIR/osync_update_$2_replica_$SCRIPT_PID 2>&1 &"
+        	rsync_cmd="$(type -p $RSYNC_EXECUTABLE) --rsync-path=\"$RSYNC_PATH\" $RSYNC_ARGS -rlptgoDEui --stats $BACKUP_DIR --exclude \"$OSYNC_DIR\" $RSYNC_EXCLUDE --exclude-from=\"$MASTER_STATE_DIR/$1-deleted-list-$SYNC_ID\" --exclude-from=\"$MASTER_STATE_DIR/$2-deleted-list-$SYNC_ID\" \"$SOURCE_DIR/\" \"$DEST_DIR/\" > $RUN_DIR/osync_update_$2_replica_$SCRIPT_PID 2>&1 &"
 	fi
 	LogDebug "RSYNC_CMD: $rsync_cmd"
 	eval "$rsync_cmd"
@@ -1063,13 +1063,12 @@ function deletion_propagation
 	        CheckConnectivityRemoteHost
 		if [ "$1" == "master" ]
 		then
-			#rsync_cmd="$(type -p $RSYNC_EXECUTABLE) --rsync-path=\"$RSYNC_PATH\" $RSYNC_ARGS -rlptgoDEui --stats -e \"$RSYNC_SSH_CMD\" $DELETE_DIR --delete --exclude \"$OSYNC_DIR\" --include-from=\"$MASTER_STATE_DIR/$1-deleted-list\" --filter=\"-! */\" \"$SOURCE_DIR/\" $REMOTE_USER@$REMOTE_HOST:\"$ESC_DEST_DIR/\" > $RUN_DIR/osync_deletion_on_$2_$SCRIPT_PID 2>&1 &"
-			rsync_cmd="$(type -p $RSYNC_EXECUTABLE) --rsync-path=\"$RSYNC_PATH\" $RSYNC_ARGS -rlptgoDEui --stats -e \"$RSYNC_SSH_CMD\" $DELETE_DIR --delete --exclude \"$OSYNC_DIR\" --include=\"*/\" --include-from=\"$MASTER_STATE_DIR/$1-deleted-list\" --filter=\"- *\" \"$SOURCE_DIR/\" $REMOTE_USER@$REMOTE_HOST:\"$ESC_DEST_DIR/\" > $RUN_DIR/osync_deletion_on_$2_$SCRIPT_PID 2>&1 &"
+			rsync_cmd="$(type -p $RSYNC_EXECUTABLE) --rsync-path=\"$RSYNC_PATH\" $RSYNC_ARGS -rlptgoDEui --stats -e \"$RSYNC_SSH_CMD\" $DELETE_DIR --delete --exclude \"$OSYNC_DIR\" --include=\"*/\" --include-from=\"$MASTER_STATE_DIR/$1-deleted-list-$SYNC_ID\" --filter=\"- *\" \"$SOURCE_DIR/\" $REMOTE_USER@$REMOTE_HOST:\"$ESC_DEST_DIR/\" > $RUN_DIR/osync_deletion_on_$2_$SCRIPT_PID 2>&1 &"
 		else
-			rsync_cmd="$(type -p $RSYNC_EXECUTABLE) --rsync-path=\"$RSYNC_PATH\" $RSYNC_ARGS -rlptgoDEui --stats -e \"$RSYNC_SSH_CMD\" $DELETE_DIR --delete --exclude \"$OSYNC_DIR\" --include=\"*/\" --include-from=\"$MASTER_STATE_DIR/$1-deleted-list\" --filter=\"- *\" $REMOTE_USER@$REMOTE_HOST:\"$ESC_SOURCE_DIR/\" \"$DEST_DIR/\"> $RUN_DIR/osync_deletion_on_$2_$SCRIPT_PID 2>&1 &"
+			rsync_cmd="$(type -p $RSYNC_EXECUTABLE) --rsync-path=\"$RSYNC_PATH\" $RSYNC_ARGS -rlptgoDEui --stats -e \"$RSYNC_SSH_CMD\" $DELETE_DIR --delete --exclude \"$OSYNC_DIR\" --include=\"*/\" --include-from=\"$MASTER_STATE_DIR/$1-deleted-list-$SYNC_ID\" --filter=\"- *\" $REMOTE_USER@$REMOTE_HOST:\"$ESC_SOURCE_DIR/\" \"$DEST_DIR/\"> $RUN_DIR/osync_deletion_on_$2_$SCRIPT_PID 2>&1 &"
 		fi
 	else
-		rsync_cmd="$(type -p $RSYNC_EXECUTABLE) --rsync-path=\"$RSYNC_PATH\" $RSYNC_ARGS -rlptgoDEui --stats $DELETE_DIR --delete --exclude \"$OSYNC_DIR\" --include=\"*/\" --include-from=\"$MASTER_STATE_DIR/$1-deleted-list\" --filter=\"- *\" \"$SOURCE_DIR/\" \"$DEST_DIR/\" > $RUN_DIR/osync_deletion_on_$2_$SCRIPT_PID 2>&1 &"
+		rsync_cmd="$(type -p $RSYNC_EXECUTABLE) --rsync-path=\"$RSYNC_PATH\" $RSYNC_ARGS -rlptgoDEui --stats $DELETE_DIR --delete --exclude \"$OSYNC_DIR\" --include=\"*/\" --include-from=\"$MASTER_STATE_DIR/$1-deleted-list-$SYNC_ID\" --filter=\"- *\" \"$SOURCE_DIR/\" \"$DEST_DIR/\" > $RUN_DIR/osync_deletion_on_$2_$SCRIPT_PID 2>&1 &"
 	fi
 	LogDebug "RSYNC_CMD: $rsync_cmd"
 	eval "$rsync_cmd"
@@ -1102,12 +1101,12 @@ function Sync
         CheckConnectivity3rdPartyHosts
         CheckConnectivityRemoteHost
 
-	if [ -f "$MASTER_STATE_DIR/last-action" ] && [ "$RESUME_SYNC" == "yes" ]
+	if [ -f "$MASTER_LAST_ACTION" ] && [ "$RESUME_SYNC" == "yes" ]
 	then
-		resume_sync=$(cat "$MASTER_STATE_DIR/last-action")
-		if [ -f "$MASTER_STATE_DIR/resume-count" ]
+		resume_sync=$(cat "$MASTER_LAST_ACTION")
+		if [ -f "$MASTER_RESUME_COUNT" ]
 		then
-			resume_count=$(cat "$MASTER_STATE_DIR/resume-count")
+			resume_count=$(cat "$MASTER_RESUME_COUNT")
 		else
 			resume_count=0
 		fi
@@ -1116,10 +1115,10 @@ function Sync
 		then
 			if [ "$resume_sync" != "sync.success" ]
 			then
-				Log "WARNING: Trying to resume aborted osync execution on $(stat --format %y "$MASTER_STATE_DIR/last-action") at task [$resume_sync]. [$resume_count] previous tries."
+				Log "WARNING: Trying to resume aborted osync execution on $(stat --format %y "$MASTER_LAST_ACTION") at task [$resume_sync]. [$resume_count] previous tries."
 				if [ $dryrun -ne 1 ]
 				then
-					echo $(($resume_count+1)) > "$MASTER_STATE_DIR/resume-count"
+					echo $(($resume_count+1)) > "$MASTER_RESUME_COUNT"
 				fi
 			else
 				resume_sync=none
@@ -1129,7 +1128,7 @@ function Sync
 			if [ $dryrun -ne 1 ]
 			then
 				echo "noresume" > "$MASTER_LAST_ACTION"
-				echo "0" > "$MASTER_STATE_DIR/resume-count"
+				echo "0" > "$MASTER_RESUME_COUNT"
 			fi
 			resume_sync=none
 		fi
@@ -1144,13 +1143,13 @@ function Sync
 	if [ "$resume_sync" == "none" ] || [ "$resume_sync" == "noresume" ] || [ "$resume_sync" == "master-replica-tree.fail" ]
 	then
 		#master_tree_current
-		tree_list "$MASTER_SYNC_DIR" master-tree-current master-replica-tree
+		tree_list "$MASTER_SYNC_DIR" master-tree-current-$SYNC_ID master-replica-tree-$SYNC_ID
 		resume_sync="resumed"
 	fi
 	if [ "$resume_sync" == "resumed" ] || [ "$resume_sync" == "master-replica-tree.success" ] || [ "$resume_sync" == "slave-replica-tree.fail" ]
 	then
 		#slave_tree_current
-		tree_list "$SLAVE_SYNC_DIR" slave-tree-current slave-replica-tree
+		tree_list "$SLAVE_SYNC_DIR" slave-tree-current-$SYNC_ID slave-replica-tree-$SYNC_ID
 		resume_sync="resumed"
 	fi
 	if [ "$resume_sync" == "resumed" ] || [ "$resume_sync" == "slave-replica-tree.success" ] || [ "$resume_sync" == "master-replica-deleted-list.fail" ]
@@ -1203,13 +1202,13 @@ function Sync
 	if [ "$resume_sync" == "resumed" ] || [ "$resume_sync" == "delete-propagation-master.success" ] || [ "$resume_sync" == "master-replica-tree-after.fail" ]
 	then
 		#master_tree_after
-		tree_list "$MASTER_SYNC_DIR" master-tree-after master-replica-tree-after
+		tree_list "$MASTER_SYNC_DIR" master-tree-after-$SYNC_ID master-replica-tree-after-$SYNC_ID
 		resume_sync="resumed"
 	fi
 	if [ "$resume_sync" == "resumed" ] || [ "$resume_sync" == "master-replica-tree-after.success" ] || [ "$resume_sync" == "slave-replica-tree-after.fail" ]
 	then
 		#slave_tree_after
-		tree_list "$SLAVE_SYNC_DIR" slave-tree-after slave-replica-tree-after
+		tree_list "$SLAVE_SYNC_DIR" slave-tree-after-$SYNC_ID slave-replica-tree-after-$SYNC_ID
 		resume_sync="resumed"
 	fi
 
@@ -1218,7 +1217,7 @@ function Sync
 
 	if [ $dryrun -ne 1 ]
 	then
-		echo "0" > "$MASTER_STATE_DIR/resume-count"
+		echo "0" > "$MASTER_RESUME_COUNT"
 	fi	
 }
 
@@ -1469,9 +1468,11 @@ function Init
 
 	if [ $dryrun -eq 1 ]
 	then
-		MASTER_LAST_ACTION="$MASTER_STATE_DIR/dry-last-action"
+		MASTER_LAST_ACTION="$MASTER_STATE_DIR/dry-last-action-$SYNC_ID"
+		MASTER_RESUME_COUNT="$MASTER_STATE_DIR/dry-resume-count-$SYNC_ID"
 	else
-		MASTER_LAST_ACTION="$MASTER_STATE_DIR/last-action"
+		MASTER_LAST_ACTION="$MASTER_STATE_DIR/last-action-$SYNC_ID"
+		MASTER_RESUME_COUNT="$MASTER_STATE_DIR/resume-count-$SYNC_ID"
 	fi
 
 	## Working directories to keep backups of updated / deleted files
@@ -1535,7 +1536,7 @@ function Init
         then
                 RSYNC_ARGS=$RSYNC_ARGS"z"
         fi
-	if [ "$PRESERVE_HARDLINKS" != "no" ]
+	if [ "$PRESERVE_HARDLINKS" == "yes" ]
 	then
 		RSYNC_ARGS$RSYNC_ARGS"H"
 	fi

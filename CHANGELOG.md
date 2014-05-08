@@ -20,11 +20,12 @@ UNDER WORK
 ----------
 
 !- Better deletion propagation (again). Using rsync for deletion propagation is definitly not working in all cases (especially empty sub directories)
-!- Mutlislave asynchronous sync support
 
 RECENT CHANGES
 --------------
 
+- Multislave asynchronous task support (Thanks to Ulrich Norbisrath)
+	- This breaks compat with elder osync runs. Add the SYNC_ID suffix to elder state files to keep deleted file information.
 - Added an easier debug setting i.e DEBUG=yes ./osync.sh (Again, thanks to Ulrich Norbisrath)
 - Added hardlink preservation (Thanks to Ulrich Norbisrath)
 - Added external exclusion file support (Thanks to Pierre Clement)
