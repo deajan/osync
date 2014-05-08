@@ -16,9 +16,21 @@ KNOWN ISSUES
 
 - Still need more testing on BSD, MacOSX and Windows MSYS
 
+UNDER WORK
+----------
+
+!- Better deletion propagation (again). Using rsync for deletion propagation is definitly not working in all cases (especially empty sub directories)
+!- Mutlislave asynchronous sync support
+
 RECENT CHANGES
 --------------
 
+- Added an easier debug setting i.e DEBUG=yes ./osync.sh (Again, thanks to Ulrich Norbisrath)
+- Added hardlink preservation (Thanks to Ulrich Norbisrath)
+- Added external exclusion file support (Thanks to Pierre Clement)
+- Fixed some typos in doc and program itself (Thanks to Pierre Clement)
+- More detailled verbose status messages
+- More detailled status messages
 - Fixed a bug preventing propagation of empty directory deletions
 - Fixed a nasty bug preventing writing lock files on remote system as superuser
 - Gzipped logs are now deleted once sent

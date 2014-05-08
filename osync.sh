@@ -4,9 +4,14 @@ PROGRAM="Osync" # Rsync based two way sync engine with fault tolerance
 AUTHOR="(L) 2013-2014 by Orsiris \"Ozy\" de Jong"
 CONTACT="http://www.netpower.fr/osync - ozy@netpower.fr"
 PROGRAM_VERSION=0.99preRC3
-PROGRAM_BUILD=3103201402
+PROGRAM_BUILD=0805201403
 
-DEBUG=no
+## allow debugging from command line with preceding ocsync with DEBUG=yes
+if [ ! "$DEBUG" == "yes" ]
+then
+	DEBUG=no
+fi
+
 SCRIPT_PID=$$
 
 LOCAL_USER=$(whoami)
@@ -735,6 +740,14 @@ function RsyncExcludePattern
         IFS=$OLD_IFS
 }
 
+function RsyncExcludeFrom
+{
+	if [ ! $RSYNC_EXCLUDE_FROM == "" ] && [ -e $RSYNC_EXCLUDE_FROM ]
+	then
+		RSYNC_EXCLUDE="$RSYNC_EXCLUDE --exclude-from=\"$RSYNC_EXCLUDE_FROM\""
+	fi
+}
+
 function WriteLockFiles
 {
         echo $SCRIPT_PID > "$MASTER_LOCK"
@@ -909,7 +922,7 @@ function tree_list
 		ESC=$(EscapeSpaces "$1")
 		rsync_cmd="$(type -p $RSYNC_EXECUTABLE) --rsync-path=\"$RSYNC_PATH\" -rlptgoDE8 $RSYNC_ARGS --exclude \"$OSYNC_DIR\" $RSYNC_EXCLUDE -e \"$RSYNC_SSH_CMD\" --list-only $REMOTE_USER@$REMOTE_HOST:\"$ESC/\" | grep \"^-\|^d\" | awk '{\$1=\$2=\$3=\$4=\"\" ;print}' | awk '{\$1=\$1 ;print}' | (grep -v \"^\.$\" || :) | sort > \"$RUN_DIR/osync_$2_$SCRIPT_PID\" &"
 	else
-		rsync_cmd="$(type -p $RSYNC_EXECUTABLE) --rsync-path=\"$RSYNC_PATH\" -rlptgoDE8 $RSYNC_ARGS --exclude \"$OSYNC_DIR\" $RSNYC_EXCLUDE --list-only \"$1/\" | grep \"^-\|^d\" | awk '{\$1=\$2=\$3=\$4=\"\" ;print}' | awk '{\$1=\$1 ;print}' | (grep -v \"^\.$\" || :) | sort > \"$RUN_DIR/osync_$2_$SCRIPT_PID\" &"
+		rsync_cmd="$(type -p $RSYNC_EXECUTABLE) --rsync-path=\"$RSYNC_PATH\" -rlptgoDE8 $RSYNC_ARGS --exclude \"$OSYNC_DIR\" $RSYNC_EXCLUDE --list-only \"$1/\" | grep \"^-\|^d\" | awk '{\$1=\$2=\$3=\$4=\"\" ;print}' | awk '{\$1=\$1 ;print}' | (grep -v \"^\.$\" || :) | sort > \"$RUN_DIR/osync_$2_$SCRIPT_PID\" &"
 	fi
 	LogDebug "RSYNC_CMD: $rsync_cmd"
 	## Redirect commands stderr here to get rsync stderr output in logfile
@@ -1051,12 +1064,12 @@ function deletion_propagation
 		if [ "$1" == "master" ]
 		then
 			#rsync_cmd="$(type -p $RSYNC_EXECUTABLE) --rsync-path=\"$RSYNC_PATH\" $RSYNC_ARGS -rlptgoDEui --stats -e \"$RSYNC_SSH_CMD\" $DELETE_DIR --delete --exclude \"$OSYNC_DIR\" --include-from=\"$MASTER_STATE_DIR/$1-deleted-list\" --filter=\"-! */\" \"$SOURCE_DIR/\" $REMOTE_USER@$REMOTE_HOST:\"$ESC_DEST_DIR/\" > $RUN_DIR/osync_deletion_on_$2_$SCRIPT_PID 2>&1 &"
-			rsync_cmd="$(type -p $RSYNC_EXECUTABLE) --rsync-path=\"$RSYNC_PATH\" $RSYNC_ARGS -rlptgoDEui --stats -e \"$RSYNC_SSH_CMD\" $DELETE_DIR --delete --exclude \"$OSYNC_DIR\" --include-from=\"$MASTER_STATE_DIR/$1-deleted-list\" --filter=\"- *\" \"$SOURCE_DIR/\" $REMOTE_USER@$REMOTE_HOST:\"$ESC_DEST_DIR/\" > $RUN_DIR/osync_deletion_on_$2_$SCRIPT_PID 2>&1 &"
+			rsync_cmd="$(type -p $RSYNC_EXECUTABLE) --rsync-path=\"$RSYNC_PATH\" $RSYNC_ARGS -rlptgoDEui --stats -e \"$RSYNC_SSH_CMD\" $DELETE_DIR --delete --exclude \"$OSYNC_DIR\" --include=\"*/\" --include-from=\"$MASTER_STATE_DIR/$1-deleted-list\" --filter=\"- *\" \"$SOURCE_DIR/\" $REMOTE_USER@$REMOTE_HOST:\"$ESC_DEST_DIR/\" > $RUN_DIR/osync_deletion_on_$2_$SCRIPT_PID 2>&1 &"
 		else
-			rsync_cmd="$(type -p $RSYNC_EXECUTABLE) --rsync-path=\"$RSYNC_PATH\" $RSYNC_ARGS -rlptgoDEui --stats -e \"$RSYNC_SSH_CMD\" $DELETE_DIR --delete --exclude \"$OSYNC_DIR\" --include-from=\"$MASTER_STATE_DIR/$1-deleted-list\" --filter=\"- *\" $REMOTE_USER@$REMOTE_HOST:\"$ESC_SOURCE_DIR/\" \"$DEST_DIR/\"> $RUN_DIR/osync_deletion_on_$2_$SCRIPT_PID 2>&1 &"
+			rsync_cmd="$(type -p $RSYNC_EXECUTABLE) --rsync-path=\"$RSYNC_PATH\" $RSYNC_ARGS -rlptgoDEui --stats -e \"$RSYNC_SSH_CMD\" $DELETE_DIR --delete --exclude \"$OSYNC_DIR\" --include=\"*/\" --include-from=\"$MASTER_STATE_DIR/$1-deleted-list\" --filter=\"- *\" $REMOTE_USER@$REMOTE_HOST:\"$ESC_SOURCE_DIR/\" \"$DEST_DIR/\"> $RUN_DIR/osync_deletion_on_$2_$SCRIPT_PID 2>&1 &"
 		fi
 	else
-		rsync_cmd="$(type -p $RSYNC_EXECUTABLE) --rsync-path=\"$RSYNC_PATH\" $RSYNC_ARGS -rlptgoDEui --stats $DELETE_DIR --delete --exclude \"$OSYNC_DIR\" --include-from=\"$MASTER_STATE_DIR/$1-deleted-list\" --filter=\"- *\" \"$SOURCE_DIR/\" \"$DEST_DIR/\" > $RUN_DIR/osync_deletion_on_$2_$SCRIPT_PID 2>&1 &"
+		rsync_cmd="$(type -p $RSYNC_EXECUTABLE) --rsync-path=\"$RSYNC_PATH\" $RSYNC_ARGS -rlptgoDEui --stats $DELETE_DIR --delete --exclude \"$OSYNC_DIR\" --include=\"*/\" --include-from=\"$MASTER_STATE_DIR/$1-deleted-list\" --filter=\"- *\" \"$SOURCE_DIR/\" \"$DEST_DIR/\" > $RUN_DIR/osync_deletion_on_$2_$SCRIPT_PID 2>&1 &"
 	fi
 	LogDebug "RSYNC_CMD: $rsync_cmd"
 	eval "$rsync_cmd"
@@ -1127,7 +1140,7 @@ function Sync
 
 	################################################################################################################################################# Actual sync begins here
 
-	## This replaces the case statement below because ;& operator is not supported in bash 3.2... Code is more messy than case :(
+	## This replaces the case statement because ;& operator is not supported in bash 3.2... Code is more messy than case :(
 	if [ "$resume_sync" == "none" ] || [ "$resume_sync" == "noresume" ] || [ "$resume_sync" == "master-replica-tree.fail" ]
 	then
 		#master_tree_current
@@ -1218,7 +1231,12 @@ function SoftDelete
 			if [ $dryrun -eq 1 ]
 			then
 				Log "Listing backups older than $CONFLICT_BACKUP_DAYS days on master replica. Won't remove anything."
-				$FIND_CMD "$MASTER_SYNC_DIR$MASTER_BACKUP_DIR/" -ctime +$CONFLICT_BACKUP_DAYS &
+				if [ $verbose -eq 1 ]
+				then
+					$FIND_CMD "$MASTER_SYNC_DIR$MASTER_BACKUP_DIR/" -ctime +$CONFLICT_BACKUP_DAYS &
+				else
+					$FIND_CMD "$MASTER_SYNC_DIR$MASTER_BACKUP_DIR/" -ctime +$CONFLICT_BACKUP_DAYS > /dev/null &
+				fi
 			else
 				Log "Removing backups older than $CONFLICT_BACKUP_DAYS days on master replica."
 				$FIND_CMD "$MASTER_SYNC_DIR$MASTER_BACKUP_DIR/" -ctime +$CONFLICT_BACKUP_DAYS -exec rm -rf '{}' \; &
@@ -1287,7 +1305,7 @@ function SoftDelete
 
 	if [ "$SOFT_DELETE" != "no" ] && [ $SOFT_DELETE_DAYS -ne 0 ]
 	then
-		if [ -w "$MASTER_SYNC_DIR$MASTER_DELETE_DIR" ]
+		if [ -d "$MASTER_SYNC_DIR$MASTER_DELETE_DIR" ]
 		then
 			if [ $dryrun -eq 1 ]
 			then
@@ -1517,6 +1535,10 @@ function Init
         then
                 RSYNC_ARGS=$RSYNC_ARGS"z"
         fi
+	if [ "$PRESERVE_HARDLINKS" != "no" ]
+	then
+		RSYNC_ARGS$RSYNC_ARGS"H"
+	fi
 	if [ $dryrun -eq 1 ]
 	then
 		RSYNC_ARGS=$RSYNC_ARGS"n"
@@ -1559,6 +1581,8 @@ function Init
 
 	## Add Rsync exclude patterns
 	RsyncExcludePattern
+	## Add Rsync exclude from file
+	RsyncExcludeFrom
 }
 
 function Main
@@ -1592,6 +1616,7 @@ function Usage
 	echo "--master=\"\"	Master replica path. Will contain state and backup directory (is mandatory)."
 	echo "--slave=\"\" 	Local or remote slave replica path. Can be a ssh uri like ssh://user@host.com:22//path/to/slave/replica (is mandatory)."
 	echo "--rsakey=\"\"	Alternative path to rsa private key for ssh connection to slave replica"
+	echo "--sync-id=\"\"	Optional task-id to identify this synchronization task when using multiple slaves."
 	exit 128
 }
 
@@ -1693,6 +1718,10 @@ do
 		SSH_RSA_PRIVATE_KEY=${i##*=}
 		opts=$opts" --rsakey=\"$SSH_RSA_PRIVATE_KEY\""
 		;;
+		--sync-id=*)
+		SYNC_ID=${i##*=}
+		opts=$opts" --sync-id=\"$SYNC_ID\""
+		;;
 		--on-changes)
 		sync_on_changes=1
 		;;
@@ -1708,9 +1737,15 @@ opts="${opts# *}"
 CheckEnvironment
 if [ $? == 0 ]
 then
+
+	## Here we set default options for quicksync tasks when no configuration file is provided.
+
 	if [ $quick_sync -eq 2 ]
 	then
-		SYNC_ID="quicksync task"
+		if [ "$SYNC_ID" == "" ]
+		then
+			SYNC_ID="quicksync task"
+		fi
 		MINIMUM_SPACE=1024
 		REMOTE_SYNC=no
 		CONFLICT_BACKUP_DAYS=30
