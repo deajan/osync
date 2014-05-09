@@ -4,7 +4,7 @@ PROGRAM="Osync" # Rsync based two way sync engine with fault tolerance
 AUTHOR="(L) 2013-2014 by Orsiris \"Ozy\" de Jong"
 CONTACT="http://www.netpower.fr/osync - ozy@netpower.fr"
 PROGRAM_VERSION=0.99preRC3
-PROGRAM_BUILD=0805201404
+PROGRAM_BUILD=0905201401
 
 ## allow debugging from command line with preceding ocsync with DEBUG=yes
 if [ ! "$DEBUG" == "yes" ]
@@ -1143,13 +1143,13 @@ function Sync
 	if [ "$resume_sync" == "none" ] || [ "$resume_sync" == "noresume" ] || [ "$resume_sync" == "master-replica-tree.fail" ]
 	then
 		#master_tree_current
-		tree_list "$MASTER_SYNC_DIR" master-tree-current-$SYNC_ID master-replica-tree-$SYNC_ID
+		tree_list "$MASTER_SYNC_DIR" master-tree-current master-replica-tree
 		resume_sync="resumed"
 	fi
 	if [ "$resume_sync" == "resumed" ] || [ "$resume_sync" == "master-replica-tree.success" ] || [ "$resume_sync" == "slave-replica-tree.fail" ]
 	then
 		#slave_tree_current
-		tree_list "$SLAVE_SYNC_DIR" slave-tree-current-$SYNC_ID slave-replica-tree-$SYNC_ID
+		tree_list "$SLAVE_SYNC_DIR" slave-tree-current slave-replica-tree
 		resume_sync="resumed"
 	fi
 	if [ "$resume_sync" == "resumed" ] || [ "$resume_sync" == "slave-replica-tree.success" ] || [ "$resume_sync" == "master-replica-deleted-list.fail" ]
@@ -1202,13 +1202,13 @@ function Sync
 	if [ "$resume_sync" == "resumed" ] || [ "$resume_sync" == "delete-propagation-master.success" ] || [ "$resume_sync" == "master-replica-tree-after.fail" ]
 	then
 		#master_tree_after
-		tree_list "$MASTER_SYNC_DIR" master-tree-after-$SYNC_ID master-replica-tree-after-$SYNC_ID
+		tree_list "$MASTER_SYNC_DIR" master-tree-after master-replica-tree-after
 		resume_sync="resumed"
 	fi
 	if [ "$resume_sync" == "resumed" ] || [ "$resume_sync" == "master-replica-tree-after.success" ] || [ "$resume_sync" == "slave-replica-tree-after.fail" ]
 	then
 		#slave_tree_after
-		tree_list "$SLAVE_SYNC_DIR" slave-tree-after-$SYNC_ID slave-replica-tree-after-$SYNC_ID
+		tree_list "$SLAVE_SYNC_DIR" slave-tree-after slave-replica-tree-after
 		resume_sync="resumed"
 	fi
 
