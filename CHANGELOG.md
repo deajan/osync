@@ -24,6 +24,7 @@ UNDER WORK
 RECENT CHANGES
 --------------
 
+- Fixed an issue with MacOSX using rsync -E differently than other *nix (Thanks to Pierre Clement)
 - Multislave asynchronous task support (Thanks to Ulrich Norbisrath)
 	- This breaks compat with elder osync runs. Add the SYNC_ID suffix to elder state files to keep deleted file information.
 - Added an easier debug setting i.e DEBUG=yes ./osync.sh (Again, thanks to Ulrich Norbisrath)
