@@ -31,15 +31,15 @@ Basic MacOS X tests have also been done, but a lot of tests are still needed.
 ## Installation
 
 Keep in mind that Osync has been designed to not delete any data, but rather make backups or soft deletes.
-Nevertheless, still consider making backups of your data before trying a sync tool.
+Nevertheless, you should always consider making backups of your data before trying a new sync tool.
 
-First, grab a fresh copy of osync and make it executable:
+You can download the latest stable release of Osync at www.netpower.fr/osync
+You may also get the last development snapshot at https://github.com/deajan/osync
 
-	$ git clone https://github.com/deajan/osync
-	$ cd osync
-	$ chmod +x ./osync.sh
+You may copy the osync.sh file to /usr/local/bin if you intend to use it on a regular basis, or just run it from the directory you downloaded it to.
+There is a very basic installation script if you plan to use osync as a daemon too.
 
-Osync needs to run with bash shell. Using any other shell will most probably result in lots of errors.
+Osync needs to run with bash shell. Using any other shell will most probably result in errors.
 If bash is not your default shell, invoke it using
 
 	$ bash osync.sh [options]
@@ -48,7 +48,7 @@ If bash is not your default shell, invoke it using
 
 Osync can work with in two flavors: Quick sync mode and configuration file mode.
 While quick sync mode is convenient to do fast sync sceanrios, a configuration file gives much more functionnality.
-Please use double quotes if directoires contain spaces. Do not use escaped spaces.
+Please use double as directoires delimiters. Do not use escaped characters in directory names.
 
 QuickSync example:
 
@@ -58,9 +58,9 @@ QuickSync example:
 Configuration files example:
 
 You'll have to customize the sync.conf file according to your needs.
-Osync needs a pair of private / public RSA keys to perform remote SSH connections.
+If you intend to sync a remote directory, osync will need a pair of private / public RSA keys to perform remote SSH connections.
 Also, running sync as superuser requires to configure /etc/sudoers file.
-Please read the documentation on author's site.
+Please read the documentation about remote sync setups.
 Once you've customized a sync.conf file, you may run osync with the following test run:
 
 	$ ./osync.sh /path/to/your.conf --dry
@@ -79,16 +79,18 @@ Once you're confident about your fist runs, you may add osync as cron task like 
 	*/5 * * * * root /usr/local/bin/osync.sh /path/to/your.conf --silent
 
 Additionnaly, you may run osync in monitor mode, which means it will perform a sync upon file operations on master replica.
-This can be a drawback on functionnality versus scheduled mode because it won't launch a sync task if there are only file modifications on slave replica.
-File monitor mode can also be launched in daemon mode.
+This can be a drawback on functionnality versus scheduled mode because this mode only launches a sync task if there are file modifications on the master replica, without being able to monitor the slave replica. Slave replica changes are then only synced when master replica changes occur.
+File monitor mode can also be launched as a daemon with an init script. Please read the documentation for more info.
 Note that monitoring changes requires inotifywait command (inotify-tools package for most Linux distributions).
-BSD, MacOS X and Windows are not yet supported for this operation mode.
+BSD, MacOS X and Windows are not yet supported for this operation mode, unless you find a inotify-tools package on these.
 
 	$ ./osync.sh /path/to/your.conf --on-changes
-	$ ./osync.sh /path/to/your.conf --on-changes --daemon
 
+Osync file monitor mode may be run as system service with the osync-srv init script. Any configuration file found in /etc/osync will then create a osync daemon instance.
 
-You may then find osync output in /var/log/osync-*.log (or current directory if /var/log is not writable).
+	$ service osync-srv start
+
+You may find osync's logs in /var/log/osync-*.log (or current directory if /var/log is not writable).
 
 ## Author
 

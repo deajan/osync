@@ -24,6 +24,7 @@ UNDER WORK
 RECENT CHANGES
 --------------
 
+- Added a simple init script working for RHEL / CentOS and an install script
 - Fixed an issue with MacOSX using rsync -E differently than other *nix (Thanks to Pierre Clement)
 - Multislave asynchronous task support (Thanks to Ulrich Norbisrath)
 	- This breaks compat with elder osync runs. Add the SYNC_ID suffix to elder state files to keep deleted file information.
