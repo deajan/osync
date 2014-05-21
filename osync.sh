@@ -1544,16 +1544,12 @@ function Init
         fi
 	if [ "$PRESERVE_HARDLINKS" == "yes" ]
 	then
-		RSYNC_ARGS$RSYNC_ARGS"H"
+		RSYNC_ARGS=$RSYNC_ARGS"H"
 	fi
 	if [ $dryrun -eq 1 ]
 	then
 		RSYNC_ARGS=$RSYNC_ARGS"n"
 		DRY_WARNING="/!\ DRY RUN"
-	fi
-	if [ "$RSYNC_ARGS" == "-" ]
-	then
-		RSYNC_ARGS=""
 	fi
 
 	if [ "$BANDWIDTH" != "" ] && [ "$BANDWIDTH" != "0" ]
