@@ -24,6 +24,7 @@ UNDER WORK
 RECENT CHANGES
 --------------
 
+- Added path detection for exclude list file
 - Added a simple init script working for RHEL / CentOS and an install script
 - Fixed an issue with MacOSX using rsync -E differently than other *nix (Thanks to Pierre Clement)
 - Multislave asynchronous task support (Thanks to Ulrich Norbisrath)

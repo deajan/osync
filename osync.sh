@@ -4,7 +4,7 @@ PROGRAM="Osync" # Rsync based two way sync engine with fault tolerance
 AUTHOR="(L) 2013-2014 by Orsiris \"Ozy\" de Jong"
 CONTACT="http://www.netpower.fr/osync - ozy@netpower.fr"
 PROGRAM_VERSION=0.99preRC3
-PROGRAM_BUILD=2105201401
+PROGRAM_BUILD=2205201401
 
 ## allow debugging from command line with preceding ocsync with DEBUG=yes
 if [ ! "$DEBUG" == "yes" ]
@@ -744,6 +744,12 @@ function RsyncExcludeFrom
 {
 	if [ ! $RSYNC_EXCLUDE_FROM == "" ] && [ -e $RSYNC_EXCLUDE_FROM ]
 	then
+		## Check if the exclude list has a full path, and if not, add the config file path if there is one
+		if [ "$(basename $RSYNC_EXCLUDE_FROM)" == "$RSYNC_EXCLUDE_FROM" ]
+		then
+			$RSYNC_EXCLUDE_FROM=$(dirname $cfgfile)/$RSYNC_EXCLUDE_FROM
+		fi
+
 		RSYNC_EXCLUDE="$RSYNC_EXCLUDE --exclude-from=\"$RSYNC_EXCLUDE_FROM\""
 	fi
 }
