@@ -92,8 +92,10 @@ status() {
 	if [ ! -f $pidfile-* ]
 	then
 		echo "Cannot find any running osync instance."
-		exit
+		exit 1
 	fi
+
+	errno=0
 
 	for pfile in $pidfile-*
 	do
@@ -102,8 +104,11 @@ status() {
 			echo "$prog instance $(basename $pfile) is running (pid $(cat $pfile))"
 		else
 			echo "$pfile is dead but lockfile exists."
+			$errno=1
 		fi
 	done
+
+	exit $errno
 }
 
 case "$1" in
