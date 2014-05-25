@@ -19,11 +19,11 @@ KNOWN ISSUES
 UNDER WORK
 ----------
 
-!- Better deletion propagation (again). Using rsync for deletion propagation is definitly not working in all cases (especially empty sub directories)
 
 RECENT CHANGES
 --------------
 
+- Fixed deletion propagation (again). Rsync is definitly not designed to delete a list of files / folders. Rsync replaced by rm function which downloads deletion list to remote system.
 - Added path detection for exclude list file
 - Added a simple init script working for RHEL / CentOS and an install script
 - Fixed an issue with MacOSX using rsync -E differently than other *nix (Thanks to Pierre Clement)

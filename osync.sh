@@ -4,7 +4,7 @@ PROGRAM="Osync" # Rsync based two way sync engine with fault tolerance
 AUTHOR="(L) 2013-2014 by Orsiris \"Ozy\" de Jong"
 CONTACT="http://www.netpower.fr/osync - ozy@netpower.fr"
 PROGRAM_VERSION=0.99preRC3
-PROGRAM_BUILD=2205201401
+PROGRAM_BUILD=2505201405
 
 ## allow debugging from command line with preceding ocsync with DEBUG=yes
 if [ ! "$DEBUG" == "yes" ]
@@ -983,7 +983,12 @@ function delete_list
 		eval $cmd
                	echo "$1-replica-deleted-list.success" > "$MASTER_LAST_ACTION"
         else
-		touch "$MASTER_STATE_DIR/$1-deleted-list-$SYNC_ID"
+		if [ $dryrun -eq 1 ]
+		then
+			touch "$MASTER_STATE_DIR/dry-$1-deleted-list-$SYNC_ID"
+		else
+			touch "$MASTER_STATE_DIR/$1-deleted-list-$SYNC_ID"
+		fi
                	echo "$1-replica-deleted-list.empty" > "$MASTER_LAST_ACTION"
         fi
 }
@@ -991,6 +996,15 @@ function delete_list
 # sync_update(source replica, destination replica)
 function sync_update
 {
+        if [ $dryrun -eq 1 ]
+        then
+                delfname1="dry-$1-deleted-list-$SYNC_ID"
+		delfname2="dry-$2-deleted-list-$SYNC_ID"
+        else
+                delfname1="$1-deleted-list-$SYNC_ID"
+		delfname2="$2-deleted-list-$SYNC_ID"
+        fi
+
         Log "Updating $2 replica."
 	if [ "$1" == "master" ]
         then
@@ -1013,12 +1027,12 @@ function sync_update
 	        CheckConnectivityRemoteHost
 		if [ "$1" == "master" ]
 		then
-        		rsync_cmd="$(type -p $RSYNC_EXECUTABLE) --rsync-path=\"$RSYNC_PATH\" $RSYNC_ARGS -ui --stats -e \"$RSYNC_SSH_CMD\" $BACKUP_DIR --exclude \"$OSYNC_DIR\" $RSYNC_EXCLUDE --exclude-from=\"$MASTER_STATE_DIR/$1-deleted-list-$SYNC_ID\" --exclude-from=\"$MASTER_STATE_DIR/$2-deleted-list-$SYNC_ID\" \"$SOURCE_DIR/\" $REMOTE_USER@$REMOTE_HOST:\"$ESC_DEST_DIR/\" > $RUN_DIR/osync_update_$2_replica_$SCRIPT_PID 2>&1 &"
+        		rsync_cmd="$(type -p $RSYNC_EXECUTABLE) --rsync-path=\"$RSYNC_PATH\" $RSYNC_ARGS $SYNC_OPTS -e \"$RSYNC_SSH_CMD\" $BACKUP_DIR --exclude \"$OSYNC_DIR\" $RSYNC_EXCLUDE --exclude-from=\"$MASTER_STATE_DIR/$delfname1\" --exclude-from=\"$MASTER_STATE_DIR/$delfname2\" \"$SOURCE_DIR/\" $REMOTE_USER@$REMOTE_HOST:\"$ESC_DEST_DIR/\" > $RUN_DIR/osync_update_$2_replica_$SCRIPT_PID 2>&1 &"
 		else
-        		rsync_cmd="$(type -p $RSYNC_EXECUTABLE) --rsync-path=\"$RSYNC_PATH\" $RSYNC_ARGS -ui --stats -e \"$RSYNC_SSH_CMD\" $BACKUP_DIR --exclude \"$OSYNC_DIR\" $RSYNC_EXCLUDE --exclude-from=\"$MASTER_STATE_DIR/$1-deleted-list-$SYNC_ID\" --exclude-from=\"$MASTER_STATE_DIR/$2-deleted-list-$SYNC_ID\" $REMOTE_USER@$REMOTE_HOST:\"$ESC_SOURCE_DIR/\" \"$DEST_DIR/\" > $RUN_DIR/osync_update_$2_replica_$SCRIPT_PID 2>&1 &"
+        		rsync_cmd="$(type -p $RSYNC_EXECUTABLE) --rsync-path=\"$RSYNC_PATH\" $RSYNC_ARGS $SYNC_OPTS -e \"$RSYNC_SSH_CMD\" $BACKUP_DIR --exclude \"$OSYNC_DIR\" $RSYNC_EXCLUDE --exclude-from=\"$MASTER_STATE_DIR/$delfname1\" --exclude-from=\"$MASTER_STATE_DIR/$delfname2\" $REMOTE_USER@$REMOTE_HOST:\"$ESC_SOURCE_DIR/\" \"$DEST_DIR/\" > $RUN_DIR/osync_update_$2_replica_$SCRIPT_PID 2>&1 &"
 		fi
 	else
-        	rsync_cmd="$(type -p $RSYNC_EXECUTABLE) --rsync-path=\"$RSYNC_PATH\" $RSYNC_ARGS -ui --stats $BACKUP_DIR --exclude \"$OSYNC_DIR\" $RSYNC_EXCLUDE --exclude-from=\"$MASTER_STATE_DIR/$1-deleted-list-$SYNC_ID\" --exclude-from=\"$MASTER_STATE_DIR/$2-deleted-list-$SYNC_ID\" \"$SOURCE_DIR/\" \"$DEST_DIR/\" > $RUN_DIR/osync_update_$2_replica_$SCRIPT_PID 2>&1 &"
+        	rsync_cmd="$(type -p $RSYNC_EXECUTABLE) --rsync-path=\"$RSYNC_PATH\" $RSYNC_ARGS $SYNC_OPTS $BACKUP_DIR --exclude \"$OSYNC_DIR\" $RSYNC_EXCLUDE --exclude-from=\"$MASTER_STATE_DIR/$delfname1\" --exclude-from=\"$MASTER_STATE_DIR/$delfname2\" \"$SOURCE_DIR/\" \"$DEST_DIR/\" > $RUN_DIR/osync_update_$2_replica_$SCRIPT_PID 2>&1 &"
 	fi
 	LogDebug "RSYNC_CMD: $rsync_cmd"
 	eval "$rsync_cmd"
@@ -1045,58 +1059,221 @@ function sync_update
         fi
 }
 
-# delete_propagation(source replica, destination replica)
+# delete_local(replica dir, delete file list, delete dir)
+function _delete_local
+{
+	
+	## On every run, check wheter the next item is already deleted because it's included in a directory already deleted
+	previous_file=""
+	OLD_IFS=$IFS
+	IFS=$'\r\n'
+        for files in $(cat "$2")
+        do
+                if [[ "$files" != "$previous_file/"* ]] && [ "$files" != "" ]
+		then
+                        if [ "$SOFT_DELETE" != "no" ]
+                        then
+                        	if [ ! -d "$REPLICA_DIR$3" ]
+                        	then
+                                	mkdir -p "$REPLICA_DIR$3"
+					if [ $? != 0 ]
+					then
+						LogError "Cannot create replica deletion directory."
+					fi
+                        	fi
+
+                               	if [ $verbose -eq 1 ]
+				then
+					Log "Soft deleting $REPLICA_DIR$files"
+				fi
+                                
+				if [ $dryrun -ne 1 ]
+				then
+					mv "$REPLICA_DIR$files" "$REPLICA_DIR$3"
+					if [ $? != 0 ]
+					then
+						LogError "Cannot move $REPLICA_DIR$files to deletion directory."
+					fi
+				fi
+                        else
+                                if [ $verbose -eq 1 ]
+				then
+					Log "Deleting $REPLICA_DIR$files"
+				fi
+
+				if [ $dryrun -ne 1 ]
+				then
+                                	rm -rf "$REPLICA_DIR$files"
+					if [ $? != 0 ]
+					then
+						LogError "Cannot delete $REPLICA_DIR$files"
+					fi
+                        	fi
+			fi
+			previous_file="$files"
+		fi
+        done
+	IFS=$OLD_IFS
+}
+
+# delete_remote(replica dir, delete file list, delete dir)
+function _delete_remote
+{
+	## This is a special coded function. Need to redelcare local functions on remote host, passing all needed variables as escaped arguments to ssh command.
+	## Anything beetween << ENDSSH and ENDSSH will be executed remotely
+
+	# Additionnaly, we need to copy the deletetion list to the remote state folder
+	ESC_DEST_DIR="$(EscapeSpaces $SLAVE_STATE_DIR)"
+       	rsync_cmd="$(type -p $RSYNC_EXECUTABLE) --rsync-path=\"$RSYNC_PATH\" $SYNC_OPTS -e \"$RSYNC_SSH_CMD\" \"$2\" $REMOTE_USER@$REMOTE_HOST:\"$ESC_DEST_DIR/\" > $RUN_DIR/osync_remote_deletion_list_copy_$SCRIPT_PID 2>&1"
+	eval $rsync_cmd
+	if [ $? != 0 ]
+	then
+		LogError "Cannot copy the deletion list to remote replica."
+		if [ -f $RUN_DIR/osync_remote_deletion_list_copy_$SCRIPT_PID ]
+		then
+			LogError "$(cat $RUN_DIR/osync_remote_deletion_list_copy_$SCRIPT_PID)"
+		fi
+		exit 1
+	fi
+
+$SSH_CMD error_alert=0 sync_on_changes=$sync_on_changes silent=$silent DEBUG=$DEBUG dryrun=$dryrun verbose=$verbose COMMAND_SUDO=$COMMAND_SUDO FILE_LIST=$(EscapeSpaces "$SLAVE_STATE_DIR/$(basename $2)") REPLICA_DIR="$(EscapeSpaces "$REPLICA_DIR") DELETE_DIR="$(EscapeSpaces "$DELETE_DIR") 'bash -s' << 'ENDSSH' > $RUN_DIR/osync_remote_deletion_$SCRIPT_PID 2>&1 &
+
+	## The following lines are executed remotely
+	function Log
+	{
+        	if [ $sync_on_changes -eq 1 ]
+        	then
+                	prefix="$(date) - "
+        	else
+                	prefix="R-TIME: $SECONDS - "
+        	fi
+
+        	if [ $silent -eq 0 ]
+        	then
+                	echo -e "$prefix$1"
+        	fi
+	}
+
+	function LogError
+	{
+        	Log "$1"
+        	error_alert=1
+	}
+
+        ## On every run, check wheter the next item is already deleted because it's included in a directory already deleted
+        previous_file=""
+        for files in $(cat "$FILE_LIST")
+        do
+                if [[ "$files" != "$previous_file/"* ]] && [ "$files" != "" ]
+                then
+                        if [ ! -d "$REPLICA_DIR$DELETE_DIR" ]
+                                then
+                                        $COMMAND_SUDO mkdir -p "$REPLICA_DIR$DELETE_DIR"
+                                        if [ $? != 0 ]
+                                        then
+                                                LogError "Cannot create replica deletion directory."
+                                        fi
+                                fi
+
+                        if [ "$SOFT_DELETE" != "no" ]
+                        then
+                                if [ $verbose -eq 1 ]
+                                then
+                                        Log "Soft deleting $REPLICA_DIR$files"
+                                fi
+
+                                if [ $dryrun -ne 1 ]
+                                then
+                                        $COMMAND_SUDO mv "$REPLICA_DIR$files" "$REPLICA_DIR$DELETE_DIR"	
+					if [ $? != 0 ]
+					then
+						LogError "Cannot move $REPLICA_DIR$files to deletion directory."
+					fi
+                                fi
+                        else
+                                if [ $verbose -eq 1 ]
+                                then
+                                        Log "Deleting $REPLICA_DIR$files"
+                                fi
+
+                                if [ $dryrun -ne 1 ]
+                                then
+                                        $COMMAND_SUDO rm -rf "$REPLICA_DIR$files"
+					if [ $? != 0 ]
+					then
+						LogError "Cannot delete $REPLICA_DIR$files"
+					fi
+                                fi
+                        fi
+                        previous_file="$files"
+                fi
+        done
+ENDSSH
+
+	exit $?
+}
+
+
+# delete_propagation(replica name)
+# replica name = "master" / "slave"
 function deletion_propagation
 {
-	Log "Propagating deletions to $2 replica."
+	Log "Propagating deletions to $1 replica."
+	
 	if [ "$1" == "master" ]
 	then
-		SOURCE_DIR="$MASTER_SYNC_DIR"
-		ESC_SOURCE_DIR=$(EscapeSpaces "$MASTER_SYNC_DIR")
-		DEST_DIR="$SLAVE_SYNC_DIR"
-		ESC_DEST_DIR=$(EscapeSpaces "$SLAVE_SYNC_DIR")
-		DELETE_DIR="$SLAVE_DELETE"
-	else
-		SOURCE_DIR="$SLAVE_SYNC_DIR"
-		ESC_SOURCE_DIR=$(EscapeSpaces "$SLAVE_SYNC_DIR")
-		DEST_DIR="$MASTER_SYNC_DIR"
-		ESC_DEST_DIR=$(EscapeSpaces "$MASTER_SYNC_DIR")
-		DELETE_DIR="$MASTER_DELETE"
-	fi
-	if [ "$REMOTE_SYNC" == "yes" ]
-	then
-	        CheckConnectivity3rdPartyHosts
-	        CheckConnectivityRemoteHost
-		if [ "$1" == "master" ]
+		REPLICA_DIR="$MASTER_SYNC_DIR"
+		DELETE_DIR="$MASTER_DELETE_DIR"
+		if [ $dryrun -eq 1 ]
 		then
-			rsync_cmd="$(type -p $RSYNC_EXECUTABLE) --rsync-path=\"$RSYNC_PATH\" $RSYNC_ARGS -ui --stats -e \"$RSYNC_SSH_CMD\" $DELETE_DIR --delete --exclude \"$OSYNC_DIR\" --include=\"*/\" --include-from=\"$MASTER_STATE_DIR/$1-deleted-list-$SYNC_ID\" --filter=\"- *\" \"$SOURCE_DIR/\" $REMOTE_USER@$REMOTE_HOST:\"$ESC_DEST_DIR/\" > $RUN_DIR/osync_deletion_on_$2_$SCRIPT_PID 2>&1 &"
+			DELETION_FILE_LIST="$MASTER_STATE_DIR/dry-slave-deleted-list-$SYNC_ID"
 		else
-			rsync_cmd="$(type -p $RSYNC_EXECUTABLE) --rsync-path=\"$RSYNC_PATH\" $RSYNC_ARGS -ui --stats -e \"$RSYNC_SSH_CMD\" $DELETE_DIR --delete --exclude \"$OSYNC_DIR\" --include=\"*/\" --include-from=\"$MASTER_STATE_DIR/$1-deleted-list-$SYNC_ID\" --filter=\"- *\" $REMOTE_USER@$REMOTE_HOST:\"$ESC_SOURCE_DIR/\" \"$DEST_DIR/\"> $RUN_DIR/osync_deletion_on_$2_$SCRIPT_PID 2>&1 &"
+			DELETION_FILE_LIST="$MASTER_STATE_DIR/slave-deleted-list-$SYNC_ID"
 		fi
-	else
-		rsync_cmd="$(type -p $RSYNC_EXECUTABLE) --rsync-path=\"$RSYNC_PATH\" $RSYNC_ARGS -ui --stats $DELETE_DIR --delete --exclude \"$OSYNC_DIR\" --include=\"*/\" --include-from=\"$MASTER_STATE_DIR/$1-deleted-list-$SYNC_ID\" --filter=\"- *\" \"$SOURCE_DIR/\" \"$DEST_DIR/\" > $RUN_DIR/osync_deletion_on_$2_$SCRIPT_PID 2>&1 &"
-	fi
-	LogDebug "RSYNC_CMD: $rsync_cmd"
-	eval "$rsync_cmd"
-	child_pid=$!
-	WaitForCompletion $child_pid $SOFT_MAX_EXEC_TIME 0
-	retval=$?
-        if [ $verbose -eq 1 ] && [ -f $RUN_DIR/osync_deletion_on_$2_$SCRIPT_PID ]
-        then
-                Log "List:\n$(cat $RUN_DIR/osync_deletion_on_$2_$SCRIPT_PID)"
-        fi
 
-	if [ $retval != 0 ] && [ $retval != 24 ]
-	then
-                if [ $verbose -eq 0 ] && [ -f $RUN_DIR/osync_deletion_on_$2_$SCRIPT_PID ]
-                then
-                        LogError "Rsync output:\n$(cat $RUN_DIR/osync_deletion_on_$2_$SCRIPT_PID)"
-                fi 
-		LogError "Deletion on $2 failed."
-		echo "delete-propagation-$2.fail" > "$MASTER_LAST_ACTION"
-		exit 1
+		_delete_local "$REPLICA_DIR" "$DELETION_FILE_LIST" "$DELETE_DIR" &
+		child_pid=$!
+		WaitForCompletion $child_pid $SOFT_MAX_EXEC_TIME $HARD_MAX_EXEC_TIME
+		retval=$?
+		if [ $retval == 0 ]
+		then
+                	echo "delete-propagation-$1.success" > "$MASTER_LAST_ACTION"
+		else
+			LogError "Deletion on replica $1 failed."
+                	echo "delete-propagation-$1.fail" > "$MASTER_LAST_ACTION"
+                	exit 1
+        	fi		
 	else
-		echo "delete-propagation-$2.success" > "$MASTER_LAST_ACTION"
+		REPLICA_DIR="$SLAVE_SYNC_DIR"
+		DELETE_DIR="$SLAVE_DELETE_DIR"
+		if [ $dryrun -eq 1 ]
+		then
+			DELETION_FILE_LIST="$MASTER_STATE_DIR/dry-master-deleted-list-$SYNC_ID"
+		else
+			DELETION_FILE_LIST="$MASTER_STATE_DIR/master-deleted-list-$SYNC_ID"
+		fi
+
+		if [ "$REMOTE_SYNC" == "yes" ]
+		then
+			_delete_remote "$REPLICA_DIR" "$DELETION_FILE_LIST" "$DELETE_DIR" &
+		else
+			_delete_local "$REPLICA_DIR" "$DELETION_FILE_LIST" "$DELETE_DIR" &
+		fi
+		child_pid=$!
+		WaitForCompletion $child_pid $SOFT_MAX_EXEC_TIME $HARD_MAX_EXEC_TIME
+		retval=$?
+                if [ $retval == 0 ]
+                then
+                        echo "delete-propagation-$1.success" > "$MASTER_LAST_ACTION"
+		else
+			LogError "Deletion on remote system failed."
+			if [ -f $RUN_DIR/osync_remote_deletion_$SCRIPT_PID ]
+			then
+				LogError "$(cat $RUN_DIR/osync_remote_deletion_$SCRIPT_PID)"
+			fi
+                        echo "delete-propagation-$1.fail" > "$MASTER_LAST_ACTION"
+                        exit 1
+                fi
 	fi
 }
 
@@ -1197,12 +1374,12 @@ function Sync
 	fi
 	if [ "$resume_sync" == "resumed" ] || [ "$resume_sync" == "update-slave-replica.success" ] || [ "$resume_sync" == "update-master-replica.success" ] || [ "$resume_sync" == "delete-propagation-slave.fail" ]
 	then
-		deletion_propagation master slave
+		deletion_propagation slave
 		resume_sync="resumed"
 	fi
 	if [ "$resume_sync" == "resumed" ] || [ "$resume_sync" == "delete-propagation-slave.success" ] || [ "$resume_sync" == "delete-propagation-master.fail" ]
 	then
-		deletion_propagation slave master
+		deletion_propagation master
 		resume_sync="resumed"
 	fi
 	if [ "$resume_sync" == "resumed" ] || [ "$resume_sync" == "delete-propagation-master.success" ] || [ "$resume_sync" == "master-replica-tree-after.fail" ]
@@ -1408,9 +1585,9 @@ function Init
         then
                 if [ -w /var/log ]
 		then
-			LOG_FILE=/var/log/osync_$PROGRAM_VERSION-$SYNC_ID.log
+			LOG_FILE=/var/log/osync_$SYNC_ID.log
 		else
-			LOG_FILE=./osync_$PROGRAM_VERSION-$SYNC_ID.log
+			LOG_FILE=./osync_$SYNC_ID.log
 		fi
         else
                 LOG_FILE="$LOGFILE"
@@ -1499,6 +1676,7 @@ function Init
 	if [ "$REMOTE_SYNC" == "yes" ]
 	then
 		SSH_CMD="$(type -p ssh) $SSH_COMP -i $SSH_RSA_PRIVATE_KEY $REMOTE_USER@$REMOTE_HOST -p $REMOTE_PORT"
+		SCP_CMD="$(type -p scp) $SSH_COMP -i $SSH_RSA_PRIVATE_KEY -P $REMOTE_PORT"
 		RSYNC_SSH_CMD="$(type -p ssh) $SSH_COMP -i $SSH_RSA_PRIVATE_KEY -p $REMOTE_PORT"
 	fi
 
@@ -1563,6 +1741,19 @@ function Init
 		RSYNC_ARGS=$RSYNC_ARGS" --bwlimit=$BANDWIDTH"
 	fi
 
+	## Set sync only function arguments for rsync
+	SYNC_OPTS="-u"
+	
+	if [ $verbose -eq 1 ]
+	then
+		SYNC_OPTS=$SYNC_OPTS"i"
+	fi
+
+	if [ $stats -eq 1 ]
+	then
+		SYNC_OPTS=$SYNC_OPTS" --stats"
+	fi
+
 	## Conflict options
 	if [ "$CONFLICT_BACKUP" != "no" ]
 	then
@@ -1576,16 +1767,6 @@ function Init
 	else
 		MASTER_BACKUP=
 		SLAVE_BACKUP=
-	fi
-
-	## Soft delete options
-	if [ "$SOFT_DELETE" != "no" ]
-	then
-		MASTER_DELETE="--backup --backup-dir=\"$MASTER_DELETE_DIR\""
-		SLAVE_DELETE="--backup --backup-dir=\"$SLAVE_DELETE_DIR\""
-	else
-		MASTER_DELETE=
-		SLAVE_DELETE=
 	fi
 
 	## Add Rsync exclude patterns
@@ -1616,6 +1797,7 @@ function Usage
 	echo "--dry             Will run osync without actually doing anything; just testing"
 	echo "--silent          Will run osync without any output to stdout, used for cron jobs"
 	echo "--verbose         Increases output"
+	echo "--stats		Adds transfer statistics"
 	echo "--no-maxtime      Disables any soft and hard execution time checks"
 	echo "--force-unlock    Will override any existing active or dead locks on master and slave replica"
 	echo "--on-changes      Will launch a sync as soon as there is some file activity on master replica"
@@ -1667,6 +1849,7 @@ function SyncOnChanges
 dryrun=0
 silent=0
 verbose=0
+stats=0
 force_unlock=0
 no_maxtime=0
 # Alert flags
@@ -1698,6 +1881,10 @@ do
 		--verbose)
 		verbose=1
 		opts=$opts" --verbose"
+		;;
+		--stats)
+		stats=1
+		opts=$opts" --stats"
 		;;
 		--force-unlock)
 		force_unlock=1
