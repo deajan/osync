@@ -4,7 +4,7 @@ PROGRAM="Osync" # Rsync based two way sync engine with fault tolerance
 AUTHOR="(L) 2013-2014 by Orsiris \"Ozy\" de Jong"
 CONTACT="http://www.netpower.fr/osync - ozy@netpower.fr"
 PROGRAM_VERSION=0.99preRC3
-PROGRAM_BUILD=2505201405
+PROGRAM_BUILD=2505201406
 
 ## allow debugging from command line with preceding ocsync with DEBUG=yes
 if [ ! "$DEBUG" == "yes" ]
@@ -334,9 +334,9 @@ function GetOperatingSystem
                 		fi
                 	fi
                 fi
-        
+
 		REMOTE_OS_VAR=$(cat $RUN_DIR/osync_remote_os_$SCRIPT_PID)
-	
+
 		case $REMOTE_OS_VAR in
 			*"Linux"*)
 			REMOTE_OS="Linux"
@@ -378,9 +378,8 @@ function WaitForTaskCompletion
 	while eval $PROCESS_TEST > /dev/null
         do
                 Spinner
-                sleep 1
                 EXEC_TIME=$(($SECONDS - $SECONDS_BEGIN))
-                if [ $(($EXEC_TIME % $KEEP_LOGGING)) -eq 0 ]
+                if [ $((($EXEC_TIME + 1) % $KEEP_LOGGING)) -eq 0 ]
                 then
                         Log "Current task still running."
                 fi
@@ -409,6 +408,7 @@ function WaitForTaskCompletion
                                 return 1
                         fi
 		fi
+                sleep 1
         done
 	wait $child_pid
 	return $?
@@ -428,8 +428,7 @@ function WaitForCompletion
 	while eval $PROCESS_TEST > /dev/null
         do
                 Spinner
-                sleep 1
-                if [ $(($SECONDS % $KEEP_LOGGING)) -eq 0 ]
+                if [ $((($SECONDS + 1) % $KEEP_LOGGING)) -eq 0 ]
                 then
                         Log "Current task still running."
                 fi
@@ -458,6 +457,7 @@ function WaitForCompletion
                                 return 1
                         fi
                 fi
+                sleep 1
 	done
 	wait $child_pid
 	return $?
@@ -487,7 +487,7 @@ function RunLocalCommand
 	then
         	Log "Command output:\n$(cat $RUN_DIR/osync_run_local_$SCRIPT_PID)"
 	fi
-	
+
         if [ "$STOP_ON_CMD_ERROR" == "yes" ] && [ $retval -ne 0 ]
         then
                 exit 1
@@ -705,11 +705,11 @@ function CheckMinimumSpace
         then
                 LogError "There is not enough free space on master [$MASTER_SPACE KB]."
         fi
-	
+
 	if [ "$REMOTE_SYNC" == "yes" ]
 	then
 	        CheckConnectivity3rdPartyHosts
-	        CheckConnectivityRemoteHost		
+	        CheckConnectivityRemoteHost
 		eval "$SSH_CMD \"$COMMAND_SUDO df -P \\\"$SLAVE_SYNC_DIR\\\"\"" > $RUN_DIR/osync_slave_space_$SCRIPT_PID &
 		child_pid=$!
 		WaitForTaskCompletion $child_pid 0 1800
@@ -717,7 +717,7 @@ function CheckMinimumSpace
 	else
 		SLAVE_SPACE=$(df -P "$SLAVE_SYNC_DIR" | tail -1 | awk '{print $4}')
 	fi
-	
+
 	if [ $SLAVE_SPACE -lt $MINIMUM_SPACE ]
 	then
 		LogError "There is not enough free space on slave [$SLAVE_SPACE KB]."
@@ -822,7 +822,7 @@ function LockDirectories
 			exit 1
 		fi
 	fi
-	
+
 	if [ "$REMOTE_SYNC" == "yes" ]
 	then
 	        CheckConnectivity3rdPartyHosts
@@ -940,9 +940,9 @@ function tree_list
 	if ([ $retval == 0 ] || [ $retval == 24 ]) && [ -f $RUN_DIR/osync_$2_$SCRIPT_PID ]
 	then
 		if [ $dryrun -eq 1 ]
-		then			
+		then
 			mv $RUN_DIR/osync_$2_$SCRIPT_PID "$MASTER_STATE_DIR/dry-$2-$SYNC_ID"
-		else	
+		else
 			mv $RUN_DIR/osync_$2_$SCRIPT_PID "$MASTER_STATE_DIR/$2-$SYNC_ID"
 		fi
 		echo "$3.success" > "$MASTER_LAST_ACTION"
@@ -1020,7 +1020,7 @@ function sync_update
 		ESC_DEST_DIR=$(EscapeSpaces "$MASTER_SYNC_DIR")
                 BACKUP_DIR="$MASTER_BACKUP"
         fi
-	
+
 	if [ "$REMOTE_SYNC" == "yes" ]
 	then
 	        CheckConnectivity3rdPartyHosts
@@ -1062,12 +1062,11 @@ function sync_update
 # delete_local(replica dir, delete file list, delete dir)
 function _delete_local
 {
-	
 	## On every run, check wheter the next item is already deleted because it's included in a directory already deleted
 	previous_file=""
 	OLD_IFS=$IFS
 	IFS=$'\r\n'
-        for files in $(cat "$2")
+        for files in $(cat "$MASTER_STATE_DIR/$2")
         do
                 if [[ "$files" != "$previous_file/"* ]] && [ "$files" != "" ]
 		then
@@ -1086,7 +1085,7 @@ function _delete_local
 				then
 					Log "Soft deleting $REPLICA_DIR$files"
 				fi
-                                
+
 				if [ $dryrun -ne 1 ]
 				then
 					mv "$REPLICA_DIR$files" "$REPLICA_DIR$3"
@@ -1123,9 +1122,9 @@ function _delete_remote
 	## Anything beetween << ENDSSH and ENDSSH will be executed remotely
 
 	# Additionnaly, we need to copy the deletetion list to the remote state folder
-	ESC_DEST_DIR="$(EscapeSpaces $SLAVE_STATE_DIR)"
-       	rsync_cmd="$(type -p $RSYNC_EXECUTABLE) --rsync-path=\"$RSYNC_PATH\" $SYNC_OPTS -e \"$RSYNC_SSH_CMD\" \"$2\" $REMOTE_USER@$REMOTE_HOST:\"$ESC_DEST_DIR/\" > $RUN_DIR/osync_remote_deletion_list_copy_$SCRIPT_PID 2>&1"
-	eval $rsync_cmd
+	ESC_DEST_DIR="$(EscapeSpaces "$SLAVE_STATE_DIR")"
+       	rsync_cmd="$(type -p $RSYNC_EXECUTABLE) --rsync-path=\"$RSYNC_PATH\" $SYNC_OPTS -e \"$RSYNC_SSH_CMD\" \"$MASTER_STATE_DIR/$2\" $REMOTE_USER@$REMOTE_HOST:\"$ESC_DEST_DIR/\" > $RUN_DIR/osync_remote_deletion_list_copy_$SCRIPT_PID 2>&1"
+	eval $rsync_cmd 2>> "$LOG_FILE"
 	if [ $? != 0 ]
 	then
 		LogError "Cannot copy the deletion list to remote replica."
@@ -1136,7 +1135,7 @@ function _delete_remote
 		exit 1
 	fi
 
-$SSH_CMD error_alert=0 sync_on_changes=$sync_on_changes silent=$silent DEBUG=$DEBUG dryrun=$dryrun verbose=$verbose COMMAND_SUDO=$COMMAND_SUDO FILE_LIST=$(EscapeSpaces "$SLAVE_STATE_DIR/$(basename $2)") REPLICA_DIR="$(EscapeSpaces "$REPLICA_DIR") DELETE_DIR="$(EscapeSpaces "$DELETE_DIR") 'bash -s' << 'ENDSSH' > $RUN_DIR/osync_remote_deletion_$SCRIPT_PID 2>&1 &
+$SSH_CMD error_alert=0 sync_on_changes=$sync_on_changes silent=$silent DEBUG=$DEBUG dryrun=$dryrun verbose=$verbose COMMAND_SUDO=$COMMAND_SUDO FILE_LIST="$(EscapeSpaces "$SLAVE_STATE_DIR/$2")" REPLICA_DIR="$(EscapeSpaces "$REPLICA_DIR")" DELETE_DIR="$(EscapeSpaces "$DELETE_DIR")" 'bash -s' << 'ENDSSH' > $RUN_DIR/osync_remote_deletion_$SCRIPT_PID 2>&1 &
 
 	## The following lines are executed remotely
 	function Log
@@ -1184,7 +1183,7 @@ $SSH_CMD error_alert=0 sync_on_changes=$sync_on_changes silent=$silent DEBUG=$DE
 
                                 if [ $dryrun -ne 1 ]
                                 then
-                                        $COMMAND_SUDO mv "$REPLICA_DIR$files" "$REPLICA_DIR$DELETE_DIR"	
+                                        $COMMAND_SUDO mv "$REPLICA_DIR$files" "$REPLICA_DIR$DELETE_DIR"
 					if [ $? != 0 ]
 					then
 						LogError "Cannot move $REPLICA_DIR$files to deletion directory."
@@ -1209,7 +1208,8 @@ $SSH_CMD error_alert=0 sync_on_changes=$sync_on_changes silent=$silent DEBUG=$DE
                 fi
         done
 ENDSSH
-
+	## Need to add a trivial sleep time to give ssh time to log to local file
+	sleep 5
 	exit $?
 }
 
@@ -1219,16 +1219,16 @@ ENDSSH
 function deletion_propagation
 {
 	Log "Propagating deletions to $1 replica."
-	
+
 	if [ "$1" == "master" ]
 	then
 		REPLICA_DIR="$MASTER_SYNC_DIR"
 		DELETE_DIR="$MASTER_DELETE_DIR"
 		if [ $dryrun -eq 1 ]
 		then
-			DELETION_FILE_LIST="$MASTER_STATE_DIR/dry-slave-deleted-list-$SYNC_ID"
+			DELETION_FILE_LIST="dry-slave-deleted-list-$SYNC_ID"
 		else
-			DELETION_FILE_LIST="$MASTER_STATE_DIR/slave-deleted-list-$SYNC_ID"
+			DELETION_FILE_LIST="slave-deleted-list-$SYNC_ID"
 		fi
 
 		_delete_local "$REPLICA_DIR" "$DELETION_FILE_LIST" "$DELETE_DIR" &
@@ -1242,15 +1242,15 @@ function deletion_propagation
 			LogError "Deletion on replica $1 failed."
                 	echo "delete-propagation-$1.fail" > "$MASTER_LAST_ACTION"
                 	exit 1
-        	fi		
+        	fi
 	else
 		REPLICA_DIR="$SLAVE_SYNC_DIR"
 		DELETE_DIR="$SLAVE_DELETE_DIR"
 		if [ $dryrun -eq 1 ]
 		then
-			DELETION_FILE_LIST="$MASTER_STATE_DIR/dry-master-deleted-list-$SYNC_ID"
+			DELETION_FILE_LIST="dry-master-deleted-list-$SYNC_ID"
 		else
-			DELETION_FILE_LIST="$MASTER_STATE_DIR/master-deleted-list-$SYNC_ID"
+			DELETION_FILE_LIST="master-deleted-list-$SYNC_ID"
 		fi
 
 		if [ "$REMOTE_SYNC" == "yes" ]
@@ -1264,12 +1264,16 @@ function deletion_propagation
 		retval=$?
                 if [ $retval == 0 ]
                 then
+			if [ -f $RUN_DIR/osync_remote_deletion_$SCRIPT_PID ] && [ $verbose -eq 1 ]
+			then
+				Log "Remote:\n$(cat $RUN_DIR/osync_remote_deletion_$SCRIPT_PID)"
+			fi
                         echo "delete-propagation-$1.success" > "$MASTER_LAST_ACTION"
 		else
 			LogError "Deletion on remote system failed."
 			if [ -f $RUN_DIR/osync_remote_deletion_$SCRIPT_PID ]
 			then
-				LogError "$(cat $RUN_DIR/osync_remote_deletion_$SCRIPT_PID)"
+				LogError "Remote:\n$(cat $RUN_DIR/osync_remote_deletion_$SCRIPT_PID)"
 			fi
                         echo "delete-propagation-$1.fail" > "$MASTER_LAST_ACTION"
                         exit 1
@@ -1401,7 +1405,7 @@ function Sync
 	if [ $dryrun -ne 1 ]
 	then
 		echo "0" > "$MASTER_RESUME_COUNT"
-	fi	
+	fi
 }
 
 function SoftDelete
@@ -1436,7 +1440,7 @@ function SoftDelete
 		then
 			LogError "Warning: Master replica conflict backup dir [$MASTER_SYNC_DIR$MASTER_BACKUP_DIR] isn't writable. Cannot clean old files."
 		fi
-		
+
 		if [ "$REMOTE_SYNC" == "yes" ]
 		then
         		CheckConnectivity3rdPartyHosts
@@ -1602,7 +1606,7 @@ function Init
 	else
 		FIND_CMD=find
 	fi
-	
+
 	if [ "$REMOTE_OS" == "msys" ]
 	then
 		REMOTE_FIND_CMD=$(dirname $BASH)/find
@@ -1663,7 +1667,7 @@ function Init
 	MASTER_DELETE_DIR="$OSYNC_DIR/deleted"
 	SLAVE_BACKUP_DIR="$OSYNC_DIR/backups"
 	SLAVE_DELETE_DIR="$OSYNC_DIR/deleted"
-	
+
 	## SSH compression
 	if [ "$SSH_COMPRESSION" != "no" ]
 	then
@@ -1743,7 +1747,7 @@ function Init
 
 	## Set sync only function arguments for rsync
 	SYNC_OPTS="-u"
-	
+
 	if [ $verbose -eq 1 ]
 	then
 		SYNC_OPTS=$SYNC_OPTS"i"
@@ -1818,7 +1822,7 @@ function SyncOnChanges
         	exit 1
 	fi
 
-	Log "#### Running Osync in file monitor mode."	
+	Log "#### Running Osync in file monitor mode."
 
 	while true
 	do
