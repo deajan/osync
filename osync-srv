@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 #
 # osync two way directory sync tool
 #
@@ -12,6 +12,7 @@ progpath=/usr/local/bin
 confdir=/etc/osync
 pidfile=/var/run/$prog
 lockfile=/var/lock/subsys/$prog
+SCRIPT_BUILD=2605201401
 
 if [ ! -f $progpath/$progexec ] && [ ! -f $progexec ]
 then

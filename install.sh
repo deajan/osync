@@ -1,4 +1,6 @@
-#!/bin/bash
+#!/usr/bin/env bash
+
+SCRIPT_BUILD=2605201401
 
 ## Osync daemon install script
 ## Tested on RHEL / CentOS 6

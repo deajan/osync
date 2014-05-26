@@ -15,6 +15,7 @@ KNOWN ISSUES
 ------------
 
 - Still need more testing on BSD, MacOSX and Windows MSYS
+- Cannot finish sync if one replica contains a directory and the other replica contains a file named the same way (Unix doesn't allow this)
 
 UNDER WORK
 ----------
@@ -23,9 +24,13 @@ UNDER WORK
 RECENT CHANGES
 --------------
 
+- Added some additionnal checks for *BSD and MacOS environments
+- Changed /bin/bash to /usr/bin/env bash for sanity on other systems, also check for bash presence before running
+- Changed default behavior for quick sync tasks: Will try to resume failed sync tasks once
+- Some code cleanup for state filenames and sync action names
 - Fixed deletion propagation (again). Rsync is definitly not designed to delete a list of files / folders. Rsync replaced by rm function which downloads deletion list to remote system.
 - Added path detection for exclude list file
-- Added a simple init script working for RHEL / CentOS and an install script
+- Added a simple init script and an install script
 - Fixed an issue with MacOSX using rsync -E differently than other *nix (Thanks to Pierre Clement)
 - Multislave asynchronous task support (Thanks to Ulrich Norbisrath)
 	- This breaks compat with elder osync runs. Add the SYNC_ID suffix to elder state files to keep deleted file information.
@@ -39,7 +44,6 @@ RECENT CHANGES
 - Fixed a nasty bug preventing writing lock files on remote system as superuser
 - Gzipped logs are now deleted once sent
 - Fixed some typos (thanks to Pavel Kiryukhin)
-- Added a simple RHEL / CentOS compatible init script
 - Fixed a bug with double trailing slashes in certain sceanrios
 - Sync execution don't fails anymore if files vanish during execution, also vanished files get logged
 - Add eventual "comm -23" replacement by "grep -F -x -v -f" to enhance compatibility with other platforms (comm is still much faster than grep, so we keep it)
