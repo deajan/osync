@@ -4,7 +4,7 @@ PROGRAM="Osync" # Rsync based two way sync engine with fault tolerance
 AUTHOR="(L) 2013-2014 by Orsiris \"Ozy\" de Jong"
 CONTACT="http://www.netpower.fr/osync - ozy@netpower.fr"
 PROGRAM_VERSION=0.99RC3+
-PROGRAM_BUILD=2705201404
+PROGRAM_BUILD=2705201405
 
 ## type doesn't work on platforms other than linux (bash). If if doesn't work, always assume output is not a zero exitcode
 if ! type -p "$BASH" > /dev/null
@@ -1733,6 +1733,10 @@ function Init
 	then
 		RSYNC_ARGS=$RSYNC_ARGS" -L"
 	fi
+	if [ "$KEEP_DIRLINKS" == "yes" ]
+	then
+		RSYNC_ARGS=$RSYNC_ARGS" -K"
+	fi
 	if [ "$PRESERVE_HARDLINKS" == "yes" ]
 	then
 		RSYNC_ARGS=$RSYNC_ARGS" -H"
@@ -1907,10 +1911,11 @@ function SyncOnChanges
 			cmd="bash $osync_cmd $opts --no-locks"
 		fi
 		eval $cmd
-		if [ $? != 0 ]
+		retval = $?
+		if [ $retval != 0 ]
 		then
 			LogError "osync child exited with error."
-			exit 1
+			exit $retval
 		fi
 
 		Log "#### Monitoring now."

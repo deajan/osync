@@ -25,6 +25,7 @@ UNDER WORK
 RECENT CHANGES
 --------------
 
+- Added treat dir symlink as dir parameter
 - 27 May 2014: Osync 0.99 RC3
 - Additionnal delete fix for *BSD and MSYS (deleted file list not created right)
 - Fixed dry mode to use non dry after run treelists to create delete lists
