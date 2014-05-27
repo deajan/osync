@@ -25,6 +25,9 @@ UNDER WORK
 RECENT CHANGES
 --------------
 
+- 27 May 2014: Osync 0.99 RC3
+- Additionnal delete fix for *BSD and MSYS (deleted file list not created right)
+- Fixed dry mode to use non dry after run treelists to create delete lists
 - Added follow symlink parameter
 - Minor fixes in parameter list when bandwidth parameter is used
 - Added some additionnal checks for *BSD and MacOS environments

@@ -4,8 +4,9 @@ PROGRAM="Osync" # Rsync based two way sync engine with fault tolerance
 AUTHOR="(L) 2013-2014 by Orsiris \"Ozy\" de Jong"
 CONTACT="http://www.netpower.fr/osync - ozy@netpower.fr"
 PROGRAM_VERSION=0.99RC3
-PROGRAM_BUILD=2705201401
+PROGRAM_BUILD=2705201403
 
+## type doesn't work on platforms other than linux (bash). If if doesn't work, always assume output is not a zero exitcode
 if ! type -p "$BASH" > /dev/null
 then
 	echo "Please run this script only with bash shell. Tested on bash >= 3.2"
@@ -950,15 +951,15 @@ function tree_list
 function delete_list
 {
         Log "Creating $1 replica deleted file list."
-        if [ -f "$MASTER_STATE_DIR/$1-tree-after-$SYNC_ID" ]
+        if [ -f "$MASTER_STATE_DIR/$1$TREE_AFTER_FILENAME_NO_SUFFIX" ]
         then
 		## Same functionnality, comm is much faster than grep but is not available on every platform
 		if type -p comm > /dev/null 2>&1
 		then
-			cmd="comm -23 \"$MASTER_STATE_DIR/$1$2\" \"$MASTER_STATE_DIR/$1$3\" > \"$MASTER_STATE_DIR/$1$4\""
+			cmd="comm -23 \"$MASTER_STATE_DIR/$1$TREE_AFTER_FILENAME_NO_SUFFIX\" \"$MASTER_STATE_DIR/$1$3\" > \"$MASTER_STATE_DIR/$1$4\""
 		else
 			## The || : forces the command to have a good result
-			cmd="grep -F -x -v -f \"$MASTER_STATE_DIR/$1$3\" \"$MASTER_STATE_DIR/$1$2\" || : > \"$MASTER_STATE_DIR/$1$4\""
+			cmd="(grep -F -x -v -f \"$MASTER_STATE_DIR/$1$3\" \"$MASTER_STATE_DIR/$1$TREE_AFTER_FILENAME_NO_SUFFIX\" || :) > \"$MASTER_STATE_DIR/$1$4\""
 		fi
 
 		LogDebug "CMD: $cmd"
@@ -1782,6 +1783,7 @@ function Init
 
 	TREE_CURRENT_FILENAME="-tree-current-$SYNC_ID$dry_suffix"
 	TREE_AFTER_FILENAME="-tree-after-$SYNC_ID$dry_suffix"
+	TREE_AFTER_FILENAME_NO_SUFFIX="-tree-after-$SYNC_ID"
 	DELETED_LIST_FILENAME="-deleted-list$SYNC_ID$dry_suffix"
 	MASTER_LAST_ACTION="$MASTER_STATE_DIR/last-action-$SYNC_ID$dry_suffix"
 	MASTER_RESUME_COUNT="$MASTER_STATE_DIR/resume-count-$SYNC_ID$dry_suffix"
