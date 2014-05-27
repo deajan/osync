@@ -3,8 +3,8 @@
 PROGRAM="Osync" # Rsync based two way sync engine with fault tolerance
 AUTHOR="(L) 2013-2014 by Orsiris \"Ozy\" de Jong"
 CONTACT="http://www.netpower.fr/osync - ozy@netpower.fr"
-PROGRAM_VERSION=0.99RC3
-PROGRAM_BUILD=2705201403
+PROGRAM_VERSION=0.99RC3+
+PROGRAM_BUILD=2705201404
 
 ## type doesn't work on platforms other than linux (bash). If if doesn't work, always assume output is not a zero exitcode
 if ! type -p "$BASH" > /dev/null
@@ -232,7 +232,13 @@ function SendAlert
                 fi
 	elif type -p sendemail > /dev/null 2>&1
 	then
-		$(type -p sendemail) -f $SENDER_MAIL -t $DESTINATION_MAILS -u "Backup alert for $BACKUP_ID" -m "$MAIL_ALERT_MSG" -s $SMTP_SERVER -o username $SMTP_USER -p password $SMTP_PASSWORD > /dev/null 2>&1
+		if [ "$SMTP_USER" != "" ] && "$SMTP_PASSWORD" != "" ]
+		then
+			$SMTP_OPTIONS="-xu $SMTP_USER -xp $SMTP_PASSWORD"
+		else
+			$SMTP_OPTIONS=""
+		fi
+		$(type -p sendemail) -f $SENDER_MAIL -t $DESTINATION_MAILS -u "Backup alert for $BACKUP_ID" -m "$MAIL_ALERT_MSG" -s $SMTP_SERVER $SMTP_OPTIONS > /dev/null 2>&1
 		if [ $? != 0 ]
 		then
 			Log "WARNING: Cannot send alert email via $(type -p sendemail) !!!"
@@ -1869,16 +1875,16 @@ function Usage
 	echo "--dry             Will run osync without actually doing anything; just testing"
 	echo "--silent          Will run osync without any output to stdout, used for cron jobs"
 	echo "--verbose         Increases output"
-	echo "--stats		Adds transfer statistics"
+	echo "--stats           Adds rsync transfer statistics to verbose output"
 	echo "--no-maxtime      Disables any soft and hard execution time checks"
 	echo "--force-unlock    Will override any existing active or dead locks on master and slave replica"
-	echo "--on-changes      Will launch a sync as soon as there is some file activity on master replica"
+	echo "--on-changes      Will launch a sync task after a short wait period if there is some file activity on master replica. You should try daemon mode instead"
 	echo ""
 	echo "[QUICKSYNC OPTIONS]"
-	echo "--master=\"\"	Master replica path. Will contain state and backup directory (is mandatory)."
-	echo "--slave=\"\" 	Local or remote slave replica path. Can be a ssh uri like ssh://user@host.com:22//path/to/slave/replica (is mandatory)."
+	echo "--master=\"\"	Master replica path. Will contain state and backup directory (is mandatory)"
+	echo "--slave=\"\" 	Local or remote slave replica path. Can be a ssh uri like ssh://user@host.com:22//path/to/slave/replica (is mandatory)"
 	echo "--rsakey=\"\"	Alternative path to rsa private key for ssh connection to slave replica"
-	echo "--sync-id=\"\"	Optional task-id to identify this synchronization task when using multiple slaves."
+	echo "--sync-id=\"\"	Optional sync task name to identify this synchronization task when using multiple slaves"
 	exit 128
 }
 
