@@ -14,16 +14,19 @@ FAR FUTURE IMPROVEMENTS
 KNOWN ISSUES
 ------------
 
-- Still need more testing on BSD, MacOSX and Windows MSYS
+- RC3 is tested against Linux, FreeBSD and MacOS X. More testing needed in MSYS Windows environment.
 - Cannot finish sync if one replica contains a directory and the other replica contains a file named the same way (Unix doesn't allow this)
 
 UNDER WORK
 ----------
 
+- sync test automation
 
 RECENT CHANGES
 --------------
 
+- Added follow symlink parameter
+- Minor fixes in parameter list when bandwidth parameter is used
 - Added some additionnal checks for *BSD and MacOS environments
 - Changed /bin/bash to /usr/bin/env bash for sanity on other systems, also check for bash presence before running
 - Changed default behavior for quick sync tasks: Will try to resume failed sync tasks once

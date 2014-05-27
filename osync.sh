@@ -4,7 +4,7 @@ PROGRAM="Osync" # Rsync based two way sync engine with fault tolerance
 AUTHOR="(L) 2013-2014 by Orsiris \"Ozy\" de Jong"
 CONTACT="http://www.netpower.fr/osync - ozy@netpower.fr"
 PROGRAM_VERSION=0.99RC3
-PROGRAM_BUILD=2605201403
+PROGRAM_BUILD=2705201401
 
 if ! type -p "$BASH" > /dev/null
 then
@@ -1712,23 +1712,27 @@ function Init
 
         if [ "$PRESERVE_ACL" == "yes" ]
         then
-                RSYNC_ARGS=$RSYNC_ARGS"A"
+                RSYNC_ARGS=$RSYNC_ARGS" -A"
         fi
         if [ "$PRESERVE_XATTR" == "yes" ]
         then
-                RSYNC_ARGS=$RSYNC_ARGS"X"
+                RSYNC_ARGS=$RSYNC_ARGS" -X"
         fi
         if [ "$RSYNC_COMPRESS" == "yes" ]
         then
-                RSYNC_ARGS=$RSYNC_ARGS"z"
+                RSYNC_ARGS=$RSYNC_ARGS" -z"
         fi
+	if [ "$COPY_SYMLINKS" == "yes" ]
+	then
+		RSYNC_ARGS=$RSYNC_ARGS" -L"
+	fi
 	if [ "$PRESERVE_HARDLINKS" == "yes" ]
 	then
-		RSYNC_ARGS=$RSYNC_ARGS"H"
+		RSYNC_ARGS=$RSYNC_ARGS" -H"
 	fi
 	if [ $dryrun -eq 1 ]
 	then
-		RSYNC_ARGS=$RSYNC_ARGS"n"
+		RSYNC_ARGS=$RSYNC_ARGS" -n"
 		DRY_WARNING="/!\ DRY RUN"
 	fi
 
@@ -1830,7 +1834,7 @@ function InitRemoteOSSettings
 	## MacOSX does not use the -E parameter like Linux or BSD does (-E is mapped to extended attrs instead of preserve executability)
 	if [ "$LOCAL_OS" != "MacOSX" ] && [ "$REMOTE_OS" != "MacOSX" ]
 	then
-		RSYNC_ARGS=$RSYNC_ARGS"E"
+		RSYNC_ARGS=$RSYNC_ARGS" -E"
 	fi
 
 	if [ "$REMOTE_OS" == "msys" ]
