@@ -1911,7 +1911,7 @@ function SyncOnChanges
 			cmd="bash $osync_cmd $opts --no-locks"
 		fi
 		eval $cmd
-		retval = $?
+		retval=$?
 		if [ $retval != 0 ]
 		then
 			LogError "osync child exited with error."
