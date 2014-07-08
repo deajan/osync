@@ -20,11 +20,13 @@ KNOWN ISSUES
 UNDER WORK
 ----------
 
+- Check for big files never get synced if max exec time
 - sync test automation
 
 RECENT CHANGES
 --------------
 
+- Added a routine that reinjects failed deletions for next run in order to prevent bringing back when deletion failed with permission issues
 - Added treat dir symlink as dir parameter
 - 27 May 2014: Osync 0.99 RC3
 - Additionnal delete fix for *BSD and MSYS (deleted file list not created right)

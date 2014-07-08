@@ -4,7 +4,7 @@ PROGRAM="Osync" # Rsync based two way sync engine with fault tolerance
 AUTHOR="(L) 2013-2014 by Orsiris \"Ozy\" de Jong"
 CONTACT="http://www.netpower.fr/osync - ozy@netpower.fr"
 PROGRAM_VERSION=0.99RC3+
-PROGRAM_BUILD=2705201405
+PROGRAM_BUILD=0807201401
 
 ## type doesn't work on platforms other than linux (bash). If if doesn't work, always assume output is not a zero exitcode
 if ! type -p "$BASH" > /dev/null
@@ -17,6 +17,9 @@ fi
 if [ ! "$DEBUG" == "yes" ]
 then
 	DEBUG=no
+	SLEEP_TIME=1
+else
+	SLEEP_TIME=10
 fi
 
 SCRIPT_PID=$$
@@ -424,7 +427,7 @@ function WaitForTaskCompletion
                                 return 1
                         fi
 		fi
-                sleep 1
+                sleep $SLEEP_TIME
         done
 	wait $child_pid
 	return $?
@@ -473,7 +476,7 @@ function WaitForCompletion
                                 return 1
                         fi
                 fi
-                sleep 1
+                sleep $SLEEP_TIME
 	done
 	wait $child_pid
 	return $?
@@ -953,7 +956,7 @@ function tree_list
 	fi
 }
 
-# delete_list(replica, tree-file-after, tree-file-current, deleted-list-file): Creates a list of files vanished from last run on replica $1 (master/slave)
+# delete_list(replica, tree-file-after, tree-file-current, deleted-list-file, deleted-failed-list-file): Creates a list of files vanished from last run on replica $1 (master/slave)
 function delete_list
 {
         Log "Creating $1 replica deleted file list."
@@ -970,10 +973,19 @@ function delete_list
 
 		LogDebug "CMD: $cmd"
 		eval $cmd
-		return $?
+		retval=$?
+
+		# Add delete failed file list to current delete list and then empty it
+		if [ -f "$MASTER_STATE_DIR/$1$5" ]
+		then
+			cat "$MASTER_STATE_DIR/$1$5" >> "$MASTER_STATE_DIR/$1$4"
+			rm -f "$MASTER_STATE_DIR/$1$5"
+		fi
+
+		return $retval
         else
 		touch "$MASTER_STATE_DIR/$1$4"
-		return $?
+		return $retval
         fi
 }
 
@@ -1033,7 +1045,7 @@ function sync_update
         fi
 }
 
-# delete_local(replica dir, delete file list, delete dir)
+# delete_local(replica dir, delete file list, delete dir, delete failed file)
 function _delete_local
 {
 	## On every run, check wheter the next item is already deleted because it's included in a directory already deleted
@@ -1066,6 +1078,7 @@ function _delete_local
 					if [ $? != 0 ]
 					then
 						LogError "Cannot move $REPLICA_DIR$files to deletion directory."
+						echo "$files" >> "$MASTER_STATE_DIR/$4"
 					fi
 				fi
                         else
@@ -1080,6 +1093,7 @@ function _delete_local
 					if [ $? != 0 ]
 					then
 						LogError "Cannot delete $REPLICA_DIR$files"
+						echo "$files" >> "$MASTER_STATE_DIR/$4"
 					fi
                         	fi
 			fi
@@ -1089,7 +1103,7 @@ function _delete_local
 	IFS=$OLD_IFS
 }
 
-# delete_remote(replica dir, delete file list, delete dir)
+# delete_remote(replica dir, delete file list, delete dir, delete fail file list)
 function _delete_remote
 {
 	## This is a special coded function. Need to redelcare local functions on remote host, passing all needed variables as escaped arguments to ssh command.
@@ -1098,6 +1112,7 @@ function _delete_remote
 	# Additionnaly, we need to copy the deletetion list to the remote state folder
 	ESC_DEST_DIR="$(EscapeSpaces "$SLAVE_STATE_DIR")"
        	rsync_cmd="$(type -p $RSYNC_EXECUTABLE) --rsync-path=\"$RSYNC_PATH\" $SYNC_OPTS -e \"$RSYNC_SSH_CMD\" \"$MASTER_STATE_DIR/$2\" $REMOTE_USER@$REMOTE_HOST:\"$ESC_DEST_DIR/\" > $RUN_DIR/osync_remote_deletion_list_copy_$SCRIPT_PID 2>&1"
+	LogDebug "RSYNC_CMD: $rsync_cmd"
 	eval $rsync_cmd 2>> "$LOG_FILE"
 	if [ $? != 0 ]
 	then
@@ -1109,7 +1124,7 @@ function _delete_remote
 		exit 1
 	fi
 
-$SSH_CMD error_alert=0 sync_on_changes=$sync_on_changes silent=$silent DEBUG=$DEBUG dryrun=$dryrun verbose=$verbose COMMAND_SUDO=$COMMAND_SUDO FILE_LIST="$(EscapeSpaces "$SLAVE_STATE_DIR/$2")" REPLICA_DIR="$(EscapeSpaces "$REPLICA_DIR")" DELETE_DIR="$(EscapeSpaces "$DELETE_DIR")" 'bash -s' << 'ENDSSH' > $RUN_DIR/osync_remote_deletion_$SCRIPT_PID 2>&1 &
+$SSH_CMD error_alert=0 sync_on_changes=$sync_on_changes silent=$silent DEBUG=$DEBUG dryrun=$dryrun verbose=$verbose COMMAND_SUDO=$COMMAND_SUDO FILE_LIST="$(EscapeSpaces "$SLAVE_STATE_DIR/$2")" REPLICA_DIR="$(EscapeSpaces "$REPLICA_DIR")" DELETE_DIR="$(EscapeSpaces "$DELETE_DIR")" FAILED_DELETE_LIST="$(EscapeSpaces "$SLAVE_STATE_DIR/$4")" 'bash -s' << 'ENDSSH' > $RUN_DIR/osync_remote_deletion_$SCRIPT_PID 2>&1 &
 
 	## The following lines are executed remotely
 	function Log
@@ -1132,6 +1147,9 @@ $SSH_CMD error_alert=0 sync_on_changes=$sync_on_changes silent=$silent DEBUG=$DE
         	Log "$1"
         	error_alert=1
 	}
+
+	## Empty earlier failed delete list
+	> "$FAILED_DELETE_LIST"
 
         ## On every run, check wheter the next item is already deleted because it's included in a directory already deleted
         previous_file=""
@@ -1161,6 +1179,7 @@ $SSH_CMD error_alert=0 sync_on_changes=$sync_on_changes silent=$silent DEBUG=$DE
 					if [ $? != 0 ]
 					then
 						LogError "Cannot move $REPLICA_DIR$files to deletion directory."
+						echo "$files" >> "$FAILED_DELETE_LIST"
 					fi
                                 fi
                         else
@@ -1175,6 +1194,7 @@ $SSH_CMD error_alert=0 sync_on_changes=$sync_on_changes silent=$silent DEBUG=$DE
 					if [ $? != 0 ]
 					then
 						LogError "Cannot delete $REPLICA_DIR$files"
+						echo "$files" >> "$SLAVE_STATE_DIR/$FAILED_DELETE_LIST"
 					fi
                                 fi
                         fi
@@ -1182,13 +1202,32 @@ $SSH_CMD error_alert=0 sync_on_changes=$sync_on_changes silent=$silent DEBUG=$DE
                 fi
         done
 ENDSSH
+
 	## Need to add a trivial sleep time to give ssh time to log to local file
 	sleep 5
+
+	## Copy back the deleted failed file list
+        ESC_SOURCE_FILE="$(EscapeSpaces "$SLAVE_STATE_DIR/$4")"
+        rsync_cmd="$(type -p $RSYNC_EXECUTABLE) --rsync-path=\"$RSYNC_PATH\" $SYNC_OPTS -e \"$RSYNC_SSH_CMD\" $REMOTE_USER@$REMOTE_HOST:\"$ESC_SOURCE_FILE\" \"$MASTER_STATE_DIR\" > $RUN_DIR/osync_remote_failed_deletion_list_copy_$SCRIPT_PID"
+	LogDebug "RSYNC_CMD: $rsync_cmd"
+        eval $rsync_cmd 2>> "$LOG_FILE"
+        if [ $? != 0 ]
+        then
+                LogError "Cannot copy back the failed deletion list to master replica."
+                if [ -f $RUN_DIR/osync_remote_failed_deletion_list_copy_$SCRIPT_PID ]
+                then
+                        LogError "$(cat $RUN_DIR/osync_remote_failed_deletion_list_copy_$SCRIPT_PID)"
+                fi
+                exit 1
+        fi
+
+
+
 	exit $?
 }
 
 
-# delete_propagation(replica name, deleted_list_filename)
+# delete_propagation(replica name, deleted_list_filename, deleted_failed_file_list)
 # replica name = "master" / "slave"
 function deletion_propagation
 {
@@ -1199,7 +1238,7 @@ function deletion_propagation
 		REPLICA_DIR="$MASTER_SYNC_DIR"
 		DELETE_DIR="$MASTER_DELETE_DIR"
 
-		_delete_local "$REPLICA_DIR" "slave$2" "$DELETE_DIR" &
+		_delete_local "$REPLICA_DIR" "slave$2" "$DELETE_DIR" "slave$3" &
 		child_pid=$!
 		WaitForCompletion $child_pid $SOFT_MAX_EXEC_TIME $HARD_MAX_EXEC_TIME
 		retval=$?
@@ -1214,9 +1253,9 @@ function deletion_propagation
 
 		if [ "$REMOTE_SYNC" == "yes" ]
 		then
-			_delete_remote "$REPLICA_DIR" "master$2" "$DELETE_DIR" &
+			_delete_remote "$REPLICA_DIR" "master$2" "$DELETE_DIR" "master$3" &
 		else
-			_delete_local "$REPLICA_DIR" "master$2" "$DELETE_DIR" &
+			_delete_local "$REPLICA_DIR" "master$2" "$DELETE_DIR" "master$3" &
 		fi
 		child_pid=$!
 		WaitForCompletion $child_pid $SOFT_MAX_EXEC_TIME $HARD_MAX_EXEC_TIME
@@ -1312,7 +1351,7 @@ function Sync
 	fi
 	if [ "$resume_sync" == "resumed" ] || [ "$resume_sync" == "${SYNC_ACTION[1]}.success" ] || [ "$resume_sync" == "${SYNC_ACTION[2]}.fail" ]
 	then
-		delete_list master "$TREE_AFTER_FILENAME" "$TREE_CURRENT_FILENAME" "$DELETED_LIST_FILENAME"
+		delete_list master "$TREE_AFTER_FILENAME" "$TREE_CURRENT_FILENAME" "$DELETED_LIST_FILENAME" "$FAILED_DELETE_LIST_FILENAME"
 		if [ $? == 0 ]
 		then
 			echo "${SYNC_ACTION[2]}.success" > "$MASTER_LAST_ACTION"
@@ -1323,7 +1362,7 @@ function Sync
 	fi
 	if [ "$resume_sync" == "resumed" ] || [ "$resume_sync" == "${SYNC_ACTION[2]}.success" ] || [ "$resume_sync" == "${SYNC_ACTION[3]}.fail" ]
 	then
-		delete_list slave "$TREE_AFTER_FILENAME" "$TREE_CURRENT_FILENAME" "$DELETED_LIST_FILENAME"
+		delete_list slave "$TREE_AFTER_FILENAME" "$TREE_CURRENT_FILENAME" "$DELETED_LIST_FILENAME" "$FAILED_DELETE_LIST_FILENAME"
 		if [ $? == 0 ]
 		then
 			echo "${SYNC_ACTION[3]}.success" > "$MASTER_LAST_ACTION"
@@ -1385,7 +1424,7 @@ function Sync
 	fi
 	if [ "$resume_sync" == "resumed" ] || [ "$resume_sync" == "${SYNC_ACTION[5]}.success" ] || [ "$resume_sync" == "${SYNC_ACTION[4]}.success" ] || [ "$resume_sync" == "${SYNC_ACTION[6]}.fail" ]
 	then
-		deletion_propagation slave "$DELETED_LIST_FILENAME"
+		deletion_propagation slave "$DELETED_LIST_FILENAME" "$FAILED_DELETE_LIST_FILENAME"
 		if [ $? == 0 ]
 		then
 			echo "${SYNC_ACTION[6]}.success" > "$MASTER_LAST_ACTION"
@@ -1396,7 +1435,7 @@ function Sync
 	fi
 	if [ "$resume_sync" == "resumed" ] || [ "$resume_sync" == "${SYNC_ACTION[6]}.success" ] || [ "$resume_sync" == "${SYNC_ACTION[7]}.fail" ]
 	then
-		deletion_propagation master "$DELETED_LIST_FILENAME"
+		deletion_propagation master "$DELETED_LIST_FILENAME" "$FAILED_DELETE_LIST_FILENAME"
 		if [ $? == 0 ]
 		then
 			echo "${SYNC_ACTION[7]}.success" > "$MASTER_LAST_ACTION"
@@ -1794,7 +1833,8 @@ function Init
 	TREE_CURRENT_FILENAME="-tree-current-$SYNC_ID$dry_suffix"
 	TREE_AFTER_FILENAME="-tree-after-$SYNC_ID$dry_suffix"
 	TREE_AFTER_FILENAME_NO_SUFFIX="-tree-after-$SYNC_ID"
-	DELETED_LIST_FILENAME="-deleted-list$SYNC_ID$dry_suffix"
+	DELETED_LIST_FILENAME="-deleted-list-$SYNC_ID$dry_suffix"
+	FAILED_DELETE_LIST_FILENAME="-failed-delete-$SYNC_ID$dry_suffix"
 	MASTER_LAST_ACTION="$MASTER_STATE_DIR/last-action-$SYNC_ID$dry_suffix"
 	MASTER_RESUME_COUNT="$MASTER_STATE_DIR/resume-count-$SYNC_ID$dry_suffix"
 
