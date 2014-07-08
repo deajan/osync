@@ -208,7 +208,8 @@ function SendAlert
 		return 0
 	fi
         cat "$LOG_FILE" | gzip -9 > $RUN_DIR/osync_lastlog.gz
-        if type -p mutt > /dev/null 2>&1
+        MAIL_ALERT_MSG=$MAIL_ALERT_MSG$'\n\n'$(tail -n 25 "$LOG_FILE")
+	if type -p mutt > /dev/null 2>&1
         then
                 echo $MAIL_ALERT_MSG | $(type -p mutt) -x -s "Sync alert for $SYNC_ID" $DESTINATION_MAILS -a $RUN_DIR/osync_lastlog.gz
                 if [ $? != 0 ]
