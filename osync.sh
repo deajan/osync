@@ -4,7 +4,7 @@ PROGRAM="Osync" # Rsync based two way sync engine with fault tolerance
 AUTHOR="(L) 2013-2014 by Orsiris \"Ozy\" de Jong"
 CONTACT="http://www.netpower.fr/osync - ozy@netpower.fr"
 PROGRAM_VERSION=0.99RC3+
-PROGRAM_BUILD=0807201401
+PROGRAM_BUILD=0909201401
 
 ## type doesn't work on platforms other than linux (bash). If if doesn't work, always assume output is not a zero exitcode
 if ! type -p "$BASH" > /dev/null
@@ -370,12 +370,14 @@ function GetRemoteOS
 			*"Darwin"*)
 			REMOTE_OS="MacOSX"
 			;;
-			"ssh"*)
+			*"ssh"*)
+			*"SSH"*)
 			LogError "Cannot connect to remote system."
 			exit 1
 			;;
 			*)
-			LogError "Running on remote >> $REMOTE_OS_VAR << not supported. Please report to the author."
+			LogError "Running on remote OS failed. Please report to the author if the OS is not supported."
+			LogError "Remote OS said:\n$REMOTE_OS_VAR"
 			exit 1
 		esac
 
