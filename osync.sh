@@ -4,7 +4,7 @@ PROGRAM="Osync" # Rsync based two way sync engine with fault tolerance
 AUTHOR="(L) 2013-2014 by Orsiris \"Ozy\" de Jong"
 CONTACT="http://www.netpower.fr/osync - ozy@netpower.fr"
 PROGRAM_VERSION=0.99RC3+
-PROGRAM_BUILD=0909201401
+PROGRAM_BUILD=1209201402
 
 ## type doesn't work on platforms other than linux (bash). If if doesn't work, always assume output is not a zero exitcode
 if ! type -p "$BASH" > /dev/null
@@ -58,6 +58,8 @@ KEEP_LOGGING=1801
 ## Correct output of sort command (language agnostic sorting)
 export LC_ALL=C
 
+ALERT_LOG_FILE=$RUN_DIR/osync_lastlog
+
 function Log
 {
 	if [ $sync_on_changes -eq 1 ]
@@ -98,11 +100,6 @@ function TrapError
         then
                 echo -e " /!\ ERROR in ${JOB}: Near line ${LINE}, exit code ${CODE}"
         fi
-}
-
-function TrapUsr1
-{
-	echo "Still doing stuff"
 }
 
 function TrapStop
@@ -207,11 +204,11 @@ function SendAlert
 		Log "Current task is a quicksync task. Will not send any alert."
 		return 0
 	fi
-        cat "$LOG_FILE" | gzip -9 > $RUN_DIR/osync_lastlog.gz
+        eval "cat $LOG_FILE $COMPRESSION_PROGRAM > $ALERT_LOG_PATH"
         MAIL_ALERT_MSG=$MAIL_ALERT_MSG$'\n\n'$(tail -n 25 "$LOG_FILE")
 	if type -p mutt > /dev/null 2>&1
         then
-                echo $MAIL_ALERT_MSG | $(type -p mutt) -x -s "Sync alert for $SYNC_ID" $DESTINATION_MAILS -a $RUN_DIR/osync_lastlog.gz
+                echo $MAIL_ALERT_MSG | $(type -p mutt) -x -s "Sync alert for $SYNC_ID" $DESTINATION_MAILS -a "$ALERT_LOG_FILE"
                 if [ $? != 0 ]
                 then
                         Log "WARNING: Cannot send alert email via $(type -p mutt) !!!"
@@ -220,7 +217,7 @@ function SendAlert
                 fi
         elif type -p mail > /dev/null 2>&1
         then
-                echo $MAIL_ALERT_MSG | $(type -p mail) -a $RUN_DIR/osync_lastlog.gz -s "Sync alert for $SYNC_ID" $DESTINATION_MAILS
+                echo $MAIL_ALERT_MSG | $(type -p mail) -a "$ALERT_LOG_FILE" -s "Sync alert for $SYNC_ID" $DESTINATION_MAILS
                 if [ $? != 0 ]
                 then
                         Log "WARNING: Cannot send alert email via $(type -p mail) with attachments !!!"
@@ -254,9 +251,9 @@ function SendAlert
                 return 1
         fi
 
-	if [ -f $RUN_DIR/osync_lastlog.gz ]
+	if [ -f "$ALERT_LOG_FILE" ]
 	then
-		rm $RUN_DIR/osync_lastlog.gz
+		rm "$ALERT_LOG_FILE"
 	fi
 }
 
@@ -370,8 +367,7 @@ function GetRemoteOS
 			*"Darwin"*)
 			REMOTE_OS="MacOSX"
 			;;
-			*"ssh"*)
-			*"SSH"*)
+			*"ssh"*|*"SSH"*)
 			LogError "Cannot connect to remote system."
 			exit 1
 			;;
@@ -951,7 +947,7 @@ function tree_list
 	## Retval 24 = some files vanished while creating list
 	if ([ $retval == 0 ] || [ $retval == 24 ]) && [ -f $RUN_DIR/osync_$2_$SCRIPT_PID ]
 	then
-		mv $RUN_DIR/osync_$2_$SCRIPT_PID "$MASTER_STATE_DIR/$2$3"		
+		mv $RUN_DIR/osync_$2_$SCRIPT_PID "$MASTER_STATE_DIR/$2$3"
 		return $?
 	else
 		LogError "Cannot create replica file list."
@@ -1156,6 +1152,8 @@ $SSH_CMD error_alert=0 sync_on_changes=$sync_on_changes silent=$silent DEBUG=$DE
 
         ## On every run, check wheter the next item is already deleted because it's included in a directory already deleted
         previous_file=""
+	OLD_IFS=$IFS
+	IFS=$'\r\n'
         for files in $(cat "$FILE_LIST")
         do
                 if [[ "$files" != "$previous_file/"* ]] && [ "$files" != "" ]
@@ -1204,6 +1202,7 @@ $SSH_CMD error_alert=0 sync_on_changes=$sync_on_changes silent=$silent DEBUG=$DE
                         previous_file="$files"
                 fi
         done
+	IFS=$OLD_IFS
 ENDSSH
 
 	## Need to add a trivial sleep time to give ssh time to log to local file
@@ -1855,6 +1854,32 @@ function Init
 	'slave-replica-tree-after'
 	'sync.success'
 	)
+
+        ## Set compression executable and extension
+	COMPRESSION_LEVEL=9
+        if type -p xz > /dev/null 2>&1
+        then
+                COMPRESSION_PROGRAM="| xz -$COMPRESSION_LEVEL"
+                COMPRESSION_EXTENSION=.xz
+        elif type -p lzma > /dev/null 2>&1
+        then
+                COMPRESSION_PROGRAM="| lzma -$COMPRESSION_LEVEL"
+                COMPRESSION_EXTENSION=.lzma
+        elif type -p pigz > /dev/null 2>&1
+        then
+                COMPRESSION_PROGRAM="| pigz -$COMPRESSION_LEVEL"
+                COMPRESSION_EXTENSION=.gz
+                COMPRESSION_OPTIONS=--rsyncable
+        elif type -p gzip > /dev/null 2>&1
+        then
+                COMPRESSION_PROGRAM="| gzip -$COMPRESSION_LEVEL"
+                COMPRESSION_EXTENSION=.gz
+                COMPRESSION_OPTIONS=--rsyncable
+        else
+		COMPRESSION_PROGRAM=
+                COMPRESSION_EXTENSION=
+        fi
+	ALERT_LOG_FILE="$ALERT_LOG_FILE$COMPRESSION_EXTENSION"
 }
 
 function InitLocalOSSettings
