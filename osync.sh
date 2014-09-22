@@ -4,7 +4,7 @@ PROGRAM="Osync" # Rsync based two way sync engine with fault tolerance
 AUTHOR="(L) 2013-2014 by Orsiris \"Ozy\" de Jong"
 CONTACT="http://www.netpower.fr/osync - ozy@netpower.fr"
 PROGRAM_VERSION=0.99RC3+
-PROGRAM_BUILD=1209201402
+PROGRAM_BUILD=2209201401
 
 ## type doesn't work on platforms other than linux (bash). If if doesn't work, always assume output is not a zero exitcode
 if ! type -p "$BASH" > /dev/null
@@ -204,7 +204,7 @@ function SendAlert
 		Log "Current task is a quicksync task. Will not send any alert."
 		return 0
 	fi
-        eval "cat $LOG_FILE $COMPRESSION_PROGRAM > $ALERT_LOG_PATH"
+        eval "cat $LOG_FILE $COMPRESSION_PROGRAM > $ALERT_LOG_FILE"
         MAIL_ALERT_MSG=$MAIL_ALERT_MSG$'\n\n'$(tail -n 25 "$LOG_FILE")
 	if type -p mutt > /dev/null 2>&1
         then
