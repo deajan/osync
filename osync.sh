@@ -750,15 +750,18 @@ function RsyncExcludePattern
 
 function RsyncExcludeFrom
 {
-	if [ ! $RSYNC_EXCLUDE_FROM == "" ] && [ -e $RSYNC_EXCLUDE_FROM ]
+	if [ ! $RSYNC_EXCLUDE_FROM == "" ]
 	then
 		## Check if the exclude list has a full path, and if not, add the config file path if there is one
 		if [ "$(basename $RSYNC_EXCLUDE_FROM)" == "$RSYNC_EXCLUDE_FROM" ]
 		then
-			$RSYNC_EXCLUDE_FROM=$(dirname $cfgfile)/$RSYNC_EXCLUDE_FROM
+			RSYNC_EXCLUDE_FROM=$(dirname $ConfigFile)/$RSYNC_EXCLUDE_FROM
 		fi
 
-		RSYNC_EXCLUDE="$RSYNC_EXCLUDE --exclude-from=\"$RSYNC_EXCLUDE_FROM\""
+		if [ -e $RSYNC_EXCLUDE_FROM ]
+		then
+			RSYNC_EXCLUDE="$RSYNC_EXCLUDE --exclude-from=\"$RSYNC_EXCLUDE_FROM\""
+		fi
 	fi
 }
 
