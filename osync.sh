@@ -387,7 +387,7 @@ function WaitForTaskCompletion
 {
         soft_alert=0
         SECONDS_BEGIN=$SECONDS
-	while eval '$PROCESS_TEST_CMD' > /dev/null
+	while eval "$PROCESS_TEST_CMD" > /dev/null
         do
                 Spinner
                 EXEC_TIME=$(($SECONDS - $SECONDS_BEGIN))
@@ -431,7 +431,7 @@ function WaitForTaskCompletion
 function WaitForCompletion
 {
         soft_alert=0
-	while eval '$PROCESS_TEST_CMD' > /dev/null
+	while eval "$PROCESS_TEST_CMD" > /dev/null
         do
                 Spinner
                 if [ $((($SECONDS + 1) % $KEEP_LOGGING)) -eq 0 ]
