@@ -20,12 +20,21 @@ KNOWN ISSUES
 UNDER WORK
 ----------
 
-- Check for big files never get synced if max exec time
+- Check for big files never being synced if max execution time is reached (--partial and --partial-dir ?)
 - sync test automation
+- See if find command could use -delete instead of exec rm (must check compat for BSD and MacOS)
+
 
 RECENT CHANGES
 --------------
 
+- Moved msys specific code to Init(Local|Remote)OSSettings
+- Added a patch by igngvs to fix some issues with Rsync Exclude files
+- Added a patch by Gary Clark to fix some issues with remote deletion
+- Minor fixes from obackup codebase
+- Added compression method fallback (xz, lzma, pigz and gzip)
+- Removed unused code
+- Fixed remote OS detection when a banner is used on SSH
 - Added a routine that reinjects failed deletions for next run in order to prevent bringing back when deletion failed with permission issues
 - Added treat dir symlink as dir parameter
 - 27 May 2014: Osync 0.99 RC3

@@ -4,7 +4,7 @@ PROGRAM="Osync" # Rsync based two way sync engine with fault tolerance
 AUTHOR="(L) 2013-2014 by Orsiris \"Ozy\" de Jong"
 CONTACT="http://www.netpower.fr/osync - ozy@netpower.fr"
 PROGRAM_VERSION=0.99RC3+
-PROGRAM_BUILD=2209201401
+PROGRAM_BUILD=2311201401
 
 ## type doesn't work on platforms other than linux (bash). If if doesn't work, always assume output is not a zero exitcode
 if ! type -p "$BASH" > /dev/null
@@ -387,12 +387,6 @@ function WaitForTaskCompletion
 {
         soft_alert=0
         SECONDS_BEGIN=$SECONDS
-	if [ "$LOCAL_OS" == "msys" ]
-	then
-		PROCESS_TEST_CMD="ps -a | awk '{\$1=\$1}\$1' | awk '{print \$1}' | grep $1"
-	else
-		PROCESS_TEST_CMD="ps -p$1"
-	fi
 	while eval $PROCESS_TEST_CMD > /dev/null
         do
                 Spinner
@@ -437,12 +431,6 @@ function WaitForTaskCompletion
 function WaitForCompletion
 {
         soft_alert=0
-	if [ "$LOCAL_OS" == "msys" ]
-	then
-		PROCESS_TEST="ps -a | awk '{\$1=\$1}\$1' | awk '{print \$1}' | grep $1"
-	else
-		PROCESS_TEST="ps -p$1"
-	fi
 	while eval $PROCESS_TEST > /dev/null
         do
                 Spinner
@@ -575,7 +563,7 @@ function CheckConnectivityRemoteHost
 {
         if [ "$REMOTE_HOST_PING" != "no" ] && [ "$REMOTE_SYNC" != "no" ]
         then
-		$PING_CMD $REMOTE_HOST > /dev/null 2>&1
+		eval "$PING_CMD $REMOTE_HOST > /dev/null 2>&1"
                 if [ $? != 0 ]
                 then
                         LogError "Cannot ping $REMOTE_HOST"
@@ -593,7 +581,7 @@ function CheckConnectivity3rdPartyHosts
                 IFS=$' \t\n'
                 for i in $REMOTE_3RD_PARTY_HOSTS
                 do
-			$PING_CMD $i > /dev/null 2>&1
+			eval "$PING_CMD $i > /dev/null 2>&1"
                         if [ $? != 0 ]
                         then
                                 Log "Cannot ping 3rd party host $i"
@@ -750,16 +738,19 @@ function RsyncExcludePattern
 
 function RsyncExcludeFrom
 {
-	if [ ! $RSYNC_EXCLUDE_FROM == "" ] && [ -e $RSYNC_EXCLUDE_FROM ]
-	then
-		## Check if the exclude list has a full path, and if not, add the config file path if there is one
-		if [ "$(basename $RSYNC_EXCLUDE_FROM)" == "$RSYNC_EXCLUDE_FROM" ]
-		then
-			$RSYNC_EXCLUDE_FROM=$(dirname $cfgfile)/$RSYNC_EXCLUDE_FROM
-		fi
+        if [ ! $RSYNC_EXCLUDE_FROM == "" ]
+        then
+                ## Check if the exclude list has a full path, and if not, add the config file path if there is one
+                if [ "$(basename $RSYNC_EXCLUDE_FROM)" == "$RSYNC_EXCLUDE_FROM" ]
+                then
+                        RSYNC_EXCLUDE_FROM=$(dirname $ConfigFile)/$RSYNC_EXCLUDE_FROM
+                fi
 
-		RSYNC_EXCLUDE="$RSYNC_EXCLUDE --exclude-from=\"$RSYNC_EXCLUDE_FROM\""
-	fi
+                if [ -e $RSYNC_EXCLUDE_FROM ]
+                then
+                        RSYNC_EXCLUDE="$RSYNC_EXCLUDE --exclude-from=\"$RSYNC_EXCLUDE_FROM\""
+                fi
+        fi
 }
 
 function WriteLockFiles
@@ -1884,12 +1875,19 @@ function Init
 
 function InitLocalOSSettings
 {
-	## If running Msys, find command of windows is used instead of msys one
+	## If running under Msys, some commands don't run the same way
+	## Using mingw version of find instead of windows one
+	## Getting running processes is quite different
+	## Ping command isn't the same
 	if [ "$LOCAL_OS" == "msys" ]
 	then
 		FIND_CMD=$(dirname $BASH)/find
+		PROCESS_TEST_CMD="ps -a | awk '{\$1=\$1}\$1' | awk '{print \$1}' | grep $1"
+		PING_CMD="ping -n 2"
 	else
 		FIND_CMD=find
+		PROCESS_TEST_CMD="ps -p$1"
+		PING_CMD="ping -c 2 -i .2"
 	fi
 
 	## Stat command has different syntax on Linux and FreeBSD/MacOSX
@@ -1898,14 +1896,6 @@ function InitLocalOSSettings
 		STAT_CMD="stat -f \"%Sm\""
 	else
 		STAT_CMD="stat --format %y"
-	fi
-
-	## Ping command has different syntax on Msys and others
-	if [ "$LOCAL_OS" == "msys" ]
-	then
-		PING_CMD="ping -n 2"
-	else
-		PING_CMD="ping -c 2 -i .2"
 	fi
 }
 
