@@ -125,13 +125,13 @@ do
                 verbose=1
                 opts=$opts" --verbose"
 		;;
-		--path)
-		CONFIG_FILE_PATH=${i##*=}
+		--path=*)
+		CONF_FILE_PATH=${i##*=}
 		;;
-		--max-retries)
+		--max-retries=*)
 		MAX_RETRIES=${i##*=}
 		;;
-		--max-exec-time)
+		--max-exec-time=*)
 		MAX_EXECUTION_TIME=${i##*}
 		;;
 		--help|-h)
