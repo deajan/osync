@@ -9,13 +9,13 @@ PROGRAM_BUILD=2411201401
 ## If an instance fails, run it again if time permits
 
 ## Configuration file path. The path where all the osync conf files are, usually /etc/osync
-CONF_FILE_PATH=/etc/osync
+CONF_FILE_PATH=.
 
 ## If maximum execution time is not reached, failed instances will be rerun. Max exec time is in seconds. Example is set to 10 hours.
 MAX_EXECUTION_TIME=36000
 
 ## Max retries specifies the number of reruns an instance may get
-MAX_RETRIES=36000
+MAX_RETRIES=3
 
 
 ## Osync executable full path can be set here if it cannot be found on the system
@@ -59,15 +59,15 @@ function Batch
 		else
 			RUN=$RUN" $i"
 		fi
-	done 
+	done
 
 	RETRIES=0
 	while [ $MAX_EXECUTION_TIME -gt $SECONDS ] && [ "$RUN" != "" ] && [ $MAX_RETRIES -gt $RETRIES ]
 	do
-		Log "Osync instances will be run for: $RUN" 
+		Log "Osync instances will be run for: $RUN"
 		for i in $RUN
 		do
-			$OSYNC_EXECUTABLE $i --silent
+			$OSYNC_EXECUTABLE $i $opts
 			if [ $? != 0 ]
 			then
 				Log "Run instance $(basename $i) failed"
@@ -77,7 +77,8 @@ function Batch
 				else
 					RUN_AGAIN=$RUN_AGAIN" $i"
 				fi
-			else
+			elif [ $verbose -eq 1 ]
+			then
 				Log "Run instance $(basename $i) succeed."
 			fi
 		done
@@ -87,16 +88,58 @@ function Batch
 	done
 }
 
+function Usage
+{
+        echo "$PROGRAM $PROGRAM_BUILD"
+        echo $AUTHOR
+        echo $CONTACT
+        echo ""
+        echo "Batch script to sequentially run osync instances and rerun failed ones."
+        echo "Usage: osync-batch.sh [OPTIONS]"
+        echo ""
+        echo "[OPTIONS]"
+	echo "--path=/path/to/conf      Path to osync conf files, defaults to /etc/osync"
+	echo "--max-retries=X           Number of retries max for failed instances, defaults to 3"
+	echo "--max-exec-time=X         Retry failed instances only if max execution time not reached (defaults to 36000 seconds)"
+        echo "--dry                     Will run osync without actually doing anything; just testing"
+        echo "--silent                  Will run osync without any output to stdout, used for cron jobs"
+        echo "--verbose                 Increases output"
+}
+
 silent=0
+dry=0
+verbose=0
+opts=""
 for i in "$@"
 do
         case $i in
                 --silent)
                 silent=1
+		opts=$opts" --silent"
                 ;;
+                --dry)
+                dry=1
+		opts=$opts" --dry"
+                ;;
+                --verbose)
+                verbose=1
+                opts=$opts" --verbose"
+		;;
+		--path)
+		CONFIG_FILE_PATH=${i##*=}
+		;;
+		--max-retries)
+		MAX_RETRIES=${i##*=}
+		;;
+		--max-exec-time)
+		MAX_EXECUTION_TIME=${i##*}
+		;;
+		--help|-h)
+		Usage
+		exit 0
+		;;
 	esac
 done
 
 Log "$(date) Osync batch run"
 Batch
-
