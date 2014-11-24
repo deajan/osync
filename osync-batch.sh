@@ -132,7 +132,7 @@ do
 		MAX_RETRIES=${i##*=}
 		;;
 		--max-exec-time=*)
-		MAX_EXECUTION_TIME=${i##*}
+		MAX_EXECUTION_TIME=${i##*=}
 		;;
 		--help|-h)
 		Usage
