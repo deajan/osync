@@ -4,7 +4,7 @@ PROGRAM="Osync" # Rsync based two way sync engine with fault tolerance
 AUTHOR="(L) 2013-2014 by Orsiris \"Ozy\" de Jong"
 CONTACT="http://www.netpower.fr/osync - ozy@netpower.fr"
 PROGRAM_VERSION=0.99RC3+
-PROGRAM_BUILD=2311201401
+PROGRAM_BUILD=2411201402
 
 ## type doesn't work on platforms other than linux (bash). If if doesn't work, always assume output is not a zero exitcode
 if ! type -p "$BASH" > /dev/null
@@ -387,7 +387,7 @@ function WaitForTaskCompletion
 {
         soft_alert=0
         SECONDS_BEGIN=$SECONDS
-	while eval $PROCESS_TEST_CMD > /dev/null
+	while eval '$PROCESS_TEST_CMD' > /dev/null
         do
                 Spinner
                 EXEC_TIME=$(($SECONDS - $SECONDS_BEGIN))
@@ -431,7 +431,7 @@ function WaitForTaskCompletion
 function WaitForCompletion
 {
         soft_alert=0
-	while eval $PROCESS_TEST > /dev/null
+	while eval '$PROCESS_TEST_CMD' > /dev/null
         do
                 Spinner
                 if [ $((($SECONDS + 1) % $KEEP_LOGGING)) -eq 0 ]
@@ -1704,6 +1704,9 @@ function Init
 	SLAVE_BACKUP_DIR="$OSYNC_DIR/backups"
 	SLAVE_DELETE_DIR="$OSYNC_DIR/deleted"
 
+	## Partial downloads dirs
+	PARTIAL_DIR="$OSYNC_DIR/partial"
+
 	## SSH compression
 	if [ "$SSH_COMPRESSION" != "no" ]
 	then
@@ -1797,6 +1800,11 @@ function Init
 		SYNC_OPTS=$SYNC_OPTS" --stats"
 	fi
 
+	if [ "$PARTIAL" == "yes" ]
+	then
+		SYNC_OPTS=$SYNC_OPTS" --partial --partial-dir=\"$PARTIAL_DIR\""
+	fi
+
 	## Conflict options
 	if [ "$CONFLICT_BACKUP" != "no" ]
 	then
@@ -1882,11 +1890,12 @@ function InitLocalOSSettings
 	if [ "$LOCAL_OS" == "msys" ]
 	then
 		FIND_CMD=$(dirname $BASH)/find
-		PROCESS_TEST_CMD="ps -a | awk '{\$1=\$1}\$1' | awk '{print \$1}' | grep $1"
+		## TODO: The following command needs to be checked on msys. Does the $1 variable substitution work ?
+		PROCESS_TEST_CMD='ps -a | awk "{\$1=\$1}\$1" | awk "{print \$1}" | grep $1'
 		PING_CMD="ping -n 2"
 	else
 		FIND_CMD=find
-		PROCESS_TEST_CMD="ps -p$1"
+		PROCESS_TEST_CMD='ps -p$1'
 		PING_CMD="ping -c 2 -i .2"
 	fi
 
@@ -1938,6 +1947,7 @@ function Usage
 	echo "--silent          Will run osync without any output to stdout, used for cron jobs"
 	echo "--verbose         Increases output"
 	echo "--stats           Adds rsync transfer statistics to verbose output"
+	echo "--partial         Allows rsync to keep partial downloads that can be resumed later"
 	echo "--no-maxtime      Disables any soft and hard execution time checks"
 	echo "--force-unlock    Will override any existing active or dead locks on master and slave replica"
 	echo "--on-changes      Will launch a sync task after a short wait period if there is some file activity on master replica. You should try daemon mode instead"
@@ -1991,6 +2001,7 @@ dryrun=0
 silent=0
 verbose=0
 stats=0
+PARTIAL=0
 force_unlock=0
 no_maxtime=0
 # Alert flags
@@ -2026,6 +2037,10 @@ do
 		--stats)
 		stats=1
 		opts=$opts" --stats"
+		;;
+		--partial)
+		PARTIAL="yes"
+		opts=$opts" --partial"
 		;;
 		--force-unlock)
 		force_unlock=1
