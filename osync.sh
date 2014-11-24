@@ -4,7 +4,7 @@ PROGRAM="Osync" # Rsync based two way sync engine with fault tolerance
 AUTHOR="(L) 2013-2014 by Orsiris \"Ozy\" de Jong"
 CONTACT="http://www.netpower.fr/osync - ozy@netpower.fr"
 PROGRAM_VERSION=0.99RC3+
-PROGRAM_BUILD=2411201402
+PROGRAM_BUILD=2411201403
 
 ## type doesn't work on platforms other than linux (bash). If if doesn't work, always assume output is not a zero exitcode
 if ! type -p "$BASH" > /dev/null
@@ -1364,7 +1364,7 @@ function Sync
 		fi
 		resume_sync="resumed"
  	fi
-	if [ "$resume_sync" == "resumed" ] || [ "$resume_sync" == "${SYNC_ACTION[3]}.success" ] || [ "$resume_sync" == "${SYNC_ACTION[4]}.fail" ] || [ "$resume_sync" == "${SYNC_ACTION[5]}.fail" ]
+	if [ "$resume_sync" == "resumed" ] || [ "$resume_sync" == "${SYNC_ACTION[3]}.success" ] || [ "$resume_sync" == "${SYNC_ACTION[4]}.fail" ] || [ "$resume_sync" == "${SYNC_ACTION[5]}.fail" ] || [ "$resume_sync" == "${SYNC_ACTION[4]}.success" ] || [ "$resume_sync" == "${SYNC_ACTION[5]}.success" ]
 	then
 		if [ "$CONFLICT_PREVALANCE" != "master" ]
 		then
@@ -1705,7 +1705,7 @@ function Init
 	SLAVE_DELETE_DIR="$OSYNC_DIR/deleted"
 
 	## Partial downloads dirs
-	PARTIAL_DIR="$OSYNC_DIR/partial"
+	PARTIAL_DIR=$OSYNC_DIR"_partial"
 
 	## SSH compression
 	if [ "$SSH_COMPRESSION" != "no" ]
@@ -1947,7 +1947,7 @@ function Usage
 	echo "--silent          Will run osync without any output to stdout, used for cron jobs"
 	echo "--verbose         Increases output"
 	echo "--stats           Adds rsync transfer statistics to verbose output"
-	echo "--partial         Allows rsync to keep partial downloads that can be resumed later"
+	echo "--partial         Allows rsync to keep partial downloads that can be resumed later (experimental)"
 	echo "--no-maxtime      Disables any soft and hard execution time checks"
 	echo "--force-unlock    Will override any existing active or dead locks on master and slave replica"
 	echo "--on-changes      Will launch a sync task after a short wait period if there is some file activity on master replica. You should try daemon mode instead"

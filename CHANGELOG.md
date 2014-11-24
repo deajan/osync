@@ -20,14 +20,17 @@ KNOWN ISSUES
 UNDER WORK
 ----------
 
-- Check for big files never being synced if max execution time is reached (--partial and --partial-dir ?)
 - sync test automation
 - See if find command could use -delete instead of exec rm (must check compat for BSD and MacOS)
-
+- Partial download is still experimental and needs more testing. Also, need to test if .osync_workdir_partial directory is excluded from file propagations
 
 RECENT CHANGES
 --------------
 
+- Added a sequential run batch script
+- Fixed an issue where a failed task never gets resumed after a successfull file replication phase
+- Added experimental partial downloads support for rsync so big files can be resumed on slow links
+- Added the ability to keep partial downloads that can be resumed on next run (usefull for big files on slow links that reach max execution time)
 - Moved msys specific code to Init(Local|Remote)OSSettings
 - Added a patch by igngvs to fix some issues with Rsync Exclude files
 - Added a patch by Gary Clark to fix some issues with remote deletion
