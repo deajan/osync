@@ -80,6 +80,19 @@ Once you're confident about your fist runs, you may add osync as cron task like 
 
 	*/5 * * * * root /usr/local/bin/osync.sh /path/to/your.conf --silent
 
+Batch mode
+----------
+
+You may want to sequentially run multiple sync sets between the same servers. In that case, osync-batch.sh is a nice tool that will run every osync conf file, and, if a task fails,
+run it again if there's still some time left.
+The following example will run all .conf files found in /etc/osync, and retry 3 times every configuration that fails, if the whole sequential run took less than 2 hours.
+
+	$ ./osync-batch.sh --path=/etc/osync --max-retries=3 --max-exec-time=7200
+
+Having multiple conf files can then be run in a single cron command like
+
+	00 00 * * * root /usr/local/bin/osync-batch.sh --path=/etc/osync --silent
+
 Daemon mode
 -----------
 Additionnaly, you may run osync in monitor mode, which means it will perform a sync upon file operations on master replica.
