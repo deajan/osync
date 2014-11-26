@@ -3,8 +3,8 @@
 PROGRAM="Osync" # Rsync based two way sync engine with fault tolerance
 AUTHOR="(L) 2013-2014 by Orsiris \"Ozy\" de Jong"
 CONTACT="http://www.netpower.fr/osync - ozy@netpower.fr"
-PROGRAM_VERSION=0.99RC3+
-PROGRAM_BUILD=2411201403
+PROGRAM_VERSION=0.99RC4
+PROGRAM_BUILD=2611201401
 
 ## type doesn't work on platforms other than linux (bash). If if doesn't work, always assume output is not a zero exitcode
 if ! type -p "$BASH" > /dev/null
@@ -1803,6 +1803,7 @@ function Init
 	if [ "$PARTIAL" == "yes" ]
 	then
 		SYNC_OPTS=$SYNC_OPTS" --partial --partial-dir=\"$PARTIAL_DIR\""
+		RSYNC_EXCLUDE="$RSYNC_EXCLUDE --exclude=\"$PARTIAL_DIR\""
 	fi
 
 	## Conflict options
