@@ -4,7 +4,7 @@ PROGRAM="Osync" # Rsync based two way sync engine with fault tolerance
 AUTHOR="(L) 2013-2014 by Orsiris \"Ozy\" de Jong"
 CONTACT="http://www.netpower.fr/osync - ozy@netpower.fr"
 PROGRAM_VERSION=0.99RC4
-PROGRAM_BUILD=2611201401
+PROGRAM_BUILD=2711201401
 
 ## type doesn't work on platforms other than linux (bash). If if doesn't work, always assume output is not a zero exitcode
 if ! type -p "$BASH" > /dev/null
@@ -204,7 +204,7 @@ function SendAlert
 		Log "Current task is a quicksync task. Will not send any alert."
 		return 0
 	fi
-        eval "cat $LOG_FILE $COMPRESSION_PROGRAM > $ALERT_LOG_FILE"
+	eval "cat \"$LOG_FILE\" $COMPRESSION_PROGRAM > $ALERT_LOG_FILE"
         MAIL_ALERT_MSG=$MAIL_ALERT_MSG$'\n\n'$(tail -n 25 "$LOG_FILE")
 	if type -p mutt > /dev/null 2>&1
         then
@@ -2000,7 +2000,12 @@ function SyncOnChanges
 # Comand line argument flags
 dryrun=0
 silent=0
-verbose=0
+if [ "$DEBUG" == "yes" ]
+then
+        verbose=1
+else
+        verbose=0
+fi
 stats=0
 PARTIAL=0
 force_unlock=0
