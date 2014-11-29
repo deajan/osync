@@ -74,6 +74,7 @@ If everything went well, you may run the actual configuration with one of the fo
 	$ ./osync.sh /path/to/your.conf --no-maxtime
 
 Verbose option will display which files and attrs are actually synchronized.
+You may mix "--silent" and "--verbose" parameters to output verbose input only in the log files.
 No-Maxtime option will disable execution time checks, which is usefull for big initial sync tasks that might take long time. Next runs should then only propagate changes and take much less time.
 
 Once you're confident about your fist runs, you may add osync as cron task like the following in /etc/crontab which would run osync every 5 minutes:

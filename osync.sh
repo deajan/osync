@@ -4,7 +4,7 @@ PROGRAM="Osync" # Rsync based two way sync engine with fault tolerance
 AUTHOR="(L) 2013-2014 by Orsiris \"Ozy\" de Jong"
 CONTACT="http://www.netpower.fr/osync - ozy@netpower.fr"
 PROGRAM_VERSION=0.99RC4
-PROGRAM_BUILD=2711201401
+PROGRAM_BUILD=2811201401
 
 ## type doesn't work on platforms other than linux (bash). If if doesn't work, always assume output is not a zero exitcode
 if ! type -p "$BASH" > /dev/null
@@ -1645,18 +1645,6 @@ function Init
                 trap 'TrapError ${LINENO} $?' ERR
         fi
 
-        if [ "$LOGFILE" == "" ]
-        then
-                if [ -w /var/log ]
-		then
-			LOG_FILE=/var/log/osync_$SYNC_ID.log
-		else
-			LOG_FILE=./osync_$SYNC_ID.log
-		fi
-        else
-                LOG_FILE="$LOGFILE"
-        fi
-
         MAIL_ALERT_MSG="Warning: Execution of osync instance $OSYNC_ID (pid $SCRIPT_PID) as $LOCAL_USER@$LOCAL_HOST produced errors on $(date)."
 
 	## Test if slave dir is a ssh uri, and if yes, break it down it its values
@@ -2091,8 +2079,6 @@ done
 # Remove leading space if there is one
 opts="${opts# *}"
 
-GetLocalOS
-InitLocalOSSettings
 CheckEnvironment
 if [ $? == 0 ]
 then
@@ -2115,6 +2101,21 @@ then
 		ConfigFile="$1"
 		LoadConfigFile "$ConfigFile"
 	fi
+
+        if [ "$LOGFILE" == "" ]
+        then
+                if [ -w /var/log ]
+		then
+			LOG_FILE=/var/log/osync_$SYNC_ID.log
+		else
+			LOG_FILE=./osync_$SYNC_ID.log
+		fi
+        else
+                LOG_FILE="$LOGFILE"
+        fi
+
+	GetLocalOS
+	InitLocalOSSettings
 	Init
 	GetRemoteOS
 	InitRemoteOSSettings

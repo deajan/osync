@@ -23,10 +23,12 @@ UNDER WORK
 - sync test automation
 - See if find command could use -delete instead of exec rm (must check compat for BSD and MacOS)
 - Partial download is still experimental and needs more testing.
+- Check the conflct backup and soft delete cleanup again
 
 RECENT CHANGES
 --------------
 
+- Prevent creation of a sync-id less log file when DEBUG is set
 - Added a sequential run batch script that can rerun failed batches
 - Fixed an issue where a failed task never gets resumed after a successfull file replication phase
 - Added experimental partial downloads support for rsync so big files can be resumed on slow links
