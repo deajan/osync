@@ -329,7 +329,7 @@ function GetRemoteOS
 	then
         	CheckConnectivity3rdPartyHosts
         	CheckConnectivityRemoteHost
-		eval "$SSH_CMD \"uname -spio\" > $RUN_DIR/osync_remote_os_$SCRIPT_PID 2>&1"
+		eval "$SSH_CMD \"uname -spio\" > $RUN_DIR/osync_remote_os_$SCRIPT_PID 2>&1" &
 		child_pid=$!
         	WaitForTaskCompletion $child_pid 120 240
         	retval=$?
