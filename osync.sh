@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
 
 PROGRAM="Osync" # Rsync based two way sync engine with fault tolerance
-AUTHOR="(L) 2013-2014 by Orsiris \"Ozy\" de Jong"
+AUTHOR="(L) 2013-2015 by Orsiris \"Ozy\" de Jong"
 CONTACT="http://www.netpower.fr/osync - ozy@netpower.fr"
 PROGRAM_VERSION=0.99RC4
-PROGRAM_BUILD=2811201401
+PROGRAM_BUILD=1601201501
 
 ## type doesn't work on platforms other than linux (bash). If if doesn't work, always assume output is not a zero exitcode
 if ! type -p "$BASH" > /dev/null
@@ -335,13 +335,13 @@ function GetRemoteOS
         	retval=$?
 		if [ $retval != 0 ]
                 then
-                	eval "$SSH_CMD \"uname -v\" > $RUN_DIR/osync_remote_os_$SCRIPT_PID 2>&1"
+                	eval "$SSH_CMD \"uname -v\" > $RUN_DIR/osync_remote_os_$SCRIPT_PID 2>&1" &
 			child_pid=$!
         		WaitForTaskCompletion $child_pid 120 240
         		retval=$?
 			if [ $retval != 0 ]
                 	then
-                		eval "$SSH_CMD \"uname\" > $RUN_DIR/osync_remote_os_$SCRIPT_PID 2>&1"
+                		eval "$SSH_CMD \"uname\" > $RUN_DIR/osync_remote_os_$SCRIPT_PID 2>&1" &
 				child_pid=$!
         			WaitForTaskCompletion $child_pid 120 240
         			retval=$?
@@ -1508,10 +1508,10 @@ function SoftDelete
 			if [ $dryrun -eq 1 ]
 			then
 				Log "Listing backups older than $CONFLICT_BACKUP_DAYS days on slave replica. Won't remove anything."
-				eval "$SSH_CMD \"if [ -w \\\"$SLAVE_SYNC_DIR$SLAVE_BACKUP_DIR\\\" ]; then $COMMAND_SUDO $REMOTE_FIND_CMD \\\"$SLAVE_SYNC_DIR$SLAVE_BACKUP_DIR/\\\" -ctime +$CONFLICT_BACKUP_DAYS; fi\""
+				eval "$SSH_CMD \"if [ -w \\\"$SLAVE_SYNC_DIR$SLAVE_BACKUP_DIR\\\" ]; then $COMMAND_SUDO $REMOTE_FIND_CMD \\\"$SLAVE_SYNC_DIR$SLAVE_BACKUP_DIR/\\\" -ctime +$CONFLICT_BACKUP_DAYS; fi\"" &
 			else
 				Log "Removing backups older than $CONFLICT_BACKUP_DAYS days on remote slave replica."
-				eval "$SSH_CMD \"if [ -w \\\"$SLAVE_SYNC_DIR$SLAVE_BACKUP_DIR\\\" ]; then $COMMAND_SUDO $REMOTE_FIND_CMD \\\"$SLAVE_SYNC_DIR$SLAVE_BACKUP_DIR/\\\" -ctime +$CONFLICT_BACKUP_DAYS -exec rm -rf '{}' \;; fi\""
+				eval "$SSH_CMD \"if [ -w \\\"$SLAVE_SYNC_DIR$SLAVE_BACKUP_DIR\\\" ]; then $COMMAND_SUDO $REMOTE_FIND_CMD \\\"$SLAVE_SYNC_DIR$SLAVE_BACKUP_DIR/\\\" -ctime +$CONFLICT_BACKUP_DAYS -exec rm -rf '{}' \;; fi\"" &
 			fi
 			child_pid=$!
                         WaitForCompletion $child_pid $SOFT_MAX_EXEC_TIME 0
@@ -1528,10 +1528,10 @@ function SoftDelete
 				if [ $dryrun -eq 1 ]
 				then
 					Log "Listing backups older than $CONFLICT_BACKUP_DAYS days on slave replica. Won't remove anything."
-					$FIND_CMD "$SLAVE_SYNC_DIR$SLAVE_BACKUP_DIR/" -ctime +$CONFLICT_BACKUP_DAYS
+					$FIND_CMD "$SLAVE_SYNC_DIR$SLAVE_BACKUP_DIR/" -ctime +$CONFLICT_BACKUP_DAYS &
 				else
 					Log "Removing backups older than $CONFLICT_BACKUP_DAYS days on slave replica."
-					$FIND_CMD "$SLAVE_SYNC_DIR$SLAVE_BACKUP_DIR/" -ctime +$CONFLICT_BACKUP_DAYS -exec rm -rf '{}' \;
+					$FIND_CMD "$SLAVE_SYNC_DIR$SLAVE_BACKUP_DIR/" -ctime +$CONFLICT_BACKUP_DAYS -exec rm -rf '{}' \; &
 				fi
 				child_pid=$!
 	                        WaitForCompletion $child_pid $SOFT_MAX_EXEC_TIME 0
@@ -1556,10 +1556,10 @@ function SoftDelete
 			if [ $dryrun -eq 1 ]
 			then
 				Log "Listing soft deleted items older than $SOFT_DELETE_DAYS days on master replica. Won't remove anything."
-				$FIND_CMD "$MASTER_SYNC_DIR$MASTER_DELETE_DIR/" -ctime +$SOFT_DELETE_DAYS
+				$FIND_CMD "$MASTER_SYNC_DIR$MASTER_DELETE_DIR/" -ctime +$SOFT_DELETE_DAYS &
 			else
 				Log "Removing soft deleted items older than $SOFT_DELETE_DAYS days on master replica."
-				$FIND_CMD "$MASTER_SYNC_DIR$MASTER_DELETE_DIR/" -ctime +$SOFT_DELETE_DAYS -exec rm -rf '{}' \;
+				$FIND_CMD "$MASTER_SYNC_DIR$MASTER_DELETE_DIR/" -ctime +$SOFT_DELETE_DAYS -exec rm -rf '{}' \; &
 			fi
 			child_pid=$!
                         WaitForCompletion $child_pid $SOFT_MAX_EXEC_TIME 0
@@ -1582,10 +1582,10 @@ function SoftDelete
 			if [ $dryrun -eq 1 ]
 			then
 				Log "Listing soft deleted items older than $SOFT_DELETE_DAYS days on slave replica. Won't remove anything."
-				eval "$SSH_CMD \"if [ -w \\\"$SLAVE_SYNC_DIR$SLAVE_DELETE_DIR\\\" ]; then $COMMAND_SUDO $REMOTE_FIND_CMD \\\"$SLAVE_SYNC_DIR$SLAVE_DELETE_DIR/\\\" -ctime +$SOFT_DELETE_DAYS; fi\""
+				eval "$SSH_CMD \"if [ -w \\\"$SLAVE_SYNC_DIR$SLAVE_DELETE_DIR\\\" ]; then $COMMAND_SUDO $REMOTE_FIND_CMD \\\"$SLAVE_SYNC_DIR$SLAVE_DELETE_DIR/\\\" -ctime +$SOFT_DELETE_DAYS; fi\"" &
 			else
 				Log "Removing soft deleted items older than $SOFT_DELETE_DAYS days on remote slave replica."
-				eval "$SSH_CMD \"if [ -w \\\"$SLAVE_SYNC_DIR$SLAVE_DELETE_DIR\\\" ]; then $COMMAND_SUDO $REMOTE_FIND_CMD \\\"$SLAVE_SYNC_DIR$SLAVE_DELETE_DIR/\\\" -ctime +$SOFT_DELETE_DAYS -exec rm -rf '{}' \;; fi\""
+				eval "$SSH_CMD \"if [ -w \\\"$SLAVE_SYNC_DIR$SLAVE_DELETE_DIR\\\" ]; then $COMMAND_SUDO $REMOTE_FIND_CMD \\\"$SLAVE_SYNC_DIR$SLAVE_DELETE_DIR/\\\" -ctime +$SOFT_DELETE_DAYS -exec rm -rf '{}' \;; fi\"" &
 			fi
 			child_pid=$!
                         WaitForCompletion $child_pid $SOFT_MAX_EXEC_TIME 0
@@ -1603,10 +1603,10 @@ function SoftDelete
 				if [ $dryrun -eq 1 ]
 				then
 					Log "Listing soft deleted items older than $SOFT_DELETE_DAYS days on slave replica. Won't remove anything."
-					$FIND_CMD "$SLAVE_SYNC_DIR$SLAVE_DELETE_DIR/" -ctime +$SOFT_DELETE_DAYS
+					$FIND_CMD "$SLAVE_SYNC_DIR$SLAVE_DELETE_DIR/" -ctime +$SOFT_DELETE_DAYS &
 				else
 					Log "Removing soft deleted items older than $SOFT_DELETE_DAYS days on slave replica."
-					$FIND_CMD "$SLAVE_SYNC_DIR$SLAVE_DELETE_DIR/" -ctime +$SOFT_DELETE_DAYS -exec rm -rf '{}' \;
+					$FIND_CMD "$SLAVE_SYNC_DIR$SLAVE_DELETE_DIR/" -ctime +$SOFT_DELETE_DAYS -exec rm -rf '{}' \; &
 				fi
 				child_pid=$!
                        		WaitForCompletion $child_pid $SOFT_MAX_EXEC_TIME 0

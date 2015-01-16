@@ -28,6 +28,7 @@ UNDER WORK
 RECENT CHANGES
 --------------
 
+- Fixed some missing child pids for time control to work
 - Prevent creation of a sync-id less log file when DEBUG is set
 - Added a sequential run batch script that can rerun failed batches
 - Fixed an issue where a failed task never gets resumed after a successfull file replication phase
