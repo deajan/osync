@@ -233,7 +233,7 @@ function SendAlert
                 fi
 	elif type -p sendemail > /dev/null 2>&1
 	then
-		if [ "$SMTP_USER" != "" ] && "$SMTP_PASSWORD" != "" ]
+		if [ "$SMTP_USER" != "" ] && [ "$SMTP_PASSWORD" != "" ]
 		then
 			$SMTP_OPTIONS="-xu $SMTP_USER -xp $SMTP_PASSWORD"
 		else
