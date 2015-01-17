@@ -127,7 +127,7 @@ function TrapQuit
         	SendAlert
 		UnlockDirectories
 		CleanUp
-        	LogError "Osync finished with errros."
+        	LogError "Osync finished with errors."
 		exitcode=1
 	else
 		UnlockDirectories
