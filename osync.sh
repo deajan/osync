@@ -127,7 +127,7 @@ function TrapQuit
         	SendAlert
 		UnlockDirectories
 		CleanUp
-        	LogError "Osync finished with errros."
+        	LogError "Osync finished with errors."
 		exitcode=1
 	else
 		UnlockDirectories
@@ -233,7 +233,7 @@ function SendAlert
                 fi
 	elif type -p sendemail > /dev/null 2>&1
 	then
-		if [ "$SMTP_USER" != "" ] && "$SMTP_PASSWORD" != "" ]
+		if [ "$SMTP_USER" != "" ] && [ "$SMTP_PASSWORD" != "" ]
 		then
 			$SMTP_OPTIONS="-xu $SMTP_USER -xp $SMTP_PASSWORD"
 		else
