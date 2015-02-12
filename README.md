@@ -1,7 +1,8 @@
-osync 0.99RC3
+osync 0.99RC4
 =============
 
-A two way sync script with fault tolerance, resuming, deletion backup and conflict backups.
+A two way filesync script with fault tolerance, resuming, deletion backup and conflict backups.
+File synchronization is bidirectional, based on rsync, and can be run manually, by cron, or triggered via inotifytools (whenever a file changes on master, a file sync is triggered).
 
 ## About
 
@@ -24,9 +25,9 @@ Osync uses a master / slave sync schema. It can sync local to local or local to 
 Also, osync uses pidlocks to prevent multiple concurrent sync processes on/to the same master / slave replica. Be sure a sync process is finished before launching next one.
 You may launch concurrent sync processes on the same system but only for different master replicas.
 
-Currently, it has been tested on CentOS 5, CentOS 6, Debian 6.0.7, Linux Mint 14, 15 and 16, Ubuntu 12.04 and Ubuntu 12.10, and FreeBSD 8.3.
+Currently, it has been tested on CentOS 5.x, 6.x, 7.x, Debian 6.0.7, Linux Mint 14, 15 and 16, Ubuntu 12.04 and 12.10, and FreeBSD 8.3.
 Some users report MacOS X to work good, but some tests are still needed.
-Windows is supported via MSYS environment.
+Microsoft Windows is supported via MSYS environment.
 
 ## Installation
 
