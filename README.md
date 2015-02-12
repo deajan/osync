@@ -1,7 +1,7 @@
 osync 0.99RC4
 =============
 
-A two way filesync script with fault tolerance, resuming, deletion backup and conflict backups.
+A two way filesync script with fault tolerance, resuming, deletion backup and conflict backups running on linux and virtually any system supporting bash.
 File synchronization is bidirectional, based on rsync, and can be run manually, by cron, or triggered via inotifytools (whenever a file changes on master, a file sync is triggered).
 
 ## About

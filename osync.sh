@@ -722,6 +722,7 @@ function CheckMinimumSpace
 
 function RsyncExcludePattern
 {
+	set -f
         OLD_IFS=$IFS
         IFS=$PATH_SEPARATOR_CHAR
         for excludedir in $RSYNC_EXCLUDE_PATTERN
@@ -734,6 +735,7 @@ function RsyncExcludePattern
                 fi
         done
         IFS=$OLD_IFS
+	set +f
 }
 
 function RsyncExcludeFrom
