@@ -28,6 +28,8 @@ UNDER WORK
 RECENT CHANGES
 --------------
 
+- Fixed an issue with empty RSYNC_EXCLUDE_FILES
+- Lowered default compression level for email alerts (for low end systems
 - Prevent exclude pattern globbing before the pattern reaches the rsync cmd
 - Fixed some missing child pids for time control to work
 - Prevent creation of a sync-id less log file when DEBUG is set

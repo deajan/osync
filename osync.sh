@@ -4,7 +4,7 @@ PROGRAM="Osync" # Rsync based two way sync engine with fault tolerance
 AUTHOR="(L) 2013-2015 by Orsiris \"Ozy\" de Jong"
 CONTACT="http://www.netpower.fr/osync - ozy@netpower.fr"
 PROGRAM_VERSION=0.99RC4
-PROGRAM_BUILD=1202201501
+PROGRAM_BUILD=1802201501
 
 ## type doesn't work on platforms other than linux (bash). If if doesn't work, always assume output is not a zero exitcode
 if ! type -p "$BASH" > /dev/null
@@ -722,10 +722,11 @@ function CheckMinimumSpace
 
 function RsyncExcludePattern
 {
+	# Disable globbing so wildcards from exclusions don't get expanded
 	set -f
         OLD_IFS=$IFS
         IFS=$PATH_SEPARATOR_CHAR
-        for excludedir in $RSYNC_EXCLUDE_PATTERN
+        for excludedir in "$RSYNC_EXCLUDE_PATTERN"
         do
                 if [ "$RSYNC_EXCLUDE" == "" ]
                 then
@@ -740,7 +741,7 @@ function RsyncExcludePattern
 
 function RsyncExcludeFrom
 {
-        if [ ! $RSYNC_EXCLUDE_FROM == "" ]
+        if [ ! "$RSYNC_EXCLUDE_FROM" == "" ]
         then
                 ## Check if the exclude list has a full path, and if not, add the config file path if there is one
                 if [ "$(basename $RSYNC_EXCLUDE_FROM)" == "$RSYNC_EXCLUDE_FROM" ]
@@ -748,7 +749,7 @@ function RsyncExcludeFrom
                         RSYNC_EXCLUDE_FROM=$(dirname $ConfigFile)/$RSYNC_EXCLUDE_FROM
                 fi
 
-                if [ -e $RSYNC_EXCLUDE_FROM ]
+                if [ -e "$RSYNC_EXCLUDE_FROM" ]
                 then
                         RSYNC_EXCLUDE="$RSYNC_EXCLUDE --exclude-from=\"$RSYNC_EXCLUDE_FROM\""
                 fi
@@ -1846,7 +1847,7 @@ function Init
 	)
 
         ## Set compression executable and extension
-	COMPRESSION_LEVEL=9
+	COMPRESSION_LEVEL=3
         if type -p xz > /dev/null 2>&1
         then
                 COMPRESSION_PROGRAM="| xz -$COMPRESSION_LEVEL"
