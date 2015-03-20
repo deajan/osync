@@ -4,7 +4,7 @@ PROGRAM="Osync" # Rsync based two way sync engine with fault tolerance
 AUTHOR="(L) 2013-2015 by Orsiris \"Ozy\" de Jong"
 CONTACT="http://www.netpower.fr/osync - ozy@netpower.fr"
 PROGRAM_VERSION=0.99RC4
-PROGRAM_BUILD=1802201501
+PROGRAM_BUILD=2003201502
 
 ## type doesn't work on platforms other than linux (bash). If if doesn't work, always assume output is not a zero exitcode
 if ! type -p "$BASH" > /dev/null
@@ -19,7 +19,7 @@ then
 	DEBUG=no
 	SLEEP_TIME=1
 else
-	SLEEP_TIME=10
+	SLEEP_TIME=3
 fi
 
 SCRIPT_PID=$$
@@ -124,7 +124,12 @@ function TrapQuit
 {
 	if [ $error_alert -ne 0 ]
 	then
-        	SendAlert
+        	if [ "$DEBUG" != "yes" ]
+		then
+			SendAlert
+		else
+			Log "Debug mode, no alert mail will be sent."
+		fi
 		UnlockDirectories
 		CleanUp
         	LogError "Osync finished with errors."
@@ -724,18 +729,27 @@ function RsyncExcludePattern
 {
 	# Disable globbing so wildcards from exclusions don't get expanded
 	set -f
-        OLD_IFS=$IFS
-        IFS=$PATH_SEPARATOR_CHAR
-        for excludedir in "$RSYNC_EXCLUDE_PATTERN"
+	rest="$RSYNC_EXCLUDE_PATTERN"
+        while [ -n "$rest" ]
         do
+		# Take the string until first occurence until $PATH_SEPARATOR_CHAR
+                str=${rest%%;*}
+		# Handle the last case
+                if [ "$rest" = "${rest/$PATH_SEPARATOR_CHAR/}" ]
+		then
+			rest=
+		else
+			# Cut everything before the first occurence of $PATH_SEPARATOR_CHAR
+			rest=${rest#*$PATH_SEPARATOR_CHAR}
+		fi
+
                 if [ "$RSYNC_EXCLUDE" == "" ]
                 then
-                        RSYNC_EXCLUDE="--exclude=\"$excludedir\""
+                        RSYNC_EXCLUDE="--exclude=\"$str\""
                 else
-                        RSYNC_EXCLUDE="$RSYNC_EXCLUDE --exclude=\"$excludedir\""
+                        RSYNC_EXCLUDE="$RSYNC_EXCLUDE --exclude=\"$str\""
                 fi
         done
-        IFS=$OLD_IFS
 	set +f
 }
 
