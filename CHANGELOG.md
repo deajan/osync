@@ -22,12 +22,16 @@ UNDER WORK
 
 - sync test automation
 - See if find command could use -delete instead of exec rm (must check compat for BSD and MacOS)
+	- Portability needs find -print0 |xargs -0 -I {} command {}
 - Partial download is still experimental and needs more testing.
-- Check the conflct backup and soft delete cleanup again
 
 RECENT CHANGES
 --------------
- 
+
+- Replaced default script execution storage from /dev/shm to /tmp because some rootkit detection software doesn't like this
+- Fixed bogus error in DEBUG for quicksync mode where no max execution time is set
+- Reworked soft deletion code to handle a case where a top level directory gets deleted even if the files contained in it are not old enough (this obviously shouldn't happen on most FS)
+- Added logging for soft deletion code
 - Prevent debug mode to send alert emails
 - Fixed an infamous bug introduced with exclude pattern globbing preventing multiple exludes to be processed
 - Fixed an issue with empty RSYNC_EXCLUDE_FILES

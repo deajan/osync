@@ -3,8 +3,8 @@
 PROGRAM="Osync" # Rsync based two way sync engine with fault tolerance
 AUTHOR="(L) 2013-2015 by Orsiris \"Ozy\" de Jong"
 CONTACT="http://www.netpower.fr/osync - ozy@netpower.fr"
-PROGRAM_VERSION=0.99RC4
-PROGRAM_BUILD=2003201502
+PROGRAM_VERSION=1.00pre
+PROGRAM_BUILD=2603201504
 
 ## type doesn't work on platforms other than linux (bash). If if doesn't work, always assume output is not a zero exitcode
 if ! type -p "$BASH" > /dev/null
@@ -36,10 +36,7 @@ else
 fi
 
 ## Default directory where to store temporary run files
-if [ -w /dev/shm ]
-then
-	RUN_DIR=/dev/shm
-elif [ -w /tmp ]
+if [ -w /tmp ]
 then
 	RUN_DIR=/tmp
 elif [ -w /var/tmp ]
@@ -59,6 +56,12 @@ KEEP_LOGGING=1801
 export LC_ALL=C
 
 ALERT_LOG_FILE=$RUN_DIR/osync_lastlog
+
+function Dummy
+{
+	sleep 1
+	exit 0
+}
 
 function Log
 {
@@ -400,14 +403,14 @@ function WaitForTaskCompletion
                 then
                         Log "Current task still running."
                 fi
-                if [ $EXEC_TIME -gt $2 ]
+                if [ $EXEC_TIME -gt "$2" ]
                 then
-                        if [ $soft_alert -eq 0 ] && [ $2 != 0 ]
+                        if [ $soft_alert -eq 0 ] && [ "$2" != 0 ]
                         then
                                 LogError "Max soft execution time exceeded for task."
                                 soft_alert=1
                         fi
-                        if [ $EXEC_TIME -gt $3 ] && [ $3 != 0 ]
+                        if [ $EXEC_TIME -gt "$3" ] && [ "$3" != 0 ]
                         then
                                 LogError "Max hard execution time exceeded for task. Stopping task execution."
 				kill -s SIGTERM $1
@@ -431,7 +434,7 @@ function WaitForTaskCompletion
 	return $?
 }
 
-# Waits for pid $1 to complete. Will log an alert if $2 seconds passed since script start unless $2 equals 0. 
+# Waits for pid $1 to complete. Will log an alert if $2 seconds passed since script start unless $2 equals 0.
 # Will stop task and log alert if $3 seconds passed since script start unless $3 equals 0.
 function WaitForCompletion
 {
@@ -443,14 +446,14 @@ function WaitForCompletion
                 then
                         Log "Current task still running."
                 fi
-                if [ $SECONDS -gt $2 ]
+                if [ $SECONDS -gt "$2" ]
                 then
-                        if [ $soft_alert -eq 0 ] && [ $2 != 0 ]
+                        if [ $soft_alert -eq 0 ] && [ "$2" != 0 ]
                         then
                                 LogError "Max soft execution time exceeded for script."
                                 soft_alert=1
                         fi
-                        if [ $SECONDS -gt $3 ] && [ $3 != 0 ]
+                        if [ $SECONDS -gt "$3" ] && [ "$3" != 0 ]
                         then
                                 LogError "Max hard execution time exceeded for script. Stopping current task execution."
                                 kill -s SIGTERM $1
@@ -1494,18 +1497,26 @@ function SoftDelete
 			if [ $dryrun -eq 1 ]
 			then
 				Log "Listing backups older than $CONFLICT_BACKUP_DAYS days on master replica. Won't remove anything."
-				if [ $verbose -eq 1 ]
-				then
-					$FIND_CMD "$MASTER_SYNC_DIR$MASTER_BACKUP_DIR/" -ctime +$CONFLICT_BACKUP_DAYS &
-				else
-					$FIND_CMD "$MASTER_SYNC_DIR$MASTER_BACKUP_DIR/" -ctime +$CONFLICT_BACKUP_DAYS > /dev/null &
-				fi
 			else
 				Log "Removing backups older than $CONFLICT_BACKUP_DAYS days on master replica."
-				$FIND_CMD "$MASTER_SYNC_DIR$MASTER_BACKUP_DIR/" -ctime +$CONFLICT_BACKUP_DAYS -exec rm -rf '{}' \; &
+			fi
+
+			if [ $verbose -eq 1 ]
+			then
+				# Cannot launch log function from xargs, ugly hack
+				$FIND_CMD "$MASTER_SYNC_DIR$MASTER_BACKUP_DIR/" -type f -ctime +$CONFLICT_BACKUP_DAYS -print0 | xargs -0 -I {} echo "Deleting file {}" > $RUN_DIR/osync_conflict_backup_$SCRIPT_PID
+				Log "Command output:\n$(cat $RUN_DIR/osync_conflict_backup_$SCRIPT_PID)"
+				$FIND_CMD "$MASTER_SYNC_DIR$MASTER_BACKUP_DIR/" -type d -empty -ctime +$CONFLICT_BACKUP_DAYS -print0 | xargs -0 -I {} echo "Deleting directory {}" >> $RUN_DIR/osync_conflict_backup_$SCRIPT_PID
+				Log "Command output:\n$(cat $RUN_DIR/osync_conflict_backup_$SCRIPT_PID)"
+				Dummy &
+			fi
+
+			if [ $dryrun -ne 1 ]
+			then
+				$FIND_CMD "$MASTER_SYNC_DIR$MASTER_BACKUP_DIR/" -type f -ctime +$CONFLICT_BACKUP_DAYS -print0 | xargs -0 -I {} rm -f "{}" && $FIND_CMD "$MASTER_SYNC_DIR$MASTER_BACKUP_DIR/" -type d -empty -ctime +$CONFLICT_BACKUP_DAYS -print0 | xargs -0 -I {} rm -rf "{}" > $RUN_DIR/osync_conflict_backup_$SCRIPT_PID &
 			fi
 			child_pid=$!
-        		WaitForCompletion $child_pid $SOFT_MAX_EXEC_TIME 0
+        		WaitForCompletion $child_pid $SOFT_MAX_EXEC_TIME $HARD_MAX_EXEC_TIME
         		retval=$?
 			if [ $retval -ne 0 ]
 			then
@@ -1513,6 +1524,12 @@ function SoftDelete
 			else
 				Log "Conflict backup cleanup complete on master replica."
 			fi
+
+			if [ $verbose -eq 1 ]
+			then
+				Log "Command output:\n$(cat $RUN_DIR/osync_conflict_backup_$SCRIPT_PID)"
+			fi
+
 		elif [ -d "$MASTER_SYNC_DIR$MASTER_BACKUP_DIR" ] && ! [ -w "$MASTER_SYNC_DIR$MASTER_BACKUP_DIR" ]
 		then
 			LogError "Warning: Master replica conflict backup dir [$MASTER_SYNC_DIR$MASTER_BACKUP_DIR] isn't writable. Cannot clean old files."
@@ -1531,7 +1548,7 @@ function SoftDelete
 				eval "$SSH_CMD \"if [ -w \\\"$SLAVE_SYNC_DIR$SLAVE_BACKUP_DIR\\\" ]; then $COMMAND_SUDO $REMOTE_FIND_CMD \\\"$SLAVE_SYNC_DIR$SLAVE_BACKUP_DIR/\\\" -ctime +$CONFLICT_BACKUP_DAYS -exec rm -rf '{}' \;; fi\"" &
 			fi
 			child_pid=$!
-                        WaitForCompletion $child_pid $SOFT_MAX_EXEC_TIME 0
+                        WaitForCompletion $child_pid $SOFT_MAX_EXEC_TIME $HARD_MAX_EXEC_TIME
                         retval=$?
                         if [ $retval -ne 0 ]
                         then
@@ -1551,7 +1568,7 @@ function SoftDelete
 					$FIND_CMD "$SLAVE_SYNC_DIR$SLAVE_BACKUP_DIR/" -ctime +$CONFLICT_BACKUP_DAYS -exec rm -rf '{}' \; &
 				fi
 				child_pid=$!
-	                        WaitForCompletion $child_pid $SOFT_MAX_EXEC_TIME 0
+	                        WaitForCompletion $child_pid $SOFT_MAX_EXEC_TIME $HARD_MAX_EXEC_TIME
         	                retval=$?
                 	        if [ $retval -ne 0 ]
                         	then
@@ -1579,7 +1596,7 @@ function SoftDelete
 				$FIND_CMD "$MASTER_SYNC_DIR$MASTER_DELETE_DIR/" -ctime +$SOFT_DELETE_DAYS -exec rm -rf '{}' \; &
 			fi
 			child_pid=$!
-                        WaitForCompletion $child_pid $SOFT_MAX_EXEC_TIME 0
+                        WaitForCompletion $child_pid $SOFT_MAX_EXEC_TIME $HARD_MAX_EXEC_TIME
                         retval=$?
                         if [ $retval -ne 0 ]
                         then
@@ -1605,7 +1622,7 @@ function SoftDelete
 				eval "$SSH_CMD \"if [ -w \\\"$SLAVE_SYNC_DIR$SLAVE_DELETE_DIR\\\" ]; then $COMMAND_SUDO $REMOTE_FIND_CMD \\\"$SLAVE_SYNC_DIR$SLAVE_DELETE_DIR/\\\" -ctime +$SOFT_DELETE_DAYS -exec rm -rf '{}' \;; fi\"" &
 			fi
 			child_pid=$!
-                        WaitForCompletion $child_pid $SOFT_MAX_EXEC_TIME 0
+                        WaitForCompletion $child_pid $SOFT_MAX_EXEC_TIME $HARD_MAX_EXEC_TIME
                         retval=$?
                         if [ $retval -ne 0 ]
                         then
@@ -1626,7 +1643,7 @@ function SoftDelete
 					$FIND_CMD "$SLAVE_SYNC_DIR$SLAVE_DELETE_DIR/" -ctime +$SOFT_DELETE_DAYS -exec rm -rf '{}' \; &
 				fi
 				child_pid=$!
-                       		WaitForCompletion $child_pid $SOFT_MAX_EXEC_TIME 0
+                       		WaitForCompletion $child_pid $SOFT_MAX_EXEC_TIME $HARD_MAX_EXEC_TIME
                         	retval=$?
                         	if [ $retval -ne 0 ]
                         	then
@@ -1944,9 +1961,9 @@ function Usage
 	echo $CONTACT
 	echo ""
 	echo "You may use Osync with a full blown configuration file, or use its default options for quick command line sync."
-	echo "Usage: osync /path/to/config/file [OPTIONS]"
-	echo "or     osync --master=/path/to/master/replica --slave=/path/to/slave/replica [OPTIONS] [QUICKSYNC OPTIONS]"
-	echo "or     osync --master=/path/to/master/replica --slave=ssh://backupuser@remotehost.com[:portnumber]//path/to/slave/replica [OPTIONS] [QUICKSYNC OPTIONS]"
+	echo "Usage: osync.sh /path/to/config/file [OPTIONS]"
+	echo "or     osync.sh --master=/path/to/master/replica --slave=/path/to/slave/replica [OPTIONS] [QUICKSYNC OPTIONS]"
+	echo "or     osync.sh --master=/path/to/master/replica --slave=ssh://backupuser@remotehost.com[:portnumber]//path/to/slave/replica [OPTIONS] [QUICKSYNC OPTIONS]"
 	echo ""
 	echo "[OPTIONS]"
 	echo "--dry             Will run osync without actually doing anything; just testing"
@@ -1963,6 +1980,9 @@ function Usage
 	echo "--slave=\"\" 	Local or remote slave replica path. Can be a ssh uri like ssh://user@host.com:22//path/to/slave/replica (is mandatory)"
 	echo "--rsakey=\"\"	Alternative path to rsa private key for ssh connection to slave replica"
 	echo "--sync-id=\"\"	Optional sync task name to identify this synchronization task when using multiple slaves"
+	echo ""
+	echo "Additionnaly, you may set most osync options at runtime. eg:"
+	echo "SOFT_DELETE_DAYS=365 osync.sh --master=/path --slave=/other/path"
 	exit 128
 }
 
@@ -2108,12 +2128,41 @@ then
 		then
 			SYNC_ID="quicksync task"
 		fi
-		MINIMUM_SPACE=1024
-		REMOTE_SYNC=no
-		CONFLICT_BACKUP_DAYS=30
-		SOFT_DELETE_DAYS=30
-		RESUME_TRY=1
+
+		# Let the possibility to initialize those values directly via command line like SOFT_DELETE_DAYS=60 ./osync.sh
+
+		if [ "$MINIMUM_SPACE" == "" ]
+		then
+			MINIMUM_SPACE=1024
+		fi
+
+		if [ "$CONFLICT_BACKUP_DAYS" == "" ]
+		then
+			CONFLICT_BACKUP_DAYS=30
+		fi
+
+		if [ "$SOFT_DELETE_DAYS" == "" ]
+		then
+			SOFT_DELETE_DAYS=30
+		fi
+
+		if [ "$RESUME_TRY" == "" ]
+		then
+			RESUME_TRY=1
+		fi
+
+		if [ "$SOFT_MAX_EXEC_TIME" == "" ]
+		then
+			SOFT_MAX_EXEC_TIME=0
+		fi
+
+		if [ "$HARD_MAX_EXEC_TIME" == "" ]
+		then
+			HARD_MAX_EXEC_TIME=0
+		fi
+
 		MIN_WAIT=30
+		REMOTE_SYNC=no
 	else
 		ConfigFile="$1"
 		LoadConfigFile "$ConfigFile"
@@ -2134,6 +2183,8 @@ then
 	GetLocalOS
 	InitLocalOSSettings
 	Init
+	SoftDelete
+	exit 0
 	GetRemoteOS
 	InitRemoteOSSettings
 	if [ $sync_on_changes -eq 1 ]
