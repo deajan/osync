@@ -27,7 +27,7 @@ UNDER WORK
 
 RECENT CHANGES
 --------------
-
+ 
 - Prevent debug mode to send alert emails
 - Fixed an infamous bug introduced with exclude pattern globbing preventing multiple exludes to be processed
 - Fixed an issue with empty RSYNC_EXCLUDE_FILES
