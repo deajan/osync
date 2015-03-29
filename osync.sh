@@ -1993,11 +1993,21 @@ function SyncOnChanges
 		fi
 
 		Log "#### Monitoring now."
-        	inotifywait --exclude $OSYNC_DIR $RSYNC_EXCLUDE -qq -r -e create -e modify -e delete -e move -e attrib "$MASTER_SYNC_DIR" &
+		inotifywait --exclude $OSYNC_DIR $RSYNC_EXCLUDE -qq -r -e create -e modify -e delete -e move -e attrib --timeout "$MAX_WAIT" "$MASTER_SYNC_DIR" &
 		sub_pid=$!
 		wait $sub_pid
-		Log "#### Changes detected, waiting $MIN_WAIT seconds before running next sync."
-		sleep $MIN_WAIT
+		retval=$?
+		if [ $retval == 0 ]
+		then
+			Log "#### Changes detected, waiting $MIN_WAIT seconds before running next sync."
+			sleep $MIN_WAIT
+		elif [ $retval == 2 ]
+		then
+			Log "#### $MAX_WAIT timeout reached, running sync."
+		else
+			LogError "#### inotify error detected, waiting $MIN_WAIT seconds before running next sync."
+			sleep $MIN_WAIT
+		fi
 	done
 
 }
