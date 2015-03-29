@@ -635,6 +635,15 @@ function CreateOsyncDirs
 
 function CheckMasterSlaveDirs
 {
+	MASTER_SYNC_DIR_CANN=$(readlink -f "$MASTER_SYNC_DIR")
+	SLAVE_SYNC_DIR_CANN=$(readlink -f "$SLAVE_SYNC_DIR")
+
+	if [ "$MASTER_SYNC_DIR_CANN" == "$SLAVE_SYNC_DIR_CANN" ]
+	then
+		LogError "Master directory [$MASTER_SYNC_DIR] can't be same as slave directory."
+		exit 1
+	fi
+
 	if ! [ -d "$MASTER_SYNC_DIR" ]
 	then
 		if [ "$CREATE_DIRS" == "yes" ]
