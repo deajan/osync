@@ -1686,6 +1686,10 @@ function Init
                 # remove everything after '@'
                 _first_part=${uri%@*}
                 REMOTE_USER=${_first_part%;*}
+		if [ -n "$REMOTE_USER" ]
+		then
+			REMOTE_USER=$(id -un)
+		fi
                 #fingerprint=${_first_part#*fingerprint=}
 		if [ "$SSH_RSA_PRIVATE_KEY" == "" ]
 		then
