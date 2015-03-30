@@ -1,3 +1,4 @@
+
 SHORT FUTURE IMPROVEMENTS
 -------------------------
 
@@ -24,6 +25,7 @@ UNDER WORK
 - See if find command could use -delete instead of exec rm (must check compat for BSD and MacOS)
 - Partial download is still experimental and needs more testing.
 - Check the conflct backup and soft delete cleanup again
+- Remote slave helper service that rsyncs a file on master to trigger a sync whenever a file is modified on slave via inotify (should check for locks)
 
 RECENT CHANGES
 --------------
@@ -32,8 +34,8 @@ RECENT CHANGES
 	- Lowered sleep time between commands
 	- Check if master and slave directories are the same
 	- Check script parameters in osync.sh and osync-batch.sh
-	- Run sync after timeout in --on-changs mode when no changes are detected (helps propagate slave changes)
-		- This still would need a remote slave helper service that creates a file on the master for inotify 
+	- Run sync after timeout in --on-changes mode when no changes are detected (helps propagate slave changes)
+	- Fix for locking in --on-changes mode (child should lock/unlock, master process shouldn't unlock)
 - Prevent debug mode to send alert emails
 - Fixed an infamous bug introduced with exclude pattern globbing preventing multiple exludes to be processed
 - Fixed an issue with empty RSYNC_EXCLUDE_FILES
