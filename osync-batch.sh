@@ -104,6 +104,7 @@ function Usage
         echo "--dry                     Will run osync without actually doing anything; just testing"
         echo "--silent                  Will run osync without any output to stdout, used for cron jobs"
         echo "--verbose                 Increases output"
+        exit 128
 }
 
 silent=0
@@ -136,7 +137,10 @@ do
 		;;
 		--help|-h)
 		Usage
-		exit 0
+		;;
+		*)
+		Log "Unknown param '$i'"
+		Usage
 		;;
 	esac
 done

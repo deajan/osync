@@ -2049,6 +2049,7 @@ then
 	Usage
 fi
 
+first=1
 for i in "$@"
 do
 	case $i in
@@ -2109,7 +2110,15 @@ do
 		--no-locks)
 		nolocks=1
 		;;
+		*)
+		if [ $first == "0" ]
+		then
+			LogError "Unknown option '$i'"
+			Usage
+		fi
+		;;
 	esac
+	first=0
 done
 
 # Remove leading space if there is one
