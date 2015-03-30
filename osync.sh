@@ -1992,9 +1992,9 @@ function SyncOnChanges
 	do
 		if [ "$ConfigFile" != "" ]
 		then
-        		cmd="bash $osync_cmd \"$ConfigFile\" $opts --no-locks"
+			cmd="bash $osync_cmd \"$ConfigFile\" $opts"
 		else
-			cmd="bash $osync_cmd $opts --no-locks"
+			cmd="bash $osync_cmd $opts"
 		fi
 		eval $cmd
 		retval=$?
@@ -2109,6 +2109,7 @@ do
 		;;
 		--on-changes)
 		sync_on_changes=1
+		nolocks=1
 		;;
 		--no-locks)
 		nolocks=1
