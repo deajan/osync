@@ -4,7 +4,7 @@ PROGRAM="Osync" # Rsync based two way sync engine with fault tolerance
 AUTHOR="(L) 2013-2015 by Orsiris \"Ozy\" de Jong"
 CONTACT="http://www.netpower.fr/osync - ozy@netpower.fr"
 PROGRAM_VERSION=0.99RC4
-PROGRAM_BUILD=3003201501
+PROGRAM_BUILD=3003201502
 
 ## type doesn't work on platforms other than linux (bash). If if doesn't work, always assume output is not a zero exitcode
 if ! type -p "$BASH" > /dev/null
@@ -638,10 +638,13 @@ function CheckMasterSlaveDirs
 	MASTER_SYNC_DIR_CANN=$(readlink -f "$MASTER_SYNC_DIR")
 	SLAVE_SYNC_DIR_CANN=$(readlink -f "$SLAVE_SYNC_DIR")
 
-	if [ "$MASTER_SYNC_DIR_CANN" == "$SLAVE_SYNC_DIR_CANN" ]
+	if [ "$REMOTE_SYNC" != "yes" ]
 	then
-		LogError "Master directory [$MASTER_SYNC_DIR] can't be same as slave directory."
-		exit 1
+		if [ "$MASTER_SYNC_DIR_CANN" == "$SLAVE_SYNC_DIR_CANN" ]
+		then
+			LogError "Master directory [$MASTER_SYNC_DIR] can't be the same as slave directory."
+			exit 1
+		fi
 	fi
 
 	if ! [ -d "$MASTER_SYNC_DIR" ]
