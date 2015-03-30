@@ -17,7 +17,7 @@ fi
 if [ ! "$DEBUG" == "yes" ]
 then
 	DEBUG=no
-	SLEEP_TIME=1
+	SLEEP_TIME=0.1
 else
 	SLEEP_TIME=3
 fi
