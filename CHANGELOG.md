@@ -27,7 +27,13 @@ UNDER WORK
 
 RECENT CHANGES
 --------------
- 
+
+- Merged various fixes from onovy (http://github.com/onovy) Thanks!
+	- Lowered sleep time between commands
+	- Check if master and slave directories are the same
+	- Check script parameters in osync.sh and osync-batch.sh
+	- Run sync after timeout in --on-changs mode when no changes are detected (helps propagate slave changes)
+		- This still would need a remote slave helper service that creates a file on the master for inotify 
 - Prevent debug mode to send alert emails
 - Fixed an infamous bug introduced with exclude pattern globbing preventing multiple exludes to be processed
 - Fixed an issue with empty RSYNC_EXCLUDE_FILES
