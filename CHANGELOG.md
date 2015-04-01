@@ -32,8 +32,9 @@ RECENT CHANGES
 --------------
 
 - 01 Avr. 2015: Osync v1.00pre
-- Improved and refactoed the soft deletion routine by merging conflict backup and soft deletion
+- Improved and refactored the soft deletion routine by merging conflict backup and soft deletion
 	- Reworked soft deletion code to handle a case where a top level directory gets deleted even if the files contained in it are not old enough (this obviously shouldn't happen on most FS)
+	- Added more logging
 - Merged various fixes from onovy (http://github.com/onovy) Thanks!
 	- Lowered sleep time between commands
 	- Check if master and slave directories are the same
