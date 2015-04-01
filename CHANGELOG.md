@@ -22,12 +22,13 @@ UNDER WORK
 
 - sync test automation
 - See if find command could use -delete instead of exec rm (must check compat for BSD and MacOS)
-	- Portability needs find -print0 |xargs -0 -I {} command {}
+	- Portability needs find -print0 |xargs -0 -I {} command {} (tested on FreeBSD 10 so far)
 - Partial download is still experimental and needs more testing.
 
 RECENT CHANGES
 --------------
 
+- Improved and refactoed the soft deletion routine by merging conflict backup and soft deletion
 - Replaced default script execution storage from /dev/shm to /tmp because some rootkit detection software doesn't like this
 - Fixed bogus error in DEBUG for quicksync mode where no max execution time is set
 - Reworked soft deletion code to handle a case where a top level directory gets deleted even if the files contained in it are not old enough (this obviously shouldn't happen on most FS)
