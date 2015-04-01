@@ -4,7 +4,7 @@ PROGRAM="Osync" # Rsync based two way sync engine with fault tolerance
 AUTHOR="(L) 2013-2015 by Orsiris \"Ozy\" de Jong"
 CONTACT="http://www.netpower.fr/osync - ozy@netpower.fr"
 PROGRAM_VERSION=1.00pre
-PROGRAM_BUILD=0104201502
+PROGRAM_BUILD=0104201503
 
 ## type doesn't work on platforms other than linux (bash). If if doesn't work, always assume output is not a zero exitcode
 if ! type -p "$BASH" > /dev/null
@@ -1660,7 +1660,7 @@ function Init
                 # remove everything after '@'
                 _first_part=${uri%@*}
                 REMOTE_USER=${_first_part%;*}
-		if [ -n "$REMOTE_USER" ]
+		if [ "$REMOTE_USER" == "" ]
 		then
 			REMOTE_USER=$(id -un)
 		fi
