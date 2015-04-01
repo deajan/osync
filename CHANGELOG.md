@@ -23,19 +23,26 @@ UNDER WORK
 
 - sync test automation
 - See if find command could use -delete instead of exec rm (must check compat for BSD and MacOS)
+	- Portability needs find -print0 |xargs -0 -I {} command {} (tested on FreeBSD 10 so far)
 - Partial download is still experimental and needs more testing.
-- Check the conflct backup and soft delete cleanup again
 - Remote slave helper service that rsyncs a file on master to trigger a sync whenever a file is modified on slave via inotify (should check for locks)
+=======
 
 RECENT CHANGES
 --------------
 
+- 01 Avr. 2015: Osync v1.00pre
+- Improved and refactoed the soft deletion routine by merging conflict backup and soft deletion
+	- Reworked soft deletion code to handle a case where a top level directory gets deleted even if the files contained in it are not old enough (this obviously shouldn't happen on most FS)
 - Merged various fixes from onovy (http://github.com/onovy) Thanks!
 	- Lowered sleep time between commands
 	- Check if master and slave directories are the same
 	- Check script parameters in osync.sh and osync-batch.sh
 	- Run sync after timeout in --on-changes mode when no changes are detected (helps propagate slave changes)
 	- Fix for locking in --on-changes mode (child should lock/unlock, master process shouldn't unlock)
+	- Remote user is now optional in quicksync mode
+- Replaced default script execution storage from /dev/shm to /tmp because some rootkit detection software doesn't like this
+- Fixed bogus error in DEBUG for quicksync mode where no max execution time is set
 - Prevent debug mode to send alert emails
 - Fixed an infamous bug introduced with exclude pattern globbing preventing multiple exludes to be processed
 - Fixed an issue with empty RSYNC_EXCLUDE_FILES
