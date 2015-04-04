@@ -51,7 +51,7 @@ If bash is not your default shell, you may invoke it using
 
 Osync can work with in three flavors: Quick sync mode, configuration file mode, and daemon mode.
 While quick sync mode is convenient to do fast syncs between some directories, a configuration file gives much more functionnality.
-Please use double as directoires delimiters. Do not use escaped characters in directory names.
+Please use double quotes as path delimiters. Do not use escaped characters in directory names.
 
 QuickSync example
 -----------------
