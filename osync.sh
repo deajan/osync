@@ -4,7 +4,7 @@ PROGRAM="Osync" # Rsync based two way sync engine with fault tolerance
 AUTHOR="(L) 2013-2015 by Orsiris \"Ozy\" de Jong"
 CONTACT="http://www.netpower.fr/osync - ozy@netpower.fr"
 PROGRAM_VERSION=1.00pre
-PROGRAM_BUILD=0104201503
+PROGRAM_BUILD=1304201501
 
 ## type doesn't work on platforms other than linux (bash). If if doesn't work, always assume output is not a zero exitcode
 if ! type -p "$BASH" > /dev/null
@@ -1603,7 +1603,7 @@ function _SoftDelete
 			$FIND_CMD "$3/" -type f -ctime +$1 -print0 | xargs -0 -I {} echo "Will delete file {}" > $RUN_DIR/osync_soft_delete_slave_$SCRIPT_PID
 			Log "Command output:\n$(cat $RUN_DIR/osync_soft_delete_slave_$SCRIPT_PID)"
 			$FIND_CMD "$3/" -type d -empty -ctime +$1 -print0 | xargs -0 -I {} echo "Will delete directory {}" > $RUN_DIR/osync_soft_delete_slave_$SCRIPT_PID
-			Log "Command output:\n$(cat $RUN_DIR/osync_conflict_backup_slave_$SCRIPT_PID)"
+			Log "Command output:\n$(cat $RUN_DIR/osync_soft_delete_slave_$SCRIPT_PID)"
 			Dummy &
 		fi
 			if [ $dryrun -ne 1 ]
@@ -1770,6 +1770,10 @@ function Init
 	if [ "$PRESERVE_HARDLINKS" == "yes" ]
 	then
 		RSYNC_ARGS=$RSYNC_ARGS" -H"
+	fi
+	if [ "$CHECKSUM" == "yes" ]
+	then
+		RSYNC_ARGS=$RSYNC_ARGS" --checksum"
 	fi
 	if [ $dryrun -eq 1 ]
 	then

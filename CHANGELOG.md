@@ -31,6 +31,8 @@ UNDER WORK
 RECENT CHANGES
 --------------
 
+- Added optional checksum parameter for the paranoid :)
+- Fixed typo in soft deletion code preventing logging slave deleted backup files
 - Removed legacy lockfile code from init script
 - Removed hardcoded program name from init script
 - 01 Avr. 2015: Osync v1.00pre
