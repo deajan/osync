@@ -12,7 +12,7 @@ progpath=/usr/local/bin
 confdir=/etc/osync
 pidfile=/var/run/$prog
 lockfile=/var/lock/subsys/$prog
-SCRIPT_BUILD=2605201401
+SCRIPT_BUILD=1304201501
 
 if [ ! -f $progpath/$progexec ] && [ ! -f $progexec ]
 then
@@ -43,7 +43,7 @@ start() {
 		then
 			./$progexec $cfgfile --on-changes > /dev/null 2>&1 &
 		else
-			echo "Cannot find osync executable in $progpath"
+			echo "Cannot find $prog executable in $progpath"
 			exit 1
 		fi
 
@@ -66,7 +66,7 @@ start() {
 stop() {
 	if [ ! -f $pidfile-* ]
 	then
-		echo "No running osync instances found."
+		echo "No running $prog instances found."
 		exit 1
 	fi
 
@@ -92,7 +92,7 @@ stop() {
 status() {
 	if [ ! -f $pidfile-* ]
 	then
-		echo "Cannot find any running osync instance."
+		echo "Cannot find any running $prog instance."
 		exit 1
 	fi
 

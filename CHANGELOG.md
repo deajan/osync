@@ -31,6 +31,7 @@ UNDER WORK
 RECENT CHANGES
 --------------
 
+- Removed hardcoded program name from init script
 - 01 Avr. 2015: Osync v1.00pre
 - Improved and refactored the soft deletion routine by merging conflict backup and soft deletion
 	- Reworked soft deletion code to handle a case where a top level directory gets deleted even if the files contained in it are not old enough (this obviously shouldn't happen on most FS)
@@ -47,7 +48,7 @@ RECENT CHANGES
 - Prevent debug mode to send alert emails
 - Fixed an infamous bug introduced with exclude pattern globbing preventing multiple exludes to be processed
 - Fixed an issue with empty RSYNC_EXCLUDE_FILES
-- Lowered default compression level for email alerts (for low end systems
+- Lowered default compression level for email alerts (for low end systems)
 - Prevent exclude pattern globbing before the pattern reaches the rsync cmd
 - Fixed some missing child pids for time control to work
 - Prevent creation of a sync-id less log file when DEBUG is set
