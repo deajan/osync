@@ -11,8 +11,7 @@ progexec=osync.sh
 progpath=/usr/local/bin
 confdir=/etc/osync
 pidfile=/var/run/$prog
-lockfile=/var/lock/subsys/$prog
-SCRIPT_BUILD=1304201501
+SCRIPT_BUILD=1304201502
 
 if [ ! -f $progpath/$progexec ] && [ ! -f $progexec ]
 then
@@ -84,7 +83,7 @@ stop() {
 			fi
 		else
 			rm -f $pfile
-			echo "$pfile is dead but lockfile exists."
+			echo "$prog instance $pfile (pid $(cat $pfile)) is dead but pidfile exists."
 		fi
 	done
 }
@@ -104,7 +103,7 @@ status() {
 		then
 			echo "$prog instance $(basename $pfile) is running (pid $(cat $pfile))"
 		else
-			echo "$pfile is dead but lockfile exists."
+			echo "$prog instance $pfile (pid $(cat $pfile)) is dead but pidfile exists."
 			$errno=1
 		fi
 	done

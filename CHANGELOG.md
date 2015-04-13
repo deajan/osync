@@ -31,6 +31,7 @@ UNDER WORK
 RECENT CHANGES
 --------------
 
+- Removed legacy lockfile code from init script
 - Removed hardcoded program name from init script
 - 01 Avr. 2015: Osync v1.00pre
 - Improved and refactored the soft deletion routine by merging conflict backup and soft deletion
