@@ -4,7 +4,7 @@ PROGRAM="Osync" # Rsync based two way sync engine with fault tolerance
 AUTHOR="(L) 2013-2015 by Orsiris \"Ozy\" de Jong"
 CONTACT="http://www.netpower.fr/osync - ozy@netpower.fr"
 PROGRAM_VERSION=1.00pre
-PROGRAM_BUILD=1304201501
+PROGRAM_BUILD=2004201501
 
 ## type doesn't work on platforms other than linux (bash). If if doesn't work, always assume output is not a zero exitcode
 if ! type -p "$BASH" > /dev/null
@@ -393,6 +393,7 @@ function GetRemoteOS
 function WaitForTaskCompletion
 {
         soft_alert=0
+	log_ttime=0
         SECONDS_BEGIN=$SECONDS
 	while eval "$PROCESS_TEST_CMD" > /dev/null
         do
@@ -400,7 +401,11 @@ function WaitForTaskCompletion
                 EXEC_TIME=$(($SECONDS - $SECONDS_BEGIN))
                 if [ $((($EXEC_TIME + 1) % $KEEP_LOGGING)) -eq 0 ]
                 then
-                        Log "Current task still running."
+			if [ $log_ttime -ne $EXEC_TIME ]
+			then
+				log_ttime=$EXEC_TIME
+                        	Log "Current task still running."
+			fi
                 fi
                 if [ $EXEC_TIME -gt "$2" ]
                 then
@@ -438,12 +443,17 @@ function WaitForTaskCompletion
 function WaitForCompletion
 {
         soft_alert=0
+	log_time=0
 	while eval "$PROCESS_TEST_CMD" > /dev/null
         do
                 Spinner
                 if [ $((($SECONDS + 1) % $KEEP_LOGGING)) -eq 0 ]
                 then
-                        Log "Current task still running."
+			if [ $log_time -ne $EXEC_TIME ]
+			then
+				log_time=$EXEC_TIME
+                        	Log "Current task still running."
+			fi
                 fi
                 if [ $SECONDS -gt "$2" ]
                 then

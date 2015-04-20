@@ -31,6 +31,7 @@ UNDER WORK
 RECENT CHANGES
 --------------
 
+- Fixed multiple keep logging messages since sleep time between commands has been lowered under a second
 - Added optional checksum parameter for the paranoid :)
 - Fixed typo in soft deletion code preventing logging slave deleted backup files
 - Removed legacy lockfile code from init script
