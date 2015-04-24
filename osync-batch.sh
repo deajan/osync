@@ -3,7 +3,7 @@
 PROGRAM="Osync-batch" # Batch program to run osync instances sequentially and rerun failed ones
 AUTHOR="(L) 2013-2014 by Orsiris \"Ozy\" de Jong"
 CONTACT="http://www.netpower.fr/osync - ozy@netpower.fr"
-PROGRAM_BUILD=0104201502
+PROGRAM_BUILD=2404201501
 
 ## Runs an osync instance for every conf file found
 ## If an instance fails, run it again if time permits
@@ -22,6 +22,8 @@ MAX_RERUNS=3
 if ! type -p osync.sh > /dev/null 2>&1
 then
 	OSYNC_EXECUTABLE=./osync.sh
+else
+	OSYNC_EXECUTABLE=$(type -p osync.sh)
 fi
 
 ## Log file path
