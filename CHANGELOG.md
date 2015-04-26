@@ -31,6 +31,7 @@ UNDER WORK
 RECENT CHANGES
 --------------
 
+- Added detection of osync.sh script in osync-batch.sh to overcome mising path in crontab
 - Fixed osync-batch.sh script when osync is in executable path like /usr/local/bin
 - Fixed multiple keep logging messages since sleep time between commands has been lowered under a second
 - Added optional checksum parameter for the paranoid :)

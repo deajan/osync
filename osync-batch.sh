@@ -3,7 +3,7 @@
 PROGRAM="Osync-batch" # Batch program to run osync instances sequentially and rerun failed ones
 AUTHOR="(L) 2013-2014 by Orsiris \"Ozy\" de Jong"
 CONTACT="http://www.netpower.fr/osync - ozy@netpower.fr"
-PROGRAM_BUILD=2404201501
+PROGRAM_BUILD=2504201501
 
 ## Runs an osync instance for every conf file found
 ## If an instance fails, run it again if time permits
@@ -16,15 +16,6 @@ MAX_EXECUTION_TIME=36000
 
 ## Specifies the number of reruns an instance may get
 MAX_RERUNS=3
-
-
-## Osync executable full path can be set here if it cannot be found on the system
-if ! type -p osync.sh > /dev/null 2>&1
-then
-	OSYNC_EXECUTABLE=./osync.sh
-else
-	OSYNC_EXECUTABLE=$(type -p osync.sh)
-fi
 
 ## Log file path
 if [ -w /var/log ]
@@ -47,6 +38,25 @@ function Log
         fi
 }
 
+function CheckEnvironment
+{
+        ## Osync executable full path can be set here if it cannot be found on the system
+        if ! type -p osync.sh > /dev/null 2>&1
+        then
+                if [ -f /usr/local/bin/osync.sh ]
+                then
+                        OSYNC_EXECUTABLE=/usr/local/bin/osync.sh
+                elif [ -f ./osync.sh ]
+                then
+                        OSYNC_EXECUTABLE=./osync.sh
+                else
+                        Log "Could not find osync.sh"
+                        exit 1
+                fi
+        else
+                OSYNC_EXECUTABLE=$(type -p osync.sh)
+        fi
+}
 
 function Batch
 {
@@ -77,8 +87,7 @@ function Batch
 				else
 					RUN_AGAIN=$RUN_AGAIN" $i"
 				fi
-			elif [ $verbose -eq 1 ]
-			then
+			else
 				Log "Run instance $(basename $i) succeed."
 			fi
 		done
@@ -145,5 +154,6 @@ do
 	esac
 done
 
+CheckEnvironment
 Log "$(date) Osync batch run"
 Batch
