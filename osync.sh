@@ -4,7 +4,7 @@ PROGRAM="Osync" # Rsync based two way sync engine with fault tolerance
 AUTHOR="(L) 2013-2015 by Orsiris \"Ozy\" de Jong"
 CONTACT="http://www.netpower.fr/osync - ozy@netpower.fr"
 PROGRAM_VERSION=1.00pre
-PROGRAM_BUILD=2004201501
+PROGRAM_BUILD=1805201501
 
 ## type doesn't work on platforms other than linux (bash). If if doesn't work, always assume output is not a zero exitcode
 if ! type -p "$BASH" > /dev/null
@@ -615,6 +615,80 @@ function CheckConnectivity3rdPartyHosts
         fi
 }
 
+############################################################################################
+
+### realpath.sh implementation from https://github.com/mkropat/sh-realpath
+
+realpath() {
+    canonicalize_path "$(resolve_symlinks "$1")"
+}
+
+resolve_symlinks() {
+    _resolve_symlinks "$1"
+}
+
+_resolve_symlinks() {
+    _assert_no_path_cycles "$@" || return
+
+    local dir_context path
+    path=$(readlink -- "$1")
+    if [ $? -eq 0 ]; then
+        dir_context=$(dirname -- "$1")
+        _resolve_symlinks "$(_prepend_dir_context_if_necessary "$dir_context" "$path")" "$@"
+    else
+        printf '%s\n' "$1"
+    fi
+}
+
+_prepend_dir_context_if_necessary() {
+    if [ "$1" = . ]; then
+        printf '%s\n' "$2"
+    else
+        _prepend_path_if_relative "$1" "$2"
+    fi
+}
+
+_prepend_path_if_relative() {
+    case "$2" in
+        /* ) printf '%s\n' "$2" ;;
+         * ) printf '%s\n' "$1/$2" ;;
+    esac
+}
+
+_assert_no_path_cycles() {
+    local target path
+
+    target=$1
+    shift
+
+    for path in "$@"; do
+        if [ "$path" = "$target" ]; then
+            return 1
+        fi
+    done
+}
+
+canonicalize_path() {
+    if [ -d "$1" ]; then
+        _canonicalize_dir_path "$1"
+    else
+        _canonicalize_file_path "$1"
+    fi
+}
+
+_canonicalize_dir_path() {
+    (cd "$1" 2>/dev/null && pwd -P)
+}
+
+_canonicalize_file_path() {
+    local dir file
+    dir=$(dirname -- "$1")
+    file=$(basename -- "$1")
+    (cd "$dir" 2>/dev/null && printf '%s/%s\n' "$(pwd -P)" "$file")
+}
+
+### Specfic Osync function
+
 function CreateOsyncDirs
 {
 	if ! [ -d "$MASTER_STATE_DIR" ]
@@ -647,8 +721,8 @@ function CreateOsyncDirs
 
 function CheckMasterSlaveDirs
 {
-	MASTER_SYNC_DIR_CANN=$(readlink -f "$MASTER_SYNC_DIR")
-	SLAVE_SYNC_DIR_CANN=$(readlink -f "$SLAVE_SYNC_DIR")
+	MASTER_SYNC_DIR_CANN=$(realpath "$MASTER_SYNC_DIR")
+	SLAVE_SYNC_DIR_CANN=$(realpath "$SLAVE_SYNC_DIR")
 
 	if [ "$REMOTE_SYNC" != "yes" ]
 	then

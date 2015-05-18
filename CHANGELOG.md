@@ -31,6 +31,7 @@ UNDER WORK
 RECENT CHANGES
 --------------
 
+- Fixed #21 by adding portable shell readlink / realpath from https://github.com/mkropat/sh-realpath
 - Added detection of osync.sh script in osync-batch.sh to overcome mising path in crontab
 - Fixed osync-batch.sh script when osync is in executable path like /usr/local/bin
 - Fixed multiple keep logging messages since sleep time between commands has been lowered under a second
