@@ -1311,8 +1311,8 @@ $SSH_CMD error_alert=0 sync_on_changes=$sync_on_changes silent=$silent DEBUG=$DE
 	IFS=$OLD_IFS
 ENDSSH
 
-	## Need to add a trivial sleep time to give ssh time to log to local file
-	sleep 5
+	child_pid=$!
+	WaitForTaskCompletion $child_pid $SOFT_MAX_EXEC_TIME $HARD_MAX_EXEC_TIME
 
 	## Copy back the deleted failed file list
         ESC_SOURCE_FILE="$(EscapeSpaces "$SLAVE_STATE_DIR/$4")"
