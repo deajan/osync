@@ -1179,6 +1179,10 @@ function _delete_local
 
 				if [ $dryrun -ne 1 ]
 				then
+					if [ -e "$REPLICA_DIR$3$files" ]
+					then
+						rm -rf "$REPLICA_DIR$3$files"
+					fi
 					mv -f "$REPLICA_DIR$files" "$REPLICA_DIR$3"
 					if [ $? != 0 ]
 					then
@@ -1282,6 +1286,10 @@ $SSH_CMD error_alert=0 sync_on_changes=$sync_on_changes silent=$silent DEBUG=$DE
 
                                 if [ $dryrun -ne 1 ]
                                 then
+                                        if [ -e "$REPLICA_DIR$DELETE_DIR$files" ]
+					then
+						$COMMAND_SUDO rm -rf "$REPLICA_DIR$DELETE_DIR$files"
+					fi
                                         $COMMAND_SUDO mv -f "$REPLICA_DIR$files" "$REPLICA_DIR$DELETE_DIR"
 					if [ $? != 0 ]
 					then
