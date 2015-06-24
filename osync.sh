@@ -4,7 +4,7 @@ PROGRAM="Osync" # Rsync based two way sync engine with fault tolerance
 AUTHOR="(L) 2013-2015 by Orsiris \"Ozy\" de Jong"
 CONTACT="http://www.netpower.fr/osync - ozy@netpower.fr"
 PROGRAM_VERSION=1.00pre
-PROGRAM_BUILD=1805201501
+PROGRAM_BUILD=2406201501
 
 ## type doesn't work on platforms other than linux (bash). If if doesn't work, always assume output is not a zero exitcode
 if ! type -p "$BASH" > /dev/null
@@ -1179,7 +1179,7 @@ function _delete_local
 
 				if [ $dryrun -ne 1 ]
 				then
-					mv "$REPLICA_DIR$files" "$REPLICA_DIR$3"
+					mv -f "$REPLICA_DIR$files" "$REPLICA_DIR$3"
 					if [ $? != 0 ]
 					then
 						LogError "Cannot move $REPLICA_DIR$files to deletion directory."
@@ -1282,7 +1282,7 @@ $SSH_CMD error_alert=0 sync_on_changes=$sync_on_changes silent=$silent DEBUG=$DE
 
                                 if [ $dryrun -ne 1 ]
                                 then
-                                        $COMMAND_SUDO mv "$REPLICA_DIR$files" "$REPLICA_DIR$DELETE_DIR"
+                                        $COMMAND_SUDO mv -f "$REPLICA_DIR$files" "$REPLICA_DIR$DELETE_DIR"
 					if [ $? != 0 ]
 					then
 						LogError "Cannot move $REPLICA_DIR$files to deletion directory."
