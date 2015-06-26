@@ -1741,11 +1741,12 @@ function Init
 
                 # remove leadng 'ssh://'
                 uri=${SLAVE_SYNC_DIR#ssh://*}
-                # remove everything after '@'
-                REMOTE_USER=${uri%@*}
-                if [ "$REMOTE_USER" == "" ]
+		if [[ "$uri" == *"@"* ]]
 		then
-                    REMOTE_USER=$LOCAL_USER
+               		# remove everything after '@'
+                	REMOTE_USER=${uri%@*}
+		else
+			REMOTE_USER=$LOCAL_USER
                 fi
 
 		if [ "$SSH_RSA_PRIVATE_KEY" == "" ]
@@ -1757,13 +1758,14 @@ function Init
                 _hosturiandpath=${uri#*@}
 		# remove everything after first '/'
                 _hosturi=${_hosturiandpath%%/*}
-		# remove last part if no port defined
-		REMOTE_HOST=${_hosturi%%:*}
-		REMOTE_PORT=${_hosturi##*:}
-		if [ "$REMOTE_PORT" == "" ]
+		if [[ "$_hosturi" == *":"* ]]
 		then
+			REMOTE_PORT=${_hosturi##*:}
+		else
 			REMOTE_PORT=22
 		fi
+		REMOTE_HOST=${_hosturi%%:*}
+
 		# remove everything before first '/'
 		SLAVE_SYNC_DIR=${_hosturiandpath#*/}
         fi
