@@ -4,7 +4,7 @@ PROGRAM="Osync" # Rsync based two way sync engine with fault tolerance
 AUTHOR="(L) 2013-2015 by Orsiris \"Ozy\" de Jong"
 CONTACT="http://www.netpower.fr/osync - ozy@netpower.fr"
 PROGRAM_VERSION=1.00pre
-PROGRAM_BUILD=1805201501
+PROGRAM_BUILD=2606201501
 
 ## type doesn't work on platforms other than linux (bash). If if doesn't work, always assume output is not a zero exitcode
 if ! type -p "$BASH" > /dev/null
@@ -1742,29 +1742,30 @@ function Init
                 # remove leadng 'ssh://'
                 uri=${SLAVE_SYNC_DIR#ssh://*}
                 # remove everything after '@'
-                _first_part=${uri%@*}
-                REMOTE_USER=${_first_part%;*}
-		if [ "$REMOTE_USER" == "" ]
+                REMOTE_USER=${uri%@*}
+                if [ "$REMOTE_USER" == "" ]
 		then
-			REMOTE_USER=$(id -un)
-		fi
-                #fingerprint=${_first_part#*fingerprint=}
+                    REMOTE_USER=$LOCAL_USER
+                fi
+
 		if [ "$SSH_RSA_PRIVATE_KEY" == "" ]
 		then
 			SSH_RSA_PRIVATE_KEY=~/.ssh/id_rsa
 		fi
+
                 # remove everything before '@'
-                _last_part=${uri#*@}
-                _last_part2=${_last_part%%/*}
+                _hosturiandpath=${uri#*@}
+		# remove everything after first '/'
+                _hosturi=${_hosturiandpath%%/*}
 		# remove last part if no port defined
-		REMOTE_HOST=${_last_part2%%:*}
-		if [[ "$_last_part2" == *":"* ]]
+		REMOTE_HOST=${_hosturi%%:*}
+		REMOTE_PORT=${_hosturi##*:}
+		if [ "$REMOTE_PORT" == "" ]
 		then
-			REMOTE_PORT=${_last_part2##*:}
-		else
 			REMOTE_PORT=22
 		fi
-		SLAVE_SYNC_DIR=${_last_part#*/}
+		# remove everything before first '/'
+		SLAVE_SYNC_DIR=${_hosturiandpath#*/}
         fi
 
 	## Make sure there is only one trailing slash on path
