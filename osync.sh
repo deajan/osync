@@ -1,10 +1,10 @@
-#!/usr/bin/env bash
+2#!/usr/bin/env bash
 
 PROGRAM="Osync" # Rsync based two way sync engine with fault tolerance
 AUTHOR="(L) 2013-2015 by Orsiris \"Ozy\" de Jong"
 CONTACT="http://www.netpower.fr/osync - ozy@netpower.fr"
-PROGRAM_VERSION=1.00pre-hotfix22
-PROGRAM_BUILD=2406201502
+PROGRAM_VERSION=1.00pre-hotfix2#22
+PROGRAM_BUILD=2606201501
 
 ## type doesn't work on platforms other than linux (bash). If if doesn't work, always assume output is not a zero exitcode
 if ! type -p "$BASH" > /dev/null
@@ -870,7 +870,7 @@ function RsyncExcludeFrom
 
 function WriteLockFiles
 {
-        echo $SCRIPT_PID > "$MASTER_LOCK"
+        echo $SCRIPT_PID > "$MASTER_LOCK" 2> "$LOG_FILE"
         if [ $? != 0 ]
         then
                 LogError "Could not set lock on master replica."
@@ -1183,7 +1183,15 @@ function _delete_local
 					then
 						rm -rf "$REPLICA_DIR$3/$files"
 					fi
-					mv -f "$REPLICA_DIR$files" "$REPLICA_DIR$3"
+					# In order to keep full path on soft deletion, create parent directories before move
+					parentdir="$(dirname "$files")"
+					if [ "$parentdir" != "." ]
+					then
+						mkdir --parents "$REPLICA_DIR$3/$parentdir"
+						mv -f "$REPLICA_DIR$files" "$REPLICA_DIR$3/$parentdir"
+					else
+						mv -f "$REPLICA_DIR$files" "$REPLICA_DIR$3"
+					fi
 					if [ $? != 0 ]
 					then
 						LogError "Cannot move $REPLICA_DIR$files to deletion directory."
@@ -1290,7 +1298,15 @@ $SSH_CMD error_alert=0 sync_on_changes=$sync_on_changes silent=$silent DEBUG=$DE
 					then
 						$COMMAND_SUDO rm -rf "$REPLICA_DIR$DELETE_DIR/$files"
 					fi
-                                        $COMMAND_SUDO mv -f "$REPLICA_DIR$files" "$REPLICA_DIR$DELETE_DIR"
+					# In order to keep full path on soft deletion, create parent directories before move
+					parentdir="$(dirname "$files")"
+					if [ "$parentdir" != "." ]
+					then
+						$COMMAND_SUDO mkdir --parents "$REPLICA_DIR$DELETE_DIR/$parentdir"
+						$COMMAND_SUDO mv -f "$REPLICA_DIR$files" "$REPLICA_DIR$DELETE_DIR/$parentdir"
+					else
+						$COMMAND_SUDO mv -f "$REPLICA_DIR$files" "$REPLICA_DIR$DELETE_DIR"
+					fi
 					if [ $? != 0 ]
 					then
 						LogError "Cannot move $REPLICA_DIR$files to deletion directory."
