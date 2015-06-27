@@ -3,6 +3,7 @@ SHORT FUTURE IMPROVEMENTS
 -------------------------
 
 - Tree functions execute piped commands (grep, awk) on local system  when launched on remote slave which can cause more bandwith usage
+- Function calls give variables like $1, $2 etc. Reassign them to local variables with better names for easier code reading
 
 FAR FUTURE IMPROVEMENTS
 -----------------------
@@ -32,6 +33,7 @@ RECENT CHANGES
 --------------
 
 - Improved ssh uri recognition (thanks to onovy)
+- Fixed #22 (missing full path in soft deletion)
 - Fixed #21 by adding portable shell readlink / realpath from https://github.com/mkropat/sh-realpath
 - Added detection of osync.sh script in osync-batch.sh to overcome mising path in crontab
 - Fixed osync-batch.sh script when osync is in executable path like /usr/local/bin
