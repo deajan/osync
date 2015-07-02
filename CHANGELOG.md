@@ -1,37 +1,14 @@
-
-SHORT FUTURE IMPROVEMENTS
--------------------------
-
-- Tree functions execute piped commands (grep, awk) on local system  when launched on remote slave which can cause more bandwith usage
-- Function calls give variables like $1, $2 etc. Reassign them to local variables with better names for easier code reading
-
-FAR FUTURE IMPROVEMENTS
------------------------
-
-- MultiMaster support
-	- Rethink of .osync_workdir/state/* files with PIDs, Host and Task Names to better identify multiple instances on the same fileset
-	- Improve Master / Slave schema to Multimaster schema
-	- State files should exist per replica for Multimaster schema
-
 KNOWN ISSUES
 ------------
 
 - RC3 is tested against Linux, FreeBSD and MacOS X. More testing needed in MSYS Windows environment.
 - Cannot finish sync if one replica contains a directory and the other replica contains a file named the same way (Unix doesn't allow this)
 
-UNDER WORK
-----------
-
-- sync test automation
-- See if find command could use -delete instead of exec rm (must check compat for BSD and MacOS)
-	- Portability needs find -print0 |xargs -0 -I {} command {} (tested on FreeBSD 10 so far)
-- Partial download is still experimental and needs more testing.
-- Remote slave helper service that rsyncs a file on master to trigger a sync whenever a file is modified on slave via inotify (should check for locks)
-=======
-
 RECENT CHANGES
 --------------
 
+- Work in progress: Unit tests (intial tests written by onovy, Thanks again!)
+- Small Improvements on install and ssh_filter scripts
 - Improved ssh uri recognition (thanks to onovy)
 - Fixed #22 (missing full path in soft deletion)
 - Fixed #21 by adding portable shell readlink / realpath from https://github.com/mkropat/sh-realpath
