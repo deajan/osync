@@ -1,6 +1,6 @@
 #!/bin/bash
 
-##### Obackup & Osync ssh command filter build 2408201301
+##### Osync ssh command filter build 2015070201
 ##### This script should be located in /usr/local/bin in the remote system to sync / backup
 ##### It will filter the commands that can be run remotely via ssh.
 ##### Please chmod 755 and chown root:root this file
@@ -32,10 +32,6 @@ function Go
 
 case ${SSH_ORIGINAL_COMMAND%% *} in
 	"$RSYNC_EXECUTABLE")
-	Go ;;
-	"mysqldump")
-	Go ;;
-	"mysql")
 	Go ;;
 	"echo")
 	Go ;;
