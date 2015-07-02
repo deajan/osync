@@ -1,5 +1,7 @@
 #!/bin/bash
 
+TEST_BUILD=2015070201
+
 cd -P -- "$(dirname -- "$0")"
 OSYNC_EXECUTABLE=$(readlink -e ../osync.sh)
 declare -A sandbox_osync

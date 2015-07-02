@@ -1,5 +1,5 @@
 #! /bin/sh
-# $Id: shunit2_test_failures.sh 286 2008-11-24 21:42:34Z kate.ward@forestent.com $
+# $Id$
 # vim:et:ft=sh:sts=2:sw=2
 #
 # Copyright 2008 Kate Ward. All Rights Reserved.
@@ -76,10 +76,7 @@ testFailSame()
 
 oneTimeSetUp()
 {
-  tmpDir="${__shunit_tmpDir}/output"
-  mkdir "${tmpDir}"
-  stdoutF="${tmpDir}/stdout"
-  stderrF="${tmpDir}/stderr"
+  th_oneTimeSetUp
 
   MSG='This is a test message'
 }

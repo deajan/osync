@@ -1,5 +1,5 @@
 #! /bin/sh
-# $Id: shunit2_test_macros.sh 299 2010-05-03 12:44:20Z kate.ward@forestent.com $
+# $Id$
 # vim:et:ft=sh:sts=2:sw=2
 #
 # Copyright 2008 Kate Ward. All Rights Reserved.
@@ -238,10 +238,7 @@ testFailNotSame()
 
 oneTimeSetUp()
 {
-  tmpDir="${__shunit_tmpDir}/output"
-  mkdir "${tmpDir}"
-  stdoutF="${tmpDir}/stdout"
-  stderrF="${tmpDir}/stderr"
+  th_oneTimeSetUp
 }
 
 # load and run shUnit2

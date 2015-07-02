@@ -1,5 +1,5 @@
 #! /bin/sh
-# $Id: shunit2_test_asserts.sh 312 2011-03-14 22:41:29Z kate.ward@forestent.com $
+# $Id$
 # vim:et:ft=sh:sts=2:sw=2
 #
 # Copyright 2008 Kate Ward. All Rights Reserved.
@@ -196,10 +196,7 @@ testAssertFalse()
 
 oneTimeSetUp()
 {
-  tmpDir="${__shunit_tmpDir}/output"
-  mkdir "${tmpDir}"
-  stdoutF="${tmpDir}/stdout"
-  stderrF="${tmpDir}/stderr"
+  th_oneTimeSetUp
 
   MSG='This is a test message'
 }
