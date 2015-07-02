@@ -52,7 +52,7 @@ Please use double quotes as path delimiters. Do not use escaped characters in pa
 QuickSync example
 -----------------
 	# osync.sh --master="/path/to/dir1" --slave="/path/to/remote dir2"
-	# /osync.sh --master="/path/to/another dir" --slave="ssh://user@host.com:22//path/to/dir2" --rsakey=/home/user/.ssh/id_rsa_private_key_example.com
+	# osync.sh --master="/path/to/another dir" --slave="ssh://user@host.com:22//path/to/dir2" --rsakey=/home/user/.ssh/id_rsa_private_key_example.com
 
 Running osync with a Configuration file
 ---------------------------------------
