@@ -2,15 +2,11 @@ osync
 =====
 
 A two way filesync script with fault tolerance, resuming, deletion backup and conflict backups running on linux and virtually any system supporting bash.
-File synchronization is bidirectional, based on rsync, and can be run manually, by cron, or triggered via inotifytools (whenever a file changes on master, a file sync is triggered).
+File synchronization is bidirectional, based on rsync, and can be run manually, by cron, or triggered whenever a file changes on master.
 
 ## About
 
-I searched for a nice tool to handle two (or more) way sync scenarios in a reliable way, easy to use and automate.
-While unison does the job, it's not very pretty to configure, slow, won't handle ACLs and won't automatically resume if something bad happened.
-
-Then i read about bitpocket, a nice script provided by Marcin Kulik (sickill) at https://github.com/sickill/bitpocket.git
-Bitpocked inspired me to write my own implementation of a two way sync script, implementing features i wanted among:
+Osync provides the following capabilities
 	
 - Fault tolerance with resume scenarios
 - Email alerts
@@ -38,9 +34,9 @@ You can download the latest stable release of Osync at www.netpower.fr/osync
 You may also get the last development version at https://github.com/deajan/osync with the following command
 
 	$ git clone https://github.com/deajan/osync
+	$ sh install.sh
 
-You may copy the osync.sh file to /usr/local/bin if you intend to use it on a regular basis, or just run it from the directory you downloaded it to.
-There is also a very basic installation script that does the copies for you, and creates /etc/osync to store your osync configuration files.
+Osync will install itself to /usr/local/bin and an example configuration file will be installed to /etc/osync
 
 Osync needs to run with bash shell. Using any other shell will most probably result in errors.
 If bash is not your default shell, you may invoke it using
@@ -55,8 +51,8 @@ Please use double quotes as path delimiters. Do not use escaped characters in pa
 
 QuickSync example
 -----------------
-	$ ./osync.sh --master="/path/to/dir1" --slave="/path/to/remote dir2"
-	$ ./osync.sh --master="/path/to/another dir" --slave="ssh://user@host.com:22//path/to/dir2" --rsakey=/home/user/.ssh/id_rsa_private_key_example.com
+	# osync.sh --master="/path/to/dir1" --slave="/path/to/remote dir2"
+	# /osync.sh --master="/path/to/another dir" --slave="ssh://user@host.com:22//path/to/dir2" --rsakey=/home/user/.ssh/id_rsa_private_key_example.com
 
 Running osync with a Configuration file
 ---------------------------------------
@@ -66,21 +62,21 @@ Also, running sync as superuser requires to configure /etc/sudoers file.
 Please read the documentation about remote sync setups.
 Once you've customized a sync.conf file, you may run osync with the following test run:
 
-	$ ./osync.sh /path/to/your.conf --dry
+	# osync.sh /path/to/your.conf --dry
 
 If everything went well, you may run the actual configuration with one of the following:
 
-	$ ./osync.sh /path/to/your.conf
-	$ ./osync.sh /path/to/your.conf --verbose
-	$ ./osync.sh /path/to/your.conf --no-maxtime
+	# osync.sh /path/to/your.conf
+	# osync.sh /path/to/your.conf --verbose
+	# osync.sh /path/to/your.conf --no-maxtime
 
 Verbose option will display which files and attrs are actually synchronized and which files are to be soft deleted / are in conflict.
 You may mix "--silent" and "--verbose" parameters to output verbose input only in the log files.
 No-Maxtime option will disable execution time checks, which is usefull for big initial sync tasks that might take long time. Next runs should then only propagate changes and take much less time.
 
-Once you're confident about your fist runs, you may add osync as cron task like the following in /etc/crontab which would run osync every 5 minutes:
+Once you're confident about your fist runs, you may add osync as cron task like the following in /etc/crontab which would run osync every 30 minutes:
 
-	*/5 * * * * root /usr/local/bin/osync.sh /path/to/your.conf --silent
+	*/30 * * * * root /usr/local/bin/osync.sh /etc/osync/my_sync.conf --silent
 
 Batch mode
 ----------
@@ -89,7 +85,7 @@ You may want to sequentially run multiple sync sets between the same servers. In
 run it again if there's still some time left.
 The following example will run all .conf files found in /etc/osync, and retry 3 times every configuration that fails, if the whole sequential run took less than 2 hours.
 
-	$ ./osync-batch.sh --path=/etc/osync --max-retries=3 --max-exec-time=7200
+	# osync-batch.sh --path=/etc/osync --max-retries=3 --max-exec-time=7200
 
 Having multiple conf files can then be run in a single cron command like
 
@@ -104,12 +100,13 @@ File monitor mode can also be launched as a daemon with an init script. Please r
 Note that monitoring changes requires inotifywait command (inotify-tools package for most Linux distributions).
 BSD, MacOS X and Windows are not yet supported for this operation mode, unless you find a inotify-tools package on these OSes.
 
-	$ ./osync.sh /path/to/your.conf --on-changes
+	# osync.sh /etc/osync/my_sync.conf --on-changes
 
 Osync file monitor mode may be run as system service with the osync-srv init script. Any configuration file found in /etc/osync will then create a osync daemon instance.
 You may run the install.sh script which should work in most cases or copy the files by hand (osync.sh to /usr/bin/local, osync-srv to /etc/init.d, sync.conf to /etc/osync).
 
 	$ service osync-srv start
+	$ chkconfig osync-srv on
 
 Troubleshooting
 ---------------
