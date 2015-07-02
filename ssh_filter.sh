@@ -1,6 +1,6 @@
 #!/bin/bash
 
-##### Osync ssh command filter build 2015070202
+##### Osync ssh command filter build 2015070203
 ##### This script should be located in /usr/local/bin in the remote system to sync / backup
 ##### It will filter the commands that can be run remotely via ssh.
 ##### Please chmod 755 and chown root:root this file
@@ -45,6 +45,8 @@ case ${SSH_ORIGINAL_COMMAND%% *} in
 	Go ;;
 	"df")
 	Go ;;
+	"mv")
+	Go ;;
 	"$CMD1")
 	if [ "$CMD1" != "" ]
 	then
@@ -82,6 +84,9 @@ case ${SSH_ORIGINAL_COMMAND%% *} in
                 then
                         Go
                 elif [[ "$SSH_ORIGINAL_COMMAND" == "sudo df"* ]]
+                then
+                        Go
+                elif [[ "$SSH_ORIGINAL_COMMAND" == "sudo mv"* ]]
                 then
                         Go
 		elif [[ "$SSH_ORIGINAL_COMMAND" == "sudo $CMD1"* ]]
