@@ -4,7 +4,7 @@ PROGRAM="Osync" # Rsync based two way sync engine with fault tolerance
 AUTHOR="(L) 2013-2015 by Orsiris \"Ozy\" de Jong"
 CONTACT="http://www.netpower.fr/osync - ozy@netpower.fr"
 PROGRAM_VERSION=1.00pre
-PROGRAM_BUILD=2015062701
+PROGRAM_BUILD=2015071701
 
 ## type doesn't work on platforms other than linux (bash). If if doesn't work, always assume output is not a zero exitcode
 if ! type -p "$BASH" > /dev/null
@@ -705,16 +705,20 @@ function CreateOsyncDirs
 	then
 		CheckConnectivity3rdPartyHosts
         	CheckConnectivityRemoteHost
-		eval "$SSH_CMD \"if ! [ -d \\\"$SLAVE_STATE_DIR\\\" ]; then $COMMAND_SUDO mkdir -p \\\"$SLAVE_STATE_DIR\\\"; fi\"" &
+		eval "$SSH_CMD \"if ! [ -d \\\"$SLAVE_STATE_DIR\\\" ]; then $COMMAND_SUDO mkdir -p \\\"$SLAVE_STATE_DIR\\\"; fi 2>&1\"" &
 		child_pid=$!
 		WaitForTaskCompletion $child_pid 0 1800
 	else
-		if ! [ -d "$SLAVE_STATE_DIR" ]; then mkdir -p "$SLAVE_STATE_DIR"; fi
+		if ! [ -d "$SLAVE_STATE_DIR" ]
+		then
+			mkdir -p "$SLAVE_STATE_DIR" > $RUN_DIR/osync_createosyncdirs_$SCRIPT_PID 2>&1
+		fi
 	fi
 
 	if [ $? != 0 ]
 	then
 		LogError "Cannot create slave replica state dir [$SLAVE_STATE_DIR]."
+		LogErorr "Command output:\n$(cat $RUN_DIR/osync_createosyncdirs_$SCRIPT_PID)"
 		exit 1
 	fi
 }
@@ -737,10 +741,11 @@ function CheckMasterSlaveDirs
 	then
 		if [ "$CREATE_DIRS" == "yes" ]
 		then
-			mkdir -p "$MASTER_SYNC_DIR"
+			mkdir -p "$MASTER_SYNC_DIR" > $RUN_DIR/osync_checkmasterslavedirs_$SCRIPT_PID 2>&1
 			if [ $? != 0 ]
 			then
 				LogError "Cannot create master directory [$MASTER_SYNC_DIR]."
+				LogError "Command output:\n$(cat $RUN_DIR/osync_checkmasterslavedirs_$SCRIPT_PID)"
 				exit 1
 			fi
 		else 
@@ -755,12 +760,13 @@ function CheckMasterSlaveDirs
         	CheckConnectivityRemoteHost
 		if [ "$CREATE_DIRS" == "yes" ]
 		then
-			eval "$SSH_CMD \"if ! [ -d \\\"$SLAVE_SYNC_DIR\\\" ]; then $COMMAND_SUDO mkdir -p \\\"$SLAVE_SYNC_DIR\\\"; fi"\" &
+			eval "$SSH_CMD \"if ! [ -d \\\"$SLAVE_SYNC_DIR\\\" ]; then $COMMAND_SUDO mkdir -p \\\"$SLAVE_SYNC_DIR\\\"; fi 2>&1"\" > $RUN_DIR/osync_checkmasterslavedirs_$SCRIPT_PID &
 			child_pid=$!
 			WaitForTaskCompletion $child_pid 0 1800
 			if [ $? != 0 ]
 			then
 				LogError "Cannot create slave directory [$SLAVE_SYNC_DIR]."
+				LogError "Command output:\n$(cat $RUN_DIR/osync_checkmasterslavedirs_$SCRIPT_PID)"
 				exit 1
 			fi
 		else
@@ -997,16 +1003,20 @@ function UnlockDirectories
 	then
 		CheckConnectivity3rdPartyHosts
        		CheckConnectivityRemoteHost
-		eval "$SSH_CMD \"if [ -f \\\"$SLAVE_LOCK\\\" ]; then $COMMAND_SUDO rm \\\"$SLAVE_LOCK\\\"; fi\"" &
+		eval "$SSH_CMD \"if [ -f \\\"$SLAVE_LOCK\\\" ]; then $COMMAND_SUDO rm \\\"$SLAVE_LOCK\\\"; fi 2>&1\"" > $RUN_DIR/osync_UnlockDirectories_$SCRIPT_PID &
 		child_pid=$!
 		WaitForTaskCompletion $child_pid 0 1800
 	else
-		if [ -f "$SLAVE_LOCK" ];then rm "$SLAVE_LOCK"; fi
+		if [ -f "$SLAVE_LOCK" ]
+		then
+			rm "$SLAVE_LOCK" > $RUN_DIR/osync_UnlockDirectories_$SCRIPT_PID 2>&1
+		fi
 	fi
 
 	if [ $? != 0 ]
 	then
 		LogError "Could not unlock slave replica."
+		LogError "Command Output:\n$(cat $RUN_DIR/osync_UnlockDirectories_$SCRIPT_PID)"
 	else
 		Log "Removed slave replica lock."
 	fi
@@ -1645,7 +1655,7 @@ function _SoftDelete
 		fi
 			if [ $dryrun -ne 1 ]
 		then
-			$FIND_CMD "$2/" -type f -ctime +$1 -print0 | xargs -0 -I {} rm -f "{}" && $FIND_CMD "$2/" -type d -empty -ctime +$1 -print0 | xargs -0 -I {} rm -rf "{}" > $RUN_DIR/osync_soft_delete_master_$SCRIPT_PID &
+			$FIND_CMD "$2/" -type f -ctime +$1 -print0 | xargs -0 -I {} rm -f "{}" && $FIND_CMD "$2/" -type d -empty -ctime +$1 -print0 | xargs -0 -I {} rm -rf "{}" > $RUN_DIR/osync_soft_delete_master_$SCRIPT_PID 2>&1 &
 		else
 			Dummy &
 		fi
@@ -1682,7 +1692,7 @@ function _SoftDelete
 		fi
 			if [ $dryrun -ne 1 ]
 		then
-			eval "$SSH_CMD \"if [ -w \\\"$3\\\" ]; then $COMMAND_SUDO $REMOTE_FIND_CMD \\\"$3/\\\" -type f -ctime +$1 -print0 | xargs -0 -I {} rm -f \\\"{}\\\" && $REMOTE_FIND_CMD \\\"$3/\\\" -type d -empty -ctime $1 -print0 | xargs -0 -I {} rm -rf \\\"{}\\\"; fi\"" > $RUN_DIR/osync_soft_delete_slave_$SCRIPT_PID &
+			eval "$SSH_CMD \"if [ -w \\\"$3\\\" ]; then $COMMAND_SUDO $REMOTE_FIND_CMD \\\"$3/\\\" -type f -ctime +$1 -print0 | xargs -0 -I {} rm -f \\\"{}\\\" && $REMOTE_FIND_CMD \\\"$3/\\\" -type d -empty -ctime $1 -print0 | xargs -0 -I {} rm -rf \\\"{}\\\"; fi 2>&1\"" > $RUN_DIR/osync_soft_delete_slave_$SCRIPT_PID &
 		else
 			Dummy &
 		fi

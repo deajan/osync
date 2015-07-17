@@ -7,6 +7,7 @@ KNOWN ISSUES
 RECENT CHANGES
 --------------
 
+- Improved various logging on error
 - Work in progress: Unit tests (intial tests written by onovy, Thanks again!)
 - Small Improvements on install and ssh_filter scripts
 - Improved ssh uri recognition (thanks to onovy)
