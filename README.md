@@ -43,6 +43,9 @@ If bash is not your default shell, you may invoke it using
 
 	$ bash osync.sh [options]
 
+On *BSD, be sure to have bash installed.
+On MSYS, On top of your basic install, you need msys-rsync and msys-coreutils-ext packages.
+
 ## Usage
 
 Osync can work with in three flavors: Quick sync mode, configuration file mode, and daemon mode.
