@@ -204,7 +204,7 @@ What exactly osync can do
 \end_layout
 
 \begin_layout Subsubsection
-Making synchronisation reliable
+Making synchronization reliable
 \end_layout
 
 \begin_layout Standard
@@ -254,7 +254,7 @@ Making a sysadmin's life easier
 \end_layout
 
 \begin_layout Standard
-osync is also desgined to ease synchronisation setups.
+osync is also desgined to ease synchronization setups.
 \end_layout
 
 \begin_layout Standard
@@ -366,9 +366,9 @@ Then, on the next day, it would transfer the remaining 40GB from 10:00 pm
 \begin_layout Standard
 Also, if you run sequential instances of osync (with osync-batch), one per
  user directory, you can decide how much time osync should spend per user.
- So if a user uploads too much data, and Osync cannot finish the synchronisation
+ So if a user uploads too much data, and Osync cannot finish the synchronization
  task for that user directory in a given timespan, it will stop that sync
- task and run next user synchronisation task so every user sync task gets
+ task and run next user synchronization task so every user sync task gets
  run, regardless of the amount of data.
  If there's time left, osync-batch reprograms the user sync task that has
  been stopped.
@@ -495,6 +495,30 @@ inotify-tools
 \end_inset
 
 
+\end_layout
+
+\begin_layout Standard
+On FreeBSD, you need to install bash with
+\end_layout
+
+\begin_layout Standard
+\begin_inset listings
+inline false
+status open
+
+\begin_layout Plain Layout
+
+pkg install bash
+\end_layout
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Standard
+On MinGW, you will have to install msys-rsync and msys-coreutils-ext on
+ top of a base install.
 \end_layout
 
 \begin_layout Subsection
