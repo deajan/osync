@@ -72,7 +72,7 @@ function Batch
 	done
 
 	RERUNS=0
-	while [ $MAX_EXECUTION_TIME -gt $SECONDS ] && [ "$RUN" != "" ] && [ $MAX_RERUNS -gt $RERUNS ]
+	while ([ $MAX_EXECUTION_TIME -gt $SECONDS ] || [ $MAX_EXECUTION_TIME -eq 0 ]) && [ "$RUN" != "" ] && [ $MAX_RERUNS -gt $RERUNS ]
 	do
 		Log "Osync instances will be run for: $RUN"
 		for i in $RUN
@@ -109,7 +109,7 @@ function Usage
         echo "[OPTIONS]"
 	echo "--path=/path/to/conf      Path to osync conf files, defaults to /etc/osync"
 	echo "--max-reruns=X            Number of runs  max for failed instances, (defaults to 3)"
-	echo "--max-exec-time=X         Retry failed instances only if max execution time not reached (defaults to 36000 seconds)"
+	echo "--max-exec-time=X         Retry failed instances only if max execution time not reached (defaults to 36000 seconds). Set to 0 to bypass execution time check."
         echo "--dry                     Will run osync without actually doing anything; just testing"
         echo "--silent                  Will run osync without any output to stdout, used for cron jobs"
         echo "--verbose                 Increases output"
@@ -134,6 +134,9 @@ do
                 --verbose)
                 verbose=1
                 opts=$opts" --verbose"
+		;;
+		--no-maxtime)
+		opts=$opts" --no-maxtime"
 		;;
 		--path=*)
 		CONF_FILE_PATH=${i##*=}
