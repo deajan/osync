@@ -56,6 +56,13 @@ function CheckEnvironment
         else
                 OSYNC_EXECUTABLE=$(type -p osync.sh)
         fi
+
+	## Check for CONF_FILE_PATH
+	if [ ! -d "$CONF_FILE_PATH" ]
+	then
+		Log "Cannot find conf file path $CONF_FILE_PATH"
+		Usage
+	fi	
 }
 
 function Batch
