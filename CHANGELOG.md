@@ -1,7 +1,6 @@
 KNOWN ISSUES
 ------------
 
-- RC3 is tested against Linux, FreeBSD and MacOS X. More testing needed in MSYS Windows environment.
 - Cannot finish sync if one replica contains a directory and the other replica contains a file named the same way (Unix doesn't allow this)
 
 RECENT CHANGES
