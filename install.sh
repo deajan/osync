@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-SCRIPT_BUILD=2015070201
+SCRIPT_BUILD=2015072201
 
 ## Osync daemon install script
 ## Tested on RHEL / CentOS 6 & 7
@@ -23,6 +23,6 @@ chmod 755 /usr/local/bin/osync.sh
 chmod 755 /usr/local/bin/osync-batch.sh
 chmod 755 /usr/local/bin/ssh_filter.sh
 chown root:root /usr/local/bin/ssh_filter.sh
-chmod 755 /usr/local/bin/osync-srv
+chmod 755 /etc/init.d/osync-srv
 
 
