@@ -6,6 +6,7 @@ KNOWN ISSUES
 RECENT CHANGES
 --------------
 
+- Integrated new realpath emulation from https://github.com/mkropat/sh-realpath
 - Small improvements in osync-batch.sh time management
 - Improved various logging on error
 - Work in progress: Unit tests (intial tests written by onovy, Thanks again!)

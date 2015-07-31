@@ -3,8 +3,8 @@
 PROGRAM="Osync" # Rsync based two way sync engine with fault tolerance
 AUTHOR="(L) 2013-2015 by Orsiris \"Ozy\" de Jong"
 CONTACT="http://www.netpower.fr/osync - ozy@netpower.fr"
-PROGRAM_VERSION=1.00
-PROGRAM_BUILD=2015072001
+PROGRAM_VERSION=1.1-dev
+PROGRAM_BUILD=2015073101
 
 ## type doesn't work on platforms other than linux (bash). If if doesn't work, always assume output is not a zero exitcode
 if ! type -p "$BASH" > /dev/null
@@ -685,6 +685,48 @@ _canonicalize_file_path() {
     dir=$(dirname -- "$1")
     file=$(basename -- "$1")
     (cd "$dir" 2>/dev/null && printf '%s/%s\n' "$(pwd -P)" "$file")
+}
+
+# Optionally, you may also want to include:
+
+### readlink emulation ###
+
+readlink() {
+    if _has_command readlink; then
+        _system_readlink "$@"
+    else
+        _emulated_readlink "$@"
+    fi
+}
+
+_has_command() {
+    hash -- "$1" 2>/dev/null
+}
+
+_system_readlink() {
+    command readlink "$@"
+}
+
+_emulated_readlink() {
+    if [ "$1" = -- ]; then
+        shift
+    fi
+
+    _gnu_stat_readlink "$@" || _bsd_stat_readlink "$@"
+}
+
+_gnu_stat_readlink() {
+    local output
+    output=$(stat -c %N -- "$1" 2>/dev/null) &&
+
+    printf '%s\n' "$output" |
+        sed "s/^‘[^’]*’ -> ‘\(.*\)’/\1/
+             s/^'[^']*' -> '\(.*\)'/\1/"
+    # FIXME: handle newlines
+}
+
+_bsd_stat_readlink() {
+    stat -f %Y -- "$1" 2>/dev/null
 }
 
 ### Specfic Osync function
