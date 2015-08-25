@@ -3,7 +3,7 @@
 PROGRAM="Osync-batch" # Batch program to run osync instances sequentially and rerun failed ones
 AUTHOR="(L) 2013-2014 by Orsiris \"Ozy\" de Jong"
 CONTACT="http://www.netpower.fr/osync - ozy@netpower.fr"
-PROGRAM_BUILD=2015042501
+PROGRAM_BUILD=2015082501
 
 ## Runs an osync instance for every conf file found
 ## If an instance fails, run it again if time permits
@@ -117,6 +117,7 @@ function Usage
 	echo "--path=/path/to/conf      Path to osync conf files, defaults to /etc/osync"
 	echo "--max-reruns=X            Number of runs  max for failed instances, (defaults to 3)"
 	echo "--max-exec-time=X         Retry failed instances only if max execution time not reached (defaults to 36000 seconds). Set to 0 to bypass execution time check."
+	echo "--no-maxtime		Run osync without honoring conf file defined timeouts"
         echo "--dry                     Will run osync without actually doing anything; just testing"
         echo "--silent                  Will run osync without any output to stdout, used for cron jobs"
         echo "--verbose                 Increases output"
@@ -154,7 +155,7 @@ do
 		--max-exec-time=*)
 		MAX_EXECUTION_TIME=${i##*=}
 		;;
-		--help|-h)
+		--help|-h|-?)
 		Usage
 		;;
 		*)
