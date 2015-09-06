@@ -1,10 +1,23 @@
-#!/usr/bin/env bash
+#!/bin/bash
 #
-# osync two way directory sync tool
+# osync-srv Two way directory sync daemon
 #
-# chkconfig: - 90 100
+# chkconfig: - 90 99
 # description: monitors a local directory and syncs to a local or remote \
 #              directory on file changes
+# processname: /usr/local/bin/osync.sh
+# config: /etc/osync/*.conf
+# pidfile: /var/run/osync
+
+### BEGIN INIT INFO
+# Provides:		osync-srv
+# Required-Start:	$local_fs $time
+# Required-Stop:	$local_fs $time
+# Default-Start:	2 3 4 5
+# Default-Stop:		0 1 6
+# Short-Description:	osync daemon
+# Description:		Two way directory sync daemon
+### END INIT INFO
 
 prog=osync
 progexec=osync.sh

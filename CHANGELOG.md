@@ -6,6 +6,7 @@ KNOWN ISSUES
 RECENT CHANGES
 --------------
 
+- Added LSB info to init script for Debian based distros
 - Small improvements in osync-batch.sh time management
 - Improved various logging on error
 - Work in progress: Unit tests (intial tests written by onovy, Thanks again!)
