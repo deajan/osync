@@ -52,13 +52,11 @@ export LC_ALL=C
 
 ALERT_LOG_FILE=$RUN_DIR/osync_lastlog
 
-function Dummy
-{
+function Dummy {
 	sleep .1
 }
 
-function Log
-{
+function Log {
 	if [ $sync_on_changes -eq 1 ]; then
 		prefix="$(date) - "
 	else
@@ -72,21 +70,18 @@ function Log
 	fi
 }
 
-function LogError
-{
+function LogError {
 	Log "$1"
 	error_alert=1
 }
 
-function LogDebug
-{
+function LogDebug {
 	if [ "$DEBUG" == "yes" ]; then
 		Log "$1"
 	fi
 }
 
-function TrapError
-{
+function TrapError {
 	local JOB="$0"
 	local LINE="$1"
 	local CODE="${2:-1}"
@@ -95,8 +90,7 @@ function TrapError
 	fi
 }
 
-function TrapStop
-{
+function TrapStop {
 	if [ $soft_stop -eq 0 ]; then
 		LogError " /!\ WARNING: Manual exit of osync is really not recommended. Sync will be in inconsistent state."
 		LogError " /!\ WARNING: If you are sure, please hit CTRL+C another time to quit."
@@ -111,8 +105,7 @@ function TrapStop
 	fi
 }
 
-function TrapQuit
-{
+function TrapQuit {
 	if [ $error_alert -ne 0 ]; then
 		if [ "$DEBUG" != "yes" ]; then
 			SendAlert
@@ -143,8 +136,7 @@ function TrapQuit
 	exit $exitcode
 }
 
-function Spinner
-{
+function Spinner {
 	if [ $silent -eq 1 ]; then
 		return 1
 	fi
@@ -177,20 +169,17 @@ function Spinner
 	esac
 }
 
-function EscapeSpaces
-{
+function EscapeSpaces {
 	echo $(echo "$1" | sed 's/ /\\ /g')
 }
 
-function CleanUp
-{
+function CleanUp {
 	if [ "$DEBUG" != "yes" ]; then
 		rm -f $RUN_DIR/osync_*_$SCRIPT_PID
 	fi
 }
 
-function SendAlert
-{
+function SendAlert {
 	if [ "$quick_sync" == "2" ]; then
 		Log "Current task is a quicksync task. Will not send any alert."
 		return 0
@@ -242,8 +231,7 @@ function SendAlert
 	fi
 }
 
-function LoadConfigFile
-{
+function LoadConfigFile {
 	if [ ! -f "$1" ]; then
 		LogError "Cannot load configuration file [$1]. Sync cannot start."
 		exit 1
@@ -256,8 +244,7 @@ function LoadConfigFile
 	fi
 }
 
-function CheckEnvironment
-{
+function CheckEnvironment {
 	if [ "$REMOTE_SYNC" == "yes" ]; then
 		if ! type -p ssh > /dev/null 2>&1
 		then
@@ -272,8 +259,7 @@ function CheckEnvironment
 	fi
 }
 
-function GetLocalOS
-{
+function GetLocalOS {
 	LOCAL_OS_VAR=$(uname -spio 2>&1)
 	if [ $? != 0 ]; then
 		LOCAL_OS_VAR=$(uname -v 2>&1)
@@ -303,8 +289,7 @@ function GetLocalOS
 	LogDebug "Local OS: [$LOCAL_OS_VAR]."
 }
 
-function GetRemoteOS
-{
+function GetRemoteOS {
 	if [ "$REMOTE_SYNC" == "yes" ]; then
 		CheckConnectivity3rdPartyHosts
 		CheckConnectivityRemoteHost
@@ -359,8 +344,7 @@ function GetRemoteOS
 
 # Waits for pid $1 to complete. Will log an alert if $2 seconds passed since current task execution unless $2 equals 0.
 # Will stop task and log alert if $3 seconds passed since current task execution unless $3 equals 0.
-function WaitForTaskCompletion
-{
+function WaitForTaskCompletion {
 	soft_alert=0
 	log_ttime=0
 	SECONDS_BEGIN=$SECONDS
@@ -402,8 +386,7 @@ function WaitForTaskCompletion
 
 # Waits for pid $1 to complete. Will log an alert if $2 seconds passed since script start unless $2 equals 0.
 # Will stop task and log alert if $3 seconds passed since script start unless $3 equals 0.
-function WaitForCompletion
-{
+function WaitForCompletion {
 	soft_alert=0
 	log_time=0
 	while eval "$PROCESS_TEST_CMD" > /dev/null
@@ -442,8 +425,7 @@ function WaitForCompletion
 }
 
 ## Runs local command $1 and waits for completition in $2 seconds
-function RunLocalCommand
-{
+function RunLocalCommand {
 	if [ $dryrun -ne 0 ]; then
 		Log "Dryrun: Local command [$1] not run."
 		return 1
@@ -469,8 +451,7 @@ function RunLocalCommand
 }
 
 ## Runs remote command $1 and waits for completition in $2 seconds
-function RunRemoteCommand
-{
+function RunRemoteCommand {
 	CheckConnectivity3rdPartyHosts
 	CheckConnectivityRemoteHost
 	if [ $dryrun -ne 0 ]; then
@@ -498,8 +479,7 @@ function RunRemoteCommand
 	fi
 }
 
-function RunBeforeHook
-{
+function RunBeforeHook {
 	if [ "$LOCAL_RUN_BEFORE_CMD" != "" ]; then
 		RunLocalCommand "$LOCAL_RUN_BEFORE_CMD" $MAX_EXEC_TIME_PER_CMD_BEFORE
 	fi
@@ -509,8 +489,7 @@ function RunBeforeHook
 	fi
 }
 
-function RunAfterHook
-{
+function RunAfterHook {
 	if [ "$LOCAL_RUN_AFTER_CMD" != "" ]; then
 		RunLocalCommand "$LOCAL_RUN_AFTER_CMD" $MAX_EXEC_TIME_PER_CMD_AFTER
 	fi
@@ -520,8 +499,7 @@ function RunAfterHook
 	fi
 }
 
-function CheckConnectivityRemoteHost
-{
+function CheckConnectivityRemoteHost {
 	if [ "$REMOTE_HOST_PING" != "no" ] && [ "$REMOTE_SYNC" != "no" ]; then
 		eval "$PING_CMD $REMOTE_HOST > /dev/null 2>&1"
 		if [ $? != 0 ]; then
@@ -531,8 +509,7 @@ function CheckConnectivityRemoteHost
 	fi
 }
 
-function CheckConnectivity3rdPartyHosts
-{
+function CheckConnectivity3rdPartyHosts {
 	if [ "$REMOTE_3RD_PARTY_HOSTS" != "" ]; then
 		remote_3rd_party_success=0
 		OLD_IFS=$IFS
@@ -670,8 +647,7 @@ _bsd_stat_readlink() {
 
 ### Specfic Osync function
 
-function CreateOsyncDirs
-{
+function CreateOsyncDirs {
 	if ! [ -d "$MASTER_STATE_DIR" ]; then
 		mkdir -p "$MASTER_STATE_DIR"
 		if [ $? != 0 ]; then
@@ -699,8 +675,7 @@ function CreateOsyncDirs
 	fi
 }
 
-function CheckMasterSlaveDirs
-{
+function CheckMasterSlaveDirs {
 	MASTER_SYNC_DIR_CANN=$(realpath "$MASTER_SYNC_DIR")
 	SLAVE_SYNC_DIR_CANN=$(realpath "$SLAVE_SYNC_DIR")
 
@@ -765,8 +740,7 @@ function CheckMasterSlaveDirs
 	fi
 }
 
-function CheckMinimumSpace
-{
+function CheckMinimumSpace {
 	Log "Checking minimum disk space on master and slave."
 
 	MASTER_SPACE=$(df -P "$MASTER_SYNC_DIR" | tail -1 | awk '{print $4}')
@@ -790,8 +764,7 @@ function CheckMinimumSpace
 	fi
 }
 
-function RsyncExcludePattern
-{
+function RsyncExcludePattern {
 	# Disable globbing so wildcards from exclusions don't get expanded
 	set -f
 	rest="$RSYNC_EXCLUDE_PATTERN"
@@ -816,8 +789,7 @@ function RsyncExcludePattern
 	set +f
 }
 
-function RsyncExcludeFrom
-{
+function RsyncExcludeFrom {
 	if [ ! "$RSYNC_EXCLUDE_FROM" == "" ]; then
 		## Check if the exclude list has a full path, and if not, add the config file path if there is one
 		if [ "$(basename $RSYNC_EXCLUDE_FROM)" == "$RSYNC_EXCLUDE_FROM" ]; then
@@ -830,8 +802,7 @@ function RsyncExcludeFrom
 	fi
 }
 
-function WriteLockFiles
-{
+function WriteLockFiles {
 	echo $SCRIPT_PID > "$MASTER_LOCK"
 	if [ $? != 0 ]; then
 		LogError "Could not set lock on master replica."
@@ -863,8 +834,7 @@ function WriteLockFiles
 	fi
 }
 
-function LockDirectories
-{
+function LockDirectories {
 	if [ $nolocks -eq 1 ]; then
 		return 0
 	fi
@@ -932,8 +902,7 @@ function LockDirectories
 	WriteLockFiles
 }
 
-function UnlockDirectories
-{
+function UnlockDirectories {
 	if [ $nolocks -eq 1 ]; then
 		return 0
 	fi
@@ -976,8 +945,7 @@ function UnlockDirectories
 
 
 ## tree_list(replica_path, replica type, tree_filename) Creates a list of files in replica_path for replica type (master/slave) in filename $3
-function tree_list
-{
+function tree_list {
 	Log "Creating $2 replica file list [$1]."
 	if [ "$REMOTE_SYNC" == "yes" ] && [ "$2" == "slave" ]; then
 		CheckConnectivity3rdPartyHosts
@@ -1004,8 +972,7 @@ function tree_list
 }
 
 # delete_list(replica, tree-file-after, tree-file-current, deleted-list-file, deleted-failed-list-file): Creates a list of files vanished from last run on replica $1 (master/slave)
-function delete_list
-{
+function delete_list {
 	Log "Creating $1 replica deleted file list."
 	if [ -f "$MASTER_STATE_DIR/$1$TREE_AFTER_FILENAME_NO_SUFFIX" ]; then
 		## Same functionnality, comm is much faster than grep but is not available on every platform
@@ -1035,8 +1002,7 @@ function delete_list
 }
 
 # sync_update(source replica, destination replica, delete_list_filename)
-function sync_update
-{
+function sync_update {
 	Log "Updating $2 replica."
 	if [ "$1" == "master" ]; then
 		SOURCE_DIR="$MASTER_SYNC_DIR"
@@ -1085,8 +1051,7 @@ function sync_update
 }
 
 # delete_local(replica dir, delete file list, delete dir, delete failed file)
-function _delete_local
-{
+function _delete_local {
 	## On every run, check wheter the next item is already deleted because it's included in a directory already deleted
 	previous_file=""
 	OLD_IFS=$IFS
@@ -1143,8 +1108,7 @@ function _delete_local
 }
 
 # delete_remote(replica dir, delete file list, delete dir, delete fail file list)
-function _delete_remote
-{
+function _delete_remote {
 	## This is a special coded function. Need to redelcare local functions on remote host, passing all needed variables as escaped arguments to ssh command.
 	## Anything beetween << ENDSSH and ENDSSH will be executed remotely
 
@@ -1265,8 +1229,7 @@ ENDSSH
 
 # delete_propagation(replica name, deleted_list_filename, deleted_failed_file_list)
 # replica name = "master" / "slave"
-function deletion_propagation
-{
+function deletion_propagation {
 	Log "Propagating deletions to $1 replica."
 
 	if [ "$1" == "master" ]; then
@@ -1316,8 +1279,7 @@ function deletion_propagation
 ###### Step 4: Deleted file propagation to master and slave replicas (Steps 4M and 4S)
 ###### Step 5: Create after run tree list for master and slave replicas (Steps 5M and 5S)
 
-function Sync
-{
+function Sync {
 	Log "Starting synchronization task."
 	CheckConnectivity3rdPartyHosts
 	CheckConnectivityRemoteHost
@@ -1475,8 +1437,7 @@ function Sync
 	echo "0" > "$MASTER_RESUME_COUNT"
 }
 
-function SoftDelete
-{
+function SoftDelete {
 	if [ "$CONFLICT_BACKUP" != "no" ] && [ $CONFLICT_BACKUP_DAYS -ne 0 ]; then
 		Log "Running conflict backup cleanup."
 		_SoftDelete $CONFLICT_BACKUP_DAYS "$MASTER_SYNC_DIR$MASTER_BACKUP_DIR" "$SLAVE_SYNC_DIR$SLAVE_BACKUP_DIR"
@@ -1491,8 +1452,7 @@ function SoftDelete
 
 # Takes 3 arguments
 # $1 = ctime (CONFLICT_BACKUP_DAYS or SOFT_DELETE_DAYS), $2 = MASTER_(BACKUP/DELETED)_DIR, $3 = SLAVE_(BACKUP/DELETED)_DIR
-function _SoftDelete
-{
+function _SoftDelete {
 	if [ -d "$2" ]; then
 		if [ $dryrun -eq 1 ]; then
 			Log "Listing files older than $1 days on master replica. Won't remove anything."
@@ -1585,8 +1545,7 @@ function _SoftDelete
 	
 }
 
-function Init
-{
+function Init {
 	# Set error exit code if a piped command fails
 	set -o pipefail
 	set -o errtrace
@@ -1814,8 +1773,7 @@ function Init
 	ALERT_LOG_FILE="$ALERT_LOG_FILE$COMPRESSION_EXTENSION"
 }
 
-function InitLocalOSSettings
-{
+function InitLocalOSSettings {
 	## If running under Msys, some commands don't run the same way
 	## Using mingw version of find instead of windows one
 	## Getting running processes is quite different
@@ -1839,8 +1797,7 @@ function InitLocalOSSettings
 	fi
 }
 
-function InitRemoteOSSettings
-{
+function InitRemoteOSSettings {
 	## MacOSX does not use the -E parameter like Linux or BSD does (-E is mapped to extended attrs instead of preserve executability)
 	if [ "$LOCAL_OS" != "MacOSX" ] && [ "$REMOTE_OS" != "MacOSX" ]; then
 		RSYNC_ARGS=$RSYNC_ARGS" -E"
@@ -1853,15 +1810,13 @@ function InitRemoteOSSettings
 	fi
 }
 
-function Main
-{
+function Main {
 	CreateOsyncDirs
 	LockDirectories
 	Sync
 }
 
-function Usage
-{
+function Usage {
 	echo "$PROGRAM $PROGRAM_VERSION $PROGRAM_BUILD"
 	echo $AUTHOR
 	echo $CONTACT
@@ -1893,8 +1848,7 @@ function Usage
 	exit 128
 }
 
-function SyncOnChanges
-{
+function SyncOnChanges {
 	if ! type -p inotifywait > /dev/null 2>&1
 	then
 		LogError "No inotifywait command found. Cannot monitor changes."
