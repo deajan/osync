@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
 
-SCRIPT_BUILD=2015072201
+SCRIPT_BUILD=2015090801
 
 ## Osync daemon install script
-## Tested on RHEL / CentOS 6 & 7
+## Tested on RHEL / CentOS 6 & 7 and Mint 17
 ## Please adapt this to fit your distro needs
 
 if [ "$(whoami)" != "root" ]
@@ -12,7 +12,11 @@ then
   exit 1
 fi
 
-mkdir /etc/osync
+if [ ! -d /etc/osync ]
+then
+	mkdir /etc/osync
+fi
+
 cp ./sync.conf /etc/osync/sync.conf.example
 cp ./exclude.list.example /etc/osync
 cp ./osync.sh /usr/local/bin
