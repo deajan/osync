@@ -64,3 +64,11 @@ The eval command should always contain 2>1&.
 There's a special case where this is needed:
 eval "some;commands" 2>> "$LOG_FILE" in order to get error messages into the log.
 
+7. Version numbering
+
+Using bind style versionning:
+
+YYYYMMDDVV (Year, Month, Day, Revision)
+Ex:
+
+2015012402 = 2nd revision of 24 Jan 2015
