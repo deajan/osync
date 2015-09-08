@@ -7,6 +7,8 @@ RECENT CHANGES
 --------------
 
 - Added LSB info to init script for Debian based distros
+- Integrated new realpath emulation from https://github.com/mkropat/sh-realpath
+- 22 Jul. 2015: Osync v1.00a released
 - Small improvements in osync-batch.sh time management
 - Improved various logging on error
 - Work in progress: Unit tests (intial tests written by onovy, Thanks again!)
