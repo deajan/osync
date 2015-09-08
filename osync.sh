@@ -4,7 +4,7 @@ PROGRAM="Osync" # Rsync based two way sync engine with fault tolerance
 AUTHOR="(L) 2013-2015 by Orsiris \"Ozy\" de Jong"
 CONTACT="http://www.netpower.fr/osync - ozy@netpower.fr"
 PROGRAM_VERSION=1.1-dev
-PROGRAM_BUILD=2015090802
+PROGRAM_BUILD=2015090804
 
 ## type doesn't work on platforms other than linux (bash). If if doesn't work, always assume output is not a zero exitcode
 if ! type -p "$BASH" > /dev/null; then
@@ -97,11 +97,11 @@ function Logger {
 }
 
 function TrapError {
-	local JOB="$0"
-	local LINE="$1"
-	local CODE="${2:-1}"
+	local job="$0"
+	local line="$1"
+	local code="${2:-1}"
 	if [ $silent -eq 0 ]; then
-		echo -e " /!\ ERROR in ${JOB}: Near line ${LINE}, exit code ${CODE}"
+		echo -e " /!\ ERROR in ${job}: Near line ${line}, exit code ${code}"
 	fi
 }
 
@@ -185,7 +185,8 @@ function Spinner {
 }
 
 function EscapeSpaces {
-	echo $(echo "$1" | sed 's/ /\\ /g')
+	local string="${1}" # String on which space will be escaped
+	echo $(echo "$string" | sed 's/ /\\ /g')
 }
 
 function CleanUp {
@@ -247,14 +248,15 @@ function SendAlert {
 }
 
 function LoadConfigFile {
-	if [ ! -f "$1" ]; then
-		Logger "Cannot load configuration file [$1]. Sync cannot start." "CRITICAL"
+	local config_file="${1}"
+	if [ ! -f "$config_file" ]; then
+		Logger "Cannot load configuration file [$config_file]. Sync cannot start." "CRITICAL"
 		exit 1
 	elif [[ "$1" != *".conf" ]]; then
-		Logger "Wrong configuration file supplied [$1]. Sync cannot start." "CRITICAL"
+		Logger "Wrong configuration file supplied [$config_file]. Sync cannot start." "CRITICAL"
 		exit 1
 	else
-		egrep '^#|^[^ ]*=[^;&]*'  "$1" > "$RUN_DIR/osync_config_$SCRIPT_PID"
+		egrep '^#|^[^ ]*=[^;&]*'  "$config_file" > "$RUN_DIR/osync_config_$SCRIPT_PID"
 		source "$RUN_DIR/osync_config_$SCRIPT_PID"
 	fi
 }
@@ -357,35 +359,48 @@ function GetRemoteOS {
 	fi
 }
 
-# Waits for pid $1 to complete. Will log an alert if $2 seconds passed since current task execution unless $2 equals 0.
-# Will stop task and log alert if $3 seconds passed since current task execution unless $3 equals 0.
 function WaitForTaskCompletion {
-	soft_alert=0
-	log_ttime=0
-	SECONDS_BEGIN=$SECONDS
-	while eval "$PROCESS_TEST_CMD" > /dev/null
+	local pid="${1}" # pid to wait for
+	local soft_max_time="${2}" # If program with pid $pid takes longer than $soft_max_time seconds, will log a warning, unless $soft_max_time equals 0.
+	if [ "$soft_max_time" == "" ]; then
+		Logger "Missing argument soft_max_time in ${0}" "CRITICAL"
+		exit 1
+	fi
+	local hard_max_time="${3}" # If program with pid $pid takes longer than $hard_max_time seconds, will stop execution, unless $hard_max_time equals 0.
+	if [ "$hard_max_time" == "" ]; then
+		Logger "Missing argument hard_max_time in ${0}" "CRITICAL"
+		exit 1
+	fi
+
+	local soft_alert=0 # Does a soft alert need to be triggered
+	local log_ttime=0 # local time instance for comparaison
+
+	local seconds_begin=$SECONDS # Seconds since the beginning of the script
+	local exec_time=0 # Seconds since the beginning of this function
+
+	while eval "$PROCESS_TEST_CMD" > /dev/null	#TODO: Replace $1 with $pid in $PROCESS_TEST_CMD
 	do
 		Spinner
-		EXEC_TIME=$(($SECONDS - $SECONDS_BEGIN))
-		if [ $((($EXEC_TIME + 1) % $KEEP_LOGGING)) -eq 0 ]; then
-			if [ $log_ttime -ne $EXEC_TIME ]; then
-				log_ttime=$EXEC_TIME
+		exec_time=$(($SECONDS - $seconds_begin))
+		if [ $((($exec_time + 1) % $KEEP_LOGGING)) -eq 0 ]; then
+			if [ $log_ttime -ne $exec_time ]; then
+				log_ttime=$exec_time
 				Logger "Current task still running." "NOTICE"
 			fi
 		fi
-		if [ $EXEC_TIME -gt "$2" ]; then
-			if [ $soft_alert -eq 0 ] && [ "$2" != 0 ]; then
+		if [ $exec_time -gt $soft_max_time ]; then
+			if [ $soft_alert -eq 0 ] && [ $soft_max_time -ne 0 ]; then
 				Logger "Max soft execution time exceeded for task." "WARN"
 				soft_alert=1
 			fi
-			if [ $EXEC_TIME -gt "$3" ] && [ "$3" != 0 ]; then
+			if [ $exec_time -gt $hard_max_time ] && [ $hard_max_time -ne 0 ]; then
 				Logger "Max hard execution time exceeded for task. Stopping task execution." "ERROR"
-				kill -s SIGTERM $1
+				kill -s SIGTERM $pid
 				if [ $? == 0 ]; then
 					Logger "Task stopped succesfully" "NOTICE"
 				else
 					Logger "Sending SIGTERM to proces failed. Trying the hard way." "ERROR"
-					kill -9 $1
+					kill -9 $pid
 					if [ $? != 0 ]; then
 						Logger "Could not stop task." "ERROR"
 					fi
@@ -395,37 +410,51 @@ function WaitForTaskCompletion {
 		fi
 		sleep $SLEEP_TIME
 	done
-	wait $child_pid
+	wait $pid
 	return $?
 }
 
-# Waits for pid $1 to complete. Will log an alert if $2 seconds passed since script start unless $2 equals 0.
-# Will stop task and log alert if $3 seconds passed since script start unless $3 equals 0.
 function WaitForCompletion {
-	soft_alert=0
-	log_time=0
-	while eval "$PROCESS_TEST_CMD" > /dev/null
+	local pid="${1}" # pid to wait for
+	local soft_max_time="${2}" # If program with pid $pid takes longer than $soft_max_time seconds, will log a warning, unless $soft_max_time equals 0.
+	if [ "$soft_max_time" == "" ]; then
+		Logger "Missing argument soft_max_time in ${0}" "CRITICAL"
+		exit 1
+	fi
+	local hard_max_time="${3}" # If program with pid $pid takes longer than $hard_max_time seconds, will stop execution, unless $hard_max_time equals 0.
+	if [ "$hard_max_time" == "" ]; then
+		Logger "Missing argument hard_max_time in ${0}" "CRITICAL"
+		exit 1
+	fi
+
+	local soft_alert=0 # Does a soft alert need to be triggered
+	local log_ttime=0 # local time instance for comparaison
+
+	local seconds_begin=$SECONDS # Seconds since the beginning of the script
+	local exec_time=0 # Seconds since the beginning of this function
+
+	while eval "$PROCESS_TEST_CMD" > /dev/null		#TODO: Replace $1 with $pid in $PROCESS_TEST_CMD
 	do
 		Spinner
 		if [ $((($SECONDS + 1) % $KEEP_LOGGING)) -eq 0 ]; then
-			if [ $log_time -ne $EXEC_TIME ]; then
-				log_time=$EXEC_TIME
+			if [ $log_time -ne $SECONDS ]; then
+				log_time=$SECONDS
 				Logger "Current task still running." "NOTICE"
 			fi
 		fi
-		if [ $SECONDS -gt "$2" ]; then
-			if [ $soft_alert -eq 0 ] && [ "$2" != 0 ]; then
+		if [ $SECONDS -gt $soft_max_time ]; then
+			if [ $soft_alert -eq 0 ] && [ $soft_max_time != 0 ]; then
 				Logger "Max soft execution time exceeded for script." "WARN"
 				soft_alert=1
 			fi
-			if [ $SECONDS -gt "$3" ] && [ "$3" != 0 ]; then
+			if [ $SECONDS -gt $hard_max_time ] && [ $hard_max_time != 0 ]; then
 				Logger "Max hard execution time exceeded for script. Stopping current task execution." "ERROR"
-				kill -s SIGTERM $1
+				kill -s SIGTERM $pid
 				if [ $? == 0 ]; then
 					Logger "Task stopped succesfully" "NOTICE"
 				else
 					Logger "Sending SIGTERM to proces failed. Trying the hard way." "ERROR"
-					kill -9 $1
+					kill -9 $pid
 					if [ $? != 0 ]; then
 						Logger "Could not stop task." "ERROR"
 					fi
@@ -435,20 +464,26 @@ function WaitForCompletion {
 		fi
 		sleep $SLEEP_TIME
 	done
-	wait $child_pid
+	wait $pid
 	return $?
 }
 
-## Runs local command $1 and waits for completition in $2 seconds
 function RunLocalCommand {
+	local command="${1}" # Command to run
+	local hard_max_time="${2}" # Max time to wait for command to compleet
+	if [ "$hard_max_time" == "" ]; then
+		Logger "Missing argument hard_max_time in ${0}" "CRITICAL"
+		exit 1
+	fi
+
 	if [ $dryrun -ne 0 ]; then
-		Logger "Dryrun: Local command [$1] not run." "NOTICE"
+		Logger "Dryrun: Local command [$command] not run." "NOTICE"
 		return 1
 	fi
-	Logger "Running command [$1] on local host." "NOTICE"
-	eval "$1" > $RUN_DIR/osync_run_local_$SCRIPT_PID 2>&1 &
+	Logger "Running command [$command] on local host." "NOTICE"
+	eval "$command" > $RUN_DIR/osync_run_local_$SCRIPT_PID 2>&1 &
 	child_pid=$!
-	WaitForTaskCompletion $child_pid 0 $2
+	WaitForTaskCompletion $child_pid 0 $hard_max_time
 	retval=$?
 	if [ $retval -eq 0 ]; then
 		Logger "Command succeded." "NOTICE"
@@ -468,16 +503,23 @@ function RunLocalCommand {
 
 ## Runs remote command $1 and waits for completition in $2 seconds
 function RunRemoteCommand {
+	local command="${1}" # Command to run
+	local hard_max_time="${2}" # Max time to wait for command to compleet
+	if [ "$hard_max_time" == "" ]; then
+		Logger "Missing argument hard_max_time in ${0}" "CRITICAL"
+		exit 1
+	fi
+
 	CheckConnectivity3rdPartyHosts
 	CheckConnectivityRemoteHost
 	if [ $dryrun -ne 0 ]; then
-		Logger "Dryrun: Local command [$1] not run." "NOTICE"
+		Logger "Dryrun: Local command [$command] not run." "NOTICE"
 		return 1
 	fi
-	Logger "Running command [$1] on remote host." "NOTICE"
-	eval "$SSH_CMD \"$1\" > $RUN_DIR/osync_run_remote_$SCRIPT_PID 2>&1 &"
+	Logger "Running command [$command] on remote host." "NOTICE"
+	eval "$SSH_CMD \"$command\" > $RUN_DIR/osync_run_remote_$SCRIPT_PID 2>&1 &"
 	child_pid=$!
-	WaitForTaskCompletion $child_pid 0 $2
+	WaitForTaskCompletion $child_pid 0 $hard_max_time
 	retval=$?
 	if [ $retval -eq 0 ]; then
 		Logger "Command succeded." "NOTICE"
@@ -566,25 +608,25 @@ _resolve_symlinks() {
     local dir_context path
     path=$(readlink -- "$1")
     if [ $? -eq 0 ]; then
-	dir_context=$(dirname -- "$1")
-	_resolve_symlinks "$(_prepend_dir_context_if_necessary "$dir_context" "$path")" "$@"
+        dir_context=$(dirname -- "$1")
+        _resolve_symlinks "$(_prepend_dir_context_if_necessary "$dir_context" "$path")" "$@"
     else
-	printf '%s\n' "$1"
+        printf '%s\n' "$1"
     fi
 }
 
 _prepend_dir_context_if_necessary() {
     if [ "$1" = . ]; then
-	printf '%s\n' "$2"
+        printf '%s\n' "$2"
     else
-	_prepend_path_if_relative "$1" "$2"
+        _prepend_path_if_relative "$1" "$2"
     fi
 }
 
 _prepend_path_if_relative() {
     case "$2" in
-	/* ) printf '%s\n' "$2" ;;
-	 * ) printf '%s\n' "$1/$2" ;;
+        /* ) printf '%s\n' "$2" ;;
+         * ) printf '%s\n' "$1/$2" ;;
     esac
 }
 
@@ -595,17 +637,17 @@ _assert_no_path_cycles() {
     shift
 
     for path in "$@"; do
-	if [ "$path" = "$target" ]; then
-	    return 1
-	fi
+        if [ "$path" = "$target" ]; then
+            return 1
+        fi
     done
 }
 
 canonicalize_path() {
     if [ -d "$1" ]; then
-	_canonicalize_dir_path "$1"
+        _canonicalize_dir_path "$1"
     else
-	_canonicalize_file_path "$1"
+        _canonicalize_file_path "$1"
     fi
 }
 
@@ -625,10 +667,10 @@ _canonicalize_file_path() {
 ### readlink emulation ###
 
 readlink() {
-    if _has_command readlink; then
-	_system_readlink "$@"
+    if  _has_command readlink; then
+        _system_readlink "$@"
     else
-	_emulated_readlink "$@"
+        _emulated_readlink "$@"
     fi
 }
 
@@ -642,7 +684,7 @@ _system_readlink() {
 
 _emulated_readlink() {
     if [ "$1" = -- ]; then
-	shift
+        shift
     fi
 
     _gnu_stat_readlink "$@" || _bsd_stat_readlink "$@"
@@ -653,8 +695,8 @@ _gnu_stat_readlink() {
     output=$(stat -c %N -- "$1" 2>/dev/null) &&
 
     printf '%s\n' "$output" |
-	sed "s/^‘[^’]*’ -> ‘\(.*\)’/\1/
-	     s/^'[^']*' -> '\(.*\)'/\1/"
+        sed "s/^‘[^’]*’ -> ‘\(.*\)’/\1/
+             s/^'[^']*' -> '\(.*\)'/\1/"
     # FIXME: handle newlines
 }
 
@@ -662,7 +704,7 @@ _bsd_stat_readlink() {
     stat -f %Y -- "$1" 2>/dev/null
 }
 
-### Specfic Osync function
+#### Osync specific functions (non shared)
 
 function CreateOsyncDirs {
 	if ! [ -d "$MASTER_STATE_DIR" ]; then
@@ -693,15 +735,15 @@ function CreateOsyncDirs {
 }
 
 function CheckMasterSlaveDirs {
-	MASTER_SYNC_DIR_CANN=$(realpath "$MASTER_SYNC_DIR")
-	SLAVE_SYNC_DIR_CANN=$(realpath "$SLAVE_SYNC_DIR")
+	#MASTER_SYNC_DIR_CANN=$(realpath "$MASTER_SYNC_DIR")	#TODO: investigate realpath & readlink issues on MSYS and busybox here
+	#SLAVE_SYNC_DIR_CANN=$(realpath "$SLAVE_SYNC_DIR")
 
-	if [ "$REMOTE_SYNC" != "yes" ]; then
-		if [ "$MASTER_SYNC_DIR_CANN" == "$SLAVE_SYNC_DIR_CANN" ]; then
-			Logger "Master directory [$MASTER_SYNC_DIR] can't be the same as slave directory." "CRITICAL"
-			exit 1
-		fi
-	fi
+	#if [ "$REMOTE_SYNC" != "yes" ]; then
+	#	if [ "$MASTER_SYNC_DIR_CANN" == "$SLAVE_SYNC_DIR_CANN" ]; then
+	#		Logger "Master directory [$MASTER_SYNC_DIR] can't be the same as slave directory." "CRITICAL"
+	#		exit 1
+	#	fi
+	#fi
 
 	if ! [ -d "$MASTER_SYNC_DIR" ]; then
 		if [ "$CREATE_DIRS" == "yes" ]; then
@@ -959,17 +1001,20 @@ function UnlockDirectories {
 	## So i'm using unescaped $MASTER_SYNC_DIR for local rsync calls and escaped $ESC_MASTER_SYNC_DIR for remote rsync calls like user@host:$ESC_MASTER_SYNC_DIR
 	## The same applies for slave sync dir..............................................T.H.I.S..I.S..A..P.R.O.G.R.A.M.M.I.N.G..N.I.G.H.T.M.A.R.E
 
-
-## tree_list(replica_path, replica type, tree_filename) Creates a list of files in replica_path for replica type (master/slave) in filename $3
 function tree_list {
-	Logger "Creating $2 replica file list [$1]." "NOTICE"
-	if [ "$REMOTE_SYNC" == "yes" ] && [ "$2" == "slave" ]; then
+	local replica_path="${1}" # path to the replica for which a tree needs to be constructed
+	local replica_type="${2}" # replica type: master, slave
+	local tree_filename="${3}" # filename to output tree (will be prefixed with $replica_type)
+
+	local escaped_replica_path=$(EscapeSpaces "$replica_path") #TODO: See if escpaed still needed when using ' instead of " for command eval
+
+	Logger "Creating $replica_type replica file list [$replica_path]." "NOTICE"
+	if [ "$REMOTE_SYNC" == "yes" ] && [ "$replica_type" == "slave" ]; then
 		CheckConnectivity3rdPartyHosts
 		CheckConnectivityRemoteHost
-		ESC=$(EscapeSpaces "$1")
-		rsync_cmd="$(type -p $RSYNC_EXECUTABLE) --rsync-path=\"$RSYNC_PATH\" $RSYNC_ARGS -8 --exclude \"$OSYNC_DIR\" $RSYNC_EXCLUDE -e \"$RSYNC_SSH_CMD\" --list-only $REMOTE_USER@$REMOTE_HOST:\"$ESC/\" | grep \"^-\|^d\" | awk '{\$1=\$2=\$3=\$4=\"\" ;print}' | awk '{\$1=\$1 ;print}' | (grep -v \"^\.$\" || :) | sort > \"$RUN_DIR/osync_$2_$SCRIPT_PID\" &"
+		rsync_cmd="$(type -p $RSYNC_EXECUTABLE) --rsync-path=\"$RSYNC_PATH\" $RSYNC_ARGS -8 --exclude \"$OSYNC_DIR\" $RSYNC_EXCLUDE -e \"$RSYNC_SSH_CMD\" --list-only $REMOTE_USER@$REMOTE_HOST:\"$escaped_replica_path/\" | grep \"^-\|^d\" | awk '{\$1=\$2=\$3=\$4=\"\" ;print}' | awk '{\$1=\$1 ;print}' | (grep -v \"^\.$\" || :) | sort > \"$RUN_DIR/osync_$replica_type_$SCRIPT_PID\" &"
 	else
-		rsync_cmd="$(type -p $RSYNC_EXECUTABLE) --rsync-path=\"$RSYNC_PATH\" $RSYNC_ARGS -8 --exclude \"$OSYNC_DIR\" $RSYNC_EXCLUDE --list-only \"$1/\" | grep \"^-\|^d\" | awk '{\$1=\$2=\$3=\$4=\"\" ;print}' | awk '{\$1=\$1 ;print}' | (grep -v \"^\.$\" || :) | sort > \"$RUN_DIR/osync_$2_$SCRIPT_PID\" &"
+		rsync_cmd="$(type -p $RSYNC_EXECUTABLE) --rsync-path=\"$RSYNC_PATH\" $RSYNC_ARGS -8 --exclude \"$OSYNC_DIR\" $RSYNC_EXCLUDE --list-only \"$replica_path/\" | grep \"^-\|^d\" | awk '{\$1=\$2=\$3=\$4=\"\" ;print}' | awk '{\$1=\$1 ;print}' | (grep -v \"^\.$\" || :) | sort > \"$RUN_DIR/osync_$replica_type_$SCRIPT_PID\" &"
 	fi
 	Logger "RSYNC_CMD: $rsync_cmd" "DEBUG"
 	## Redirect commands stderr here to get rsync stderr output in logfile
@@ -979,7 +1024,7 @@ function tree_list {
 	retval=$?
 	## Retval 24 = some files vanished while creating list
 	if ([ $retval == 0 ] || [ $retval == 24 ]) && [ -f $RUN_DIR/osync_$2_$SCRIPT_PID ]; then
-		mv $RUN_DIR/osync_$2_$SCRIPT_PID "$MASTER_STATE_DIR/$2$3"
+		mv $RUN_DIR/osync_$replica_type_$SCRIPT_PID "$MASTER_STATE_DIR/$replica_type$tree_filename"
 		return $?
 	else
 		Logger "Cannot create replica file list." "CRITICAL"
@@ -989,7 +1034,15 @@ function tree_list {
 
 # delete_list(replica, tree-file-after, tree-file-current, deleted-list-file, deleted-failed-list-file): Creates a list of files vanished from last run on replica $1 (master/slave)
 function delete_list {
-	Logger "Creating $1 replica deleted file list." "NOTICE"
+	local replica_type="${1}" # replica type: master, slave
+	local tree_file_after_filename="${2}" # tree-file-after, will be prefixed with replica type
+	local tree_file_current_filename="${3}" # tree-file-current, will be prefixed with replica type
+	local deleted_list_file="${4}" # file containing deleted file list, will be prefixed with replica type
+	local deleted_failed_list_file="${5}" # file containing files that couldn't be deleted on last run, will be prefixed with replica type
+	
+	# TODO: WIP here
+
+	Logger "Creating $replica_type replica deleted file list." "NOTICE"
 	if [ -f "$MASTER_STATE_DIR/$1$TREE_AFTER_FILENAME_NO_SUFFIX" ]; then
 		## Same functionnality, comm is much faster than grep but is not available on every platform
 		if type -p comm > /dev/null 2>&1
@@ -1161,7 +1214,7 @@ $SSH_CMD error_alert=0 sync_on_changes=$sync_on_changes silent=$silent DEBUG=$DE
 		if [ $sync_on_changes -eq 1 ]; then
 			prefix="$(date) - "
 		else
-			prefix="TIME: $SECONDS - "
+			prefix="RTIME: $SECONDS - "
 		fi
 
 		if [ "$level" == "CRITICAL" ]; then
@@ -1174,13 +1227,14 @@ $SSH_CMD error_alert=0 sync_on_changes=$sync_on_changes silent=$silent DEBUG=$DE
 			_logger "$prefix\e[93m$value\e[0m"
 		elif [ "$level" == "NOTICE" ]; then
 			_logger "$prefix$value"
-		elif [ "$level" == "DEBUG" ] && [ "$DEBUG" == "yes" ]; then
-			_logger "$prefix$value"
+		elif [ "$level" == "DEBUG" ]; then
+			if [ "$DEBUG" == "yes" ]; then
+				_logger "$prefix$value"
+			fi
 		else
 			_logger "\e[41mLogger function called without proper loglevel.\e[0m"
 			_logger "$prefix$value"
 		fi
-
 	}
 	
 	## Empty earlier failed delete list
@@ -1489,21 +1543,26 @@ function SoftDelete {
 # Takes 3 arguments
 # $1 = ctime (CONFLICT_BACKUP_DAYS or SOFT_DELETE_DAYS), $2 = MASTER_(BACKUP/DELETED)_DIR, $3 = SLAVE_(BACKUP/DELETED)_DIR
 function _SoftDelete {
-	if [ -d "$2" ]; then
+	local change_time="${1}" # Contains the number of days a file needs to be old to be processed here (conflict or soft deletion)
+	local master_directory="${2}" # Master backup / deleted directory to search in
+	local slave_directory="${3}" # Slave backup / deleted directory to search in 
+
+
+	if [ -d "$master_directory" ]; then
 		if [ $dryrun -eq 1 ]; then
-			Logger "Listing files older than $1 days on master replica. Won't remove anything." "NOTICE"
+			Logger "Listing files older than $change_time days on master replica. Won't remove anything." "NOTICE"
 		else
-			Logger "Removing files older than $1 days on master replica." "NOTICE"
+			Logger "Removing files older than $change_time days on master replica." "NOTICE"
 		fi
 			if [ $verbose -eq 1 ]; then
 			# Cannot launch log function from xargs, ugly hack
-			$FIND_CMD "$2/" -type f -ctime +$1 -print0 | xargs -0 -I {} echo "Will delete file {}" > $RUN_DIR/osync_soft_delete_master_$SCRIPT_PID
+			$FIND_CMD "$master_directory/" -type f -ctime +$change_time -print0 | xargs -0 -I {} echo "Will delete file {}" > $RUN_DIR/osync_soft_delete_master_$SCRIPT_PID
 			Logger "Command output:\n$(cat $RUN_DIR/osync_soft_delete_master_$SCRIPT_PID)" "NOTICE"
-			$FIND_CMD "$2/" -type d -empty -ctime +$1 -print0 | xargs -0 -I {} echo "Will delete directory {}" > $RUN_DIR/osync_soft_delete_master_$SCRIPT_PID
+			$FIND_CMD "$master_directory/" -type d -empty -ctime +$change_time -print0 | xargs -0 -I {} echo "Will delete directory {}" > $RUN_DIR/osync_soft_delete_master_$SCRIPT_PID
 			Logger "Command output:\n$(cat $RUN_DIR/osync_soft_delete_master_$SCRIPT_PID)" "NOTICE"
 		fi
 			if [ $dryrun -ne 1 ]; then
-			$FIND_CMD "$2/" -type f -ctime +$1 -print0 | xargs -0 -I {} rm -f "{}" && $FIND_CMD "$2/" -type d -empty -ctime +$1 -print0 | xargs -0 -I {} rm -rf "{}" > $RUN_DIR/osync_soft_delete_master_$SCRIPT_PID 2>&1 &
+			$FIND_CMD "$master_directory/" -type f -ctime +$change_time -print0 | xargs -0 -I {} rm -f "{}" && $FIND_CMD "$master_directory/" -type d -empty -ctime +$change_time -print0 | xargs -0 -I {} rm -rf "{}" > $RUN_DIR/osync_soft_delete_master_$SCRIPT_PID 2>&1 &
 		else
 			Dummy &
 		fi
@@ -1516,25 +1575,25 @@ function _SoftDelete {
 		else
 			Logger "Cleanup complete on master replica." "NOTICE"
 		fi
-	elif [ -d "$2" ] && ! [ -w "$2" ]; then
-		Logger "Warning: Master replica dir [$2] isn't writable. Cannot clean old files." "ERROR"
+	elif [ -d "$master_directory" ] && ! [ -w "$master_directory" ]; then
+		Logger "Warning: Master replica dir [$master_directory] isn't writable. Cannot clean old files." "ERROR"
 	fi
 
 	if [ "$REMOTE_SYNC" == "yes" ]; then
 		CheckConnectivity3rdPartyHosts
 		CheckConnectivityRemoteHost
 			if [ $dryrun -eq 1 ]; then
-			Logger "Listing files older than $1 days on slave replica. Won't remove anything." "NOTICE"
+			Logger "Listing files older than $change_time days on slave replica. Won't remove anything." "NOTICE"
 		else
-			Logger "Removing files older than $1 days on slave replica." "NOTICE"
+			Logger "Removing files older than $change_time days on slave replica." "NOTICE"
 		fi
 			if [ $verbose -eq 1 ]; then
 			# Cannot launch log function from xargs, ugly hack
-			eval "$SSH_CMD \"if [ -w \\\"$3\\\" ]; then $COMMAND_SUDO $REMOTE_FIND_CMD \\\"$3/\\\" -type f -ctime +$1 -print0 | xargs -0 -I {} echo Will delete file {} && $REMOTE_FIND_CMD \\\"$3/\\\" -type d -empty -ctime $1 -print0 | xargs -0 -I {} echo Will delete directory {}; fi\"" > $RUN_DIR/osync_soft_delete_slave_$SCRIPT_PID
+			eval "$SSH_CMD \"if [ -w \\\"$slave_directory\\\" ]; then $COMMAND_SUDO $REMOTE_FIND_CMD \\\"$slave_directory/\\\" -type f -ctime +$change_time -print0 | xargs -0 -I {} echo Will delete file {} && $REMOTE_FIND_CMD \\\"$slave_directory/\\\" -type d -empty -ctime $change_time -print0 | xargs -0 -I {} echo Will delete directory {}; fi\"" > $RUN_DIR/osync_soft_delete_slave_$SCRIPT_PID
 			Logger "Command output:\n$(cat $RUN_DIR/osync_soft_delete_slave_$SCRIPT_PID)" "NOTICE"
 		fi
 			if [ $dryrun -ne 1 ]; then
-			eval "$SSH_CMD \"if [ -w \\\"$3\\\" ]; then $COMMAND_SUDO $REMOTE_FIND_CMD \\\"$3/\\\" -type f -ctime +$1 -print0 | xargs -0 -I {} rm -f \\\"{}\\\" && $REMOTE_FIND_CMD \\\"$3/\\\" -type d -empty -ctime $1 -print0 | xargs -0 -I {} rm -rf \\\"{}\\\"; fi 2>&1\"" > $RUN_DIR/osync_soft_delete_slave_$SCRIPT_PID &
+			eval "$SSH_CMD \"if [ -w \\\"$slave_directory\\\" ]; then $COMMAND_SUDO $REMOTE_FIND_CMD \\\"$slave_directory/\\\" -type f -ctime +$change_time -print0 | xargs -0 -I {} rm -f \\\"{}\\\" && $REMOTE_FIND_CMD \\\"$slave_directory/\\\" -type d -empty -ctime $change_time -print0 | xargs -0 -I {} rm -rf \\\"{}\\\"; fi 2>&1\"" > $RUN_DIR/osync_soft_delete_slave_$SCRIPT_PID &
 		else
 			Dummy &
 		fi
@@ -1548,22 +1607,22 @@ function _SoftDelete {
 				Logger "Cleanup complete on slave replica." "NOTICE"
 			fi
 	else
-	if [ -w "$3" ]; then
+	if [ -w "$slave_directory" ]; then
 		if [ $dryrun -eq 1 ]; then
-			Logger "Listing files older than $1 days on slave replica. Won't remove anything." "NOTICE"
+			Logger "Listing files older than $change_time days on slave replica. Won't remove anything." "NOTICE"
 		else
-			Logger "Removing files older than $1 days on slave replica." "NOTICE"
+			Logger "Removing files older than $change_time days on slave replica." "NOTICE"
 		fi
 			if [ $verbose -eq 1 ]; then
 			# Cannot launch log function from xargs, ugly hack
-			$FIND_CMD "$3/" -type f -ctime +$1 -print0 | xargs -0 -I {} echo "Will delete file {}" > $RUN_DIR/osync_soft_delete_slave_$SCRIPT_PID
+			$FIND_CMD "$slave_directory/" -type f -ctime +$change_time -print0 | xargs -0 -I {} echo "Will delete file {}" > $RUN_DIR/osync_soft_delete_slave_$SCRIPT_PID
 			Logger "Command output:\n$(cat $RUN_DIR/osync_soft_delete_slave_$SCRIPT_PID)" "NOTICE"
-			$FIND_CMD "$3/" -type d -empty -ctime +$1 -print0 | xargs -0 -I {} echo "Will delete directory {}" > $RUN_DIR/osync_soft_delete_slave_$SCRIPT_PID
+			$FIND_CMD "$slave_directory/" -type d -empty -ctime +$change_time -print0 | xargs -0 -I {} echo "Will delete directory {}" > $RUN_DIR/osync_soft_delete_slave_$SCRIPT_PID
 			Logger "Command output:\n$(cat $RUN_DIR/osync_soft_delete_slave_$SCRIPT_PID)" "NOTICE"
 			Dummy &
 		fi
 			if [ $dryrun -ne 1 ]; then
-			$FIND_CMD "$3/" -type f -ctime +$1 -print0 | xargs -0 -I {} rm -f "{}" && $FIND_CMD "$3/" -type d -empty -ctime +$1 -print0 | xargs -0 -I {} rm -rf "{}" > $RUN_DIR/osync_soft_delete_slave_$SCRIPT_PID &
+			$FIND_CMD "$slave_directory/" -type f -ctime +$change_time -print0 | xargs -0 -I {} rm -f "{}" && $FIND_CMD "$slave_directory/" -type d -empty -ctime +$change_time -print0 | xargs -0 -I {} rm -rf "{}" > $RUN_DIR/osync_soft_delete_slave_$SCRIPT_PID &
 		fi
 		child_pid=$!
 		WaitForCompletion $child_pid $SOFT_MAX_EXEC_TIME $HARD_MAX_EXEC_TIME
@@ -1574,8 +1633,8 @@ function _SoftDelete {
 		else
 			Logger "Cleanup complete on slave replica." "NOTICE"
 		fi
-		elif [ -d "$3" ] && ! [ -w "$3" ]; then
-			Logger "Warning: Slave replica dir [$3] isn't writable. Cannot clean old files." "ERROR"
+		elif [ -d "$slave_directory" ] && ! [ -w "$slave_directory" ]; then
+			Logger "Warning: Slave replica dir [$slave_directory] isn't writable. Cannot clean old files." "ERROR"
 		fi
 	fi
 	
