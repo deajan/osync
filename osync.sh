@@ -4,7 +4,7 @@ PROGRAM="Osync" # Rsync based two way sync engine with fault tolerance
 AUTHOR="(L) 2013-2015 by Orsiris \"Ozy\" de Jong"
 CONTACT="http://www.netpower.fr/osync - ozy@netpower.fr"
 PROGRAM_VERSION=1.1-dev
-PROGRAM_BUILD=2015073101
+PROGRAM_BUILD=2015090802
 
 ## type doesn't work on platforms other than linux (bash). If if doesn't work, always assume output is not a zero exitcode
 if ! type -p "$BASH" > /dev/null; then
@@ -56,28 +56,43 @@ function Dummy {
 	sleep .1
 }
 
-function Log {
+function _logger {
+	local value="${1}" # What to log
+	echo -e "$value" >> "$LOG_FILE"
+	
+	if [ $silent -eq 0 ]; then
+		echo -e "$value"
+	fi
+}
+
+function Logger {
+	local value="${1}" # What to log
+	local level="${2}" # Log level: DEBUG, NOTICE, WARN, ERROR, CRITIAL
+
+	# Special case in daemon mode we should timestamp instead of counting seconds
 	if [ $sync_on_changes -eq 1 ]; then
 		prefix="$(date) - "
 	else
 		prefix="TIME: $SECONDS - "
 	fi
 
-	echo -e "$prefix$1" >> "$LOG_FILE"
-
-	if [ $silent -eq 0 ]; then
-		echo -e "$prefix$1"
-	fi
-}
-
-function LogError {
-	Log "$1"
-	error_alert=1
-}
-
-function LogDebug {
-	if [ "$DEBUG" == "yes" ]; then
-		Log "$1"
+	if [ "$level" == "CRITICAL" ]; then
+		_logger "$prefix\e[41m$value\e[0m"
+		ERROR_ALERT=1
+	elif [ "$level" == "ERROR" ]; then
+		_logger "$prefix\e[91m$value\e[0m"
+		ERROR_ALERT=1
+	elif [ "$level" == "WARN" ]; then
+		_logger "$prefix\e[93m$value\e[0m"
+	elif [ "$level" == "NOTICE" ]; then
+		_logger "$prefix$value"
+	elif [ "$level" == "DEBUG" ]; then
+		if [ "$DEBUG" == "yes" ]; then
+			_logger "$prefix$value"
+		fi
+	else
+		_logger "\e[41mLogger function called without proper loglevel.\e[0m"
+		_logger "$prefix$value"
 	fi
 }
 
@@ -92,14 +107,14 @@ function TrapError {
 
 function TrapStop {
 	if [ $soft_stop -eq 0 ]; then
-		LogError " /!\ WARNING: Manual exit of osync is really not recommended. Sync will be in inconsistent state."
-		LogError " /!\ WARNING: If you are sure, please hit CTRL+C another time to quit."
+		Logger " /!\ WARNING: Manual exit of osync is really not recommended. Sync will be in inconsistent state." "WARN"
+		Logger " /!\ WARNING: If you are sure, please hit CTRL+C another time to quit." "WARN"
 		soft_stop=1
 		return 1
 	fi
 
 	if [ $soft_stop -eq 1 ]; then
-		LogError " /!\ WARNING: CTRL+C hit twice. Quitting osync. Please wait..."
+		Logger " /!\ WARNING: CTRL+C hit twice. Quitting osync. Please wait..." "WARN"
 		soft_stop=2
 		exit 1
 	fi
@@ -110,16 +125,16 @@ function TrapQuit {
 		if [ "$DEBUG" != "yes" ]; then
 			SendAlert
 		else
-			Log "Debug mode, no alert mail will be sent."
+			Logger "Debug mode, no alert mail will be sent." "NOTICE"
 		fi
 		UnlockDirectories
 		CleanUp
-		LogError "Osync finished with errors."
+		Logger "Osync finished with errors." "WARN"
 		exitcode=1
 	else
 		UnlockDirectories
 		CleanUp
-		Log "Osync finished."
+		Logger "Osync finished." "NOTICE"
 		exitcode=0
 	fi
 
@@ -181,7 +196,7 @@ function CleanUp {
 
 function SendAlert {
 	if [ "$quick_sync" == "2" ]; then
-		Log "Current task is a quicksync task. Will not send any alert."
+		Logger "Current task is a quicksync task. Will not send any alert." "NOTICE"
 		return 0
 	fi
 	eval "cat \"$LOG_FILE\" $COMPRESSION_PROGRAM > $ALERT_LOG_FILE"
@@ -190,23 +205,23 @@ function SendAlert {
 	then
 		echo $MAIL_ALERT_MSG | $(type -p mutt) -x -s "Sync alert for $SYNC_ID" $DESTINATION_MAILS -a "$ALERT_LOG_FILE"
 		if [ $? != 0 ]; then
-			Log "WARNING: Cannot send alert email via $(type -p mutt) !!!"
+			Logger "WARNING: Cannot send alert email via $(type -p mutt) !!!" "WARN"
 		else
-			Log "Sent alert mail using mutt."
+			Logger "Sent alert mail using mutt." "NOTICE"
 		fi
 	elif type -p mail > /dev/null 2>&1
 	then
 		echo $MAIL_ALERT_MSG | $(type -p mail) -a "$ALERT_LOG_FILE" -s "Sync alert for $SYNC_ID" $DESTINATION_MAILS
 		if [ $? != 0 ]; then
-			Log "WARNING: Cannot send alert email via $(type -p mail) with attachments !!!"
+			Logger "WARNING: Cannot send alert email via $(type -p mail) with attachments !!!" "WARN"
 			echo $MAIL_ALERT_MSG | $(type -p mail) -s "Sync alert for $SYNC_ID" $DESTINATION_MAILS
 			if [ $? != 0 ]; then
-				Log "WARNING: Cannot send alert email via $(type -p mail) without attachments !!!"
+				Logger "WARNING: Cannot send alert email via $(type -p mail) without attachments !!!" "WARN"
 			else
-				Log "Sent alert mail using mail command without attachment."
+				Logger "Sent alert mail using mail command without attachment." "NOTICE"
 			fi
 		else
-			Log "Sent alert mail using mail command."
+			Logger "Sent alert mail using mail command." "NOTICE"
 		fi
 	elif type -p sendemail > /dev/null 2>&1
 	then
@@ -217,12 +232,12 @@ function SendAlert {
 		fi
 		$(type -p sendemail) -f $SENDER_MAIL -t $DESTINATION_MAILS -u "Backup alert for $BACKUP_ID" -m "$MAIL_ALERT_MSG" -s $SMTP_SERVER $SMTP_OPTIONS > /dev/null 2>&1
 		if [ $? != 0 ]; then
-			Log "WARNING: Cannot send alert email via $(type -p sendemail) !!!"
+			Logger "WARNING: Cannot send alert email via $(type -p sendemail) !!!" "WARN"
 		else
-			Log "Sent alert mail using sendemail command without attachment."
+			Logger "Sent alert mail using sendemail command without attachment." "NOTICE"
 		fi
 	else
-		Log "WARNING: Cannot send alert email (no mutt / mail present) !!!"
+		Logger "WARNING: Cannot send alert email (no mutt / mail present) !!!" "WARN"
 		return 1
 	fi
 
@@ -233,10 +248,10 @@ function SendAlert {
 
 function LoadConfigFile {
 	if [ ! -f "$1" ]; then
-		LogError "Cannot load configuration file [$1]. Sync cannot start."
+		Logger "Cannot load configuration file [$1]. Sync cannot start." "CRITICAL"
 		exit 1
 	elif [[ "$1" != *".conf" ]]; then
-		LogError "Wrong configuration file supplied [$1]. Sync cannot start."
+		Logger "Wrong configuration file supplied [$1]. Sync cannot start." "CRITICAL"
 		exit 1
 	else
 		egrep '^#|^[^ ]*=[^;&]*'  "$1" > "$RUN_DIR/osync_config_$SCRIPT_PID"
@@ -248,13 +263,13 @@ function CheckEnvironment {
 	if [ "$REMOTE_SYNC" == "yes" ]; then
 		if ! type -p ssh > /dev/null 2>&1
 		then
-			LogError "ssh not present. Cannot start sync."
+			Logger "ssh not present. Cannot start sync." "CRITICAL"
 			return 1
 		fi
 	fi
 	if ! type -p rsync > /dev/null 2>&1
 	then
-		LogError "rsync not present. Sync cannot start."
+		Logger "rsync not present. Sync cannot start." "CRITICAL"
 		return 1
 	fi
 }
@@ -282,11 +297,11 @@ function GetLocalOS {
 		LOCAL_OS="MacOSX"
 		;;
 		*)
-		LogError "Running on >> $LOCAL_OS_VAR << not supported. Please report to the author."
+		Logger "Running on >> $LOCAL_OS_VAR << not supported. Please report to the author." "ERROR"
 		exit 1
 		;;
 	esac
-	LogDebug "Local OS: [$LOCAL_OS_VAR]."
+	Logger "Local OS: [$LOCAL_OS_VAR]." "DEBUG"
 }
 
 function GetRemoteOS {
@@ -308,7 +323,7 @@ function GetRemoteOS {
 				WaitForTaskCompletion $child_pid 120 240
 				retval=$?
 				if [ $retval != 0 ]; then
-					LogError "Cannot Get remote OS type."
+					Logger "Cannot Get remote OS type." "ERROR"
 				fi
 			fi
 		fi
@@ -329,16 +344,16 @@ function GetRemoteOS {
 			REMOTE_OS="MacOSX"
 			;;
 			*"ssh"*|*"SSH"*)
-			LogError "Cannot connect to remote system."
+			Logger "Cannot connect to remote system." "CRITICAL"
 			exit 1
 			;;
 			*)
-			LogError "Running on remote OS failed. Please report to the author if the OS is not supported."
-			LogError "Remote OS said:\n$REMOTE_OS_VAR"
+			Logger "Running on remote OS failed. Please report to the author if the OS is not supported." "CRITICAL"
+			Logger "Remote OS said:\n$REMOTE_OS_VAR" "CRITICAL"
 			exit 1
 		esac
 
-		LogDebug "Remote OS: [$REMOTE_OS_VAR]."
+		Logger "Remote OS: [$REMOTE_OS_VAR]." "DEBUG"
 	fi
 }
 
@@ -355,24 +370,24 @@ function WaitForTaskCompletion {
 		if [ $((($EXEC_TIME + 1) % $KEEP_LOGGING)) -eq 0 ]; then
 			if [ $log_ttime -ne $EXEC_TIME ]; then
 				log_ttime=$EXEC_TIME
-				Log "Current task still running."
+				Logger "Current task still running." "NOTICE"
 			fi
 		fi
 		if [ $EXEC_TIME -gt "$2" ]; then
 			if [ $soft_alert -eq 0 ] && [ "$2" != 0 ]; then
-				LogError "Max soft execution time exceeded for task."
+				Logger "Max soft execution time exceeded for task." "WARN"
 				soft_alert=1
 			fi
 			if [ $EXEC_TIME -gt "$3" ] && [ "$3" != 0 ]; then
-				LogError "Max hard execution time exceeded for task. Stopping task execution."
+				Logger "Max hard execution time exceeded for task. Stopping task execution." "ERROR"
 				kill -s SIGTERM $1
 				if [ $? == 0 ]; then
-					LogError "Task stopped succesfully"
+					Logger "Task stopped succesfully" "NOTICE"
 				else
-					LogError "Sending SIGTERM to proces failed. Trying the hard way."
+					Logger "Sending SIGTERM to proces failed. Trying the hard way." "ERROR"
 					kill -9 $1
 					if [ $? != 0 ]; then
-						LogError "Could not stop task."
+						Logger "Could not stop task." "ERROR"
 					fi
 				fi
 				return 1
@@ -395,24 +410,24 @@ function WaitForCompletion {
 		if [ $((($SECONDS + 1) % $KEEP_LOGGING)) -eq 0 ]; then
 			if [ $log_time -ne $EXEC_TIME ]; then
 				log_time=$EXEC_TIME
-				Log "Current task still running."
+				Logger "Current task still running." "NOTICE"
 			fi
 		fi
 		if [ $SECONDS -gt "$2" ]; then
 			if [ $soft_alert -eq 0 ] && [ "$2" != 0 ]; then
-				LogError "Max soft execution time exceeded for script."
+				Logger "Max soft execution time exceeded for script." "WARN"
 				soft_alert=1
 			fi
 			if [ $SECONDS -gt "$3" ] && [ "$3" != 0 ]; then
-				LogError "Max hard execution time exceeded for script. Stopping current task execution."
+				Logger "Max hard execution time exceeded for script. Stopping current task execution." "ERROR"
 				kill -s SIGTERM $1
 				if [ $? == 0 ]; then
-					LogError "Task stopped succesfully"
+					Logger "Task stopped succesfully" "NOTICE"
 				else
-					LogError "Sending SIGTERM to proces failed. Trying the hard way."
+					Logger "Sending SIGTERM to proces failed. Trying the hard way." "ERROR"
 					kill -9 $1
 					if [ $? != 0 ]; then
-						LogError "Could not stop task."
+						Logger "Could not stop task." "ERROR"
 					fi
 				fi
 				return 1
@@ -427,25 +442,26 @@ function WaitForCompletion {
 ## Runs local command $1 and waits for completition in $2 seconds
 function RunLocalCommand {
 	if [ $dryrun -ne 0 ]; then
-		Log "Dryrun: Local command [$1] not run."
+		Logger "Dryrun: Local command [$1] not run." "NOTICE"
 		return 1
 	fi
-	Log "Running command [$1] on local host."
+	Logger "Running command [$1] on local host." "NOTICE"
 	eval "$1" > $RUN_DIR/osync_run_local_$SCRIPT_PID 2>&1 &
 	child_pid=$!
 	WaitForTaskCompletion $child_pid 0 $2
 	retval=$?
 	if [ $retval -eq 0 ]; then
-		Log "Command succeded."
+		Logger "Command succeded." "NOTICE"
 	else
-		LogError "Command failed."
+		Logger "Command failed." "ERROR"
 	fi
 
 	if [ $verbose -eq 1 ] || [ $retval -ne 0 ]; then
-		Log "Command output:\n$(cat $RUN_DIR/osync_run_local_$SCRIPT_PID)"
+		Logger "Command output:\n$(cat $RUN_DIR/osync_run_local_$SCRIPT_PID)" "NOTICE"
 	fi
 
 	if [ "$STOP_ON_CMD_ERROR" == "yes" ] && [ $retval -ne 0 ]; then
+		Logger "Stopping on command execution error." "CRITICAL"
 		exit 1
 	fi
 }
@@ -455,26 +471,27 @@ function RunRemoteCommand {
 	CheckConnectivity3rdPartyHosts
 	CheckConnectivityRemoteHost
 	if [ $dryrun -ne 0 ]; then
-		Log "Dryrun: Local command [$1] not run."
+		Logger "Dryrun: Local command [$1] not run." "NOTICE"
 		return 1
 	fi
-	Log "Running command [$1] on remote host."
+	Logger "Running command [$1] on remote host." "NOTICE"
 	eval "$SSH_CMD \"$1\" > $RUN_DIR/osync_run_remote_$SCRIPT_PID 2>&1 &"
 	child_pid=$!
 	WaitForTaskCompletion $child_pid 0 $2
 	retval=$?
 	if [ $retval -eq 0 ]; then
-		Log "Command succeded."
+		Logger "Command succeded." "NOTICE"
 	else
-		LogError "Command failed."
+		Logger "Command failed." "ERROR"
 	fi
 
 	if [ -f $RUN_DIR/osync_run_remote_$SCRIPT_PID ] && ([ $verbose -eq 1 ] || [ $retval -ne 0 ])
 	then
-		Log "Command output:\n$(cat $RUN_DIR/osync_run_remote_$SCRIPT_PID)"
+		Logger "Command output:\n$(cat $RUN_DIR/osync_run_remote_$SCRIPT_PID)" "NOTICE"
 	fi
 
 	if [ "$STOP_ON_CMD_ERROR" == "yes" ] && [ $retval -ne 0 ]; then
+		Logger "Stopping on command execution error." "CRITICAL"
 		exit 1
 	fi
 }
@@ -503,7 +520,7 @@ function CheckConnectivityRemoteHost {
 	if [ "$REMOTE_HOST_PING" != "no" ] && [ "$REMOTE_SYNC" != "no" ]; then
 		eval "$PING_CMD $REMOTE_HOST > /dev/null 2>&1"
 		if [ $? != 0 ]; then
-			LogError "Cannot ping $REMOTE_HOST"
+			Logger "Cannot ping $REMOTE_HOST" "CRITICAL"
 			exit 1
 		fi
 	fi
@@ -518,14 +535,14 @@ function CheckConnectivity3rdPartyHosts {
 		do
 			eval "$PING_CMD $i > /dev/null 2>&1"
 			if [ $? != 0 ]; then
-				Log "Cannot ping 3rd party host $i"
+				Logger "Cannot ping 3rd party host $i" "WARN"
 			else
 				remote_3rd_party_success=1
 			fi
 		done
 		IFS=$OLD_IFS
 		if [ $remote_3rd_party_success -ne 1 ]; then
-			LogError "No remote 3rd party host responded to ping. No internet ?"
+			Logger "No remote 3rd party host responded to ping. No internet ?" "CRITICAL"
 			exit 1
 		fi
 	fi
@@ -651,7 +668,7 @@ function CreateOsyncDirs {
 	if ! [ -d "$MASTER_STATE_DIR" ]; then
 		mkdir -p "$MASTER_STATE_DIR"
 		if [ $? != 0 ]; then
-			LogError "Cannot create master replica state dir [$MASTER_STATE_DIR]."
+			Logger "Cannot create master replica state dir [$MASTER_STATE_DIR]." "CRITICAL"
 			exit 1
 		fi
 	fi
@@ -669,8 +686,8 @@ function CreateOsyncDirs {
 	fi
 
 	if [ $? != 0 ]; then
-		LogError "Cannot create slave replica state dir [$SLAVE_STATE_DIR]."
-		LogErorr "Command output:\n$(cat $RUN_DIR/osync_createosyncdirs_$SCRIPT_PID)"
+		Logger "Cannot create slave replica state dir [$SLAVE_STATE_DIR]." "CRITICAL"
+		Logger "Command output:\n$(cat $RUN_DIR/osync_createosyncdirs_$SCRIPT_PID)" "NOTICE"
 		exit 1
 	fi
 }
@@ -681,7 +698,7 @@ function CheckMasterSlaveDirs {
 
 	if [ "$REMOTE_SYNC" != "yes" ]; then
 		if [ "$MASTER_SYNC_DIR_CANN" == "$SLAVE_SYNC_DIR_CANN" ]; then
-			LogError "Master directory [$MASTER_SYNC_DIR] can't be the same as slave directory."
+			Logger "Master directory [$MASTER_SYNC_DIR] can't be the same as slave directory." "CRITICAL"
 			exit 1
 		fi
 	fi
@@ -690,12 +707,12 @@ function CheckMasterSlaveDirs {
 		if [ "$CREATE_DIRS" == "yes" ]; then
 			mkdir -p "$MASTER_SYNC_DIR" > $RUN_DIR/osync_checkmasterslavedirs_$SCRIPT_PID 2>&1
 			if [ $? != 0 ]; then
-				LogError "Cannot create master directory [$MASTER_SYNC_DIR]."
-				LogError "Command output:\n$(cat $RUN_DIR/osync_checkmasterslavedirs_$SCRIPT_PID)"
+				Logger "Cannot create master directory [$MASTER_SYNC_DIR]." "CRITICAL"
+				Logger "Command output:\n$(cat $RUN_DIR/osync_checkmasterslavedirs_$SCRIPT_PID)" "NOTICE"
 				exit 1
 			fi
 		else 
-			LogError "Master directory [$MASTER_SYNC_DIR] does not exist."
+			Logger "Master directory [$MASTER_SYNC_DIR] does not exist." "CRITICAL"
 			exit 1
 		fi
 	fi
@@ -708,8 +725,8 @@ function CheckMasterSlaveDirs {
 			child_pid=$!
 			WaitForTaskCompletion $child_pid 0 1800
 			if [ $? != 0 ]; then
-				LogError "Cannot create slave directory [$SLAVE_SYNC_DIR]."
-				LogError "Command output:\n$(cat $RUN_DIR/osync_checkmasterslavedirs_$SCRIPT_PID)"
+				Logger "Cannot create slave directory [$SLAVE_SYNC_DIR]." "CRITICAL"
+				Logger "Command output:\n$(cat $RUN_DIR/osync_checkmasterslavedirs_$SCRIPT_PID)" "NOTICE"
 				exit 1
 			fi
 		else
@@ -718,7 +735,7 @@ function CheckMasterSlaveDirs {
 			WaitForTaskCompletion $child_pid 0 1800
 			res=$?
 			if [ $res != 0 ]; then
-				LogError "Slave directory [$SLAVE_SYNC_DIR] does not exist."
+				Logger "Slave directory [$SLAVE_SYNC_DIR] does not exist." "CRITICAL"
 				exit 1
 			fi
 		fi
@@ -727,13 +744,13 @@ function CheckMasterSlaveDirs {
 			if [ "$CREATE_DIRS" == "yes" ]; then
 				mkdir -p "$SLAVE_SYNC_DIR"
 				if [ $? != 0 ]; then
-					LogError "Cannot create slave directory [$SLAVE_SYNC_DIR]."
+					Logger "Cannot create slave directory [$SLAVE_SYNC_DIR]." "CRITICAL"
 					exit 1
 				else
-					Log "Created slave directory [$SLAVE_SYNC_DIR]."
+					Logger "Created slave directory [$SLAVE_SYNC_DIR]." "NOTICE"
 				fi
 			else
-				LogError "Slave directory [$SLAVE_SYNC_DIR] does not exist."
+				Logger "Slave directory [$SLAVE_SYNC_DIR] does not exist." "CRITICAL"
 				exit 1
 			fi
 		fi
@@ -741,11 +758,11 @@ function CheckMasterSlaveDirs {
 }
 
 function CheckMinimumSpace {
-	Log "Checking minimum disk space on master and slave."
+	Logger "Checking minimum disk space on master and slave." "NOTICE"
 
 	MASTER_SPACE=$(df -P "$MASTER_SYNC_DIR" | tail -1 | awk '{print $4}')
 	if [ $MASTER_SPACE -lt $MINIMUM_SPACE ]; then
-		LogError "There is not enough free space on master [$MASTER_SPACE KB]."
+		Logger "There is not enough free space on master [$MASTER_SPACE KB]." "ERROR"
 	fi
 
 	if [ "$REMOTE_SYNC" == "yes" ]; then
@@ -760,7 +777,7 @@ function CheckMinimumSpace {
 	fi
 
 	if [ $SLAVE_SPACE -lt $MINIMUM_SPACE ]; then
-		LogError "There is not enough free space on slave [$SLAVE_SPACE KB]."
+		Logger "There is not enough free space on slave [$SLAVE_SPACE KB]." "ERROR"
 	fi
 }
 
@@ -805,10 +822,10 @@ function RsyncExcludeFrom {
 function WriteLockFiles {
 	echo $SCRIPT_PID > "$MASTER_LOCK"
 	if [ $? != 0 ]; then
-		LogError "Could not set lock on master replica."
+		Logger "Could not set lock on master replica." "CRITICAL"
 		exit 1
 	else
-		Log "Locked master replica."
+		Logger "Locked master replica." "NOTICE"
 	fi
 
 	if [ "$REMOTE_SYNC" == "yes" ]; then
@@ -818,18 +835,18 @@ function WriteLockFiles {
 		child_pid=$!
 		WaitForTaskCompletion $child_pid 0 1800
 		if [ $? != 0 ]; then
-			LogError "Could not set lock on remote slave replica."
+			Logger "Could not set lock on remote slave replica." "CRITICAL"
 			exit 1
 		else
-			Log "Locked remote slave replica."
+			Logger "Locked remote slave replica." "NOTICE"
 		fi
 	else
 		echo "$SCRIPT_PID@$SYNC_ID" > "$SLAVE_LOCK"
 		if [ $? != 0 ]; then
-			LogError "Couuld not set lock on local slave replica."
+			Logger "Couuld not set lock on local slave replica." "CRITICAL"
 			exit 1
 		else
-			Log "Locked local slave replica."
+			Logger "Locked local slave replica." "NOTICE"
 		fi
 	fi
 }
@@ -846,16 +863,16 @@ function LockDirectories {
 		fi
 	fi
 
-	Log "Checking for replica locks."
+	Logger "Checking for replica locks." "NOTICE"
 
 	if [ -f "$MASTER_LOCK" ]; then
 		master_lock_pid=$(cat $MASTER_LOCK)
-		LogDebug "Master lock pid present: $master_lock_pid"
+		Logger "Master lock pid present: $master_lock_pid" "DEBUG"
 		ps -p$master_lock_pid > /dev/null 2>&1
 		if [ $? != 0 ]; then
-			Log "There is a dead osync lock on master. Instance $master_lock_pid no longer running. Resuming."
+			Logger "There is a dead osync lock on master. Instance $master_lock_pid no longer running. Resuming." "NOTICE"
 		else
-			LogError "There is already a local instance of osync that locks master replica. Cannot start. If your are sure this is an error, plaese kill instance $master_lock_pid of osync."
+			Logger "There is already a local instance of osync that locks master replica. Cannot start. If your are sure this is an error, plaese kill instance $master_lock_pid of osync." "CRITICAL"
 			exit 1
 		fi
 	fi
@@ -878,23 +895,22 @@ function LockDirectories {
 	fi
 
 	if [ "$slave_lock_pid" != "" ] && [ "$slave_lock_id" != "" ]; then
-		LogDebug "Slave lock pid: $slave_lock_pid"
-		LogDebug "Slave lock id: $slave_lock_pid"
+		Logger "Slave lock pid: $slave_lock_pid" "DEBUG"
 
 		ps -p$slave_lock_pid > /dev/null
 		if [ $? != 0 ]; then
 			if [ "$slave_lock_id" == "$SYNC_ID" ]; then
-				Log "There is a dead osync lock on slave replica that corresponds to this master sync-id. Instance $slave_lock_pid no longer running. Resuming."
+				Logger "There is a dead osync lock on slave replica that corresponds to this master sync-id. Instance $slave_lock_pid no longer running. Resuming." "NOTICE"
 			else
 				if [ "$FORCE_STRANGER_LOCK_RESUME" == "yes" ]; then
-					LogError "WARNING: There is a dead osync lock on slave replica that does not correspond to this master sync-id. Forcing resume."
+					Logger "WARNING: There is a dead osync lock on slave replica that does not correspond to this master sync-id. Forcing resume." "WARN"
 				else
-					LogError "There is a dead osync lock on slave replica that does not correspond to this master sync-id. Will not resume."
+					Logger "There is a dead osync lock on slave replica that does not correspond to this master sync-id. Will not resume." "CRITICAL"
 					exit 1
 				fi
 			fi
 		else
-			LogError "There is already a local instance of osync that locks slave replica. Cannot start. If you are sure this is an error, please kill instance $slave_lock_pid of osync."
+			Logger "There is already a local instance of osync that locks slave replica. Cannot start. If you are sure this is an error, please kill instance $slave_lock_pid of osync." "CRITICAL"
 			exit 1
 		fi
 	fi
@@ -920,18 +936,18 @@ function UnlockDirectories {
 	fi
 
 	if [ $? != 0 ]; then
-		LogError "Could not unlock slave replica."
-		LogError "Command Output:\n$(cat $RUN_DIR/osync_UnlockDirectories_$SCRIPT_PID)"
+		Logger "Could not unlock slave replica." "ERROR"
+		Logger "Command Output:\n$(cat $RUN_DIR/osync_UnlockDirectories_$SCRIPT_PID)" "NOTICE"
 	else
-		Log "Removed slave replica lock."
+		Logger "Removed slave replica lock." "NOTICE"
 	fi
 
 	if [ -f "$MASTER_LOCK" ]; then
 		rm "$MASTER_LOCK"
 		if [ $? != 0 ]; then
-			LogError "Could not unlock master replica."
+			Logger "Could not unlock master replica." "ERROR"
 		else
-			Log "Removed master replica lock."
+			Logger "Removed master replica lock." "NOTICE"
 		fi
 	fi
 }
@@ -946,7 +962,7 @@ function UnlockDirectories {
 
 ## tree_list(replica_path, replica type, tree_filename) Creates a list of files in replica_path for replica type (master/slave) in filename $3
 function tree_list {
-	Log "Creating $2 replica file list [$1]."
+	Logger "Creating $2 replica file list [$1]." "NOTICE"
 	if [ "$REMOTE_SYNC" == "yes" ] && [ "$2" == "slave" ]; then
 		CheckConnectivity3rdPartyHosts
 		CheckConnectivityRemoteHost
@@ -955,7 +971,7 @@ function tree_list {
 	else
 		rsync_cmd="$(type -p $RSYNC_EXECUTABLE) --rsync-path=\"$RSYNC_PATH\" $RSYNC_ARGS -8 --exclude \"$OSYNC_DIR\" $RSYNC_EXCLUDE --list-only \"$1/\" | grep \"^-\|^d\" | awk '{\$1=\$2=\$3=\$4=\"\" ;print}' | awk '{\$1=\$1 ;print}' | (grep -v \"^\.$\" || :) | sort > \"$RUN_DIR/osync_$2_$SCRIPT_PID\" &"
 	fi
-	LogDebug "RSYNC_CMD: $rsync_cmd"
+	Logger "RSYNC_CMD: $rsync_cmd" "DEBUG"
 	## Redirect commands stderr here to get rsync stderr output in logfile
 	eval $rsync_cmd 2>> "$LOG_FILE"
 	child_pid=$!
@@ -966,14 +982,14 @@ function tree_list {
 		mv $RUN_DIR/osync_$2_$SCRIPT_PID "$MASTER_STATE_DIR/$2$3"
 		return $?
 	else
-		LogError "Cannot create replica file list."
+		Logger "Cannot create replica file list." "CRITICAL"
 		exit $retval
 	fi
 }
 
 # delete_list(replica, tree-file-after, tree-file-current, deleted-list-file, deleted-failed-list-file): Creates a list of files vanished from last run on replica $1 (master/slave)
 function delete_list {
-	Log "Creating $1 replica deleted file list."
+	Logger "Creating $1 replica deleted file list." "NOTICE"
 	if [ -f "$MASTER_STATE_DIR/$1$TREE_AFTER_FILENAME_NO_SUFFIX" ]; then
 		## Same functionnality, comm is much faster than grep but is not available on every platform
 		if type -p comm > /dev/null 2>&1
@@ -984,8 +1000,8 @@ function delete_list {
 			cmd="(grep -F -x -v -f \"$MASTER_STATE_DIR/$1$3\" \"$MASTER_STATE_DIR/$1$TREE_AFTER_FILENAME_NO_SUFFIX\" || :) > \"$MASTER_STATE_DIR/$1$4\""
 		fi
 
-		LogDebug "CMD: $cmd"
-		eval $cmd
+		Logger "CMD: $cmd" "DEBUG"
+		eval $cmd 2>> "$LOG_FILE"
 		retval=$?
 
 		# Add delete failed file list to current delete list and then empty it
@@ -1003,7 +1019,7 @@ function delete_list {
 
 # sync_update(source replica, destination replica, delete_list_filename)
 function sync_update {
-	Log "Updating $2 replica."
+	Logger "Updating $2 replica." "NOTICE"
 	if [ "$1" == "master" ]; then
 		SOURCE_DIR="$MASTER_SYNC_DIR"
 		ESC_SOURCE_DIR=$(EscapeSpaces "$MASTER_SYNC_DIR")
@@ -1029,23 +1045,23 @@ function sync_update {
 	else
 		rsync_cmd="$(type -p $RSYNC_EXECUTABLE) --rsync-path=\"$RSYNC_PATH\" $RSYNC_ARGS $SYNC_OPTS $BACKUP_DIR --exclude \"$OSYNC_DIR\" $RSYNC_EXCLUDE --exclude-from=\"$MASTER_STATE_DIR/$1$3\" --exclude-from=\"$MASTER_STATE_DIR/$2$3\" \"$SOURCE_DIR/\" \"$DEST_DIR/\" > $RUN_DIR/osync_update_$2_replica_$SCRIPT_PID 2>&1 &"
 	fi
-	LogDebug "RSYNC_CMD: $rsync_cmd"
+	Logger "RSYNC_CMD: $rsync_cmd" "DEBUG"
 	eval "$rsync_cmd"
 	child_pid=$!
 	WaitForCompletion $child_pid $SOFT_MAX_EXEC_TIME $HARD_MAX_EXEC_TIME
 	retval=$?
 	if [ $verbose -eq 1 ] && [ -f $RUN_DIR/osync_update_$2_replica_$SCRIPT_PID ]; then
-		Log "List:\n$(cat $RUN_DIR/osync_update_$2_replica_$SCRIPT_PID)"
+		Logger "List:\n$(cat $RUN_DIR/osync_update_$2_replica_$SCRIPT_PID)" "NOTICE"
 	fi
 
 	if [ $retval != 0 ] && [ $retval != 24 ]; then
-		LogError "Updating $2 replica failed. Stopping execution."
+		Logger "Updating $2 replica failed. Stopping execution." "CRITICAL"
 		if [ $verbose -eq 0 ] && [ -f $RUN_DIR/osync_update_$2_replica_$SCRIPT_PID ]; then
-			LogError "Rsync output:\n$(cat $RUN_DIR/osync_update_$2_replica_$SCRIPT_PID)"
+			Logger "Rsync output:\n$(cat $RUN_DIR/osync_update_$2_replica_$SCRIPT_PID)" "NOTICE"
 		fi
 		exit $retval
 	else
-		Log "Updating $2 replica succeded."
+		Logger "Updating $2 replica succeded." "NOTICE"
 		return 0
 	fi
 }
@@ -1063,12 +1079,12 @@ function _delete_local {
 				if [ ! -d "$REPLICA_DIR$3" ]; then
 					mkdir -p "$REPLICA_DIR$3"
 					if [ $? != 0 ]; then
-						LogError "Cannot create replica deletion directory."
+						Logger "Cannot create replica deletion directory." "ERROR"
 					fi
 				fi
 
 				if [ $verbose -eq 1 ]; then
-					Log "Soft deleting $REPLICA_DIR$files"
+					Logger "Soft deleting $REPLICA_DIR$files" "NOTICE"
 				fi
 
 				if [ $dryrun -ne 1 ]; then
@@ -1084,19 +1100,19 @@ function _delete_local {
 						mv -f "$REPLICA_DIR$files" "$REPLICA_DIR$3"
 					fi
 					if [ $? != 0 ]; then
-						LogError "Cannot move $REPLICA_DIR$files to deletion directory."
+						Logger "Cannot move $REPLICA_DIR$files to deletion directory." "ERROR"
 						echo "$files" >> "$MASTER_STATE_DIR/$4"
 					fi
 				fi
 			else
 				if [ $verbose -eq 1 ]; then
-					Log "Deleting $REPLICA_DIR$files"
+					Logger "Deleting $REPLICA_DIR$files" "NOTICE"
 				fi
 
 				if [ $dryrun -ne 1 ]; then
 					rm -rf "$REPLICA_DIR$files"
 					if [ $? != 0 ]; then
-						LogError "Cannot delete $REPLICA_DIR$files"
+						Logger "Cannot delete $REPLICA_DIR$files" "ERROR"
 						echo "$files" >> "$MASTER_STATE_DIR/$4"
 					fi
 				fi
@@ -1115,12 +1131,12 @@ function _delete_remote {
 	# Additionnaly, we need to copy the deletetion list to the remote state folder
 	ESC_DEST_DIR="$(EscapeSpaces "$SLAVE_STATE_DIR")"
 	rsync_cmd="$(type -p $RSYNC_EXECUTABLE) --rsync-path=\"$RSYNC_PATH\" $SYNC_OPTS -e \"$RSYNC_SSH_CMD\" \"$MASTER_STATE_DIR/$2\" $REMOTE_USER@$REMOTE_HOST:\"$ESC_DEST_DIR/\" > $RUN_DIR/osync_remote_deletion_list_copy_$SCRIPT_PID 2>&1"
-	LogDebug "RSYNC_CMD: $rsync_cmd"
+	Logger "RSYNC_CMD: $rsync_cmd" "DEBUG"
 	eval $rsync_cmd 2>> "$LOG_FILE"
 	if [ $? != 0 ]; then
-		LogError "Cannot copy the deletion list to remote replica."
+		Logger "Cannot copy the deletion list to remote replica." "CRITICAL"
 		if [ -f $RUN_DIR/osync_remote_deletion_list_copy_$SCRIPT_PID ]; then
-			LogError "$(cat $RUN_DIR/osync_remote_deletion_list_copy_$SCRIPT_PID)"
+			Logger "$(cat $RUN_DIR/osync_remote_deletion_list_copy_$SCRIPT_PID)" "CRITICAL" #TODO: remote deletion is critical. local deletion isn't. What to do ?
 		fi
 		exit 1
 	fi
@@ -1128,25 +1144,45 @@ function _delete_remote {
 $SSH_CMD error_alert=0 sync_on_changes=$sync_on_changes silent=$silent DEBUG=$DEBUG dryrun=$dryrun verbose=$verbose COMMAND_SUDO=$COMMAND_SUDO FILE_LIST="$(EscapeSpaces "$SLAVE_STATE_DIR/$2")" REPLICA_DIR="$(EscapeSpaces "$REPLICA_DIR")" DELETE_DIR="$(EscapeSpaces "$DELETE_DIR")" FAILED_DELETE_LIST="$(EscapeSpaces "$SLAVE_STATE_DIR/$4")" 'bash -s' << 'ENDSSH' > $RUN_DIR/osync_remote_deletion_$SCRIPT_PID 2>&1 &
 
 	## The following lines are executed remotely
-	function Log
-	{
+	function _logger {
+		local value="${1}" # What to log
+		echo -e "$value" >> "$LOG_FILE"
+
+		if [ $silent -eq 0 ]; then
+		echo -e "$value"
+		fi
+	}
+
+	function Logger {
+		local value="${1}" # What to log
+		local level="${2}" # Log level: DEBUG, NOTICE, WARN, ERROR, CRITIAL
+
+		# Special case in daemon mode we should timestamp instead of counting seconds
 		if [ $sync_on_changes -eq 1 ]; then
 			prefix="$(date) - "
 		else
-			prefix="R-TIME: $SECONDS - "
+			prefix="TIME: $SECONDS - "
 		fi
 
-		if [ $silent -eq 0 ]; then
-			echo -e "$prefix$1"
+		if [ "$level" == "CRITICAL" ]; then
+			_logger "$prefix\e[41m$value\e[0m"
+			ERROR_ALERT=1
+		elif [ "$level" == "ERROR" ]; then
+			_logger "$prefix\e[91m$value\e[0m"
+			ERROR_ALERT=1
+		elif [ "$level" == "WARN" ]; then
+			_logger "$prefix\e[93m$value\e[0m"
+		elif [ "$level" == "NOTICE" ]; then
+			_logger "$prefix$value"
+		elif [ "$level" == "DEBUG" ] && [ "$DEBUG" == "yes" ]; then
+			_logger "$prefix$value"
+		else
+			_logger "\e[41mLogger function called without proper loglevel.\e[0m"
+			_logger "$prefix$value"
 		fi
-	}
 
-	function LogError
-	{
-		Log "$1"
-		error_alert=1
 	}
-
+	
 	## Empty earlier failed delete list
 	> "$FAILED_DELETE_LIST"
 
@@ -1160,13 +1196,13 @@ $SSH_CMD error_alert=0 sync_on_changes=$sync_on_changes silent=$silent DEBUG=$DE
 			if [ ! -d "$REPLICA_DIR$DELETE_DIR" ]; then
 					$COMMAND_SUDO mkdir -p "$REPLICA_DIR$DELETE_DIR"
 					if [ $? != 0 ]; then
-						LogError "Cannot create replica deletion directory."
+						Logger "Cannot create replica deletion directory." "ERROR"
 					fi
 				fi
 
 			if [ "$SOFT_DELETE" != "no" ]; then
 				if [ $verbose -eq 1 ]; then
-					Log "Soft deleting $REPLICA_DIR$files"
+					Logger "Soft deleting $REPLICA_DIR$files" "NOTICE"
 				fi
 
 				if [ $dryrun -ne 1 ]; then
@@ -1182,19 +1218,19 @@ $SSH_CMD error_alert=0 sync_on_changes=$sync_on_changes silent=$silent DEBUG=$DE
 						$COMMAND_SUDO mv -f "$REPLICA_DIR$files" "$REPLICA_DIR$DELETE_DIR"
 					fi
 					if [ $? != 0 ]; then
-						LogError "Cannot move $REPLICA_DIR$files to deletion directory."
+						Logger "Cannot move $REPLICA_DIR$files to deletion directory." "ERROR"
 						echo "$files" >> "$FAILED_DELETE_LIST"
 					fi
 				fi
 			else
 				if [ $verbose -eq 1 ]; then
-					Log "Deleting $REPLICA_DIR$files"
+					Logger "Deleting $REPLICA_DIR$files" "NOTICE"
 				fi
 
 				if [ $dryrun -ne 1 ]; then
 					$COMMAND_SUDO rm -rf "$REPLICA_DIR$files"
 					if [ $? != 0 ]; then
-						LogError "Cannot delete $REPLICA_DIR$files"
+						Logger "Cannot delete $REPLICA_DIR$files" "ERROR"
 						echo "$files" >> "$SLAVE_STATE_DIR/$FAILED_DELETE_LIST"
 					fi
 				fi
@@ -1211,12 +1247,12 @@ ENDSSH
 	## Copy back the deleted failed file list
 	ESC_SOURCE_FILE="$(EscapeSpaces "$SLAVE_STATE_DIR/$4")"
 	rsync_cmd="$(type -p $RSYNC_EXECUTABLE) --rsync-path=\"$RSYNC_PATH\" $SYNC_OPTS -e \"$RSYNC_SSH_CMD\" $REMOTE_USER@$REMOTE_HOST:\"$ESC_SOURCE_FILE\" \"$MASTER_STATE_DIR\" > $RUN_DIR/osync_remote_failed_deletion_list_copy_$SCRIPT_PID"
-	LogDebug "RSYNC_CMD: $rsync_cmd"
+	Logger "RSYNC_CMD: $rsync_cmd" "DEBUG"
 	eval $rsync_cmd 2>> "$LOG_FILE"
 	if [ $? != 0 ]; then
-		LogError "Cannot copy back the failed deletion list to master replica."
+		Logger "Cannot copy back the failed deletion list to master replica." "CRITICAL"
 		if [ -f $RUN_DIR/osync_remote_failed_deletion_list_copy_$SCRIPT_PID ]; then
-			LogError "$(cat $RUN_DIR/osync_remote_failed_deletion_list_copy_$SCRIPT_PID)"
+			Logger "$(cat $RUN_DIR/osync_remote_failed_deletion_list_copy_$SCRIPT_PID)" "NOTICE"
 		fi
 		exit 1
 	fi
@@ -1230,7 +1266,7 @@ ENDSSH
 # delete_propagation(replica name, deleted_list_filename, deleted_failed_file_list)
 # replica name = "master" / "slave"
 function deletion_propagation {
-	Log "Propagating deletions to $1 replica."
+	Logger "Propagating deletions to $1 replica." "NOTICE"
 
 	if [ "$1" == "master" ]; then
 		REPLICA_DIR="$MASTER_SYNC_DIR"
@@ -1241,7 +1277,7 @@ function deletion_propagation {
 		WaitForCompletion $child_pid $SOFT_MAX_EXEC_TIME $HARD_MAX_EXEC_TIME
 		retval=$?
 		if [ $retval != 0 ]; then
-			LogError "Deletion on replica $1 failed."
+			Logger "Deletion on replica $1 failed." "CRITICAL"
 			exit 1
 		fi
 	else
@@ -1258,13 +1294,13 @@ function deletion_propagation {
 		retval=$?
 		if [ $retval == 0 ]; then
 			if [ -f $RUN_DIR/osync_remote_deletion_$SCRIPT_PID ] && [ $verbose -eq 1 ]; then
-				Log "Remote:\n$(cat $RUN_DIR/osync_remote_deletion_$SCRIPT_PID)"
+				Logger "Remote:\n$(cat $RUN_DIR/osync_remote_deletion_$SCRIPT_PID)" "DEBUG"
 			fi
 			return $retval
 		else
-			LogError "Deletion on remote system failed."
+			Logger "Deletion on remote system failed." "CRITICAL"
 			if [ -f $RUN_DIR/osync_remote_deletion_$SCRIPT_PID ]; then
-				LogError "Remote:\n$(cat $RUN_DIR/osync_remote_deletion_$SCRIPT_PID)"
+				Logger "Remote:\n$(cat $RUN_DIR/osync_remote_deletion_$SCRIPT_PID)" "CRITICAL"
 			fi
 			exit 1
 		fi
@@ -1280,7 +1316,7 @@ function deletion_propagation {
 ###### Step 5: Create after run tree list for master and slave replicas (Steps 5M and 5S)
 
 function Sync {
-	Log "Starting synchronization task."
+	Logger "Starting synchronization task." "NOTICE"
 	CheckConnectivity3rdPartyHosts
 	CheckConnectivityRemoteHost
 
@@ -1294,13 +1330,13 @@ function Sync {
 
 		if [ $resume_count -lt $RESUME_TRY ]; then
 			if [ "$resume_sync" != "sync.success" ]; then
-				Log "WARNING: Trying to resume aborted osync execution on $($STAT_CMD "$MASTER_LAST_ACTION") at task [$resume_sync]. [$resume_count] previous tries."
+				Logger "WARNING: Trying to resume aborted osync execution on $($STAT_CMD "$MASTER_LAST_ACTION") at task [$resume_sync]. [$resume_count] previous tries." "WARN"
 				echo $(($resume_count+1)) > "$MASTER_RESUME_COUNT"
 			else
 				resume_sync=none
 			fi
 		else
-			Log "Will not resume aborted osync execution. Too much resume tries [$resume_count]."
+			Logger "Will not resume aborted osync execution. Too much resume tries [$resume_count]." "WARN"
 			echo "noresume" > "$MASTER_LAST_ACTION"
 			echo "0" > "$MASTER_RESUME_COUNT"
 			resume_sync=none
@@ -1431,7 +1467,7 @@ function Sync {
 		resume_sync="resumed"
 	fi
 
-	Log "Finished synchronization task."
+	Logger "Finished synchronization task." "NOTICE"
 	echo "${SYNC_ACTION[10]}" > "$MASTER_LAST_ACTION"
 
 	echo "0" > "$MASTER_RESUME_COUNT"
@@ -1439,12 +1475,12 @@ function Sync {
 
 function SoftDelete {
 	if [ "$CONFLICT_BACKUP" != "no" ] && [ $CONFLICT_BACKUP_DAYS -ne 0 ]; then
-		Log "Running conflict backup cleanup."
+		Logger "Running conflict backup cleanup." "NOTICE"
 		_SoftDelete $CONFLICT_BACKUP_DAYS "$MASTER_SYNC_DIR$MASTER_BACKUP_DIR" "$SLAVE_SYNC_DIR$SLAVE_BACKUP_DIR"
 	fi
 
 	if [ "$SOFT_DELETE" != "no" ] && [ $SOFT_DELETE_DAYS -ne 0 ]; then
-		Log "Running soft deletion cleanup."
+		Logger "Running soft deletion cleanup." "NOTICE"
 		_SoftDelete $SOFT_DELETE_DAYS "$MASTER_SYNC_DIR$MASTER_DELETE_DIR" "$SLAVE_SYNC_DIR$SLAVE_DELETE_DIR"	
 	fi	
 }
@@ -1455,16 +1491,16 @@ function SoftDelete {
 function _SoftDelete {
 	if [ -d "$2" ]; then
 		if [ $dryrun -eq 1 ]; then
-			Log "Listing files older than $1 days on master replica. Won't remove anything."
+			Logger "Listing files older than $1 days on master replica. Won't remove anything." "NOTICE"
 		else
-			Log "Removing files older than $1 days on master replica."
+			Logger "Removing files older than $1 days on master replica." "NOTICE"
 		fi
 			if [ $verbose -eq 1 ]; then
 			# Cannot launch log function from xargs, ugly hack
 			$FIND_CMD "$2/" -type f -ctime +$1 -print0 | xargs -0 -I {} echo "Will delete file {}" > $RUN_DIR/osync_soft_delete_master_$SCRIPT_PID
-			Log "Command output:\n$(cat $RUN_DIR/osync_soft_delete_master_$SCRIPT_PID)"
+			Logger "Command output:\n$(cat $RUN_DIR/osync_soft_delete_master_$SCRIPT_PID)" "NOTICE"
 			$FIND_CMD "$2/" -type d -empty -ctime +$1 -print0 | xargs -0 -I {} echo "Will delete directory {}" > $RUN_DIR/osync_soft_delete_master_$SCRIPT_PID
-			Log "Command output:\n$(cat $RUN_DIR/osync_soft_delete_master_$SCRIPT_PID)"
+			Logger "Command output:\n$(cat $RUN_DIR/osync_soft_delete_master_$SCRIPT_PID)" "NOTICE"
 		fi
 			if [ $dryrun -ne 1 ]; then
 			$FIND_CMD "$2/" -type f -ctime +$1 -print0 | xargs -0 -I {} rm -f "{}" && $FIND_CMD "$2/" -type d -empty -ctime +$1 -print0 | xargs -0 -I {} rm -rf "{}" > $RUN_DIR/osync_soft_delete_master_$SCRIPT_PID 2>&1 &
@@ -1475,27 +1511,27 @@ function _SoftDelete {
 		WaitForCompletion $child_pid $SOFT_MAX_EXEC_TIME $HARD_MAX_EXEC_TIME
 		retval=$?
 		if [ $retval -ne 0 ]; then
-			LogError "Error while executing cleanup on master replica."
-			Log "Command output:\n$(cat $RUN_DIR/osync_soft_delete_master_$SCRIPT_PID)"
+			Logger "Error while executing cleanup on master replica." "ERROR"
+			Logger "Command output:\n$(cat $RUN_DIR/osync_soft_delete_master_$SCRIPT_PID)" "NOTICE"
 		else
-			Log "Cleanup complete on master replica."
+			Logger "Cleanup complete on master replica." "NOTICE"
 		fi
 	elif [ -d "$2" ] && ! [ -w "$2" ]; then
-		LogError "Warning: Master replica dir [$2] isn't writable. Cannot clean old files."
+		Logger "Warning: Master replica dir [$2] isn't writable. Cannot clean old files." "ERROR"
 	fi
 
 	if [ "$REMOTE_SYNC" == "yes" ]; then
 		CheckConnectivity3rdPartyHosts
 		CheckConnectivityRemoteHost
 			if [ $dryrun -eq 1 ]; then
-			Log "Listing files older than $1 days on slave replica. Won't remove anything."
+			Logger "Listing files older than $1 days on slave replica. Won't remove anything." "NOTICE"
 		else
-			Log "Removing files older than $1 days on slave replica."
+			Logger "Removing files older than $1 days on slave replica." "NOTICE"
 		fi
 			if [ $verbose -eq 1 ]; then
 			# Cannot launch log function from xargs, ugly hack
 			eval "$SSH_CMD \"if [ -w \\\"$3\\\" ]; then $COMMAND_SUDO $REMOTE_FIND_CMD \\\"$3/\\\" -type f -ctime +$1 -print0 | xargs -0 -I {} echo Will delete file {} && $REMOTE_FIND_CMD \\\"$3/\\\" -type d -empty -ctime $1 -print0 | xargs -0 -I {} echo Will delete directory {}; fi\"" > $RUN_DIR/osync_soft_delete_slave_$SCRIPT_PID
-			Log "Command output:\n$(cat $RUN_DIR/osync_soft_delete_slave_$SCRIPT_PID)"
+			Logger "Command output:\n$(cat $RUN_DIR/osync_soft_delete_slave_$SCRIPT_PID)" "NOTICE"
 		fi
 			if [ $dryrun -ne 1 ]; then
 			eval "$SSH_CMD \"if [ -w \\\"$3\\\" ]; then $COMMAND_SUDO $REMOTE_FIND_CMD \\\"$3/\\\" -type f -ctime +$1 -print0 | xargs -0 -I {} rm -f \\\"{}\\\" && $REMOTE_FIND_CMD \\\"$3/\\\" -type d -empty -ctime $1 -print0 | xargs -0 -I {} rm -rf \\\"{}\\\"; fi 2>&1\"" > $RUN_DIR/osync_soft_delete_slave_$SCRIPT_PID &
@@ -1506,24 +1542,24 @@ function _SoftDelete {
 			WaitForCompletion $child_pid $SOFT_MAX_EXEC_TIME $HARD_MAX_EXEC_TIME
 			retval=$?
 			if [ $retval -ne 0 ]; then
-				LogError "Error while executing cleanup on slave replica."
-				Log "Command output:\n$(cat $RUN_DIR/osync_soft_delete_slave_$SCRIPT_PID)"
+				Logger "Error while executing cleanup on slave replica." "ERROR"
+				Logger "Command output:\n$(cat $RUN_DIR/osync_soft_delete_slave_$SCRIPT_PID)" "NOTICE"
 			else
-				Log "Cleanup complete on slave replica."
+				Logger "Cleanup complete on slave replica." "NOTICE"
 			fi
 	else
 	if [ -w "$3" ]; then
 		if [ $dryrun -eq 1 ]; then
-			Log "Listing files older than $1 days on slave replica. Won't remove anything."
+			Logger "Listing files older than $1 days on slave replica. Won't remove anything." "NOTICE"
 		else
-			Log "Removing files older than $1 days on slave replica."
+			Logger "Removing files older than $1 days on slave replica." "NOTICE"
 		fi
 			if [ $verbose -eq 1 ]; then
 			# Cannot launch log function from xargs, ugly hack
 			$FIND_CMD "$3/" -type f -ctime +$1 -print0 | xargs -0 -I {} echo "Will delete file {}" > $RUN_DIR/osync_soft_delete_slave_$SCRIPT_PID
-			Log "Command output:\n$(cat $RUN_DIR/osync_soft_delete_slave_$SCRIPT_PID)"
+			Logger "Command output:\n$(cat $RUN_DIR/osync_soft_delete_slave_$SCRIPT_PID)" "NOTICE"
 			$FIND_CMD "$3/" -type d -empty -ctime +$1 -print0 | xargs -0 -I {} echo "Will delete directory {}" > $RUN_DIR/osync_soft_delete_slave_$SCRIPT_PID
-			Log "Command output:\n$(cat $RUN_DIR/osync_soft_delete_slave_$SCRIPT_PID)"
+			Logger "Command output:\n$(cat $RUN_DIR/osync_soft_delete_slave_$SCRIPT_PID)" "NOTICE"
 			Dummy &
 		fi
 			if [ $dryrun -ne 1 ]; then
@@ -1533,13 +1569,13 @@ function _SoftDelete {
 		WaitForCompletion $child_pid $SOFT_MAX_EXEC_TIME $HARD_MAX_EXEC_TIME
 		retval=$?
 		if [ $retval -ne 0 ]; then
-			LogError "Error while executing cleanup on slave replica."
-			Log "Command output:\n$(cat $RUN_DIR/osync_soft_delete_slave_$SCRIPT_PID)"
+			Logger "Error while executing cleanup on slave replica." "ERROR"
+			Logger "Command output:\n$(cat $RUN_DIR/osync_soft_delete_slave_$SCRIPT_PID)" "NOTICE"
 		else
-			Log "Cleanup complete on slave replica."
+			Logger "Cleanup complete on slave replica." "NOTICE"
 		fi
 		elif [ -d "$3" ] && ! [ -w "$3" ]; then
-			LogError "Warning: Slave replica dir [$3] isn't writable. Cannot clean old files."
+			Logger "Warning: Slave replica dir [$3] isn't writable. Cannot clean old files." "ERROR"
 		fi
 	fi
 	
@@ -1851,11 +1887,11 @@ function Usage {
 function SyncOnChanges {
 	if ! type -p inotifywait > /dev/null 2>&1
 	then
-		LogError "No inotifywait command found. Cannot monitor changes."
+		Logger "No inotifywait command found. Cannot monitor changes." "CRITICAL"
 		exit 1
 	fi
 
-	Log "#### Running Osync in file monitor mode."
+	Logger "#### Running Osync in file monitor mode." "NOTICE"
 
 	while true
 	do
@@ -1867,22 +1903,22 @@ function SyncOnChanges {
 		eval $cmd
 		retval=$?
 		if [ $retval != 0 ]; then
-			LogError "osync child exited with error."
+			Logger "osync child exited with error." "CRITICAL"
 			exit $retval
 		fi
 
-		Log "#### Monitoring now."
+		Logger "#### Monitoring now." "NOTICE"
 		inotifywait --exclude $OSYNC_DIR $RSYNC_EXCLUDE -qq -r -e create -e modify -e delete -e move -e attrib --timeout "$MAX_WAIT" "$MASTER_SYNC_DIR" &
 		sub_pid=$!
 		wait $sub_pid
 		retval=$?
 		if [ $retval == 0 ]; then
-			Log "#### Changes detected, waiting $MIN_WAIT seconds before running next sync."
+			Logger "#### Changes detected, waiting $MIN_WAIT seconds before running next sync." "NOTICE"
 			sleep $MIN_WAIT
 		elif [ $retval == 2 ]; then
-			Log "#### $MAX_WAIT timeout reached, running sync."
+			Logger "#### $MAX_WAIT timeout reached, running sync." "NOTICE"
 		else
-			LogError "#### inotify error detected, waiting $MIN_WAIT seconds before running next sync."
+			Logger "#### inotify error detected, waiting $MIN_WAIT seconds before running next sync." "ERROR"
 			sleep $MIN_WAIT
 		fi
 	done
@@ -1981,7 +2017,7 @@ do
 		;;
 		*)
 		if [ $first == "0" ]; then
-			LogError "Unknown option '$i'"
+			Logger "Unknown option '$i'" "CRITICAL"
 			Usage
 		fi
 		;;
@@ -2055,10 +2091,10 @@ then
 		SyncOnChanges
 	else
 		DATE=$(date)
-		Log "-------------------------------------------------------------"
-		Log "$DRY_WARNING $DATE - $PROGRAM $PROGRAM_VERSION script begin."
-		Log "-------------------------------------------------------------"
-		Log "Sync task [$SYNC_ID] launched as $LOCAL_USER@$LOCAL_HOST (PID $SCRIPT_PID)"
+		Logger "-------------------------------------------------------------" "NOTICE"
+		Logger "$DRY_WARNING $DATE - $PROGRAM $PROGRAM_VERSION script begin." "NOTICE"
+		Logger "-------------------------------------------------------------" "NOTICE"
+		Logger "Sync task [$SYNC_ID] launched as $LOCAL_USER@$LOCAL_HOST (PID $SCRIPT_PID)" "NOTICE"
 		if [ $no_maxtime -eq 1 ]; then
 			SOFT_MAX_EXEC_TIME=0
 			HARD_MAX_EXEC_TIME=0
@@ -2075,6 +2111,6 @@ then
 		fi
 	fi
 else
-	LogError "Environment not suitable to run osync."
+	Logger "Environment not suitable to run osync." "CRITICAL"
 	exit 1
 fi

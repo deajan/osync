@@ -27,13 +27,15 @@ Some users report osync to work on MacOS X too. Microsoft Windows is supported v
 
 ## Installation
 
+Please note that development of version 1.1 has begun. Stable release is v1.01.
+
 Osync has been designed to not delete any data, but rather make backups of conflictual files or soft deletes.
 Nevertheless, you should always have a neat backup of your data before trying a new sync tool.
 
 You can download the latest stable release of Osync at www.netpower.fr/osync
 You may also get the last development version at https://github.com/deajan/osync with the following command
 
-	$ git clone https://github.com/deajan/osync
+	$ git clone -b "v1.01" https://github.com/deajan/osync
 	$ sh install.sh
 
 Osync will install itself to /usr/local/bin and an example configuration file will be installed to /etc/osync

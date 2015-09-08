@@ -1,0 +1,66 @@
+Coding style used for my bash projects (v2 Sep 2015)
+
+1. Indentation
+
+Using tabs
+Transform old shell scripts using unexpand command
+
+2. Comments
+
+# Some comment
+## Some important comment for the next function
+################################################# Some separation
+
+3. Functions
+
+Every word in a function begins with an uppercase (ex: SomeFunctionDoesThings)
+
+Define functions this way. Use sed ':a;N;$!ba;s/\n{\n/ {\n/g' to adapt when opening bracket is on a new line.
+
+function something {
+	
+}
+
+If function has some arguments, use local variable names that are more readable than $1...$n. Explain via comments what those variables contain if needed.
+
+function anotherthing {
+	local var_name="${1}"
+	local other_var_name="${2}" # This variable contains stuff
+}
+
+Functions should always have return status
+function thirdthing {
+	some_command
+	return $?
+}
+
+3.1 Sub functions
+
+When a function is a subroutine of another function, it is called _SomethingAsSubFunction
+
+4. If statements
+
+If statements will be fully written (word "if" must be used). then is written on the same line.
+(Use sed ':a;N;$!ba;s/]\n\t*then/]; then/g' to convert files to this format... Replace "],new line, zero or more tabs, then" by "; then")
+if [ something ]; then
+	stuff
+else
+	other stuff
+fi
+
+5. Logging
+
+A logging function is available with the following levels of logging:
+
+- DEBUG: Only log this when DEBUG flas is set in program. Any command forged for eval should be logged by this.
+- NOTICE: Standard messages
+- WARN: Requires attention
+- ERROR: Program produced an error but continues execution
+- CRITICAL: Program execution is halted
+
+6. Eval
+
+The eval command should always contain 2>1&.
+There's a special case where this is needed:
+eval "some;commands" 2>> "$LOG_FILE" in order to get error messages into the log.
+

@@ -6,14 +6,12 @@ SCRIPT_BUILD=2015090801
 ## Tested on RHEL / CentOS 6 & 7 and Mint 17
 ## Please adapt this to fit your distro needs
 
-if [ "$(whoami)" != "root" ]
-then
+if [ "$(whoami)" != "root" ]; then
   echo "Must be run as root."
   exit 1
 fi
 
-if [ ! -d /etc/osync ]
-then
+if [ ! -d /etc/osync ]; then
 	mkdir /etc/osync
 fi
 

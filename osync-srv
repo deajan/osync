@@ -26,20 +26,17 @@ confdir=/etc/osync
 pidfile=/var/run/$prog
 SCRIPT_BUILD=1304201502
 
-if [ ! -f $progpath/$progexec ] && [ ! -f $progexec ]
-then
+if [ ! -f $progpath/$progexec ] && [ ! -f $progexec ]; then
 	echo "Cannot find $prog executable in $progpath nor in local path."
 	exit 1
 fi
 
-if [ ! -w $(dirname $pidfile) ]
-then
+if [ ! -w $(dirname $pidfile) ]; then
 	pidfile=./$prog
 fi
 
 start() {
-	if [ ! -f $confdir/*.conf ]
-	then
+	if [ ! -f $confdir/*.conf ]; then
 		echo "Cannot find any configuration files in $confdir."
 		exit 1
 	fi
@@ -48,11 +45,9 @@ start() {
 
 	for cfgfile in $confdir/*.conf
 	do
-		if [ -f $progpath/$progexec ]
-		then
+		if [ -f $progpath/$progexec ]; then
 			$progpath/$progexec $cfgfile --on-changes > /dev/null 2>&1 &
-		elif [ -f ./$progexec ]
-		then
+		elif [ -f ./$progexec ]; then
 			./$progexec $cfgfile --on-changes > /dev/null 2>&1 &
 		else
 			echo "Cannot find $prog executable in $progpath"
@@ -62,8 +57,7 @@ start() {
 		pid=$!
 		retval=$?
 
-		if [ $? == 0 ]
-		then
+		if [ $? == 0 ]; then
 			echo $pid > "$pidfile-$(basename $cfgfile)"
 			echo "$prog successfully started for configuration file $cfgfile"
 		else
@@ -76,8 +70,7 @@ start() {
 }
 
 stop() {
-	if [ ! -f $pidfile-* ]
-	then
+	if [ ! -f $pidfile-* ]; then
 		echo "No running $prog instances found."
 		exit 1
 	fi
@@ -87,8 +80,7 @@ stop() {
 		if ps -p$(cat $pfile) > /dev/null 2>&1
 		then
 			kill -TERM $(cat $pfile)
-			if [ $? == 0 ]
-			then
+			if [ $? == 0 ]; then
 				rm -f $pfile
 				echo "$prog instance $(basename $pfile) stopped."
 			else
@@ -102,8 +94,7 @@ stop() {
 }
 
 status() {
-	if [ ! -f $pidfile-* ]
-	then
+	if [ ! -f $pidfile-* ]; then
 		echo "Cannot find any running $prog instance."
 		exit 1
 	fi

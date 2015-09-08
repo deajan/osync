@@ -18,8 +18,7 @@ MAX_EXECUTION_TIME=36000
 MAX_RERUNS=3
 
 ## Log file path
-if [ -w /var/log ]
-then
+if [ -w /var/log ]; then
         LOG_FILE=/var/log/osync-batch.log
 else
         LOG_FILE=./osync-batch.log
@@ -27,8 +26,7 @@ fi
 
 # No need to edit under this line ##############################################################
 
-function Log
-{
+function Log {
         prefix="TIME: $SECONDS - "
         echo -e "$prefix$1" >> "$LOG_FILE"
 
@@ -38,8 +36,7 @@ function Log
         fi
 }
 
-function CheckEnvironment
-{
+function CheckEnvironment {
         ## Osync executable full path can be set here if it cannot be found on the system
         if ! type -p osync.sh > /dev/null 2>&1
         then
@@ -58,20 +55,17 @@ function CheckEnvironment
         fi
 
 	## Check for CONF_FILE_PATH
-	if [ ! -d "$CONF_FILE_PATH" ]
-	then
+	if [ ! -d "$CONF_FILE_PATH" ]; then
 		Log "Cannot find conf file path $CONF_FILE_PATH"
 		Usage
 	fi	
 }
 
-function Batch
-{
+function Batch {
 	## Get list of .conf files
 	for i in $(ls $CONF_FILE_PATH/*.conf)
 	do
-		if [ "$RUN" == "" ]
-		then
+		if [ "$RUN" == "" ]; then
 			RUN="$i"
 		else
 			RUN=$RUN" $i"
@@ -85,11 +79,9 @@ function Batch
 		for i in $RUN
 		do
 			$OSYNC_EXECUTABLE "$i" $opts
-			if [ $? != 0 ]
-			then
+			if [ $? != 0 ]; then
 				Log "Run instance $(basename $i) failed"
-				if [ "RUN_AGAIN" == "" ]
-				then
+				if [ "RUN_AGAIN" == "" ]; then
 					RUN_AGAIN="$i"
 				else
 					RUN_AGAIN=$RUN_AGAIN" $i"
@@ -104,8 +96,7 @@ function Batch
 	done
 }
 
-function Usage
-{
+function Usage {
         echo "$PROGRAM $PROGRAM_BUILD"
         echo $AUTHOR
         echo $CONTACT

@@ -19,14 +19,12 @@ CMD3=
 
 LOG_FILE=~/.ssh/ssh_filter.log
 
-function Log
-{
+function Log {
 	DATE=$(date)
 	echo "$DATE - $1" >> $LOG_FILE
 }
 
-function Go
-{
+function Go {
 	eval $SSH_ORIGINAL_COMMAND
 }
 
@@ -48,31 +46,24 @@ case ${SSH_ORIGINAL_COMMAND%% *} in
 	"mv")
 	Go ;;
 	"$CMD1")
-	if [ "$CMD1" != "" ]
-	then
+	if [ "$CMD1" != "" ]; then
 		Go ;;
 	fi
 	"$CMD2")
-	if [ "$CMD2" != "" ]
-	then
+	if [ "$CMD2" != "" ]; then
 		Go ;;
 	fi
 	"$CMD3")
-	if [ "$CMD3" != "" ]
-	then
+	if [ "$CMD3" != "" ]; then
 		Go ;;
 	fi
 	"sudo")
-	if [ "$SUDO_EXEC" == "yes" ]
-	then
-		if [[ "$SSH_ORIGINAL_COMMAND" == "sudo $RSYNC_EXECUTABLE"* ]]
-		then
+	if [ "$SUDO_EXEC" == "yes" ]; then
+		if [[ "$SSH_ORIGINAL_COMMAND" == "sudo $RSYNC_EXECUTABLE"* ]]; then
 			Go
-		elif [[ "$SSH_ORIGINAL_COMMAND" == "sudo du"* ]]
-		then
+		elif [[ "$SSH_ORIGINAL_COMMAND" == "sudo du"* ]]; then
 			Go
-		elif [[ "$SSH_ORIGINAL_COMMAND" == "sudo find"* ]]
-		then
+		elif [[ "$SSH_ORIGINAL_COMMAND" == "sudo find"* ]]; then
 			Go
                 elif [[ "$SSH_ORIGINAL_COMMAND" == "sudo mkdir"* ]]
                 then
@@ -89,22 +80,16 @@ case ${SSH_ORIGINAL_COMMAND%% *} in
                 elif [[ "$SSH_ORIGINAL_COMMAND" == "sudo mv"* ]]
                 then
                         Go
-		elif [[ "$SSH_ORIGINAL_COMMAND" == "sudo $CMD1"* ]]
-		then
-			if [ "$CMD1" != "" ]
-			then
+		elif [[ "$SSH_ORIGINAL_COMMAND" == "sudo $CMD1"* ]]; then
+			if [ "$CMD1" != "" ]; then
 			Go
 			fi
-		elif [[ "$SSH_ORIGINAL_COMMAND" == "sudo $CMD2"* ]]
-		then
-			if [ "$CMD2" != "" ]
-			then
+		elif [[ "$SSH_ORIGINAL_COMMAND" == "sudo $CMD2"* ]]; then
+			if [ "$CMD2" != "" ]; then
 			Go
 			fi
-		elif [[ "$SSH_ORIGINAL_COMMAND" == "sudo $CMD3"* ]]
-		then
-			if [ "$CMD3" != "" ]
-			then
+		elif [[ "$SSH_ORIGINAL_COMMAND" == "sudo $CMD3"* ]]; then
+			if [ "$CMD3" != "" ]; then
 			Go
 			fi
 		else
