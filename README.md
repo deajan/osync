@@ -33,6 +33,7 @@ Osync has been designed to not delete any data, but rather make backups of confl
 Nevertheless, you should always have a neat backup of your data before trying a new sync tool.
 
 You can download the latest stable release of Osync at www.netpower.fr/osync or https://github.com/deajan/osync/archive/v1.01.tar.gz
+
 You may also get the last development version at https://github.com/deajan/osync with the following command
 
 	$ git clone -b "v1.01" https://github.com/deajan/osync
