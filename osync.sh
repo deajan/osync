@@ -4,7 +4,7 @@ PROGRAM="Osync" # Rsync based two way sync engine with fault tolerance
 AUTHOR="(L) 2013-2015 by Orsiris \"Ozy\" de Jong"
 CONTACT="http://www.netpower.fr/osync - ozy@netpower.fr"
 PROGRAM_VERSION=1.1-dev
-PROGRAM_BUILD=2015090901
+PROGRAM_BUILD=2015090902
 
 ## type doesn't work on platforms other than linux (bash). If if doesn't work, always assume output is not a zero exitcode
 if ! type -p "$BASH" > /dev/null; then
@@ -1035,22 +1035,22 @@ function tree_list {
 # delete_list(replica, tree-file-after, tree-file-current, deleted-list-file, deleted-failed-list-file): Creates a list of files vanished from last run on replica $1 (master/slave)
 function delete_list {
 	local replica_type="${1}" # replica type: master, slave
-	local tree_file_after_filename="${2}" # tree-file-after, will be prefixed with replica type
-	local tree_file_current_filename="${3}" # tree-file-current, will be prefixed with replica type
-	local deleted_list_file_filename="${4}" # file containing deleted file list, will be prefixed with replica type
-	local deleted_failed_list_file_filename="${5}" # file containing files that couldn't be deleted on last run, will be prefixed with replica type
+	local tree_file_after="${2}" # tree-file-after, will be prefixed with replica type
+	local tree_file_current="${3}" # tree-file-current, will be prefixed with replica type
+	local deleted_list_file="${4}" # file containing deleted file list, will be prefixed with replica type
+	local deleted_failed_list_file="${5}" # file containing files that couldn't be deleted on last run, will be prefixed with replica type
 	
-	# TODO: WIP here
+	# TODO: Check why external filenames are used (see dryrun option because of NOSUFFIX)
 
 	Logger "Creating $replica_type replica deleted file list." "NOTICE"
 	if [ -f "$MASTER_STATE_DIR/$replica_type$TREE_AFTER_FILENAME_NO_SUFFIX" ]; then
 		## Same functionnality, comm is much faster than grep but is not available on every platform
 		if type -p comm > /dev/null 2>&1
 		then
-			cmd="comm -23 \"$MASTER_STATE_DIR/$replica_type$TREE_AFTER_FILENAME_NO_SUFFIX\" \"$MASTER_STATE_DIR/$replica_type$3\" > \"$MASTER_STATE_DIR/$replica_type$4\""
+			cmd="comm -23 \"$MASTER_STATE_DIR/$replica_type$TREE_AFTER_FILENAME_NO_SUFFIX\" \"$MASTER_STATE_DIR/$replica_type$tree_file_current\" > \"$MASTER_STATE_DIR/$replica_type$deleted_list_file\""
 		else
 			## The || : forces the command to have a good result
-			cmd="(grep -F -x -v -f \"$MASTER_STATE_DIR/$replica_type$3\" \"$MASTER_STATE_DIR/$replica_type$TREE_AFTER_FILENAME_NO_SUFFIX\" || :) > \"$MASTER_STATE_DIR/$replica_type$4\""
+			cmd="(grep -F -x -v -f \"$MASTER_STATE_DIR/$replica_type$tree_file_current\" \"$MASTER_STATE_DIR/$replica_type$TREE_AFTER_FILENAME_NO_SUFFIX\" || :) > \"$MASTER_STATE_DIR/$replica_type$deleted_list_file\""
 		fi
 
 		Logger "CMD: $cmd" "DEBUG"
@@ -1058,14 +1058,14 @@ function delete_list {
 		retval=$?
 
 		# Add delete failed file list to current delete list and then empty it
-		if [ -f "$MASTER_STATE_DIR/$replica_type$5" ]; then
-			cat "$MASTER_STATE_DIR/$replica_type$5" >> "$MASTER_STATE_DIR/$replica_type$4"
-			rm -f "$MASTER_STATE_DIR/$replica_type$5"
+		if [ -f "$MASTER_STATE_DIR/$replica_type$deleted_failed_list_file" ]; then
+			cat "$MASTER_STATE_DIR/$replica_type$deleted_failed_list_file" >> "$MASTER_STATE_DIR/$replica_type$deleted_list_file"
+			rm -f "$MASTER_STATE_DIR/$replica_type$deleted_failed_list_file"
 		fi
 
 		return $retval
 	else
-		touch "$MASTER_STATE_DIR/$replica_type$4"
+		touch "$MASTER_STATE_DIR/$replica_type$deleted_list_file"
 		return $retval
 	fi
 }
@@ -1125,52 +1125,57 @@ function sync_update {
 
 # delete_local(replica dir, delete file list, delete dir, delete failed file)
 function _delete_local {
+	local replica_dir="${1}" # Full path to replica
+	local deleted_list_file="${2}" # file containing deleted file list, will be prefixed with replica type
+	local deletion_dir="${3}" # deletion dir in format .[workdir]/deleted
+	local deleted_failed_list_file="${4}" # file containing files that couldn't be deleted on last run, will be prefixed with replica type
+
 	## On every run, check wheter the next item is already deleted because it's included in a directory already deleted
 	previous_file=""
 	OLD_IFS=$IFS
 	IFS=$'\r\n'
-	for files in $(cat "$MASTER_STATE_DIR/$2")
+	for files in $(cat "$MASTER_STATE_DIR/$deleted_list_file")
 	do
 		if [[ "$files" != "$previous_file/"* ]] && [ "$files" != "" ]; then
 			if [ "$SOFT_DELETE" != "no" ]; then
-				if [ ! -d "$REPLICA_DIR$3" ]; then
-					mkdir -p "$REPLICA_DIR$3"
+				if [ ! -d "$replica_dir$deletion_dir" ]; then
+					mkdir -p "$replica_dir$deletion_dir"
 					if [ $? != 0 ]; then
 						Logger "Cannot create replica deletion directory." "ERROR"
 					fi
 				fi
 
 				if [ $verbose -eq 1 ]; then
-					Logger "Soft deleting $REPLICA_DIR$files" "NOTICE"
+					Logger "Soft deleting $replica_dir$files" "NOTICE"
 				fi
 
 				if [ $dryrun -ne 1 ]; then
-					if [ -e "$REPLICA_DIR$3/$files" ]; then
-						rm -rf "$REPLICA_DIR$3/$files"
+					if [ -e "$replica_dir$deletion_dir/$files" ]; then
+						rm -rf "$replica_dir$deletion_dir/$files"
 					fi
 					# In order to keep full path on soft deletion, create parent directories before move
 					parentdir="$(dirname "$files")"
 					if [ "$parentdir" != "." ]; then
-						mkdir --parents "$REPLICA_DIR$3/$parentdir"
-						mv -f "$REPLICA_DIR$files" "$REPLICA_DIR$3/$parentdir"
+						mkdir --parents "$replica_dir$deletion_dir/$parentdir"
+						mv -f "$replica_dir$files" "$replica_dir$deletion_dir/$parentdir"
 					else
-						mv -f "$REPLICA_DIR$files" "$REPLICA_DIR$3"
+						mv -f "$replica_dir$files" "$replica_dir$deletion_dir"
 					fi
 					if [ $? != 0 ]; then
-						Logger "Cannot move $REPLICA_DIR$files to deletion directory." "ERROR"
-						echo "$files" >> "$MASTER_STATE_DIR/$4"
+						Logger "Cannot move $replica_dir$files to deletion directory." "ERROR"
+						echo "$files" >> "$MASTER_STATE_DIR/$deleted_failed_list_file"
 					fi
 				fi
 			else
 				if [ $verbose -eq 1 ]; then
-					Logger "Deleting $REPLICA_DIR$files" "NOTICE"
+					Logger "Deleting $replica_dir$files" "NOTICE"
 				fi
 
 				if [ $dryrun -ne 1 ]; then
-					rm -rf "$REPLICA_DIR$files"
+					rm -rf "$replica_dir$files"
 					if [ $? != 0 ]; then
-						Logger "Cannot delete $REPLICA_DIR$files" "ERROR"
-						echo "$files" >> "$MASTER_STATE_DIR/$4"
+						Logger "Cannot delete $replica_dir$files" "ERROR"
+						echo "$files" >> "$MASTER_STATE_DIR/$deleted_failed_list_file"
 					fi
 				fi
 			fi
@@ -1180,8 +1185,12 @@ function _delete_local {
 	IFS=$OLD_IFS
 }
 
-# delete_remote(replica dir, delete file list, delete dir, delete fail file list)
 function _delete_remote {
+	local replica_dir="${1}" # Full path to replica
+	local deleted_list_file="${2}" # file containing deleted file list, will be prefixed with replica type
+	local deletion_dir="${3}" # deletion dir in format .[workdir]/deleted
+	local deleted_failed_list_file="${4}" # file containing files that couldn't be deleted on last run, will be prefixed with replica type
+
 	## This is a special coded function. Need to redelcare local functions on remote host, passing all needed variables as escaped arguments to ssh command.
 	## Anything beetween << ENDSSH and ENDSSH will be executed remotely
 
@@ -1198,7 +1207,7 @@ function _delete_remote {
 		exit 1
 	fi
 
-$SSH_CMD error_alert=0 sync_on_changes=$sync_on_changes silent=$silent DEBUG=$DEBUG dryrun=$dryrun verbose=$verbose COMMAND_SUDO=$COMMAND_SUDO FILE_LIST="$(EscapeSpaces "$SLAVE_STATE_DIR/$2")" REPLICA_DIR="$(EscapeSpaces "$REPLICA_DIR")" DELETE_DIR="$(EscapeSpaces "$DELETE_DIR")" FAILED_DELETE_LIST="$(EscapeSpaces "$SLAVE_STATE_DIR/$4")" 'bash -s' << 'ENDSSH' > $RUN_DIR/osync_remote_deletion_$SCRIPT_PID 2>&1 &
+$SSH_CMD error_alert=0 sync_on_changes=$sync_on_changes silent=$silent DEBUG=$DEBUG dryrun=$dryrun verbose=$verbose COMMAND_SUDO=$COMMAND_SUDO FILE_LIST="$(EscapeSpaces "$SLAVE_STATE_DIR/$deleted_list_file")" REPLICA_DIR="$(EscapeSpaces "$replica_dir")" DELETE_DIR="$(EscapeSpaces "$deletion_dir")" FAILED_DELETE_LIST="$(EscapeSpaces "$SLAVE_STATE_DIR/$deleted_failed_list_file")" 'bash -s' << 'ENDSSH' > $RUN_DIR/osync_remote_deletion_$SCRIPT_PID 2>&1 &
 
 	## The following lines are executed remotely
 	function _logger {
@@ -1322,20 +1331,23 @@ ENDSSH
 
 
 # delete_propagation(replica name, deleted_list_filename, deleted_failed_file_list)
-# replica name = "master" / "slave"
 function deletion_propagation {
-	Logger "Propagating deletions to $1 replica." "NOTICE"
+	local replica_type="${1}" # Contains replica type: master, slave
+	local deleted_list_file="${2}" # file containing deleted file list, will be prefixed with replica type
+	local deleted_failed_list_file="${3}" # file containing files that couldn't be deleted on last run, will be prefixed with replica type
 
-	if [ "$1" == "master" ]; then
+	Logger "Propagating deletions to $replica_type replica." "NOTICE"
+
+	if [ "$replica_type" == "master" ]; then
 		REPLICA_DIR="$MASTER_SYNC_DIR"
 		DELETE_DIR="$MASTER_DELETE_DIR"
 
-		_delete_local "$REPLICA_DIR" "slave$2" "$DELETE_DIR" "slave$3" &
+		_delete_local "$REPLICA_DIR" "slave$deleted_list_file" "$DELETE_DIR" "slave$deleted_failed_list_file" &
 		child_pid=$!
 		WaitForCompletion $child_pid $SOFT_MAX_EXEC_TIME $HARD_MAX_EXEC_TIME
 		retval=$?
 		if [ $retval != 0 ]; then
-			Logger "Deletion on replica $1 failed." "CRITICAL"
+			Logger "Deletion on replica $replica_type failed." "CRITICAL"
 			exit 1
 		fi
 	else
@@ -1343,9 +1355,9 @@ function deletion_propagation {
 		DELETE_DIR="$SLAVE_DELETE_DIR"
 
 		if [ "$REMOTE_SYNC" == "yes" ]; then
-			_delete_remote "$REPLICA_DIR" "master$2" "$DELETE_DIR" "master$3" &
+			_delete_remote "$REPLICA_DIR" "master$deleted_list_file" "$DELETE_DIR" "master$deleted_failed_list_file" &
 		else
-			_delete_local "$REPLICA_DIR" "master$2" "$DELETE_DIR" "master$3" &
+			_delete_local "$REPLICA_DIR" "master$deleted_list_file" "$DELETE_DIR" "master$deleted_failed_list_file" &
 		fi
 		child_pid=$!
 		WaitForCompletion $child_pid $SOFT_MAX_EXEC_TIME $HARD_MAX_EXEC_TIME
