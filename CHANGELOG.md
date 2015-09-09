@@ -6,6 +6,7 @@ KNOWN ISSUES
 RECENT CHANGES
 --------------
 
+- Added some automatic typo checks in code, for DEBUG mode (and PARANOIA_DEBUG now)
 ! Refactor local master, local slave, remote slave code to local and remote code for node-i or node-t
 - Improved Logging
 !- Updated osync to be fully compliant with coding style

@@ -66,6 +66,22 @@ function thirdthing {
 
 When a function is a subroutine of another function, it is called _SomethingAsSubFunction
 
+++++ Function argument check
+
+Bash does not provide any checks against missing function arguments. Also, missing quotes can lead to an inconsistent number of arguments.
+Every function call will be checked by __CheckArguments which takes the number of arguments, $# (the real number of args given), the parent function name and the parent function's arguments.
+__CheckArguments will trigger a critical error if number of arguments if incorrect. This will also prevent silent typo errors.
+Ex:
+
+function Something {
+	local some="${1}"
+	local other="${2}"
+	local args="${3}"
+	__CheckArguments 3 $# $FUNCNAME "$*"
+
+__CheckArguments will only trigger if script is called with DEBUG=yes
+Also, with PARANOIA_DEBUG=yes, __CheckArguments will recount all arguments given by "$*" and compare. This can mislead if arguments contain spaces.
+
 ++++ If statements
 
 If statements will be fully written (word "if" must be used). then is written on the same line.

@@ -4,7 +4,7 @@ PROGRAM="Osync" # Rsync based two way sync engine with fault tolerance
 AUTHOR="(L) 2013-2015 by Orsiris \"Ozy\" de Jong"
 CONTACT="http://www.netpower.fr/osync - ozy@netpower.fr"
 PROGRAM_VERSION=1.1-dev
-PROGRAM_BUILD=2015090902
+PROGRAM_BUILD=2015090903
 
 ## type doesn't work on platforms other than linux (bash). If if doesn't work, always assume output is not a zero exitcode
 if ! type -p "$BASH" > /dev/null; then
@@ -153,31 +153,31 @@ function TrapQuit {
 
 function Spinner {
 	if [ $silent -eq 1 ]; then
-		return 1
+		return 0
 	fi
 
 	case $toggle
 	in
 	1)
-	echo -n $1" \ "
+	echo -n " \ "
 	echo -ne "\r"
 	toggle="2"
 	;;
 
 	2)
-	echo -n $1" | "
+	echo -n " | "
 	echo -ne "\r"
 	toggle="3"
 	;;
 
 	3)
-	echo -n $1" / "
+	echo -n " / "
 	echo -ne "\r"
 	toggle="4"
 	;;
 
 	*)
-	echo -n $1" - "
+	echo -n " - "
 	echo -ne "\r"
 	toggle="1"
 	;;
@@ -362,15 +362,8 @@ function GetRemoteOS {
 function WaitForTaskCompletion {
 	local pid="${1}" # pid to wait for
 	local soft_max_time="${2}" # If program with pid $pid takes longer than $soft_max_time seconds, will log a warning, unless $soft_max_time equals 0.
-	if [ "$soft_max_time" == "" ]; then
-		Logger "Missing argument soft_max_time in ${0}" "CRITICAL"
-		exit 1
-	fi
 	local hard_max_time="${3}" # If program with pid $pid takes longer than $hard_max_time seconds, will stop execution, unless $hard_max_time equals 0.
-	if [ "$hard_max_time" == "" ]; then
-		Logger "Missing argument hard_max_time in ${0}" "CRITICAL"
-		exit 1
-	fi
+	__CheckArguments 3 $# $FUNCNAME "$*"
 
 	local soft_alert=0 # Does a soft alert need to be triggered
 	local log_ttime=0 # local time instance for comparaison
@@ -417,15 +410,8 @@ function WaitForTaskCompletion {
 function WaitForCompletion {
 	local pid="${1}" # pid to wait for
 	local soft_max_time="${2}" # If program with pid $pid takes longer than $soft_max_time seconds, will log a warning, unless $soft_max_time equals 0.
-	if [ "$soft_max_time" == "" ]; then
-		Logger "Missing argument soft_max_time in ${0}" "CRITICAL"
-		exit 1
-	fi
 	local hard_max_time="${3}" # If program with pid $pid takes longer than $hard_max_time seconds, will stop execution, unless $hard_max_time equals 0.
-	if [ "$hard_max_time" == "" ]; then
-		Logger "Missing argument hard_max_time in ${0}" "CRITICAL"
-		exit 1
-	fi
+	__CheckArguments 3 $# $FUNCNAME "$*"
 
 	local soft_alert=0 # Does a soft alert need to be triggered
 	local log_ttime=0 # local time instance for comparaison
@@ -471,10 +457,7 @@ function WaitForCompletion {
 function RunLocalCommand {
 	local command="${1}" # Command to run
 	local hard_max_time="${2}" # Max time to wait for command to compleet
-	if [ "$hard_max_time" == "" ]; then
-		Logger "Missing argument hard_max_time in ${0}" "CRITICAL"
-		exit 1
-	fi
+	__CheckArguments 2 $# $FUNCNAME "$*"
 
 	if [ $dryrun -ne 0 ]; then
 		Logger "Dryrun: Local command [$command] not run." "NOTICE"
@@ -505,10 +488,7 @@ function RunLocalCommand {
 function RunRemoteCommand {
 	local command="${1}" # Command to run
 	local hard_max_time="${2}" # Max time to wait for command to compleet
-	if [ "$hard_max_time" == "" ]; then
-		Logger "Missing argument hard_max_time in ${0}" "CRITICAL"
-		exit 1
-	fi
+	__CheckArguments 2 $# $FUNCNAME "$*"
 
 	CheckConnectivity3rdPartyHosts
 	CheckConnectivityRemoteHost
@@ -586,6 +566,36 @@ function CheckConnectivity3rdPartyHosts {
 		if [ $remote_3rd_party_success -ne 1 ]; then
 			Logger "No remote 3rd party host responded to ping. No internet ?" "CRITICAL"
 			exit 1
+		fi
+	fi
+}
+
+function __CheckArguments {
+	# Checks the number of arguments and raises an error if some are missing
+
+	if [ "$DEBUG" == "yes" ]; then
+
+		local number_of_arguments="${1}" # Number of arguments a function should have
+		local number_of_given_arguments="${2}" # Number of arguments that have been passed
+		local function_name="${3}" # Function name that called __CheckArguments
+		local arguments="${4}" # All other arguments
+
+        	if [ $number_of_arguments -ne $number_of_given_arguments ]; then
+                	Logger "Inconsistnent number of arguments in $function_name. Should have $number_of_arguments arguments, has $number_of_given_arguments arguments, see log file." "CRITICAL"
+			# Cannot user Logger here because $@ is a list of arguments
+			echo "Argumnt list: $4" >> "$LOG_FILE"
+        	fi
+
+		if [ "$PARANOIA_DEBUG" == "yes" ]; then
+			# Paranoia check... Can help finding empty arguments 
+			local count=-3 # Number of arguments minus the function calls for __CheckArguments
+			for i in $@; do
+				count=$((count + 1))
+			done
+			if [ $count -ne $1 ]; then
+				Logger "Function $function_name may have inconsistent number of arguments. Expected: $number_of_arguments, count: $count, see log file." "WARN"
+				echo "Argument list (including checks): $@" >> "$LOG_FILE"
+			fi
 		fi
 	fi
 }
@@ -1005,6 +1015,7 @@ function tree_list {
 	local replica_path="${1}" # path to the replica for which a tree needs to be constructed
 	local replica_type="${2}" # replica type: master, slave
 	local tree_filename="${3}" # filename to output tree (will be prefixed with $replica_type)
+	__CheckArguments 3 "$#" "$FUNCNAME" "$*"
 
 	local escaped_replica_path=$(EscapeSpaces "$replica_path") #TODO: See if escpaed still needed when using ' instead of " for command eval
 
@@ -1039,7 +1050,8 @@ function delete_list {
 	local tree_file_current="${3}" # tree-file-current, will be prefixed with replica type
 	local deleted_list_file="${4}" # file containing deleted file list, will be prefixed with replica type
 	local deleted_failed_list_file="${5}" # file containing files that couldn't be deleted on last run, will be prefixed with replica type
-	
+	__CheckArguments 5 "$#" "$FUNCNAME" "$*"
+
 	# TODO: Check why external filenames are used (see dryrun option because of NOSUFFIX)
 
 	Logger "Creating $replica_type replica deleted file list." "NOTICE"
@@ -1075,6 +1087,7 @@ function sync_update {
 	local source_replica="${1}" # Contains replica type of source: master, slave
 	local destination_replica="${2}" # Contains replica type of destination: master, slave
 	local delete_list_filename="${3}" # Contains deleted list filename, will be prefixed with replica type
+	__CheckArguments 3 "$#" "$FUNCNAME" "$*"
 
 	Logger "Updating $destination_replica replica." "NOTICE"
 	if [ "$source_replica" == "master" ]; then
@@ -1129,6 +1142,7 @@ function _delete_local {
 	local deleted_list_file="${2}" # file containing deleted file list, will be prefixed with replica type
 	local deletion_dir="${3}" # deletion dir in format .[workdir]/deleted
 	local deleted_failed_list_file="${4}" # file containing files that couldn't be deleted on last run, will be prefixed with replica type
+	__CheckArguments 4 "$#" "$FUNCNAME" "$*"
 
 	## On every run, check wheter the next item is already deleted because it's included in a directory already deleted
 	previous_file=""
@@ -1190,6 +1204,7 @@ function _delete_remote {
 	local deleted_list_file="${2}" # file containing deleted file list, will be prefixed with replica type
 	local deletion_dir="${3}" # deletion dir in format .[workdir]/deleted
 	local deleted_failed_list_file="${4}" # file containing files that couldn't be deleted on last run, will be prefixed with replica type
+	__CheckArguments 4 "$#" "$FUNCNAME" "$*"
 
 	## This is a special coded function. Need to redelcare local functions on remote host, passing all needed variables as escaped arguments to ssh command.
 	## Anything beetween << ENDSSH and ENDSSH will be executed remotely
@@ -1312,7 +1327,7 @@ ENDSSH
 	sleep 5
 
 	## Copy back the deleted failed file list
-	ESC_SOURCE_FILE="$(EscapeSpaces "$SLAVE_STATE_DIR/$4")"
+	ESC_SOURCE_FILE="$(EscapeSpaces "$SLAVE_STATE_DIR/$deleted_failed_list_file")"
 	rsync_cmd="$(type -p $RSYNC_EXECUTABLE) --rsync-path=\"$RSYNC_PATH\" $SYNC_OPTS -e \"$RSYNC_SSH_CMD\" $REMOTE_USER@$REMOTE_HOST:\"$ESC_SOURCE_FILE\" \"$MASTER_STATE_DIR\" > $RUN_DIR/osync_remote_failed_deletion_list_copy_$SCRIPT_PID"
 	Logger "RSYNC_CMD: $rsync_cmd" "DEBUG"
 	eval $rsync_cmd 2>> "$LOG_FILE"
@@ -1335,6 +1350,7 @@ function deletion_propagation {
 	local replica_type="${1}" # Contains replica type: master, slave
 	local deleted_list_file="${2}" # file containing deleted file list, will be prefixed with replica type
 	local deleted_failed_list_file="${3}" # file containing files that couldn't be deleted on last run, will be prefixed with replica type
+	__CheckArguments 3 "$#" "$FUNCNAME" "$*"
 
 	Logger "Propagating deletions to $replica_type replica." "NOTICE"
 
@@ -1562,7 +1578,7 @@ function _SoftDelete {
 	local change_time="${1}" # Contains the number of days a file needs to be old to be processed here (conflict or soft deletion)
 	local master_directory="${2}" # Master backup / deleted directory to search in
 	local slave_directory="${3}" # Slave backup / deleted directory to search in 
-
+	__CheckArguments 3 "$#" "$FUNCNAME" "$*"
 
 	if [ -d "$master_directory" ]; then
 		if [ $dryrun -eq 1 ]; then
@@ -2145,7 +2161,7 @@ then
 		MIN_WAIT=30
 		REMOTE_SYNC=no
 	else
-		ConfigFile="$1"
+		ConfigFile="${1}"
 		LoadConfigFile "$ConfigFile"
 	fi
 
