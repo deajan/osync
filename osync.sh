@@ -4,7 +4,7 @@ PROGRAM="Osync" # Rsync based two way sync engine with fault tolerance
 AUTHOR="(L) 2013-2015 by Orsiris \"Ozy\" de Jong"
 CONTACT="http://www.netpower.fr/osync - ozy@netpower.fr"
 PROGRAM_VERSION=1.1-dev
-PROGRAM_BUILD=2015090804
+PROGRAM_BUILD=2015090901
 
 ## type doesn't work on platforms other than linux (bash). If if doesn't work, always assume output is not a zero exitcode
 if ! type -p "$BASH" > /dev/null; then
@@ -378,7 +378,7 @@ function WaitForTaskCompletion {
 	local seconds_begin=$SECONDS # Seconds since the beginning of the script
 	local exec_time=0 # Seconds since the beginning of this function
 
-	while eval "$PROCESS_TEST_CMD" > /dev/null	#TODO: Replace $1 with $pid in $PROCESS_TEST_CMD
+	while eval "$PROCESS_TEST_CMD" > /dev/null
 	do
 		Spinner
 		exec_time=$(($SECONDS - $seconds_begin))
@@ -433,7 +433,7 @@ function WaitForCompletion {
 	local seconds_begin=$SECONDS # Seconds since the beginning of the script
 	local exec_time=0 # Seconds since the beginning of this function
 
-	while eval "$PROCESS_TEST_CMD" > /dev/null		#TODO: Replace $1 with $pid in $PROCESS_TEST_CMD
+	while eval "$PROCESS_TEST_CMD" > /dev/null
 	do
 		Spinner
 		if [ $((($SECONDS + 1) % $KEEP_LOGGING)) -eq 0 ]; then
@@ -1875,12 +1875,14 @@ function InitLocalOSSettings {
 	## Ping command isn't the same
 	if [ "$LOCAL_OS" == "msys" ]; then
 		FIND_CMD=$(dirname $BASH)/find
-		## TODO: The following command needs to be checked on msys. Does the $1 variable substitution work ?
-		PROCESS_TEST_CMD='ps -a | awk "{\$1=\$1}\$1" | awk "{print \$1}" | grep $1'
+		#TODO: The following command needs to be checked on msys. Does the $1 variable substitution work ?
+		# PROCESS_TEST_CMD assumes there is a variable $pid
+		PROCESS_TEST_CMD='ps -a | awk "{\$1=\$1}\$1" | awk "{print \$1}" | grep $pid'
 		PING_CMD="ping -n 2"
 	else
 		FIND_CMD=find
-		PROCESS_TEST_CMD='ps -p$1'
+		# PROCESS_TEST_CMD assumes there is a variable $pid
+		PROCESS_TEST_CMD='ps -p$pid'
 		PING_CMD="ping -c 2 -i .2"
 	fi
 
