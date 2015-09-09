@@ -6,6 +6,7 @@ KNOWN ISSUES
 RECENT CHANGES
 --------------
 
+! Refactor local master, local slave, remote slave code to local and remote code for node-i or node-t
 - Improved Logging
 !- Updated osync to be fully compliant with coding style
 - Uploaded coding style manifest

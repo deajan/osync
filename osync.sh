@@ -1023,7 +1023,7 @@ function tree_list {
 	WaitForCompletion $child_pid $SOFT_MAX_EXEC_TIME $HARD_MAX_EXEC_TIME
 	retval=$?
 	## Retval 24 = some files vanished while creating list
-	if ([ $retval == 0 ] || [ $retval == 24 ]) && [ -f $RUN_DIR/osync_$2_$SCRIPT_PID ]; then
+	if ([ $retval == 0 ] || [ $retval == 24 ]) && [ -f $RUN_DIR/osync_$replica_type_$SCRIPT_PID ]; then
 		mv $RUN_DIR/osync_$replica_type_$SCRIPT_PID "$MASTER_STATE_DIR/$replica_type$tree_filename"
 		return $?
 	else
@@ -1037,20 +1037,20 @@ function delete_list {
 	local replica_type="${1}" # replica type: master, slave
 	local tree_file_after_filename="${2}" # tree-file-after, will be prefixed with replica type
 	local tree_file_current_filename="${3}" # tree-file-current, will be prefixed with replica type
-	local deleted_list_file="${4}" # file containing deleted file list, will be prefixed with replica type
-	local deleted_failed_list_file="${5}" # file containing files that couldn't be deleted on last run, will be prefixed with replica type
+	local deleted_list_file_filename="${4}" # file containing deleted file list, will be prefixed with replica type
+	local deleted_failed_list_file_filename="${5}" # file containing files that couldn't be deleted on last run, will be prefixed with replica type
 	
 	# TODO: WIP here
 
 	Logger "Creating $replica_type replica deleted file list." "NOTICE"
-	if [ -f "$MASTER_STATE_DIR/$1$TREE_AFTER_FILENAME_NO_SUFFIX" ]; then
+	if [ -f "$MASTER_STATE_DIR/$replica_type$TREE_AFTER_FILENAME_NO_SUFFIX" ]; then
 		## Same functionnality, comm is much faster than grep but is not available on every platform
 		if type -p comm > /dev/null 2>&1
 		then
-			cmd="comm -23 \"$MASTER_STATE_DIR/$1$TREE_AFTER_FILENAME_NO_SUFFIX\" \"$MASTER_STATE_DIR/$1$3\" > \"$MASTER_STATE_DIR/$1$4\""
+			cmd="comm -23 \"$MASTER_STATE_DIR/$replica_type$TREE_AFTER_FILENAME_NO_SUFFIX\" \"$MASTER_STATE_DIR/$replica_type$3\" > \"$MASTER_STATE_DIR/$replica_type$4\""
 		else
 			## The || : forces the command to have a good result
-			cmd="(grep -F -x -v -f \"$MASTER_STATE_DIR/$1$3\" \"$MASTER_STATE_DIR/$1$TREE_AFTER_FILENAME_NO_SUFFIX\" || :) > \"$MASTER_STATE_DIR/$1$4\""
+			cmd="(grep -F -x -v -f \"$MASTER_STATE_DIR/$replica_type$3\" \"$MASTER_STATE_DIR/$replica_type$TREE_AFTER_FILENAME_NO_SUFFIX\" || :) > \"$MASTER_STATE_DIR/$replica_type$4\""
 		fi
 
 		Logger "CMD: $cmd" "DEBUG"
@@ -1058,22 +1058,26 @@ function delete_list {
 		retval=$?
 
 		# Add delete failed file list to current delete list and then empty it
-		if [ -f "$MASTER_STATE_DIR/$1$5" ]; then
-			cat "$MASTER_STATE_DIR/$1$5" >> "$MASTER_STATE_DIR/$1$4"
-			rm -f "$MASTER_STATE_DIR/$1$5"
+		if [ -f "$MASTER_STATE_DIR/$replica_type$5" ]; then
+			cat "$MASTER_STATE_DIR/$replica_type$5" >> "$MASTER_STATE_DIR/$replica_type$4"
+			rm -f "$MASTER_STATE_DIR/$replica_type$5"
 		fi
 
 		return $retval
 	else
-		touch "$MASTER_STATE_DIR/$1$4"
+		touch "$MASTER_STATE_DIR/$replica_type$4"
 		return $retval
 	fi
 }
 
 # sync_update(source replica, destination replica, delete_list_filename)
 function sync_update {
-	Logger "Updating $2 replica." "NOTICE"
-	if [ "$1" == "master" ]; then
+	local source_replica="${1}" # Contains replica type of source: master, slave
+	local destination_replica="${2}" # Contains replica type of destination: master, slave
+	local delete_list_filename="${3}" # Contains deleted list filename, will be prefixed with replica type
+
+	Logger "Updating $destination_replica replica." "NOTICE"
+	if [ "$source_replica" == "master" ]; then
 		SOURCE_DIR="$MASTER_SYNC_DIR"
 		ESC_SOURCE_DIR=$(EscapeSpaces "$MASTER_SYNC_DIR")
 		DEST_DIR="$SLAVE_SYNC_DIR"
@@ -1090,31 +1094,31 @@ function sync_update {
 	if [ "$REMOTE_SYNC" == "yes" ]; then
 		CheckConnectivity3rdPartyHosts
 		CheckConnectivityRemoteHost
-		if [ "$1" == "master" ]; then
-			rsync_cmd="$(type -p $RSYNC_EXECUTABLE) --rsync-path=\"$RSYNC_PATH\" $RSYNC_ARGS $SYNC_OPTS -e \"$RSYNC_SSH_CMD\" $BACKUP_DIR --exclude \"$OSYNC_DIR\" $RSYNC_EXCLUDE --exclude-from=\"$MASTER_STATE_DIR/$1$3\" --exclude-from=\"$MASTER_STATE_DIR/$2$3\" \"$SOURCE_DIR/\" $REMOTE_USER@$REMOTE_HOST:\"$ESC_DEST_DIR/\" > $RUN_DIR/osync_update_$2_replica_$SCRIPT_PID 2>&1 &"
+		if [ "$source_replica" == "master" ]; then
+			rsync_cmd="$(type -p $RSYNC_EXECUTABLE) --rsync-path=\"$RSYNC_PATH\" $RSYNC_ARGS $SYNC_OPTS -e \"$RSYNC_SSH_CMD\" $BACKUP_DIR --exclude \"$OSYNC_DIR\" $RSYNC_EXCLUDE --exclude-from=\"$MASTER_STATE_DIR/$source_replica$delete_list_filename\" --exclude-from=\"$MASTER_STATE_DIR/$destination_replica$delete_list_filename\" \"$SOURCE_DIR/\" $REMOTE_USER@$REMOTE_HOST:\"$ESC_DEST_DIR/\" > $RUN_DIR/osync_update_$destination_replica_replica_$SCRIPT_PID 2>&1 &"
 		else
-			rsync_cmd="$(type -p $RSYNC_EXECUTABLE) --rsync-path=\"$RSYNC_PATH\" $RSYNC_ARGS $SYNC_OPTS -e \"$RSYNC_SSH_CMD\" $BACKUP_DIR --exclude \"$OSYNC_DIR\" $RSYNC_EXCLUDE --exclude-from=\"$MASTER_STATE_DIR/$2$3\" --exclude-from=\"$MASTER_STATE_DIR/$1$3\" $REMOTE_USER@$REMOTE_HOST:\"$ESC_SOURCE_DIR/\" \"$DEST_DIR/\" > $RUN_DIR/osync_update_$2_replica_$SCRIPT_PID 2>&1 &"
+			rsync_cmd="$(type -p $RSYNC_EXECUTABLE) --rsync-path=\"$RSYNC_PATH\" $RSYNC_ARGS $SYNC_OPTS -e \"$RSYNC_SSH_CMD\" $BACKUP_DIR --exclude \"$OSYNC_DIR\" $RSYNC_EXCLUDE --exclude-from=\"$MASTER_STATE_DIR/$destination_replica$delete_list_filename\" --exclude-from=\"$MASTER_STATE_DIR/$source_replica$delete_list_filename\" $REMOTE_USER@$REMOTE_HOST:\"$ESC_SOURCE_DIR/\" \"$DEST_DIR/\" > $RUN_DIR/osync_update_$destination_replica_replica_$SCRIPT_PID 2>&1 &"
 		fi
 	else
-		rsync_cmd="$(type -p $RSYNC_EXECUTABLE) --rsync-path=\"$RSYNC_PATH\" $RSYNC_ARGS $SYNC_OPTS $BACKUP_DIR --exclude \"$OSYNC_DIR\" $RSYNC_EXCLUDE --exclude-from=\"$MASTER_STATE_DIR/$1$3\" --exclude-from=\"$MASTER_STATE_DIR/$2$3\" \"$SOURCE_DIR/\" \"$DEST_DIR/\" > $RUN_DIR/osync_update_$2_replica_$SCRIPT_PID 2>&1 &"
+		rsync_cmd="$(type -p $RSYNC_EXECUTABLE) --rsync-path=\"$RSYNC_PATH\" $RSYNC_ARGS $SYNC_OPTS $BACKUP_DIR --exclude \"$OSYNC_DIR\" $RSYNC_EXCLUDE --exclude-from=\"$MASTER_STATE_DIR/$source_replica$delete_list_filename\" --exclude-from=\"$MASTER_STATE_DIR/$destination_replica$delete_list_filename\" \"$SOURCE_DIR/\" \"$DEST_DIR/\" > $RUN_DIR/osync_update_$destination_replica_replica_$SCRIPT_PID 2>&1 &"
 	fi
 	Logger "RSYNC_CMD: $rsync_cmd" "DEBUG"
 	eval "$rsync_cmd"
 	child_pid=$!
 	WaitForCompletion $child_pid $SOFT_MAX_EXEC_TIME $HARD_MAX_EXEC_TIME
 	retval=$?
-	if [ $verbose -eq 1 ] && [ -f $RUN_DIR/osync_update_$2_replica_$SCRIPT_PID ]; then
-		Logger "List:\n$(cat $RUN_DIR/osync_update_$2_replica_$SCRIPT_PID)" "NOTICE"
+	if [ $verbose -eq 1 ] && [ -f $RUN_DIR/osync_update_$destination_replica_replica_$SCRIPT_PID ]; then
+		Logger "List:\n$(cat $RUN_DIR/osync_update_$destination_replica_replica_$SCRIPT_PID)" "NOTICE"
 	fi
 
 	if [ $retval != 0 ] && [ $retval != 24 ]; then
-		Logger "Updating $2 replica failed. Stopping execution." "CRITICAL"
-		if [ $verbose -eq 0 ] && [ -f $RUN_DIR/osync_update_$2_replica_$SCRIPT_PID ]; then
-			Logger "Rsync output:\n$(cat $RUN_DIR/osync_update_$2_replica_$SCRIPT_PID)" "NOTICE"
+		Logger "Updating $destination_replica replica failed. Stopping execution." "CRITICAL"
+		if [ $verbose -eq 0 ] && [ -f $RUN_DIR/osync_update_$destination_replica_replica_$SCRIPT_PID ]; then
+			Logger "Rsync output:\n$(cat $RUN_DIR/osync_update_$destination_replica_replica_$SCRIPT_PID)" "NOTICE"
 		fi
 		exit $retval
 	else
-		Logger "Updating $2 replica succeded." "NOTICE"
+		Logger "Updating $destination_replica replica succeded." "NOTICE"
 		return 0
 	fi
 }
