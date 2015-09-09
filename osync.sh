@@ -4,7 +4,7 @@ PROGRAM="Osync" # Rsync based two way sync engine with fault tolerance
 AUTHOR="(L) 2013-2015 by Orsiris \"Ozy\" de Jong"
 CONTACT="http://www.netpower.fr/osync - ozy@netpower.fr"
 PROGRAM_VERSION=1.1-dev
-PROGRAM_BUILD=2015090903
+PROGRAM_BUILD=2015090904
 
 ## type doesn't work on platforms other than linux (bash). If if doesn't work, always assume output is not a zero exitcode
 if ! type -p "$BASH" > /dev/null; then
@@ -13,8 +13,8 @@ if ! type -p "$BASH" > /dev/null; then
 fi
 
 ## allow debugging from command line with preceding ocsync with DEBUG=yes
-if [ ! "$DEBUG" == "yes" ]; then
-	DEBUG=no
+if [ ! "$_DEBUG" == "yes" ]; then
+	_DEBUG=no
 	SLEEP_TIME=.1
 else
 	SLEEP_TIME=3
@@ -60,7 +60,7 @@ function _logger {
 	local value="${1}" # What to log
 	echo -e "$value" >> "$LOG_FILE"
 	
-	if [ $silent -eq 0 ]; then
+	if [ $_SILENT -eq 0 ]; then
 		echo -e "$value"
 	fi
 }
@@ -87,7 +87,7 @@ function Logger {
 	elif [ "$level" == "NOTICE" ]; then
 		_logger "$prefix$value"
 	elif [ "$level" == "DEBUG" ]; then
-		if [ "$DEBUG" == "yes" ]; then
+		if [ "$_DEBUG" == "yes" ]; then
 			_logger "$prefix$value"
 		fi
 	else
@@ -100,7 +100,7 @@ function TrapError {
 	local job="$0"
 	local line="$1"
 	local code="${2:-1}"
-	if [ $silent -eq 0 ]; then
+	if [ $_SILENT -eq 0 ]; then
 		echo -e " /!\ ERROR in ${job}: Near line ${line}, exit code ${code}"
 	fi
 }
@@ -122,7 +122,7 @@ function TrapStop {
 
 function TrapQuit {
 	if [ $error_alert -ne 0 ]; then
-		if [ "$DEBUG" != "yes" ]; then
+		if [ "$_DEBUG" != "yes" ]; then
 			SendAlert
 		else
 			Logger "Debug mode, no alert mail will be sent." "NOTICE"
@@ -152,7 +152,7 @@ function TrapQuit {
 }
 
 function Spinner {
-	if [ $silent -eq 1 ]; then
+	if [ $_SILENT -eq 1 ]; then
 		return 0
 	fi
 
@@ -190,7 +190,7 @@ function EscapeSpaces {
 }
 
 function CleanUp {
-	if [ "$DEBUG" != "yes" ]; then
+	if [ "$_DEBUG" != "yes" ]; then
 		rm -f $RUN_DIR/osync_*_$SCRIPT_PID
 	fi
 }
@@ -459,7 +459,7 @@ function RunLocalCommand {
 	local hard_max_time="${2}" # Max time to wait for command to compleet
 	__CheckArguments 2 $# $FUNCNAME "$*"
 
-	if [ $dryrun -ne 0 ]; then
+	if [ $_DRYRUN -ne 0 ]; then
 		Logger "Dryrun: Local command [$command] not run." "NOTICE"
 		return 1
 	fi
@@ -474,7 +474,7 @@ function RunLocalCommand {
 		Logger "Command failed." "ERROR"
 	fi
 
-	if [ $verbose -eq 1 ] || [ $retval -ne 0 ]; then
+	if [ $_VERBOSE -eq 1 ] || [ $retval -ne 0 ]; then
 		Logger "Command output:\n$(cat $RUN_DIR/osync_run_local_$SCRIPT_PID)" "NOTICE"
 	fi
 
@@ -492,7 +492,7 @@ function RunRemoteCommand {
 
 	CheckConnectivity3rdPartyHosts
 	CheckConnectivityRemoteHost
-	if [ $dryrun -ne 0 ]; then
+	if [ $_DRYRUN -ne 0 ]; then
 		Logger "Dryrun: Local command [$command] not run." "NOTICE"
 		return 1
 	fi
@@ -507,7 +507,7 @@ function RunRemoteCommand {
 		Logger "Command failed." "ERROR"
 	fi
 
-	if [ -f $RUN_DIR/osync_run_remote_$SCRIPT_PID ] && ([ $verbose -eq 1 ] || [ $retval -ne 0 ])
+	if [ -f $RUN_DIR/osync_run_remote_$SCRIPT_PID ] && ([ $_VERBOSE -eq 1 ] || [ $retval -ne 0 ])
 	then
 		Logger "Command output:\n$(cat $RUN_DIR/osync_run_remote_$SCRIPT_PID)" "NOTICE"
 	fi
@@ -573,7 +573,7 @@ function CheckConnectivity3rdPartyHosts {
 function __CheckArguments {
 	# Checks the number of arguments and raises an error if some are missing
 
-	if [ "$DEBUG" == "yes" ]; then
+	if [ "$_DEBUG" == "yes" ]; then
 
 		local number_of_arguments="${1}" # Number of arguments a function should have
 		local number_of_given_arguments="${2}" # Number of arguments that have been passed
@@ -586,7 +586,7 @@ function __CheckArguments {
 			echo "Argumnt list: $4" >> "$LOG_FILE"
         	fi
 
-		if [ "$PARANOIA_DEBUG" == "yes" ]; then
+		if [ "$_PARANOIA_DEBUG" == "yes" ]; then
 			# Paranoia check... Can help finding empty arguments 
 			local count=-3 # Number of arguments minus the function calls for __CheckArguments
 			for i in $@; do
@@ -1052,7 +1052,7 @@ function delete_list {
 	local deleted_failed_list_file="${5}" # file containing files that couldn't be deleted on last run, will be prefixed with replica type
 	__CheckArguments 5 "$#" "$FUNCNAME" "$*"
 
-	# TODO: Check why external filenames are used (see dryrun option because of NOSUFFIX)
+	# TODO: Check why external filenames are used (see _DRYRUN option because of NOSUFFIX)
 
 	Logger "Creating $replica_type replica deleted file list." "NOTICE"
 	if [ -f "$MASTER_STATE_DIR/$replica_type$TREE_AFTER_FILENAME_NO_SUFFIX" ]; then
@@ -1120,13 +1120,13 @@ function sync_update {
 	child_pid=$!
 	WaitForCompletion $child_pid $SOFT_MAX_EXEC_TIME $HARD_MAX_EXEC_TIME
 	retval=$?
-	if [ $verbose -eq 1 ] && [ -f $RUN_DIR/osync_update_$destination_replica_replica_$SCRIPT_PID ]; then
+	if [ $_VERBOSE -eq 1 ] && [ -f $RUN_DIR/osync_update_$destination_replica_replica_$SCRIPT_PID ]; then
 		Logger "List:\n$(cat $RUN_DIR/osync_update_$destination_replica_replica_$SCRIPT_PID)" "NOTICE"
 	fi
 
 	if [ $retval != 0 ] && [ $retval != 24 ]; then
 		Logger "Updating $destination_replica replica failed. Stopping execution." "CRITICAL"
-		if [ $verbose -eq 0 ] && [ -f $RUN_DIR/osync_update_$destination_replica_replica_$SCRIPT_PID ]; then
+		if [ $_VERBOSE -eq 0 ] && [ -f $RUN_DIR/osync_update_$destination_replica_replica_$SCRIPT_PID ]; then
 			Logger "Rsync output:\n$(cat $RUN_DIR/osync_update_$destination_replica_replica_$SCRIPT_PID)" "NOTICE"
 		fi
 		exit $retval
@@ -1159,11 +1159,11 @@ function _delete_local {
 					fi
 				fi
 
-				if [ $verbose -eq 1 ]; then
+				if [ $_VERBOSE -eq 1 ]; then
 					Logger "Soft deleting $replica_dir$files" "NOTICE"
 				fi
 
-				if [ $dryrun -ne 1 ]; then
+				if [ $_DRYRUN -ne 1 ]; then
 					if [ -e "$replica_dir$deletion_dir/$files" ]; then
 						rm -rf "$replica_dir$deletion_dir/$files"
 					fi
@@ -1181,11 +1181,11 @@ function _delete_local {
 					fi
 				fi
 			else
-				if [ $verbose -eq 1 ]; then
+				if [ $_VERBOSE -eq 1 ]; then
 					Logger "Deleting $replica_dir$files" "NOTICE"
 				fi
 
-				if [ $dryrun -ne 1 ]; then
+				if [ $_DRYRUN -ne 1 ]; then
 					rm -rf "$replica_dir$files"
 					if [ $? != 0 ]; then
 						Logger "Cannot delete $replica_dir$files" "ERROR"
@@ -1222,14 +1222,14 @@ function _delete_remote {
 		exit 1
 	fi
 
-$SSH_CMD error_alert=0 sync_on_changes=$sync_on_changes silent=$silent DEBUG=$DEBUG dryrun=$dryrun verbose=$verbose COMMAND_SUDO=$COMMAND_SUDO FILE_LIST="$(EscapeSpaces "$SLAVE_STATE_DIR/$deleted_list_file")" REPLICA_DIR="$(EscapeSpaces "$replica_dir")" DELETE_DIR="$(EscapeSpaces "$deletion_dir")" FAILED_DELETE_LIST="$(EscapeSpaces "$SLAVE_STATE_DIR/$deleted_failed_list_file")" 'bash -s' << 'ENDSSH' > $RUN_DIR/osync_remote_deletion_$SCRIPT_PID 2>&1 &
+$SSH_CMD error_alert=0 sync_on_changes=$sync_on_changes _SILENT=$_SILENT _DEBUG=$_DEBUG _DRYRUN=$_DRYRUN _VERBOSE=$_VERBOSE COMMAND_SUDO=$COMMAND_SUDO FILE_LIST="$(EscapeSpaces "$SLAVE_STATE_DIR/$deleted_list_file")" REPLICA_DIR="$(EscapeSpaces "$replica_dir")" DELETE_DIR="$(EscapeSpaces "$deletion_dir")" FAILED_DELETE_LIST="$(EscapeSpaces "$SLAVE_STATE_DIR/$deleted_failed_list_file")" 'bash -s' << 'ENDSSH' > $RUN_DIR/osync_remote_deletion_$SCRIPT_PID 2>&1 &
 
 	## The following lines are executed remotely
 	function _logger {
 		local value="${1}" # What to log
 		echo -e "$value" >> "$LOG_FILE"
 
-		if [ $silent -eq 0 ]; then
+		if [ $_SILENT -eq 0 ]; then
 		echo -e "$value"
 		fi
 	}
@@ -1256,7 +1256,7 @@ $SSH_CMD error_alert=0 sync_on_changes=$sync_on_changes silent=$silent DEBUG=$DE
 		elif [ "$level" == "NOTICE" ]; then
 			_logger "$prefix$value"
 		elif [ "$level" == "DEBUG" ]; then
-			if [ "$DEBUG" == "yes" ]; then
+			if [ "$_DEBUG" == "yes" ]; then
 				_logger "$prefix$value"
 			fi
 		else
@@ -1283,11 +1283,11 @@ $SSH_CMD error_alert=0 sync_on_changes=$sync_on_changes silent=$silent DEBUG=$DE
 				fi
 
 			if [ "$SOFT_DELETE" != "no" ]; then
-				if [ $verbose -eq 1 ]; then
+				if [ $_VERBOSE -eq 1 ]; then
 					Logger "Soft deleting $REPLICA_DIR$files" "NOTICE"
 				fi
 
-				if [ $dryrun -ne 1 ]; then
+				if [ $_DRYRUN -ne 1 ]; then
 					if [ -e "$REPLICA_DIR$DELETE_DIR/$files" ]; then
 						$COMMAND_SUDO rm -rf "$REPLICA_DIR$DELETE_DIR/$files"
 					fi
@@ -1305,11 +1305,11 @@ $SSH_CMD error_alert=0 sync_on_changes=$sync_on_changes silent=$silent DEBUG=$DE
 					fi
 				fi
 			else
-				if [ $verbose -eq 1 ]; then
+				if [ $_VERBOSE -eq 1 ]; then
 					Logger "Deleting $REPLICA_DIR$files" "NOTICE"
 				fi
 
-				if [ $dryrun -ne 1 ]; then
+				if [ $_DRYRUN -ne 1 ]; then
 					$COMMAND_SUDO rm -rf "$REPLICA_DIR$files"
 					if [ $? != 0 ]; then
 						Logger "Cannot delete $REPLICA_DIR$files" "ERROR"
@@ -1379,7 +1379,7 @@ function deletion_propagation {
 		WaitForCompletion $child_pid $SOFT_MAX_EXEC_TIME $HARD_MAX_EXEC_TIME
 		retval=$?
 		if [ $retval == 0 ]; then
-			if [ -f $RUN_DIR/osync_remote_deletion_$SCRIPT_PID ] && [ $verbose -eq 1 ]; then
+			if [ -f $RUN_DIR/osync_remote_deletion_$SCRIPT_PID ] && [ $_VERBOSE -eq 1 ]; then
 				Logger "Remote:\n$(cat $RUN_DIR/osync_remote_deletion_$SCRIPT_PID)" "DEBUG"
 			fi
 			return $retval
@@ -1581,19 +1581,19 @@ function _SoftDelete {
 	__CheckArguments 3 "$#" "$FUNCNAME" "$*"
 
 	if [ -d "$master_directory" ]; then
-		if [ $dryrun -eq 1 ]; then
+		if [ $_DRYRUN -eq 1 ]; then
 			Logger "Listing files older than $change_time days on master replica. Won't remove anything." "NOTICE"
 		else
 			Logger "Removing files older than $change_time days on master replica." "NOTICE"
 		fi
-			if [ $verbose -eq 1 ]; then
+			if [ $_VERBOSE -eq 1 ]; then
 			# Cannot launch log function from xargs, ugly hack
 			$FIND_CMD "$master_directory/" -type f -ctime +$change_time -print0 | xargs -0 -I {} echo "Will delete file {}" > $RUN_DIR/osync_soft_delete_master_$SCRIPT_PID
 			Logger "Command output:\n$(cat $RUN_DIR/osync_soft_delete_master_$SCRIPT_PID)" "NOTICE"
 			$FIND_CMD "$master_directory/" -type d -empty -ctime +$change_time -print0 | xargs -0 -I {} echo "Will delete directory {}" > $RUN_DIR/osync_soft_delete_master_$SCRIPT_PID
 			Logger "Command output:\n$(cat $RUN_DIR/osync_soft_delete_master_$SCRIPT_PID)" "NOTICE"
 		fi
-			if [ $dryrun -ne 1 ]; then
+			if [ $_DRYRUN -ne 1 ]; then
 			$FIND_CMD "$master_directory/" -type f -ctime +$change_time -print0 | xargs -0 -I {} rm -f "{}" && $FIND_CMD "$master_directory/" -type d -empty -ctime +$change_time -print0 | xargs -0 -I {} rm -rf "{}" > $RUN_DIR/osync_soft_delete_master_$SCRIPT_PID 2>&1 &
 		else
 			Dummy &
@@ -1614,17 +1614,17 @@ function _SoftDelete {
 	if [ "$REMOTE_SYNC" == "yes" ]; then
 		CheckConnectivity3rdPartyHosts
 		CheckConnectivityRemoteHost
-			if [ $dryrun -eq 1 ]; then
+			if [ $_DRYRUN -eq 1 ]; then
 			Logger "Listing files older than $change_time days on slave replica. Won't remove anything." "NOTICE"
 		else
 			Logger "Removing files older than $change_time days on slave replica." "NOTICE"
 		fi
-			if [ $verbose -eq 1 ]; then
+			if [ $_VERBOSE -eq 1 ]; then
 			# Cannot launch log function from xargs, ugly hack
 			eval "$SSH_CMD \"if [ -w \\\"$slave_directory\\\" ]; then $COMMAND_SUDO $REMOTE_FIND_CMD \\\"$slave_directory/\\\" -type f -ctime +$change_time -print0 | xargs -0 -I {} echo Will delete file {} && $REMOTE_FIND_CMD \\\"$slave_directory/\\\" -type d -empty -ctime $change_time -print0 | xargs -0 -I {} echo Will delete directory {}; fi\"" > $RUN_DIR/osync_soft_delete_slave_$SCRIPT_PID
 			Logger "Command output:\n$(cat $RUN_DIR/osync_soft_delete_slave_$SCRIPT_PID)" "NOTICE"
 		fi
-			if [ $dryrun -ne 1 ]; then
+			if [ $_DRYRUN -ne 1 ]; then
 			eval "$SSH_CMD \"if [ -w \\\"$slave_directory\\\" ]; then $COMMAND_SUDO $REMOTE_FIND_CMD \\\"$slave_directory/\\\" -type f -ctime +$change_time -print0 | xargs -0 -I {} rm -f \\\"{}\\\" && $REMOTE_FIND_CMD \\\"$slave_directory/\\\" -type d -empty -ctime $change_time -print0 | xargs -0 -I {} rm -rf \\\"{}\\\"; fi 2>&1\"" > $RUN_DIR/osync_soft_delete_slave_$SCRIPT_PID &
 		else
 			Dummy &
@@ -1640,12 +1640,12 @@ function _SoftDelete {
 			fi
 	else
 	if [ -w "$slave_directory" ]; then
-		if [ $dryrun -eq 1 ]; then
+		if [ $_DRYRUN -eq 1 ]; then
 			Logger "Listing files older than $change_time days on slave replica. Won't remove anything." "NOTICE"
 		else
 			Logger "Removing files older than $change_time days on slave replica." "NOTICE"
 		fi
-			if [ $verbose -eq 1 ]; then
+			if [ $_VERBOSE -eq 1 ]; then
 			# Cannot launch log function from xargs, ugly hack
 			$FIND_CMD "$slave_directory/" -type f -ctime +$change_time -print0 | xargs -0 -I {} echo "Will delete file {}" > $RUN_DIR/osync_soft_delete_slave_$SCRIPT_PID
 			Logger "Command output:\n$(cat $RUN_DIR/osync_soft_delete_slave_$SCRIPT_PID)" "NOTICE"
@@ -1653,7 +1653,7 @@ function _SoftDelete {
 			Logger "Command output:\n$(cat $RUN_DIR/osync_soft_delete_slave_$SCRIPT_PID)" "NOTICE"
 			Dummy &
 		fi
-			if [ $dryrun -ne 1 ]; then
+			if [ $_DRYRUN -ne 1 ]; then
 			$FIND_CMD "$slave_directory/" -type f -ctime +$change_time -print0 | xargs -0 -I {} rm -f "{}" && $FIND_CMD "$slave_directory/" -type d -empty -ctime +$change_time -print0 | xargs -0 -I {} rm -rf "{}" > $RUN_DIR/osync_soft_delete_slave_$SCRIPT_PID &
 		fi
 		child_pid=$!
@@ -1685,7 +1685,7 @@ function Init {
 		trap TrapQuit SIGTERM EXIT SIGKILL SIGHUP SIGQUIT
 	fi
 
-	if [ "$DEBUG" == "yes" ]; then
+	if [ "$_DEBUG" == "yes" ]; then
 		trap 'TrapError ${LINENO} $?' ERR
 	fi
 
@@ -1802,7 +1802,7 @@ function Init {
 	if [ "$CHECKSUM" == "yes" ]; then
 		RSYNC_ARGS=$RSYNC_ARGS" --checksum"
 	fi
-	if [ $dryrun -eq 1 ]; then
+	if [ $_DRYRUN -eq 1 ]; then
 		RSYNC_ARGS=$RSYNC_ARGS" -n"
 		DRY_WARNING="/!\ DRY RUN"
 	fi
@@ -1814,7 +1814,7 @@ function Init {
 	## Set sync only function arguments for rsync
 	SYNC_OPTS="-u"
 
-	if [ $verbose -eq 1 ]; then
+	if [ $_VERBOSE -eq 1 ]; then
 		SYNC_OPTS=$SYNC_OPTS"i"
 	fi
 
@@ -1846,7 +1846,7 @@ function Init {
 	RsyncExcludeFrom
 
 	## Filenames for state files
-	if [ $dryrun -eq 1 ]; then
+	if [ $_DRYRUN -eq 1 ]; then
 		dry_suffix="-dry"
 	fi
 
@@ -2019,14 +2019,16 @@ function SyncOnChanges {
 }
 
 # Comand line argument flags
-dryrun=0
-silent=0
-if [ "$DEBUG" == "yes" ]
+_DRYRUN=0
+_SILENT=0
+
+if [ "$_DEBUG" == "yes" ]
 then
-	verbose=1
+	_VERBOSE=1
 else
-	verbose=0
+	_VERBOSE=0
 fi
+
 stats=0
 PARTIAL=0
 force_unlock=0
@@ -2051,16 +2053,16 @@ for i in "$@"
 do
 	case $i in
 		--dry)
-		dryrun=1
+		_DRYRUN=1
 		opts=$opts" --dry"
 		;;
-		--silent)
-		silent=1
-		opts=$opts" --silent"
+		--_SILENT)
+		_SILENT=1
+		opts=$opts" --_SILENT"
 		;;
 		--verbose)
-		verbose=1
-		opts=$opts" --verbose"
+		_VERBOSE=1
+		opts=$opts" --_VERBOSE"
 		;;
 		--stats)
 		stats=1
