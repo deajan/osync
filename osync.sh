@@ -3,8 +3,8 @@
 PROGRAM="Osync" # Rsync based two way sync engine with fault tolerance
 AUTHOR="(L) 2013-2015 by Orsiris \"Ozy\" de Jong"
 CONTACT="http://www.netpower.fr/osync - ozy@netpower.fr"
-PROGRAM_VERSION=1.1-dev
-PROGRAM_BUILD=2015091001
+PROGRAM_VERSION=1.1-unstable
+PROGRAM_BUILD=2015091002
 
 ## type doesn't work on platforms other than linux (bash). If if doesn't work, always assume output is not a zero exitcode
 if ! type -p "$BASH" > /dev/null; then
@@ -12,12 +12,18 @@ if ! type -p "$BASH" > /dev/null; then
 	exit 127
 fi
 
-## allow debugging from command line with preceding ocsync with DEBUG=yes
+## allow debugging from command line with DEBUG=yes
 if [ ! "$_DEBUG" == "yes" ]; then
 	_DEBUG=no
 	SLEEP_TIME=.1
 else
-	SLEEP_TIME=3
+	SLEEP_TIME=1
+fi
+
+## allow function call checks
+if [ "$_PARANOIA_DEBUG" == "yes" ];then
+	_DEBUG=yes
+	SLEEP_TIME=1
 fi
 
 SCRIPT_PID=$$
@@ -580,11 +586,11 @@ function __CheckArguments {
 		local function_name="${3}" # Function name that called __CheckArguments
 		local arguments="${4}" # All other arguments
 
-        	if [ $number_of_arguments -ne $number_of_given_arguments ]; then
-                	Logger "Inconsistnent number of arguments in $function_name. Should have $number_of_arguments arguments, has $number_of_given_arguments arguments, see log file." "CRITICAL"
+		if [ $number_of_arguments -ne $number_of_given_arguments ]; then
+			Logger "Inconsistnent number of arguments in $function_name. Should have $number_of_arguments arguments, has $number_of_given_arguments arguments, see log file." "CRITICAL"
 			# Cannot user Logger here because $@ is a list of arguments
 			echo "Argumnt list: $4" >> "$LOG_FILE"
-        	fi
+		fi
 
 		if [ "$_PARANOIA_DEBUG" == "yes" ]; then
 			# Paranoia check... Can help finding empty arguments 
@@ -618,25 +624,25 @@ _resolve_symlinks() {
     local dir_context path
     path=$(readlink -- "$1")
     if [ $? -eq 0 ]; then
-        dir_context=$(dirname -- "$1")
-        _resolve_symlinks "$(_prepend_dir_context_if_necessary "$dir_context" "$path")" "$@"
+	dir_context=$(dirname -- "$1")
+	_resolve_symlinks "$(_prepend_dir_context_if_necessary "$dir_context" "$path")" "$@"
     else
-        printf '%s\n' "$1"
+	printf '%s\n' "$1"
     fi
 }
 
 _prepend_dir_context_if_necessary() {
     if [ "$1" = . ]; then
-        printf '%s\n' "$2"
+	printf '%s\n' "$2"
     else
-        _prepend_path_if_relative "$1" "$2"
+	_prepend_path_if_relative "$1" "$2"
     fi
 }
 
 _prepend_path_if_relative() {
     case "$2" in
-        /* ) printf '%s\n' "$2" ;;
-         * ) printf '%s\n' "$1/$2" ;;
+	/* ) printf '%s\n' "$2" ;;
+	 * ) printf '%s\n' "$1/$2" ;;
     esac
 }
 
@@ -647,17 +653,17 @@ _assert_no_path_cycles() {
     shift
 
     for path in "$@"; do
-        if [ "$path" = "$target" ]; then
-            return 1
-        fi
+	if [ "$path" = "$target" ]; then
+	    return 1
+	fi
     done
 }
 
 canonicalize_path() {
     if [ -d "$1" ]; then
-        _canonicalize_dir_path "$1"
+	_canonicalize_dir_path "$1"
     else
-        _canonicalize_file_path "$1"
+	_canonicalize_file_path "$1"
     fi
 }
 
@@ -678,9 +684,9 @@ _canonicalize_file_path() {
 
 readlink() {
     if  _has_command readlink; then
-        _system_readlink "$@"
+	_system_readlink "$@"
     else
-        _emulated_readlink "$@"
+	_emulated_readlink "$@"
     fi
 }
 
@@ -694,7 +700,7 @@ _system_readlink() {
 
 _emulated_readlink() {
     if [ "$1" = -- ]; then
-        shift
+	shift
     fi
 
     _gnu_stat_readlink "$@" || _bsd_stat_readlink "$@"
@@ -705,8 +711,8 @@ _gnu_stat_readlink() {
     output=$(stat -c %N -- "$1" 2>/dev/null) &&
 
     printf '%s\n' "$output" |
-        sed "s/^‘[^’]*’ -> ‘\(.*\)’/\1/
-             s/^'[^']*' -> '\(.*\)'/\1/"
+	sed "s/^‘[^’]*’ -> ‘\(.*\)’/\1/
+	     s/^'[^']*' -> '\(.*\)'/\1/"
     # FIXME: handle newlines
 }
 
@@ -716,11 +722,51 @@ _bsd_stat_readlink() {
 
 #### Osync specific functions (non shared)
 
-function CreateOsyncDirs {
-	if ! [ -d "$MASTER_STATE_DIR" ]; then
-		mkdir -p "$MASTER_STATE_DIR"
+function _CreateStateDirsLocal {
+	local replica_state_dir="${1}"
+	__CheckArguments 1 $# $FUNCNAME "$*"
+
+	if ! [ -d "$replica_state_dir" ]; then
+		$COMMAND_SUDO mkdir -p "$replica_state_dir" > $RUN_DIR/osync_$FUNCNAME_$SCRIPT_PID 2>&1
 		if [ $? != 0 ]; then
-			Logger "Cannot create master replica state dir [$MASTER_STATE_DIR]." "CRITICAL"
+			Logger "Cannot create state dir [$replica_state_dir]." "CRITICAL"
+			Logger "Command output:\n$RUN_DIR/osync_$FUNCNAME_$SCRIPT_PID" "ERROR"
+			exit 1
+		fi
+	fi
+}
+
+function _CreateStateDirsRemote {
+	local replica_state_dir="${1}"
+	__CheckArguments 1 $# $FUNCNAME "$*"
+
+	CheckConnectivity3rdPartyHosts
+	CheckConnectivityRemoteHost
+
+	$cmd = "$SSH_CMD \"if ! [ -d \\\"$replica_state_dir\\\" ]; then $COMMAND_SUDO mkdir -p \\\"$replica_state_dir\\\"; fi 2>&1\" &"
+	eval $cmd > $RUN_DIR/osync_$FUNCNAME_$SCRIPT_PID 2>&1
+	WaitForTaskCompletion $! 0 1800
+	if [ $? != 0 ]; then
+		Logger "Cannot create remote state dir [$replica_state_dir]." "CRITICAL"
+		Logger "Command output:\n$RUN_DIR/osync_$FUNCNAME_$SCRIPT_PID" "ERROR"
+		exit 1
+	fi
+}
+
+function CreateStateDirs {
+	_CreateStateDirsLocal "$INITIATOR_STATE_DIR"
+	if [ "$REMOTE_SYNC" == "no" ]; then
+		_CreateStateDirsLocal "$TARGET_STATE_DIR"
+	else
+		_CreateStateDirsRemote "$TARGET_STATE_DIR"
+	fi
+}
+
+function _LEGACY_CreateOsyncDirs {
+	if ! [ -d "$INITIATOR_STATE_DIR" ]; then
+		mkdir -p "$INITIATOR_STATE_DIR"
+		if [ $? != 0 ]; then
+			Logger "Cannot create initiator replica state dir [$INITIATOR_STATE_DIR]." "CRITICAL"
 			exit 1
 		fi
 	fi
@@ -728,43 +774,106 @@ function CreateOsyncDirs {
 	if [ "$REMOTE_SYNC" == "yes" ]; then
 		CheckConnectivity3rdPartyHosts
 		CheckConnectivityRemoteHost
-		eval "$SSH_CMD \"if ! [ -d \\\"$SLAVE_STATE_DIR\\\" ]; then $COMMAND_SUDO mkdir -p \\\"$SLAVE_STATE_DIR\\\"; fi 2>&1\"" &
+		eval "$SSH_CMD \"if ! [ -d \\\"$TARGET_STATE_DIR\\\" ]; then $COMMAND_SUDO mkdir -p \\\"$TARGET_STATE_DIR\\\"; fi 2>&1\"" &
 		child_pid=$!
 		WaitForTaskCompletion $child_pid 0 1800
 	else
-		if ! [ -d "$SLAVE_STATE_DIR" ]; then
-			mkdir -p "$SLAVE_STATE_DIR" > $RUN_DIR/osync_createosyncdirs_$SCRIPT_PID 2>&1
+		if ! [ -d "$TARGET_STATE_DIR" ]; then
+			mkdir -p "$TARGET_STATE_DIR" > $RUN_DIR/osync_createosyncdirs_$SCRIPT_PID 2>&1
 		fi
 	fi
 
 	if [ $? != 0 ]; then
-		Logger "Cannot create slave replica state dir [$SLAVE_STATE_DIR]." "CRITICAL"
+		Logger "Cannot create target replica state dir [$TARGET_STATE_DIR]." "CRITICAL"
 		Logger "Command output:\n$(cat $RUN_DIR/osync_createosyncdirs_$SCRIPT_PID)" "NOTICE"
 		exit 1
 	fi
 }
 
-function CheckMasterSlaveDirs {
-	#MASTER_SYNC_DIR_CANN=$(realpath "$MASTER_SYNC_DIR")	#TODO: investigate realpath & readlink issues on MSYS and busybox here
-	#SLAVE_SYNC_DIR_CANN=$(realpath "$SLAVE_SYNC_DIR")
+function _CheckReplicaPathsLocal {
+	local replica_path="${1}"
+	__CheckArguments 1 $# $FUNCNAME "$*"
+		
+	if [ ! -d "$replica_path" ]; then
+		if [ "$CREATE_DIRS" == "yes" ]; then
+			$COMMAND_SUDO mkdir -p "$replica_path" > $RUN_DIR/osync_$FUNCNAME_$SCRIPT_PID 2>&1
+			if [ $? != 0 ]; then
+				Logger "Cannot create local replica path [$replica_path]." "CRITICAL"
+				Logger "Command output:\n$(cat $RUN_DIR/osync_$FUNCNAME_$SCRIPT_PID)"
+				exit 1
+			else
+				Logger "Created local replica path [$replica_path]." "NOTICE"
+			fi
+		else
+			Logger "Local replica path [$replica_path] does not exist." "CRITICAL"
+			exit 1
+		fi
+	fi
+
+	if [ ! -w "$replica_path" ]; then
+		Logger "Local replica path [$replica_path] is not writable." "CRITICAL"
+		exit 1
+	fi
+}
+
+function _CheckReplicaPathsRemote {
+	local replica_path="${1}"
+	__CheckArguments 1 $# $FUNCNAME "$*"
+
+	CheckConnectivity3rdPartyHosts
+	CheckConnectivityRemoteHost
+
+	cmd="$SSH_CMD \"if ! [ -d \\\"$replica_path\\\" ]; then if [ "$CREATE_DIRS" == "yes" ]; then $COMMAND_SUDO mkdir -p \\\"$replica_path\\\"; fi; fi 2>&1\" &" 
+        eval $cmd > $RUN_DIR/osync_$FUNCNAME_$SCRIPT_PID 2>&1
+        WaitForTaskCompletion $! 0 1800
+        if [ $? != 0 ]; then
+                Logger "Cannot create remote replica path [$replica_path]." "CRITICAL"
+                Logger "Command output:\n$RUN_DIR/osync_$FUNCNAME_$SCRIPT_PID" "ERROR"
+                exit 1
+        fi
+
+	cmd="$SSH_CMD \"if [ ! -w "$replica_path" ];then exit 1; fi 2>&1\" &"
+	eval $cmd
+        WaitForTaskCompletion $! 0 1800
+        if [ $? != 0 ]; then
+                Logger "Remote replica path [$replica_path] is not writable." "CRITICAL"
+                exit 1
+        fi
+}
+
+function CheckReplicaPaths {
+	#INITIATOR_SYNC_DIR_CANN=$(realpath "$INITIATOR_SYNC_DIR")	#TODO: investigate realpath & readlink issues on MSYS and busybox here
+	#TARGET_SYNC_DIR_CANN=$(realpath "$TARGET_SYNC_DIR")
 
 	#if [ "$REMOTE_SYNC" != "yes" ]; then
-	#	if [ "$MASTER_SYNC_DIR_CANN" == "$SLAVE_SYNC_DIR_CANN" ]; then
-	#		Logger "Master directory [$MASTER_SYNC_DIR] can't be the same as slave directory." "CRITICAL"
+	#	if [ "$INITIATOR_SYNC_DIR_CANN" == "$TARGET_SYNC_DIR_CANN" ]; then
+	#		Logger "Master directory [$INITIATOR_SYNC_DIR] can't be the same as target directory." "CRITICAL"
 	#		exit 1
 	#	fi
 	#fi
 
-	if ! [ -d "$MASTER_SYNC_DIR" ]; then
+	_CheckReplicaPathsLocal "$INITIATOR_STATE_DIR"
+	if [ "$REMOTE_SYNC" == "no" ]; then
+		_CheckReplicaPathsLocal "$TARGET_STATE_DIR"
+	else
+		_CheckReplicaPathsRemote "$TARGET_STATE_DIR"
+	fi
+}
+
+function _LEGACY_CheckMasterSlaveDirs {
+	#INITIATOR_SYNC_DIR_CANN=$(realpath "$INITIATOR_SYNC_DIR")	#TODO: investigate realpath & readlink issues on MSYS and busybox here
+	#TARGET_SYNC_DIR_CANN=$(realpath "$TARGET_SYNC_DIR")
+
+	if ! [ -d "$INITIATOR_SYNC_DIR" ]; then
 		if [ "$CREATE_DIRS" == "yes" ]; then
-			mkdir -p "$MASTER_SYNC_DIR" > $RUN_DIR/osync_checkmasterslavedirs_$SCRIPT_PID 2>&1
+			mkdir -p "$INITIATOR_SYNC_DIR" > $RUN_DIR/osync_checkinitiatortargetdirs_$SCRIPT_PID 2>&1
 			if [ $? != 0 ]; then
-				Logger "Cannot create master directory [$MASTER_SYNC_DIR]." "CRITICAL"
-				Logger "Command output:\n$(cat $RUN_DIR/osync_checkmasterslavedirs_$SCRIPT_PID)" "NOTICE"
+				Logger "Cannot create initiator directory [$INITIATOR_SYNC_DIR]." "CRITICAL"
+				Logger "Command output:\n$(cat $RUN_DIR/osync_checkinitiatortargetdirs_$SCRIPT_PID)" "NOTICE"
 				exit 1
 			fi
 		else 
-			Logger "Master directory [$MASTER_SYNC_DIR] does not exist." "CRITICAL"
+			Logger "Master directory [$INITIATOR_SYNC_DIR] does not exist." "CRITICAL"
 			exit 1
 		fi
 	fi
@@ -773,36 +882,36 @@ function CheckMasterSlaveDirs {
 		CheckConnectivity3rdPartyHosts
 		CheckConnectivityRemoteHost
 		if [ "$CREATE_DIRS" == "yes" ]; then
-			eval "$SSH_CMD \"if ! [ -d \\\"$SLAVE_SYNC_DIR\\\" ]; then $COMMAND_SUDO mkdir -p \\\"$SLAVE_SYNC_DIR\\\"; fi 2>&1"\" > $RUN_DIR/osync_checkmasterslavedirs_$SCRIPT_PID &
+			eval "$SSH_CMD \"if ! [ -d \\\"$TARGET_SYNC_DIR\\\" ]; then $COMMAND_SUDO mkdir -p \\\"$TARGET_SYNC_DIR\\\"; fi 2>&1"\" > $RUN_DIR/osync_checkinitiatortargetdirs_$SCRIPT_PID &
 			child_pid=$!
 			WaitForTaskCompletion $child_pid 0 1800
 			if [ $? != 0 ]; then
-				Logger "Cannot create slave directory [$SLAVE_SYNC_DIR]." "CRITICAL"
-				Logger "Command output:\n$(cat $RUN_DIR/osync_checkmasterslavedirs_$SCRIPT_PID)" "NOTICE"
+				Logger "Cannot create target directory [$TARGET_SYNC_DIR]." "CRITICAL"
+				Logger "Command output:\n$(cat $RUN_DIR/osync_checkinitiatortargetdirs_$SCRIPT_PID)" "NOTICE"
 				exit 1
 			fi
 		else
-			eval "$SSH_CMD \"if ! [ -d \\\"$SLAVE_SYNC_DIR\\\" ]; then exit 1; fi"\" &
+			eval "$SSH_CMD \"if ! [ -d \\\"$TARGET_SYNC_DIR\\\" ]; then exit 1; fi"\" &
 			child_pid=$!
 			WaitForTaskCompletion $child_pid 0 1800
 			res=$?
 			if [ $res != 0 ]; then
-				Logger "Slave directory [$SLAVE_SYNC_DIR] does not exist." "CRITICAL"
+				Logger "Slave directory [$TARGET_SYNC_DIR] does not exist." "CRITICAL"
 				exit 1
 			fi
 		fi
 	else
-		if [ ! -d "$SLAVE_SYNC_DIR" ]; then
+		if [ ! -d "$TARGET_SYNC_DIR" ]; then
 			if [ "$CREATE_DIRS" == "yes" ]; then
-				mkdir -p "$SLAVE_SYNC_DIR"
+				mkdir -p "$TARGET_SYNC_DIR"
 				if [ $? != 0 ]; then
-					Logger "Cannot create slave directory [$SLAVE_SYNC_DIR]." "CRITICAL"
+					Logger "Cannot create target directory [$TARGET_SYNC_DIR]." "CRITICAL"
 					exit 1
 				else
-					Logger "Created slave directory [$SLAVE_SYNC_DIR]." "NOTICE"
+					Logger "Created target directory [$TARGET_SYNC_DIR]." "NOTICE"
 				fi
 			else
-				Logger "Slave directory [$SLAVE_SYNC_DIR] does not exist." "CRITICAL"
+				Logger "Slave directory [$TARGET_SYNC_DIR] does not exist." "CRITICAL"
 				exit 1
 			fi
 		fi
@@ -810,26 +919,26 @@ function CheckMasterSlaveDirs {
 }
 
 function CheckMinimumSpace {
-	Logger "Checking minimum disk space on master and slave." "NOTICE"
+	Logger "Checking minimum disk space on initiator and target." "NOTICE"
 
-	MASTER_SPACE=$(df -P "$MASTER_SYNC_DIR" | tail -1 | awk '{print $4}')
-	if [ $MASTER_SPACE -lt $MINIMUM_SPACE ]; then
-		Logger "There is not enough free space on master [$MASTER_SPACE KB]." "ERROR"
+	INITIATOR_SPACE=$(df -P "$INITIATOR_SYNC_DIR" | tail -1 | awk '{print $4}')
+	if [ $INITIATOR_SPACE -lt $MINIMUM_SPACE ]; then
+		Logger "There is not enough free space on initiator [$INITIATOR_SPACE KB]." "ERROR"
 	fi
 
 	if [ "$REMOTE_SYNC" == "yes" ]; then
 		CheckConnectivity3rdPartyHosts
 		CheckConnectivityRemoteHost
-		eval "$SSH_CMD \"$COMMAND_SUDO df -P \\\"$SLAVE_SYNC_DIR\\\"\"" > $RUN_DIR/osync_slave_space_$SCRIPT_PID &
+		eval "$SSH_CMD \"$COMMAND_SUDO df -P \\\"$TARGET_SYNC_DIR\\\"\"" > $RUN_DIR/osync_target_space_$SCRIPT_PID &
 		child_pid=$!
 		WaitForTaskCompletion $child_pid 0 1800
-		SLAVE_SPACE=$(cat $RUN_DIR/osync_slave_space_$SCRIPT_PID | tail -1 | awk '{print $4}')
+		TARGET_SPACE=$(cat $RUN_DIR/osync_target_space_$SCRIPT_PID | tail -1 | awk '{print $4}')
 	else
-		SLAVE_SPACE=$(df -P "$SLAVE_SYNC_DIR" | tail -1 | awk '{print $4}')
+		TARGET_SPACE=$(df -P "$TARGET_SYNC_DIR" | tail -1 | awk '{print $4}')
 	fi
 
-	if [ $SLAVE_SPACE -lt $MINIMUM_SPACE ]; then
-		Logger "There is not enough free space on slave [$SLAVE_SPACE KB]." "ERROR"
+	if [ $TARGET_SPACE -lt $MINIMUM_SPACE ]; then
+		Logger "There is not enough free space on target [$TARGET_SPACE KB]." "ERROR"
 	fi
 }
 
@@ -872,33 +981,33 @@ function RsyncExcludeFrom {
 }
 
 function WriteLockFiles {
-	echo $SCRIPT_PID > "$MASTER_LOCK"
+	echo $SCRIPT_PID > "$INITIATOR_LOCK"
 	if [ $? != 0 ]; then
-		Logger "Could not set lock on master replica." "CRITICAL"
+		Logger "Could not set lock on initiator replica." "CRITICAL"
 		exit 1
 	else
-		Logger "Locked master replica." "NOTICE"
+		Logger "Locked initiator replica." "NOTICE"
 	fi
 
 	if [ "$REMOTE_SYNC" == "yes" ]; then
 		CheckConnectivity3rdPartyHosts
 		CheckConnectivityRemoteHost
-		eval "$SSH_CMD \"echo $SCRIPT_PID@$SYNC_ID | $COMMAND_SUDO tee \\\"$SLAVE_LOCK\\\" > /dev/null \"" &
+		eval "$SSH_CMD \"echo $SCRIPT_PID@$SYNC_ID | $COMMAND_SUDO tee \\\"$TARGET_LOCK\\\" > /dev/null \"" &
 		child_pid=$!
 		WaitForTaskCompletion $child_pid 0 1800
 		if [ $? != 0 ]; then
-			Logger "Could not set lock on remote slave replica." "CRITICAL"
+			Logger "Could not set lock on remote target replica." "CRITICAL"
 			exit 1
 		else
-			Logger "Locked remote slave replica." "NOTICE"
+			Logger "Locked remote target replica." "NOTICE"
 		fi
 	else
-		echo "$SCRIPT_PID@$SYNC_ID" > "$SLAVE_LOCK"
+		echo "$SCRIPT_PID@$SYNC_ID" > "$TARGET_LOCK"
 		if [ $? != 0 ]; then
-			Logger "Couuld not set lock on local slave replica." "CRITICAL"
+			Logger "Couuld not set lock on local target replica." "CRITICAL"
 			exit 1
 		else
-			Logger "Locked local slave replica." "NOTICE"
+			Logger "Locked local target replica." "NOTICE"
 		fi
 	fi
 }
@@ -917,14 +1026,14 @@ function LockDirectories {
 
 	Logger "Checking for replica locks." "NOTICE"
 
-	if [ -f "$MASTER_LOCK" ]; then
-		master_lock_pid=$(cat $MASTER_LOCK)
-		Logger "Master lock pid present: $master_lock_pid" "DEBUG"
-		ps -p$master_lock_pid > /dev/null 2>&1
+	if [ -f "$INITIATOR_LOCK" ]; then
+		initiator_lock_pid=$(cat $INITIATOR_LOCK)
+		Logger "Master lock pid present: $initiator_lock_pid" "DEBUG"
+		ps -p$initiator_lock_pid > /dev/null 2>&1
 		if [ $? != 0 ]; then
-			Logger "There is a dead osync lock on master. Instance $master_lock_pid no longer running. Resuming." "NOTICE"
+			Logger "There is a dead osync lock on initiator. Instance $initiator_lock_pid no longer running. Resuming." "NOTICE"
 		else
-			Logger "There is already a local instance of osync that locks master replica. Cannot start. If your are sure this is an error, plaese kill instance $master_lock_pid of osync." "CRITICAL"
+			Logger "There is already a local instance of osync that locks initiator replica. Cannot start. If your are sure this is an error, plaese kill instance $initiator_lock_pid of osync." "CRITICAL"
 			exit 1
 		fi
 	fi
@@ -932,37 +1041,37 @@ function LockDirectories {
 	if [ "$REMOTE_SYNC" == "yes" ]; then
 		CheckConnectivity3rdPartyHosts
 		CheckConnectivityRemoteHost
-		eval "$SSH_CMD \"if [ -f \\\"$SLAVE_LOCK\\\" ]; then cat \\\"$SLAVE_LOCK\\\"; fi\" > $RUN_DIR/osync_remote_slave_lock_$SCRIPT_PID" &
+		eval "$SSH_CMD \"if [ -f \\\"$TARGET_LOCK\\\" ]; then cat \\\"$TARGET_LOCK\\\"; fi\" > $RUN_DIR/osync_remote_target_lock_$SCRIPT_PID" &
 		child_pid=$!
 		WaitForTaskCompletion $child_pid 0 1800
-		if [ -f $RUN_DIR/osync_remote_slave_lock_$SCRIPT_PID ]; then
-			slave_lock_pid=$(cat $RUN_DIR/osync_remote_slave_lock_$SCRIPT_PID | cut -d'@' -f1)
-			slave_lock_id=$(cat $RUN_DIR/osync_remote_slave_lock_$SCRIPT_PID | cut -d'@' -f2)
+		if [ -f $RUN_DIR/osync_remote_target_lock_$SCRIPT_PID ]; then
+			target_lock_pid=$(cat $RUN_DIR/osync_remote_target_lock_$SCRIPT_PID | cut -d'@' -f1)
+			target_lock_id=$(cat $RUN_DIR/osync_remote_target_lock_$SCRIPT_PID | cut -d'@' -f2)
 		fi
 	else
-		if [ -f "$SLAVE_LOCK" ]; then
-			slave_lock_pid=$(cat "$SLAVE_LOCK" | cut -d'@' -f1)
-			slave_lock_id=$(cat "$SLAVE_LOCK" | cut -d'@' -f2)
+		if [ -f "$TARGET_LOCK" ]; then
+			target_lock_pid=$(cat "$TARGET_LOCK" | cut -d'@' -f1)
+			target_lock_id=$(cat "$TARGET_LOCK" | cut -d'@' -f2)
 		fi
 	fi
 
-	if [ "$slave_lock_pid" != "" ] && [ "$slave_lock_id" != "" ]; then
-		Logger "Slave lock pid: $slave_lock_pid" "DEBUG"
+	if [ "$target_lock_pid" != "" ] && [ "$target_lock_id" != "" ]; then
+		Logger "Slave lock pid: $target_lock_pid" "DEBUG"
 
-		ps -p$slave_lock_pid > /dev/null
+		ps -p$target_lock_pid > /dev/null
 		if [ $? != 0 ]; then
-			if [ "$slave_lock_id" == "$SYNC_ID" ]; then
-				Logger "There is a dead osync lock on slave replica that corresponds to this master sync-id. Instance $slave_lock_pid no longer running. Resuming." "NOTICE"
+			if [ "$target_lock_id" == "$SYNC_ID" ]; then
+				Logger "There is a dead osync lock on target replica that corresponds to this initiator sync-id. Instance $target_lock_pid no longer running. Resuming." "NOTICE"
 			else
 				if [ "$FORCE_STRANGER_LOCK_RESUME" == "yes" ]; then
-					Logger "WARNING: There is a dead osync lock on slave replica that does not correspond to this master sync-id. Forcing resume." "WARN"
+					Logger "WARNING: There is a dead osync lock on target replica that does not correspond to this initiator sync-id. Forcing resume." "WARN"
 				else
-					Logger "There is a dead osync lock on slave replica that does not correspond to this master sync-id. Will not resume." "CRITICAL"
+					Logger "There is a dead osync lock on target replica that does not correspond to this initiator sync-id. Will not resume." "CRITICAL"
 					exit 1
 				fi
 			fi
 		else
-			Logger "There is already a local instance of osync that locks slave replica. Cannot start. If you are sure this is an error, please kill instance $slave_lock_pid of osync." "CRITICAL"
+			Logger "There is already a local instance of osync that locks target replica. Cannot start. If you are sure this is an error, please kill instance $target_lock_pid of osync." "CRITICAL"
 			exit 1
 		fi
 	fi
@@ -978,28 +1087,28 @@ function UnlockDirectories {
 	if [ "$REMOTE_SYNC" == "yes" ]; then
 		CheckConnectivity3rdPartyHosts
 		CheckConnectivityRemoteHost
-		eval "$SSH_CMD \"if [ -f \\\"$SLAVE_LOCK\\\" ]; then $COMMAND_SUDO rm \\\"$SLAVE_LOCK\\\"; fi 2>&1\"" > $RUN_DIR/osync_UnlockDirectories_$SCRIPT_PID &
+		eval "$SSH_CMD \"if [ -f \\\"$TARGET_LOCK\\\" ]; then $COMMAND_SUDO rm \\\"$TARGET_LOCK\\\"; fi 2>&1\"" > $RUN_DIR/osync_UnlockDirectories_$SCRIPT_PID &
 		child_pid=$!
 		WaitForTaskCompletion $child_pid 0 1800
 	else
-		if [ -f "$SLAVE_LOCK" ]; then
-			rm "$SLAVE_LOCK" > $RUN_DIR/osync_UnlockDirectories_$SCRIPT_PID 2>&1
+		if [ -f "$TARGET_LOCK" ]; then
+			rm "$TARGET_LOCK" > $RUN_DIR/osync_UnlockDirectories_$SCRIPT_PID 2>&1
 		fi
 	fi
 
 	if [ $? != 0 ]; then
-		Logger "Could not unlock slave replica." "ERROR"
+		Logger "Could not unlock target replica." "ERROR"
 		Logger "Command Output:\n$(cat $RUN_DIR/osync_UnlockDirectories_$SCRIPT_PID)" "NOTICE"
 	else
-		Logger "Removed slave replica lock." "NOTICE"
+		Logger "Removed target replica lock." "NOTICE"
 	fi
 
-	if [ -f "$MASTER_LOCK" ]; then
-		rm "$MASTER_LOCK"
+	if [ -f "$INITIATOR_LOCK" ]; then
+		rm "$INITIATOR_LOCK"
 		if [ $? != 0 ]; then
-			Logger "Could not unlock master replica." "ERROR"
+			Logger "Could not unlock initiator replica." "ERROR"
 		else
-			Logger "Removed master replica lock." "NOTICE"
+			Logger "Removed initiator replica lock." "NOTICE"
 		fi
 	fi
 }
@@ -1008,19 +1117,19 @@ function UnlockDirectories {
 
 	## Rsync does not like spaces in directory names, considering it as two different directories. Handling this schema by escaping space.
 	## It seems this only happens when trying to execute an rsync command through eval $rsync_cmd on a remote host.
-	## So i'm using unescaped $MASTER_SYNC_DIR for local rsync calls and escaped $ESC_MASTER_SYNC_DIR for remote rsync calls like user@host:$ESC_MASTER_SYNC_DIR
-	## The same applies for slave sync dir..............................................T.H.I.S..I.S..A..P.R.O.G.R.A.M.M.I.N.G..N.I.G.H.T.M.A.R.E
+	## So i'm using unescaped $INITIATOR_SYNC_DIR for local rsync calls and escaped $ESC_INITIATOR_SYNC_DIR for remote rsync calls like user@host:$ESC_INITIATOR_SYNC_DIR
+	## The same applies for target sync dir..............................................T.H.I.S..I.S..A..P.R.O.G.R.A.M.M.I.N.G..N.I.G.H.T.M.A.R.E
 
 function tree_list {
 	local replica_path="${1}" # path to the replica for which a tree needs to be constructed
-	local replica_type="${2}" # replica type: master, slave
+	local replica_type="${2}" # replica type: initiator, target
 	local tree_filename="${3}" # filename to output tree (will be prefixed with $replica_type)
 	__CheckArguments 3 "$#" "$FUNCNAME" "$*"
 
 	local escaped_replica_path=$(EscapeSpaces "$replica_path") #TODO: See if escpaed still needed when using ' instead of " for command eval
 
 	Logger "Creating $replica_type replica file list [$replica_path]." "NOTICE"
-	if [ "$REMOTE_SYNC" == "yes" ] && [ "$replica_type" == "slave" ]; then
+	if [ "$REMOTE_SYNC" == "yes" ] && [ "$replica_type" == "target" ]; then
 		CheckConnectivity3rdPartyHosts
 		CheckConnectivityRemoteHost
 		rsync_cmd="$(type -p $RSYNC_EXECUTABLE) --rsync-path=\"$RSYNC_PATH\" $RSYNC_ARGS -8 --exclude \"$OSYNC_DIR\" $RSYNC_EXCLUDE -e \"$RSYNC_SSH_CMD\" --list-only $REMOTE_USER@$REMOTE_HOST:\"$escaped_replica_path/\" | grep \"^-\|^d\" | awk '{\$1=\$2=\$3=\$4=\"\" ;print}' | awk '{\$1=\$1 ;print}' | (grep -v \"^\.$\" || :) | sort > \"$RUN_DIR/osync_$replica_type_$SCRIPT_PID\" &"
@@ -1035,7 +1144,7 @@ function tree_list {
 	retval=$?
 	## Retval 24 = some files vanished while creating list
 	if ([ $retval == 0 ] || [ $retval == 24 ]) && [ -f $RUN_DIR/osync_$replica_type_$SCRIPT_PID ]; then
-		mv $RUN_DIR/osync_$replica_type_$SCRIPT_PID "$MASTER_STATE_DIR/$replica_type$tree_filename"
+		mv $RUN_DIR/osync_$replica_type_$SCRIPT_PID "$INITIATOR_STATE_DIR/$replica_type$tree_filename"
 		return $?
 	else
 		Logger "Cannot create replica file list." "CRITICAL"
@@ -1043,9 +1152,9 @@ function tree_list {
 	fi
 }
 
-# delete_list(replica, tree-file-after, tree-file-current, deleted-list-file, deleted-failed-list-file): Creates a list of files vanished from last run on replica $1 (master/slave)
+# delete_list(replica, tree-file-after, tree-file-current, deleted-list-file, deleted-failed-list-file): Creates a list of files vanished from last run on replica $1 (initiator/target)
 function delete_list {
-	local replica_type="${1}" # replica type: master, slave
+	local replica_type="${1}" # replica type: initiator, target
 	local tree_file_after="${2}" # tree-file-after, will be prefixed with replica type
 	local tree_file_current="${3}" # tree-file-current, will be prefixed with replica type
 	local deleted_list_file="${4}" # file containing deleted file list, will be prefixed with replica type
@@ -1055,14 +1164,14 @@ function delete_list {
 	# TODO: Check why external filenames are used (see _DRYRUN option because of NOSUFFIX)
 
 	Logger "Creating $replica_type replica deleted file list." "NOTICE"
-	if [ -f "$MASTER_STATE_DIR/$replica_type$TREE_AFTER_FILENAME_NO_SUFFIX" ]; then
+	if [ -f "$INITIATOR_STATE_DIR/$replica_type$TREE_AFTER_FILENAME_NO_SUFFIX" ]; then
 		## Same functionnality, comm is much faster than grep but is not available on every platform
 		if type -p comm > /dev/null 2>&1
 		then
-			cmd="comm -23 \"$MASTER_STATE_DIR/$replica_type$TREE_AFTER_FILENAME_NO_SUFFIX\" \"$MASTER_STATE_DIR/$replica_type$tree_file_current\" > \"$MASTER_STATE_DIR/$replica_type$deleted_list_file\""
+			cmd="comm -23 \"$INITIATOR_STATE_DIR/$replica_type$TREE_AFTER_FILENAME_NO_SUFFIX\" \"$INITIATOR_STATE_DIR/$replica_type$tree_file_current\" > \"$INITIATOR_STATE_DIR/$replica_type$deleted_list_file\""
 		else
 			## The || : forces the command to have a good result
-			cmd="(grep -F -x -v -f \"$MASTER_STATE_DIR/$replica_type$tree_file_current\" \"$MASTER_STATE_DIR/$replica_type$TREE_AFTER_FILENAME_NO_SUFFIX\" || :) > \"$MASTER_STATE_DIR/$replica_type$deleted_list_file\""
+			cmd="(grep -F -x -v -f \"$INITIATOR_STATE_DIR/$replica_type$tree_file_current\" \"$INITIATOR_STATE_DIR/$replica_type$TREE_AFTER_FILENAME_NO_SUFFIX\" || :) > \"$INITIATOR_STATE_DIR/$replica_type$deleted_list_file\""
 		fi
 
 		Logger "CMD: $cmd" "DEBUG"
@@ -1070,50 +1179,50 @@ function delete_list {
 		retval=$?
 
 		# Add delete failed file list to current delete list and then empty it
-		if [ -f "$MASTER_STATE_DIR/$replica_type$deleted_failed_list_file" ]; then
-			cat "$MASTER_STATE_DIR/$replica_type$deleted_failed_list_file" >> "$MASTER_STATE_DIR/$replica_type$deleted_list_file"
-			rm -f "$MASTER_STATE_DIR/$replica_type$deleted_failed_list_file"
+		if [ -f "$INITIATOR_STATE_DIR/$replica_type$deleted_failed_list_file" ]; then
+			cat "$INITIATOR_STATE_DIR/$replica_type$deleted_failed_list_file" >> "$INITIATOR_STATE_DIR/$replica_type$deleted_list_file"
+			rm -f "$INITIATOR_STATE_DIR/$replica_type$deleted_failed_list_file"
 		fi
 
 		return $retval
 	else
-		touch "$MASTER_STATE_DIR/$replica_type$deleted_list_file"
+		touch "$INITIATOR_STATE_DIR/$replica_type$deleted_list_file"
 		return $retval
 	fi
 }
 
 # sync_update(source replica, destination replica, delete_list_filename)
 function sync_update {
-	local source_replica="${1}" # Contains replica type of source: master, slave
-	local destination_replica="${2}" # Contains replica type of destination: master, slave
+	local source_replica="${1}" # Contains replica type of source: initiator, target
+	local destination_replica="${2}" # Contains replica type of destination: initiator, target
 	local delete_list_filename="${3}" # Contains deleted list filename, will be prefixed with replica type
 	__CheckArguments 3 "$#" "$FUNCNAME" "$*"
 
 	Logger "Updating $destination_replica replica." "NOTICE"
-	if [ "$source_replica" == "master" ]; then
-		SOURCE_DIR="$MASTER_SYNC_DIR"
-		ESC_SOURCE_DIR=$(EscapeSpaces "$MASTER_SYNC_DIR")
-		DEST_DIR="$SLAVE_SYNC_DIR"
-		ESC_DEST_DIR=$(EscapeSpaces "$SLAVE_SYNC_DIR")
-		BACKUP_DIR="$SLAVE_BACKUP"
+	if [ "$source_replica" == "initiator" ]; then
+		SOURCE_DIR="$INITIATOR_SYNC_DIR"
+		ESC_SOURCE_DIR=$(EscapeSpaces "$INITIATOR_SYNC_DIR")
+		DEST_DIR="$TARGET_SYNC_DIR"
+		ESC_DEST_DIR=$(EscapeSpaces "$TARGET_SYNC_DIR")
+		BACKUP_DIR="$TARGET_BACKUP"
 	else
-		SOURCE_DIR="$SLAVE_SYNC_DIR"
-		ESC_SOURCE_DIR=$(EscapeSpaces "$SLAVE_SYNC_DIR")
-		DEST_DIR="$MASTER_SYNC_DIR"
-		ESC_DEST_DIR=$(EscapeSpaces "$MASTER_SYNC_DIR")
-		BACKUP_DIR="$MASTER_BACKUP"
+		SOURCE_DIR="$TARGET_SYNC_DIR"
+		ESC_SOURCE_DIR=$(EscapeSpaces "$TARGET_SYNC_DIR")
+		DEST_DIR="$INITIATOR_SYNC_DIR"
+		ESC_DEST_DIR=$(EscapeSpaces "$INITIATOR_SYNC_DIR")
+		BACKUP_DIR="$INITIATOR_BACKUP"
 	fi
 
 	if [ "$REMOTE_SYNC" == "yes" ]; then
 		CheckConnectivity3rdPartyHosts
 		CheckConnectivityRemoteHost
-		if [ "$source_replica" == "master" ]; then
-			rsync_cmd="$(type -p $RSYNC_EXECUTABLE) --rsync-path=\"$RSYNC_PATH\" $RSYNC_ARGS $SYNC_OPTS -e \"$RSYNC_SSH_CMD\" $BACKUP_DIR --exclude \"$OSYNC_DIR\" $RSYNC_EXCLUDE --exclude-from=\"$MASTER_STATE_DIR/$source_replica$delete_list_filename\" --exclude-from=\"$MASTER_STATE_DIR/$destination_replica$delete_list_filename\" \"$SOURCE_DIR/\" $REMOTE_USER@$REMOTE_HOST:\"$ESC_DEST_DIR/\" > $RUN_DIR/osync_update_$destination_replica_replica_$SCRIPT_PID 2>&1 &"
+		if [ "$source_replica" == "initiator" ]; then
+			rsync_cmd="$(type -p $RSYNC_EXECUTABLE) --rsync-path=\"$RSYNC_PATH\" $RSYNC_ARGS $SYNC_OPTS -e \"$RSYNC_SSH_CMD\" $BACKUP_DIR --exclude \"$OSYNC_DIR\" $RSYNC_EXCLUDE --exclude-from=\"$INITIATOR_STATE_DIR/$source_replica$delete_list_filename\" --exclude-from=\"$INITIATOR_STATE_DIR/$destination_replica$delete_list_filename\" \"$SOURCE_DIR/\" $REMOTE_USER@$REMOTE_HOST:\"$ESC_DEST_DIR/\" > $RUN_DIR/osync_update_$destination_replica_replica_$SCRIPT_PID 2>&1 &"
 		else
-			rsync_cmd="$(type -p $RSYNC_EXECUTABLE) --rsync-path=\"$RSYNC_PATH\" $RSYNC_ARGS $SYNC_OPTS -e \"$RSYNC_SSH_CMD\" $BACKUP_DIR --exclude \"$OSYNC_DIR\" $RSYNC_EXCLUDE --exclude-from=\"$MASTER_STATE_DIR/$destination_replica$delete_list_filename\" --exclude-from=\"$MASTER_STATE_DIR/$source_replica$delete_list_filename\" $REMOTE_USER@$REMOTE_HOST:\"$ESC_SOURCE_DIR/\" \"$DEST_DIR/\" > $RUN_DIR/osync_update_$destination_replica_replica_$SCRIPT_PID 2>&1 &"
+			rsync_cmd="$(type -p $RSYNC_EXECUTABLE) --rsync-path=\"$RSYNC_PATH\" $RSYNC_ARGS $SYNC_OPTS -e \"$RSYNC_SSH_CMD\" $BACKUP_DIR --exclude \"$OSYNC_DIR\" $RSYNC_EXCLUDE --exclude-from=\"$INITIATOR_STATE_DIR/$destination_replica$delete_list_filename\" --exclude-from=\"$INITIATOR_STATE_DIR/$source_replica$delete_list_filename\" $REMOTE_USER@$REMOTE_HOST:\"$ESC_SOURCE_DIR/\" \"$DEST_DIR/\" > $RUN_DIR/osync_update_$destination_replica_replica_$SCRIPT_PID 2>&1 &"
 		fi
 	else
-		rsync_cmd="$(type -p $RSYNC_EXECUTABLE) --rsync-path=\"$RSYNC_PATH\" $RSYNC_ARGS $SYNC_OPTS $BACKUP_DIR --exclude \"$OSYNC_DIR\" $RSYNC_EXCLUDE --exclude-from=\"$MASTER_STATE_DIR/$source_replica$delete_list_filename\" --exclude-from=\"$MASTER_STATE_DIR/$destination_replica$delete_list_filename\" \"$SOURCE_DIR/\" \"$DEST_DIR/\" > $RUN_DIR/osync_update_$destination_replica_replica_$SCRIPT_PID 2>&1 &"
+		rsync_cmd="$(type -p $RSYNC_EXECUTABLE) --rsync-path=\"$RSYNC_PATH\" $RSYNC_ARGS $SYNC_OPTS $BACKUP_DIR --exclude \"$OSYNC_DIR\" $RSYNC_EXCLUDE --exclude-from=\"$INITIATOR_STATE_DIR/$source_replica$delete_list_filename\" --exclude-from=\"$INITIATOR_STATE_DIR/$destination_replica$delete_list_filename\" \"$SOURCE_DIR/\" \"$DEST_DIR/\" > $RUN_DIR/osync_update_$destination_replica_replica_$SCRIPT_PID 2>&1 &"
 	fi
 	Logger "RSYNC_CMD: $rsync_cmd" "DEBUG"
 	eval "$rsync_cmd"
@@ -1148,7 +1257,7 @@ function _delete_local {
 	previous_file=""
 	OLD_IFS=$IFS
 	IFS=$'\r\n'
-	for files in $(cat "$MASTER_STATE_DIR/$deleted_list_file")
+	for files in $(cat "$INITIATOR_STATE_DIR/$deleted_list_file")
 	do
 		if [[ "$files" != "$previous_file/"* ]] && [ "$files" != "" ]; then
 			if [ "$SOFT_DELETE" != "no" ]; then
@@ -1177,7 +1286,7 @@ function _delete_local {
 					fi
 					if [ $? != 0 ]; then
 						Logger "Cannot move $replica_dir$files to deletion directory." "ERROR"
-						echo "$files" >> "$MASTER_STATE_DIR/$deleted_failed_list_file"
+						echo "$files" >> "$INITIATOR_STATE_DIR/$deleted_failed_list_file"
 					fi
 				fi
 			else
@@ -1189,7 +1298,7 @@ function _delete_local {
 					rm -rf "$replica_dir$files"
 					if [ $? != 0 ]; then
 						Logger "Cannot delete $replica_dir$files" "ERROR"
-						echo "$files" >> "$MASTER_STATE_DIR/$deleted_failed_list_file"
+						echo "$files" >> "$INITIATOR_STATE_DIR/$deleted_failed_list_file"
 					fi
 				fi
 			fi
@@ -1210,8 +1319,8 @@ function _delete_remote {
 	## Anything beetween << ENDSSH and ENDSSH will be executed remotely
 
 	# Additionnaly, we need to copy the deletetion list to the remote state folder
-	ESC_DEST_DIR="$(EscapeSpaces "$SLAVE_STATE_DIR")"
-	rsync_cmd="$(type -p $RSYNC_EXECUTABLE) --rsync-path=\"$RSYNC_PATH\" $SYNC_OPTS -e \"$RSYNC_SSH_CMD\" \"$MASTER_STATE_DIR/$2\" $REMOTE_USER@$REMOTE_HOST:\"$ESC_DEST_DIR/\" > $RUN_DIR/osync_remote_deletion_list_copy_$SCRIPT_PID 2>&1"
+	ESC_DEST_DIR="$(EscapeSpaces "$TARGET_STATE_DIR")"
+	rsync_cmd="$(type -p $RSYNC_EXECUTABLE) --rsync-path=\"$RSYNC_PATH\" $SYNC_OPTS -e \"$RSYNC_SSH_CMD\" \"$INITIATOR_STATE_DIR/$2\" $REMOTE_USER@$REMOTE_HOST:\"$ESC_DEST_DIR/\" > $RUN_DIR/osync_remote_deletion_list_copy_$SCRIPT_PID 2>&1"
 	Logger "RSYNC_CMD: $rsync_cmd" "DEBUG"
 	eval $rsync_cmd 2>> "$LOG_FILE"
 	if [ $? != 0 ]; then
@@ -1222,7 +1331,7 @@ function _delete_remote {
 		exit 1
 	fi
 
-$SSH_CMD error_alert=0 sync_on_changes=$sync_on_changes _SILENT=$_SILENT _DEBUG=$_DEBUG _DRYRUN=$_DRYRUN _VERBOSE=$_VERBOSE COMMAND_SUDO=$COMMAND_SUDO FILE_LIST="$(EscapeSpaces "$SLAVE_STATE_DIR/$deleted_list_file")" REPLICA_DIR="$(EscapeSpaces "$replica_dir")" DELETE_DIR="$(EscapeSpaces "$deletion_dir")" FAILED_DELETE_LIST="$(EscapeSpaces "$SLAVE_STATE_DIR/$deleted_failed_list_file")" 'bash -s' << 'ENDSSH' > $RUN_DIR/osync_remote_deletion_$SCRIPT_PID 2>&1 &
+$SSH_CMD error_alert=0 sync_on_changes=$sync_on_changes _SILENT=$_SILENT _DEBUG=$_DEBUG _DRYRUN=$_DRYRUN _VERBOSE=$_VERBOSE COMMAND_SUDO=$COMMAND_SUDO FILE_LIST="$(EscapeSpaces "$TARGET_STATE_DIR/$deleted_list_file")" REPLICA_DIR="$(EscapeSpaces "$replica_dir")" DELETE_DIR="$(EscapeSpaces "$deletion_dir")" FAILED_DELETE_LIST="$(EscapeSpaces "$TARGET_STATE_DIR/$deleted_failed_list_file")" 'bash -s' << 'ENDSSH' > $RUN_DIR/osync_remote_deletion_$SCRIPT_PID 2>&1 &
 
 	## The following lines are executed remotely
 	function _logger {
@@ -1313,7 +1422,7 @@ $SSH_CMD error_alert=0 sync_on_changes=$sync_on_changes _SILENT=$_SILENT _DEBUG=
 					$COMMAND_SUDO rm -rf "$REPLICA_DIR$files"
 					if [ $? != 0 ]; then
 						Logger "Cannot delete $REPLICA_DIR$files" "ERROR"
-						echo "$files" >> "$SLAVE_STATE_DIR/$FAILED_DELETE_LIST"
+						echo "$files" >> "$TARGET_STATE_DIR/$FAILED_DELETE_LIST"
 					fi
 				fi
 			fi
@@ -1327,12 +1436,12 @@ ENDSSH
 	sleep 5
 
 	## Copy back the deleted failed file list
-	ESC_SOURCE_FILE="$(EscapeSpaces "$SLAVE_STATE_DIR/$deleted_failed_list_file")"
-	rsync_cmd="$(type -p $RSYNC_EXECUTABLE) --rsync-path=\"$RSYNC_PATH\" $SYNC_OPTS -e \"$RSYNC_SSH_CMD\" $REMOTE_USER@$REMOTE_HOST:\"$ESC_SOURCE_FILE\" \"$MASTER_STATE_DIR\" > $RUN_DIR/osync_remote_failed_deletion_list_copy_$SCRIPT_PID"
+	ESC_SOURCE_FILE="$(EscapeSpaces "$TARGET_STATE_DIR/$deleted_failed_list_file")"
+	rsync_cmd="$(type -p $RSYNC_EXECUTABLE) --rsync-path=\"$RSYNC_PATH\" $SYNC_OPTS -e \"$RSYNC_SSH_CMD\" $REMOTE_USER@$REMOTE_HOST:\"$ESC_SOURCE_FILE\" \"$INITIATOR_STATE_DIR\" > $RUN_DIR/osync_remote_failed_deletion_list_copy_$SCRIPT_PID"
 	Logger "RSYNC_CMD: $rsync_cmd" "DEBUG"
 	eval $rsync_cmd 2>> "$LOG_FILE"
 	if [ $? != 0 ]; then
-		Logger "Cannot copy back the failed deletion list to master replica." "CRITICAL"
+		Logger "Cannot copy back the failed deletion list to initiator replica." "CRITICAL"
 		if [ -f $RUN_DIR/osync_remote_failed_deletion_list_copy_$SCRIPT_PID ]; then
 			Logger "$(cat $RUN_DIR/osync_remote_failed_deletion_list_copy_$SCRIPT_PID)" "NOTICE"
 		fi
@@ -1347,18 +1456,18 @@ ENDSSH
 
 # delete_propagation(replica name, deleted_list_filename, deleted_failed_file_list)
 function deletion_propagation {
-	local replica_type="${1}" # Contains replica type: master, slave
+	local replica_type="${1}" # Contains replica type: initiator, target
 	local deleted_list_file="${2}" # file containing deleted file list, will be prefixed with replica type
 	local deleted_failed_list_file="${3}" # file containing files that couldn't be deleted on last run, will be prefixed with replica type
 	__CheckArguments 3 "$#" "$FUNCNAME" "$*"
 
 	Logger "Propagating deletions to $replica_type replica." "NOTICE"
 
-	if [ "$replica_type" == "master" ]; then
-		REPLICA_DIR="$MASTER_SYNC_DIR"
-		DELETE_DIR="$MASTER_DELETE_DIR"
+	if [ "$replica_type" == "initiator" ]; then
+		REPLICA_DIR="$INITIATOR_SYNC_DIR"
+		DELETE_DIR="$INITIATOR_DELETE_DIR"
 
-		_delete_local "$REPLICA_DIR" "slave$deleted_list_file" "$DELETE_DIR" "slave$deleted_failed_list_file" &
+		_delete_local "$REPLICA_DIR" "target$deleted_list_file" "$DELETE_DIR" "target$deleted_failed_list_file" &
 		child_pid=$!
 		WaitForCompletion $child_pid $SOFT_MAX_EXEC_TIME $HARD_MAX_EXEC_TIME
 		retval=$?
@@ -1367,13 +1476,13 @@ function deletion_propagation {
 			exit 1
 		fi
 	else
-		REPLICA_DIR="$SLAVE_SYNC_DIR"
-		DELETE_DIR="$SLAVE_DELETE_DIR"
+		REPLICA_DIR="$TARGET_SYNC_DIR"
+		DELETE_DIR="$TARGET_DELETE_DIR"
 
 		if [ "$REMOTE_SYNC" == "yes" ]; then
-			_delete_remote "$REPLICA_DIR" "master$deleted_list_file" "$DELETE_DIR" "master$deleted_failed_list_file" &
+			_delete_remote "$REPLICA_DIR" "initiator$deleted_list_file" "$DELETE_DIR" "initiator$deleted_failed_list_file" &
 		else
-			_delete_local "$REPLICA_DIR" "master$deleted_list_file" "$DELETE_DIR" "master$deleted_failed_list_file" &
+			_delete_local "$REPLICA_DIR" "initiator$deleted_list_file" "$DELETE_DIR" "initiator$deleted_failed_list_file" &
 		fi
 		child_pid=$!
 		WaitForCompletion $child_pid $SOFT_MAX_EXEC_TIME $HARD_MAX_EXEC_TIME
@@ -1395,36 +1504,36 @@ function deletion_propagation {
 
 ###### Sync function in 5 steps of each 2 runs (functions above)
 ######
-###### Step 1: Create current tree list for master and slave replicas (Steps 1M and 1S)
-###### Step 2: Create deleted file list for master and slave replicas (Steps 2M and 2S)
-###### Step 3: Update master and slave replicas (Steps 3M and 3S, order depending on conflict prevalence)
-###### Step 4: Deleted file propagation to master and slave replicas (Steps 4M and 4S)
-###### Step 5: Create after run tree list for master and slave replicas (Steps 5M and 5S)
+###### Step 1: Create current tree list for initiator and target replicas (Steps 1M and 1S)
+###### Step 2: Create deleted file list for initiator and target replicas (Steps 2M and 2S)
+###### Step 3: Update initiator and target replicas (Steps 3M and 3S, order depending on conflict prevalence)
+###### Step 4: Deleted file propagation to initiator and target replicas (Steps 4M and 4S)
+###### Step 5: Create after run tree list for initiator and target replicas (Steps 5M and 5S)
 
 function Sync {
 	Logger "Starting synchronization task." "NOTICE"
 	CheckConnectivity3rdPartyHosts
 	CheckConnectivityRemoteHost
 
-	if [ -f "$MASTER_LAST_ACTION" ] && [ "$RESUME_SYNC" != "no" ]; then
-		resume_sync=$(cat "$MASTER_LAST_ACTION")
-		if [ -f "$MASTER_RESUME_COUNT" ]; then
-			resume_count=$(cat "$MASTER_RESUME_COUNT")
+	if [ -f "$INITIATOR_LAST_ACTION" ] && [ "$RESUME_SYNC" != "no" ]; then
+		resume_sync=$(cat "$INITIATOR_LAST_ACTION")
+		if [ -f "$INITIATOR_RESUME_COUNT" ]; then
+			resume_count=$(cat "$INITIATOR_RESUME_COUNT")
 		else
 			resume_count=0
 		fi
 
 		if [ $resume_count -lt $RESUME_TRY ]; then
 			if [ "$resume_sync" != "sync.success" ]; then
-				Logger "WARNING: Trying to resume aborted osync execution on $($STAT_CMD "$MASTER_LAST_ACTION") at task [$resume_sync]. [$resume_count] previous tries." "WARN"
-				echo $(($resume_count+1)) > "$MASTER_RESUME_COUNT"
+				Logger "WARNING: Trying to resume aborted osync execution on $($STAT_CMD "$INITIATOR_LAST_ACTION") at task [$resume_sync]. [$resume_count] previous tries." "WARN"
+				echo $(($resume_count+1)) > "$INITIATOR_RESUME_COUNT"
 			else
 				resume_sync=none
 			fi
 		else
 			Logger "Will not resume aborted osync execution. Too much resume tries [$resume_count]." "WARN"
-			echo "noresume" > "$MASTER_LAST_ACTION"
-			echo "0" > "$MASTER_RESUME_COUNT"
+			echo "noresume" > "$INITIATOR_LAST_ACTION"
+			echo "0" > "$INITIATOR_RESUME_COUNT"
 			resume_sync=none
 		fi
 	else
@@ -1435,166 +1544,166 @@ function Sync {
 	################################################################################################################################################# Actual sync begins here
 
 	## This replaces the case statement because ;& operator is not supported in bash 3.2... Code is more messy than case :(
-	if [ "$resume_sync" == "none" ] || [ "$resume_sync" == "noresume" ] || [ "$resume_sync" == "master-replica-tree.fail" ]; then
-		#master_tree_current
-		tree_list "$MASTER_SYNC_DIR" master "$TREE_CURRENT_FILENAME"
+	if [ "$resume_sync" == "none" ] || [ "$resume_sync" == "noresume" ] || [ "$resume_sync" == "initiator-replica-tree.fail" ]; then
+		#initiator_tree_current
+		tree_list "$INITIATOR_SYNC_DIR" initiator "$TREE_CURRENT_FILENAME"
 		if [ $? == 0 ]; then
-			echo "${SYNC_ACTION[0]}.success" > "$MASTER_LAST_ACTION"
+			echo "${SYNC_ACTION[0]}.success" > "$INITIATOR_LAST_ACTION"
 		else
-			echo "${SYNC_ACTION[0]}.fail" > "$MASTER_LAST_ACTION"
+			echo "${SYNC_ACTION[0]}.fail" > "$INITIATOR_LAST_ACTION"
 		fi
 		resume_sync="resumed"
 	fi
 	if [ "$resume_sync" == "resumed" ] || [ "$resume_sync" == "${SYNC_ACTION[0]}.success" ] || [ "$resume_sync" == "${SYNC_ACTION[1]}.fail" ]; then
-		#slave_tree_current
-		tree_list "$SLAVE_SYNC_DIR" slave "$TREE_CURRENT_FILENAME"
+		#target_tree_current
+		tree_list "$TARGET_SYNC_DIR" target "$TREE_CURRENT_FILENAME"
 		if [ $? == 0 ]; then
-			echo "${SYNC_ACTION[1]}.success" > "$MASTER_LAST_ACTION"
+			echo "${SYNC_ACTION[1]}.success" > "$INITIATOR_LAST_ACTION"
 		else
-			echo "${SYNC_ACTION[1]}.fail" > "$MASTER_LAST_ACTION"
+			echo "${SYNC_ACTION[1]}.fail" > "$INITIATOR_LAST_ACTION"
 		fi
 		resume_sync="resumed"
 	fi
 	if [ "$resume_sync" == "resumed" ] || [ "$resume_sync" == "${SYNC_ACTION[1]}.success" ] || [ "$resume_sync" == "${SYNC_ACTION[2]}.fail" ]; then
-		delete_list master "$TREE_AFTER_FILENAME" "$TREE_CURRENT_FILENAME" "$DELETED_LIST_FILENAME" "$FAILED_DELETE_LIST_FILENAME"
+		delete_list initiator "$TREE_AFTER_FILENAME" "$TREE_CURRENT_FILENAME" "$DELETED_LIST_FILENAME" "$FAILED_DELETE_LIST_FILENAME"
 		if [ $? == 0 ]; then
-			echo "${SYNC_ACTION[2]}.success" > "$MASTER_LAST_ACTION"
+			echo "${SYNC_ACTION[2]}.success" > "$INITIATOR_LAST_ACTION"
 		else
-			echo "${SYNc_ACTION[2]}.fail" > "$MASTER_LAST_ACTION"
+			echo "${SYNc_ACTION[2]}.fail" > "$INITIATOR_LAST_ACTION"
 		fi
 		resume_sync="resumed"
 	fi
 	if [ "$resume_sync" == "resumed" ] || [ "$resume_sync" == "${SYNC_ACTION[2]}.success" ] || [ "$resume_sync" == "${SYNC_ACTION[3]}.fail" ]; then
-		delete_list slave "$TREE_AFTER_FILENAME" "$TREE_CURRENT_FILENAME" "$DELETED_LIST_FILENAME" "$FAILED_DELETE_LIST_FILENAME"
+		delete_list target "$TREE_AFTER_FILENAME" "$TREE_CURRENT_FILENAME" "$DELETED_LIST_FILENAME" "$FAILED_DELETE_LIST_FILENAME"
 		if [ $? == 0 ]; then
-			echo "${SYNC_ACTION[3]}.success" > "$MASTER_LAST_ACTION"
+			echo "${SYNC_ACTION[3]}.success" > "$INITIATOR_LAST_ACTION"
 		else
-			echo "${SYNC_ACTION[3]}.fail" > "$MASTER_LAST_ACTION"
+			echo "${SYNC_ACTION[3]}.fail" > "$INITIATOR_LAST_ACTION"
 		fi
 		resume_sync="resumed"
 	fi
 	if [ "$resume_sync" == "resumed" ] || [ "$resume_sync" == "${SYNC_ACTION[3]}.success" ] || [ "$resume_sync" == "${SYNC_ACTION[4]}.fail" ] || [ "$resume_sync" == "${SYNC_ACTION[5]}.fail" ] || [ "$resume_sync" == "${SYNC_ACTION[4]}.success" ] || [ "$resume_sync" == "${SYNC_ACTION[5]}.success" ]; then
-		if [ "$CONFLICT_PREVALANCE" != "master" ]; then
+		if [ "$CONFLICT_PREVALANCE" != "initiator" ]; then
 			if [ "$resume_sync" == "resumed" ] || [ "$resume_sync" == "${SYNC_ACTION[3]}.success" ] || [ "$resume_sync" == "${SYNC_ACTION[4]}.fail" ]; then
-				sync_update slave master "$DELETED_LIST_FILENAME"
+				sync_update target initiator "$DELETED_LIST_FILENAME"
 				if [ $? == 0 ]; then
-					echo "${SYNC_ACTION[4]}.success" > "$MASTER_LAST_ACTION"
+					echo "${SYNC_ACTION[4]}.success" > "$INITIATOR_LAST_ACTION"
 				else
-					echo "${SYNC_ACTION[4]}.fail" > "$MASTER_LAST_ACTION"
+					echo "${SYNC_ACTION[4]}.fail" > "$INITIATOR_LAST_ACTION"
 				fi
 				resume_sync="resumed"
 			fi
 			if [ "$resume_sync" == "resumed" ] || [ "$resume_sync" == "${SYNC_ACTION[4]}.success" ] || [ "$resume_sync" == "${SYNC_ACTION[5]}.fail" ]; then
-				sync_update master slave "$DELETED_LIST_FILENAME"
+				sync_update initiator target "$DELETED_LIST_FILENAME"
 				if [ $? == 0 ]; then
-					echo "${SYNC_ACTION[5]}.success" > "$MASTER_LAST_ACTION"
+					echo "${SYNC_ACTION[5]}.success" > "$INITIATOR_LAST_ACTION"
 				else
-					echo "${SYNC_ACTION[5]}.fail" > "$MASTER_LAST_ACTION"
+					echo "${SYNC_ACTION[5]}.fail" > "$INITIATOR_LAST_ACTION"
 				fi
 				resume_sync="resumed"
 			fi
 		else
 			if [ "$resume_sync" == "resumed" ] || [ "$resume_sync" == "${SYNC_ACTION[3]}.success" ] || [ "$resume_sync" == "${SYNC_ACTION[5]}.fail" ]; then
-				sync_update master slave "$DELETED_LIST_FILENAME"
+				sync_update initiator target "$DELETED_LIST_FILENAME"
 				if [ $? == 0 ]; then
-					echo "${SYNC_ACTION[5]}.success" > "$MASTER_LAST_ACTION"
+					echo "${SYNC_ACTION[5]}.success" > "$INITIATOR_LAST_ACTION"
 				else
-					echo "${SYNC_ACTION[5]}.fail" > "$MASTER_LAST_ACTION"
+					echo "${SYNC_ACTION[5]}.fail" > "$INITIATOR_LAST_ACTION"
 				fi
 				resume_sync="resumed"
 			fi
 			if [ "$resume_sync" == "resumed" ] || [ "$resume_sync" == "${SYNC_ACTION[5]}.success" ] || [ "$resume_sync" == "${SYNC_ACTION[4]}.fail" ]; then
-				sync_update slave master "$DELETED_LIST_FILENAME"
+				sync_update target initiator "$DELETED_LIST_FILENAME"
 				if [ $? == 0 ]; then
-					echo "${SYNC_ACTION[4]}.success" > "$MASTER_LAST_ACTION"
+					echo "${SYNC_ACTION[4]}.success" > "$INITIATOR_LAST_ACTION"
 				else
-					echo "${SYNC_ACTION[4]}.fail" > "$MASTER_LAST_ACTION"
+					echo "${SYNC_ACTION[4]}.fail" > "$INITIATOR_LAST_ACTION"
 				fi
 				resume_sync="resumed"
 			fi
 		fi
 	fi
 	if [ "$resume_sync" == "resumed" ] || [ "$resume_sync" == "${SYNC_ACTION[5]}.success" ] || [ "$resume_sync" == "${SYNC_ACTION[4]}.success" ] || [ "$resume_sync" == "${SYNC_ACTION[6]}.fail" ]; then
-		deletion_propagation slave "$DELETED_LIST_FILENAME" "$FAILED_DELETE_LIST_FILENAME"
+		deletion_propagation target "$DELETED_LIST_FILENAME" "$FAILED_DELETE_LIST_FILENAME"
 		if [ $? == 0 ]; then
-			echo "${SYNC_ACTION[6]}.success" > "$MASTER_LAST_ACTION"
+			echo "${SYNC_ACTION[6]}.success" > "$INITIATOR_LAST_ACTION"
 		else
-			echo "${SYNC_ACTION[6]}.fail" > "$MASTER_LAST_ACTION"
+			echo "${SYNC_ACTION[6]}.fail" > "$INITIATOR_LAST_ACTION"
 		fi
 		resume_sync="resumed"
 	fi
 	if [ "$resume_sync" == "resumed" ] || [ "$resume_sync" == "${SYNC_ACTION[6]}.success" ] || [ "$resume_sync" == "${SYNC_ACTION[7]}.fail" ]; then
-		deletion_propagation master "$DELETED_LIST_FILENAME" "$FAILED_DELETE_LIST_FILENAME"
+		deletion_propagation initiator "$DELETED_LIST_FILENAME" "$FAILED_DELETE_LIST_FILENAME"
 		if [ $? == 0 ]; then
-			echo "${SYNC_ACTION[7]}.success" > "$MASTER_LAST_ACTION"
+			echo "${SYNC_ACTION[7]}.success" > "$INITIATOR_LAST_ACTION"
 		else
-			echo "${SYNC_ACTION[7]}.fail" > "$MASTER_LAST_ACTION"
+			echo "${SYNC_ACTION[7]}.fail" > "$INITIATOR_LAST_ACTION"
 		fi
 		resume_sync="resumed"
 	fi
 	if [ "$resume_sync" == "resumed" ] || [ "$resume_sync" == "${SYNC_ACTION[7]}.success" ] || [ "$resume_sync" == "${SYNC_ACTION[8]}.fail" ]; then
-		#master_tree_after
-		tree_list "$MASTER_SYNC_DIR" master "$TREE_AFTER_FILENAME"
+		#initiator_tree_after
+		tree_list "$INITIATOR_SYNC_DIR" initiator "$TREE_AFTER_FILENAME"
 		if [ $? == 0 ]; then
-			echo "${SYNC_ACTION[8]}.success" > "$MASTER_LAST_ACTION"
+			echo "${SYNC_ACTION[8]}.success" > "$INITIATOR_LAST_ACTION"
 		else
-			echo "${SYNC_ACTION[8]}.fail" > "$MASTER_LAST_ACTION"
+			echo "${SYNC_ACTION[8]}.fail" > "$INITIATOR_LAST_ACTION"
 		fi
 		resume_sync="resumed"
 	fi
 	if [ "$resume_sync" == "resumed" ] || [ "$resume_sync" == "${SYNC_ACTION[8]}.success" ] || [ "$resume_sync" == "${SYNC_ACTION[9]}.fail" ]; then
-		#slave_tree_after
-		tree_list "$SLAVE_SYNC_DIR" slave "$TREE_AFTER_FILENAME"
+		#target_tree_after
+		tree_list "$TARGET_SYNC_DIR" target "$TREE_AFTER_FILENAME"
 		if [ $? == 0 ]; then
-			echo "${SYNC_ACTION[9]}.success" > "$MASTER_LAST_ACTION"
+			echo "${SYNC_ACTION[9]}.success" > "$INITIATOR_LAST_ACTION"
 		else
-			echo "${SYNC_ACTION[9]}.fail" > "$MASTER_LAST_ACTION"
+			echo "${SYNC_ACTION[9]}.fail" > "$INITIATOR_LAST_ACTION"
 		fi
 		resume_sync="resumed"
 	fi
 
 	Logger "Finished synchronization task." "NOTICE"
-	echo "${SYNC_ACTION[10]}" > "$MASTER_LAST_ACTION"
+	echo "${SYNC_ACTION[10]}" > "$INITIATOR_LAST_ACTION"
 
-	echo "0" > "$MASTER_RESUME_COUNT"
+	echo "0" > "$INITIATOR_RESUME_COUNT"
 }
 
 function SoftDelete {
 	if [ "$CONFLICT_BACKUP" != "no" ] && [ $CONFLICT_BACKUP_DAYS -ne 0 ]; then
 		Logger "Running conflict backup cleanup." "NOTICE"
-		_SoftDelete $CONFLICT_BACKUP_DAYS "$MASTER_SYNC_DIR$MASTER_BACKUP_DIR" "$SLAVE_SYNC_DIR$SLAVE_BACKUP_DIR"
+		_SoftDelete $CONFLICT_BACKUP_DAYS "$INITIATOR_SYNC_DIR$INITIATOR_BACKUP_DIR" "$TARGET_SYNC_DIR$TARGET_BACKUP_DIR"
 	fi
 
 	if [ "$SOFT_DELETE" != "no" ] && [ $SOFT_DELETE_DAYS -ne 0 ]; then
 		Logger "Running soft deletion cleanup." "NOTICE"
-		_SoftDelete $SOFT_DELETE_DAYS "$MASTER_SYNC_DIR$MASTER_DELETE_DIR" "$SLAVE_SYNC_DIR$SLAVE_DELETE_DIR"	
+		_SoftDelete $SOFT_DELETE_DAYS "$INITIATOR_SYNC_DIR$INITIATOR_DELETE_DIR" "$TARGET_SYNC_DIR$TARGET_DELETE_DIR"	
 	fi	
 }
 
 
 # Takes 3 arguments
-# $1 = ctime (CONFLICT_BACKUP_DAYS or SOFT_DELETE_DAYS), $2 = MASTER_(BACKUP/DELETED)_DIR, $3 = SLAVE_(BACKUP/DELETED)_DIR
+# $1 = ctime (CONFLICT_BACKUP_DAYS or SOFT_DELETE_DAYS), $2 = INITIATOR_(BACKUP/DELETED)_DIR, $3 = TARGET_(BACKUP/DELETED)_DIR
 function _SoftDelete {
 	local change_time="${1}" # Contains the number of days a file needs to be old to be processed here (conflict or soft deletion)
-	local master_directory="${2}" # Master backup / deleted directory to search in
-	local slave_directory="${3}" # Slave backup / deleted directory to search in 
+	local initiator_directory="${2}" # Master backup / deleted directory to search in
+	local target_directory="${3}" # Slave backup / deleted directory to search in 
 	__CheckArguments 3 "$#" "$FUNCNAME" "$*"
 
-	if [ -d "$master_directory" ]; then
+	if [ -d "$initiator_directory" ]; then
 		if [ $_DRYRUN -eq 1 ]; then
-			Logger "Listing files older than $change_time days on master replica. Won't remove anything." "NOTICE"
+			Logger "Listing files older than $change_time days on initiator replica. Won't remove anything." "NOTICE"
 		else
-			Logger "Removing files older than $change_time days on master replica." "NOTICE"
+			Logger "Removing files older than $change_time days on initiator replica." "NOTICE"
 		fi
 			if [ $_VERBOSE -eq 1 ]; then
 			# Cannot launch log function from xargs, ugly hack
-			$FIND_CMD "$master_directory/" -type f -ctime +$change_time -print0 | xargs -0 -I {} echo "Will delete file {}" > $RUN_DIR/osync_soft_delete_master_$SCRIPT_PID
-			Logger "Command output:\n$(cat $RUN_DIR/osync_soft_delete_master_$SCRIPT_PID)" "NOTICE"
-			$FIND_CMD "$master_directory/" -type d -empty -ctime +$change_time -print0 | xargs -0 -I {} echo "Will delete directory {}" > $RUN_DIR/osync_soft_delete_master_$SCRIPT_PID
-			Logger "Command output:\n$(cat $RUN_DIR/osync_soft_delete_master_$SCRIPT_PID)" "NOTICE"
+			$FIND_CMD "$initiator_directory/" -type f -ctime +$change_time -print0 | xargs -0 -I {} echo "Will delete file {}" > $RUN_DIR/osync_soft_delete_initiator_$SCRIPT_PID
+			Logger "Command output:\n$(cat $RUN_DIR/osync_soft_delete_initiator_$SCRIPT_PID)" "NOTICE"
+			$FIND_CMD "$initiator_directory/" -type d -empty -ctime +$change_time -print0 | xargs -0 -I {} echo "Will delete directory {}" > $RUN_DIR/osync_soft_delete_initiator_$SCRIPT_PID
+			Logger "Command output:\n$(cat $RUN_DIR/osync_soft_delete_initiator_$SCRIPT_PID)" "NOTICE"
 		fi
 			if [ $_DRYRUN -ne 1 ]; then
-			$FIND_CMD "$master_directory/" -type f -ctime +$change_time -print0 | xargs -0 -I {} rm -f "{}" && $FIND_CMD "$master_directory/" -type d -empty -ctime +$change_time -print0 | xargs -0 -I {} rm -rf "{}" > $RUN_DIR/osync_soft_delete_master_$SCRIPT_PID 2>&1 &
+			$FIND_CMD "$initiator_directory/" -type f -ctime +$change_time -print0 | xargs -0 -I {} rm -f "{}" && $FIND_CMD "$initiator_directory/" -type d -empty -ctime +$change_time -print0 | xargs -0 -I {} rm -rf "{}" > $RUN_DIR/osync_soft_delete_initiator_$SCRIPT_PID 2>&1 &
 		else
 			Dummy &
 		fi
@@ -1602,30 +1711,30 @@ function _SoftDelete {
 		WaitForCompletion $child_pid $SOFT_MAX_EXEC_TIME $HARD_MAX_EXEC_TIME
 		retval=$?
 		if [ $retval -ne 0 ]; then
-			Logger "Error while executing cleanup on master replica." "ERROR"
-			Logger "Command output:\n$(cat $RUN_DIR/osync_soft_delete_master_$SCRIPT_PID)" "NOTICE"
+			Logger "Error while executing cleanup on initiator replica." "ERROR"
+			Logger "Command output:\n$(cat $RUN_DIR/osync_soft_delete_initiator_$SCRIPT_PID)" "NOTICE"
 		else
-			Logger "Cleanup complete on master replica." "NOTICE"
+			Logger "Cleanup complete on initiator replica." "NOTICE"
 		fi
-	elif [ -d "$master_directory" ] && ! [ -w "$master_directory" ]; then
-		Logger "Warning: Master replica dir [$master_directory] isn't writable. Cannot clean old files." "ERROR"
+	elif [ -d "$initiator_directory" ] && ! [ -w "$initiator_directory" ]; then
+		Logger "Warning: Master replica dir [$initiator_directory] isn't writable. Cannot clean old files." "ERROR"
 	fi
 
 	if [ "$REMOTE_SYNC" == "yes" ]; then
 		CheckConnectivity3rdPartyHosts
 		CheckConnectivityRemoteHost
 			if [ $_DRYRUN -eq 1 ]; then
-			Logger "Listing files older than $change_time days on slave replica. Won't remove anything." "NOTICE"
+			Logger "Listing files older than $change_time days on target replica. Won't remove anything." "NOTICE"
 		else
-			Logger "Removing files older than $change_time days on slave replica." "NOTICE"
+			Logger "Removing files older than $change_time days on target replica." "NOTICE"
 		fi
 			if [ $_VERBOSE -eq 1 ]; then
 			# Cannot launch log function from xargs, ugly hack
-			eval "$SSH_CMD \"if [ -w \\\"$slave_directory\\\" ]; then $COMMAND_SUDO $REMOTE_FIND_CMD \\\"$slave_directory/\\\" -type f -ctime +$change_time -print0 | xargs -0 -I {} echo Will delete file {} && $REMOTE_FIND_CMD \\\"$slave_directory/\\\" -type d -empty -ctime $change_time -print0 | xargs -0 -I {} echo Will delete directory {}; fi\"" > $RUN_DIR/osync_soft_delete_slave_$SCRIPT_PID
-			Logger "Command output:\n$(cat $RUN_DIR/osync_soft_delete_slave_$SCRIPT_PID)" "NOTICE"
+			eval "$SSH_CMD \"if [ -w \\\"$target_directory\\\" ]; then $COMMAND_SUDO $REMOTE_FIND_CMD \\\"$target_directory/\\\" -type f -ctime +$change_time -print0 | xargs -0 -I {} echo Will delete file {} && $REMOTE_FIND_CMD \\\"$target_directory/\\\" -type d -empty -ctime $change_time -print0 | xargs -0 -I {} echo Will delete directory {}; fi\"" > $RUN_DIR/osync_soft_delete_target_$SCRIPT_PID
+			Logger "Command output:\n$(cat $RUN_DIR/osync_soft_delete_target_$SCRIPT_PID)" "NOTICE"
 		fi
 			if [ $_DRYRUN -ne 1 ]; then
-			eval "$SSH_CMD \"if [ -w \\\"$slave_directory\\\" ]; then $COMMAND_SUDO $REMOTE_FIND_CMD \\\"$slave_directory/\\\" -type f -ctime +$change_time -print0 | xargs -0 -I {} rm -f \\\"{}\\\" && $REMOTE_FIND_CMD \\\"$slave_directory/\\\" -type d -empty -ctime $change_time -print0 | xargs -0 -I {} rm -rf \\\"{}\\\"; fi 2>&1\"" > $RUN_DIR/osync_soft_delete_slave_$SCRIPT_PID &
+			eval "$SSH_CMD \"if [ -w \\\"$target_directory\\\" ]; then $COMMAND_SUDO $REMOTE_FIND_CMD \\\"$target_directory/\\\" -type f -ctime +$change_time -print0 | xargs -0 -I {} rm -f \\\"{}\\\" && $REMOTE_FIND_CMD \\\"$target_directory/\\\" -type d -empty -ctime $change_time -print0 | xargs -0 -I {} rm -rf \\\"{}\\\"; fi 2>&1\"" > $RUN_DIR/osync_soft_delete_target_$SCRIPT_PID &
 		else
 			Dummy &
 		fi
@@ -1633,40 +1742,40 @@ function _SoftDelete {
 			WaitForCompletion $child_pid $SOFT_MAX_EXEC_TIME $HARD_MAX_EXEC_TIME
 			retval=$?
 			if [ $retval -ne 0 ]; then
-				Logger "Error while executing cleanup on slave replica." "ERROR"
-				Logger "Command output:\n$(cat $RUN_DIR/osync_soft_delete_slave_$SCRIPT_PID)" "NOTICE"
+				Logger "Error while executing cleanup on target replica." "ERROR"
+				Logger "Command output:\n$(cat $RUN_DIR/osync_soft_delete_target_$SCRIPT_PID)" "NOTICE"
 			else
-				Logger "Cleanup complete on slave replica." "NOTICE"
+				Logger "Cleanup complete on target replica." "NOTICE"
 			fi
 	else
-	if [ -w "$slave_directory" ]; then
+	if [ -w "$target_directory" ]; then
 		if [ $_DRYRUN -eq 1 ]; then
-			Logger "Listing files older than $change_time days on slave replica. Won't remove anything." "NOTICE"
+			Logger "Listing files older than $change_time days on target replica. Won't remove anything." "NOTICE"
 		else
-			Logger "Removing files older than $change_time days on slave replica." "NOTICE"
+			Logger "Removing files older than $change_time days on target replica." "NOTICE"
 		fi
 			if [ $_VERBOSE -eq 1 ]; then
 			# Cannot launch log function from xargs, ugly hack
-			$FIND_CMD "$slave_directory/" -type f -ctime +$change_time -print0 | xargs -0 -I {} echo "Will delete file {}" > $RUN_DIR/osync_soft_delete_slave_$SCRIPT_PID
-			Logger "Command output:\n$(cat $RUN_DIR/osync_soft_delete_slave_$SCRIPT_PID)" "NOTICE"
-			$FIND_CMD "$slave_directory/" -type d -empty -ctime +$change_time -print0 | xargs -0 -I {} echo "Will delete directory {}" > $RUN_DIR/osync_soft_delete_slave_$SCRIPT_PID
-			Logger "Command output:\n$(cat $RUN_DIR/osync_soft_delete_slave_$SCRIPT_PID)" "NOTICE"
+			$FIND_CMD "$target_directory/" -type f -ctime +$change_time -print0 | xargs -0 -I {} echo "Will delete file {}" > $RUN_DIR/osync_soft_delete_target_$SCRIPT_PID
+			Logger "Command output:\n$(cat $RUN_DIR/osync_soft_delete_target_$SCRIPT_PID)" "NOTICE"
+			$FIND_CMD "$target_directory/" -type d -empty -ctime +$change_time -print0 | xargs -0 -I {} echo "Will delete directory {}" > $RUN_DIR/osync_soft_delete_target_$SCRIPT_PID
+			Logger "Command output:\n$(cat $RUN_DIR/osync_soft_delete_target_$SCRIPT_PID)" "NOTICE"
 			Dummy &
 		fi
 			if [ $_DRYRUN -ne 1 ]; then
-			$FIND_CMD "$slave_directory/" -type f -ctime +$change_time -print0 | xargs -0 -I {} rm -f "{}" && $FIND_CMD "$slave_directory/" -type d -empty -ctime +$change_time -print0 | xargs -0 -I {} rm -rf "{}" > $RUN_DIR/osync_soft_delete_slave_$SCRIPT_PID &
+			$FIND_CMD "$target_directory/" -type f -ctime +$change_time -print0 | xargs -0 -I {} rm -f "{}" && $FIND_CMD "$target_directory/" -type d -empty -ctime +$change_time -print0 | xargs -0 -I {} rm -rf "{}" > $RUN_DIR/osync_soft_delete_target_$SCRIPT_PID &
 		fi
 		child_pid=$!
 		WaitForCompletion $child_pid $SOFT_MAX_EXEC_TIME $HARD_MAX_EXEC_TIME
 		retval=$?
 		if [ $retval -ne 0 ]; then
-			Logger "Error while executing cleanup on slave replica." "ERROR"
-			Logger "Command output:\n$(cat $RUN_DIR/osync_soft_delete_slave_$SCRIPT_PID)" "NOTICE"
+			Logger "Error while executing cleanup on target replica." "ERROR"
+			Logger "Command output:\n$(cat $RUN_DIR/osync_soft_delete_target_$SCRIPT_PID)" "NOTICE"
 		else
-			Logger "Cleanup complete on slave replica." "NOTICE"
+			Logger "Cleanup complete on target replica." "NOTICE"
 		fi
-		elif [ -d "$slave_directory" ] && ! [ -w "$slave_directory" ]; then
-			Logger "Warning: Slave replica dir [$slave_directory] isn't writable. Cannot clean old files." "ERROR"
+		elif [ -d "$target_directory" ] && ! [ -w "$target_directory" ]; then
+			Logger "Warning: Slave replica dir [$target_directory] isn't writable. Cannot clean old files." "ERROR"
 		fi
 	fi
 	
@@ -1691,12 +1800,12 @@ function Init {
 
 	MAIL_ALERT_MSG="Warning: Execution of osync instance $OSYNC_ID (pid $SCRIPT_PID) as $LOCAL_USER@$LOCAL_HOST produced errors on $(date)."
 
-	## Test if slave dir is a ssh uri, and if yes, break it down it its values
-	if [ "${SLAVE_SYNC_DIR:0:6}" == "ssh://" ]; then
+	## Test if target dir is a ssh uri, and if yes, break it down it its values
+	if [ "${TARGET_SYNC_DIR:0:6}" == "ssh://" ]; then
 		REMOTE_SYNC="yes"
 
 		# remove leadng 'ssh://'
-		uri=${SLAVE_SYNC_DIR#ssh://*}
+		uri=${TARGET_SYNC_DIR#ssh://*}
 		if [[ "$uri" == *"@"* ]]; then
 			# remove everything after '@'
 			REMOTE_USER=${uri%@*}
@@ -1720,24 +1829,24 @@ function Init {
 		REMOTE_HOST=${_hosturi%%:*}
 
 		# remove everything before first '/'
-		SLAVE_SYNC_DIR=${_hosturiandpath#*/}
+		TARGET_SYNC_DIR=${_hosturiandpath#*/}
 	fi
 
 	## Make sure there is only one trailing slash on path
-	MASTER_SYNC_DIR="${MASTER_SYNC_DIR%/}/"
-	SLAVE_SYNC_DIR="${SLAVE_SYNC_DIR%/}/"
+	INITIATOR_SYNC_DIR="${INITIATOR_SYNC_DIR%/}/"
+	TARGET_SYNC_DIR="${TARGET_SYNC_DIR%/}/"
 
-	MASTER_STATE_DIR="$MASTER_SYNC_DIR$OSYNC_DIR/state"
-	SLAVE_STATE_DIR="$SLAVE_SYNC_DIR$OSYNC_DIR/state"
+	INITIATOR_STATE_DIR="$INITIATOR_SYNC_DIR$OSYNC_DIR/state"
+	TARGET_STATE_DIR="$TARGET_SYNC_DIR$OSYNC_DIR/state"
 	STATE_DIR="$OSYNC_DIR/state"
-	MASTER_LOCK="$MASTER_STATE_DIR/lock"
-	SLAVE_LOCK="$SLAVE_STATE_DIR/lock"
+	INITIATOR_LOCK="$INITIATOR_STATE_DIR/lock"
+	TARGET_LOCK="$TARGET_STATE_DIR/lock"
 
 	## Working directories to keep backups of updated / deleted files
-	MASTER_BACKUP_DIR="$OSYNC_DIR/backups"
-	MASTER_DELETE_DIR="$OSYNC_DIR/deleted"
-	SLAVE_BACKUP_DIR="$OSYNC_DIR/backups"
-	SLAVE_DELETE_DIR="$OSYNC_DIR/deleted"
+	INITIATOR_BACKUP_DIR="$OSYNC_DIR/backups"
+	INITIATOR_DELETE_DIR="$OSYNC_DIR/deleted"
+	TARGET_BACKUP_DIR="$OSYNC_DIR/backups"
+	TARGET_DELETE_DIR="$OSYNC_DIR/deleted"
 
 	## Partial downloads dirs
 	PARTIAL_DIR=$OSYNC_DIR"_partial"
@@ -1829,15 +1938,15 @@ function Init {
 
 	## Conflict options
 	if [ "$CONFLICT_BACKUP" != "no" ]; then
-		MASTER_BACKUP="--backup --backup-dir=\"$MASTER_BACKUP_DIR\""
-		SLAVE_BACKUP="--backup --backup-dir=\"$SLAVE_BACKUP_DIR\""
+		INITIATOR_BACKUP="--backup --backup-dir=\"$INITIATOR_BACKUP_DIR\""
+		TARGET_BACKUP="--backup --backup-dir=\"$TARGET_BACKUP_DIR\""
 		if [ "$CONFLICT_BACKUP_MULTIPLE" == "yes" ]; then
-			MASTER_BACKUP="$MASTER_BACKUP --suffix .$(date +%Y.%m.%d-%H.%M.%S)"
-			SLAVE_BACKUP="$SLAVE_BACKUP --suffix .$(date +%Y.%m.%d-%H.%M.%S)"
+			INITIATOR_BACKUP="$INITIATOR_BACKUP --suffix .$(date +%Y.%m.%d-%H.%M.%S)"
+			TARGET_BACKUP="$TARGET_BACKUP --suffix .$(date +%Y.%m.%d-%H.%M.%S)"
 		fi
 	else
-		MASTER_BACKUP=
-		SLAVE_BACKUP=
+		INITIATOR_BACKUP=
+		TARGET_BACKUP=
 	fi
 
 	## Add Rsync exclude patterns
@@ -1855,21 +1964,21 @@ function Init {
 	TREE_AFTER_FILENAME_NO_SUFFIX="-tree-after-$SYNC_ID"
 	DELETED_LIST_FILENAME="-deleted-list-$SYNC_ID$dry_suffix"
 	FAILED_DELETE_LIST_FILENAME="-failed-delete-$SYNC_ID$dry_suffix"
-	MASTER_LAST_ACTION="$MASTER_STATE_DIR/last-action-$SYNC_ID$dry_suffix"
-	MASTER_RESUME_COUNT="$MASTER_STATE_DIR/resume-count-$SYNC_ID$dry_suffix"
+	INITIATOR_LAST_ACTION="$INITIATOR_STATE_DIR/last-action-$SYNC_ID$dry_suffix"
+	INITIATOR_RESUME_COUNT="$INITIATOR_STATE_DIR/resume-count-$SYNC_ID$dry_suffix"
 
 	## Sync function actions (0-9)
 	SYNC_ACTION=(
-	'master-replica-tree'
-	'slave-replica-tree'
-	'master-deleted-list'
-	'slave-deleted-list'
-	'update-master-replica'
-	'update-slave-replica'
-	'delete-propagation-slave'
-	'delete-propagation-master'
-	'master-replica-tree-after'
-	'slave-replica-tree-after'
+	'initiator-replica-tree'
+	'target-replica-tree'
+	'initiator-deleted-list'
+	'target-deleted-list'
+	'update-initiator-replica'
+	'update-target-replica'
+	'delete-propagation-target'
+	'delete-propagation-initiator'
+	'initiator-replica-tree-after'
+	'target-replica-tree-after'
 	'sync.success'
 	)
 
@@ -1940,7 +2049,7 @@ function InitRemoteOSSettings {
 }
 
 function Main {
-	CreateOsyncDirs
+	CreateStateDirs
 	LockDirectories
 	Sync
 }
@@ -1950,10 +2059,11 @@ function Usage {
 	echo $AUTHOR
 	echo $CONTACT
 	echo ""
+	echo -e "\e[41mWARNING: This is an unstable dev build\e[0m"
 	echo "You may use Osync with a full blown configuration file, or use its default options for quick command line sync."
 	echo "Usage: osync.sh /path/to/config/file [OPTIONS]"
-	echo "or     osync.sh --master=/path/to/master/replica --slave=/path/to/slave/replica [OPTIONS] [QUICKSYNC OPTIONS]"
-	echo "or     osync.sh --master=/path/to/master/replica --slave=ssh://[backupuser]@remotehost.com[:portnumber]//path/to/slave/replica [OPTIONS] [QUICKSYNC OPTIONS]"
+	echo "or     osync.sh --initiator=/path/to/initiator/replica --target=/path/to/target/replica [OPTIONS] [QUICKSYNC OPTIONS]"
+	echo "or     osync.sh --initiator=/path/to/initiator/replica --target=ssh://[backupuser]@remotehost.com[:portnumber]//path/to/target/replica [OPTIONS] [QUICKSYNC OPTIONS]"
 	echo ""
 	echo "[OPTIONS]"
 	echo "--dry             Will run osync without actually doing anything; just testing"
@@ -1962,17 +2072,17 @@ function Usage {
 	echo "--stats           Adds rsync transfer statistics to verbose output"
 	echo "--partial         Allows rsync to keep partial downloads that can be resumed later (experimental)"
 	echo "--no-maxtime      Disables any soft and hard execution time checks"
-	echo "--force-unlock    Will override any existing active or dead locks on master and slave replica"
-	echo "--on-changes      Will launch a sync task after a short wait period if there is some file activity on master replica. You should try daemon mode instead"
+	echo "--force-unlock    Will override any existing active or dead locks on initiator and target replica"
+	echo "--on-changes      Will launch a sync task after a short wait period if there is some file activity on initiator replica. You should try daemon mode instead"
 	echo ""
 	echo "[QUICKSYNC OPTIONS]"
-	echo "--master=\"\"	Master replica path. Will contain state and backup directory (is mandatory)"
-	echo "--slave=\"\" 	Local or remote slave replica path. Can be a ssh uri like ssh://user@host.com:22//path/to/slave/replica (is mandatory)"
-	echo "--rsakey=\"\"	Alternative path to rsa private key for ssh connection to slave replica"
-	echo "--sync-id=\"\"	Optional sync task name to identify this synchronization task when using multiple slaves"
+	echo "--initiator=\"\"	Master replica path. Will contain state and backup directory (is mandatory)"
+	echo "--target=\"\" 	Local or remote target replica path. Can be a ssh uri like ssh://user@host.com:22//path/to/target/replica (is mandatory)"
+	echo "--rsakey=\"\"	Alternative path to rsa private key for ssh connection to target replica"
+	echo "--sync-id=\"\"	Optional sync task name to identify this synchronization task when using multiple targets"
 	echo ""
 	echo "Additionnaly, you may set most osync options at runtime. eg:"
-	echo "SOFT_DELETE_DAYS=365 osync.sh --master=/path --slave=/other/path"
+	echo "SOFT_DELETE_DAYS=365 osync.sh --initiator=/path --target=/other/path"
 	echo ""
 	exit 128
 }
@@ -2001,7 +2111,7 @@ function SyncOnChanges {
 		fi
 
 		Logger "#### Monitoring now." "NOTICE"
-		inotifywait --exclude $OSYNC_DIR $RSYNC_EXCLUDE -qq -r -e create -e modify -e delete -e move -e attrib --timeout "$MAX_WAIT" "$MASTER_SYNC_DIR" &
+		inotifywait --exclude $OSYNC_DIR $RSYNC_EXCLUDE -qq -r -e create -e modify -e delete -e move -e attrib --timeout "$MAX_WAIT" "$INITIATOR_SYNC_DIR" &
 		sub_pid=$!
 		wait $sub_pid
 		retval=$?
@@ -2083,16 +2193,16 @@ do
 		--help|-h|--version|-v)
 		Usage
 		;;
-		--master=*)
+		--initiator=*)
 		quick_sync=$(($quick_sync + 1))
 		no_maxtime=1
-		MASTER_SYNC_DIR=${i##*=}
-		opts=$opts" --master=\"$MASTER_SYNC_DIR\""
+		INITIATOR_SYNC_DIR=${i##*=}
+		opts=$opts" --initiator=\"$INITIATOR_SYNC_DIR\""
 		;;
-		--slave=*)
+		--target=*)
 		quick_sync=$(($quick_sync + 1))
-		SLAVE_SYNC_DIR=${i##*=}
-		opts=$opts" --slave=\"$SLAVE_SYNC_DIR\""
+		TARGET_SYNC_DIR=${i##*=}
+		opts=$opts" --target=\"$TARGET_SYNC_DIR\""
 		no_maxtime=1
 		;;
 		--rsakey=*)
@@ -2194,7 +2304,7 @@ then
 			SOFT_MAX_EXEC_TIME=0
 			HARD_MAX_EXEC_TIME=0
 		fi
-		CheckMasterSlaveDirs
+		CheckReplicaPaths
 		CheckMinimumSpace
 		if [ $? == 0 ]; then
 			RunBeforeHook
