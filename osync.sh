@@ -4,7 +4,7 @@ PROGRAM="Osync" # Rsync based two way sync engine with fault tolerance
 AUTHOR="(L) 2013-2015 by Orsiris \"Ozy\" de Jong"
 CONTACT="http://www.netpower.fr/osync - ozy@netpower.fr"
 PROGRAM_VERSION=1.1-dev
-PROGRAM_BUILD=2015090904
+PROGRAM_BUILD=2015091001
 
 ## type doesn't work on platforms other than linux (bash). If if doesn't work, always assume output is not a zero exitcode
 if ! type -p "$BASH" > /dev/null; then
@@ -904,7 +904,7 @@ function WriteLockFiles {
 }
 
 function LockDirectories {
-	if [ $nolocks -eq 1 ]; then
+	if [ $_NOLOCKS -eq 1 ]; then
 		return 0
 	fi
 
@@ -971,7 +971,7 @@ function LockDirectories {
 }
 
 function UnlockDirectories {
-	if [ $nolocks -eq 1 ]; then
+	if [ $_NOLOCKS -eq 1 ]; then
 		return 0
 	fi
 
@@ -2040,7 +2040,7 @@ error_alert=0
 soft_stop=0
 quick_sync=0
 sync_on_changes=0
-nolocks=0
+_NOLOCKS=0
 osync_cmd=$0
 
 if [ $# -eq 0 ]
@@ -2105,10 +2105,10 @@ do
 		;;
 		--on-changes)
 		sync_on_changes=1
-		nolocks=1
+		_NOLOCKS=1
 		;;
 		--no-locks)
-		nolocks=1
+		_NOLOCKS=1
 		;;
 		*)
 		if [ $first == "0" ]; then

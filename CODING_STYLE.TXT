@@ -37,7 +37,7 @@ Whenever there is some idea to postpone, use #TODO: (exact match for searches)
 
 All local variables are lowercase, separated by _ (ex: low_wait)
 All global variables full upercase, separated by _ (ex: EXEC_TIME)
-All instance variables (verbose, silent, etc) have prefix _ and are full upercase, separated by _ (ex: _VERBOSE)
+All instance variables (verbose, silent, etc) have prefix _ and are full upercase, separated by _ (ex: _VERBOSE_INSTANCE)
 
 ++++ Functions
 
