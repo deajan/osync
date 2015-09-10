@@ -4,7 +4,7 @@ PROGRAM="Osync" # Rsync based two way sync engine with fault tolerance
 AUTHOR="(L) 2013-2015 by Orsiris \"Ozy\" de Jong"
 CONTACT="http://www.netpower.fr/osync - ozy@netpower.fr"
 PROGRAM_VERSION=1.1-unstable
-PROGRAM_BUILD=2015091002
+PROGRAM_BUILD=2015091003
 
 ## type doesn't work on platforms other than linux (bash). If if doesn't work, always assume output is not a zero exitcode
 if ! type -p "$BASH" > /dev/null; then
@@ -62,7 +62,7 @@ function Dummy {
 	sleep .1
 }
 
-function _logger {
+function _Logger {
 	local value="${1}" # What to log
 	echo -e "$value" >> "$LOG_FILE"
 	
@@ -72,7 +72,7 @@ function _logger {
 }
 
 function Logger {
-	local value="${1}" # What to log
+	local value="${1}" # Sentence to log (in double quotes)
 	local level="${2}" # Log level: DEBUG, NOTICE, WARN, ERROR, CRITIAL
 
 	# Special case in daemon mode we should timestamp instead of counting seconds
@@ -83,22 +83,27 @@ function Logger {
 	fi
 
 	if [ "$level" == "CRITICAL" ]; then
-		_logger "$prefix\e[41m$value\e[0m"
+		_Logger "$prefix\e[41m$value\e[0m"
 		ERROR_ALERT=1
+		return
 	elif [ "$level" == "ERROR" ]; then
-		_logger "$prefix\e[91m$value\e[0m"
+		_Logger "$prefix\e[91m$value\e[0m"
 		ERROR_ALERT=1
+		return
 	elif [ "$level" == "WARN" ]; then
-		_logger "$prefix\e[93m$value\e[0m"
+		_Logger "$prefix\e[93m$value\e[0m"
+		return
 	elif [ "$level" == "NOTICE" ]; then
-		_logger "$prefix$value"
+		_Logger "$prefix$value"
+		return
 	elif [ "$level" == "DEBUG" ]; then
 		if [ "$_DEBUG" == "yes" ]; then
-			_logger "$prefix$value"
+			_Logger "$prefix$value"
+			return
 		fi
 	else
-		_logger "\e[41mLogger function called without proper loglevel.\e[0m"
-		_logger "$prefix$value"
+		_Logger "\e[41mLogger function called without proper loglevel.\e[0m"
+		_Logger "$prefix$value"
 	fi
 }
 
@@ -918,13 +923,54 @@ function _LEGACY_CheckMasterSlaveDirs {
 	fi
 }
 
-function CheckMinimumSpace {
+function _CheckDiskSpaceLocal {
+	local replica_path="${1}"
+	__CheckArguments 1 $# $FUNCNAME "$*"
+
+	Logger "Checking minimum disk space in [$replica_path]." "NOTICE"
+
+	local initiator_space=$(df -P "$replica_path" | tail -1 | awk '{print $4}')
+	if [ $initiator_space -lt $MINIMUM_SPACE ]; then
+		Logger "There is not enough free space on initiator [$initiator_space KB]." "WARN"
+	fi
+}
+
+function _CheckDiskSpaceRemote {
+	local replica_path="${1}"
+	__CheckArguments 1 $# $FUNCNAME "$*"
+
+	Logger "Checking minimum disk space on target [$replica_path]." "NOTICE"
+	
+	CheckConnectivity3rdPartyHosts
+	CheckConnectivityRemoteHost
+
+	cmd="$SSH_CMD \"$COMMAND_SUDO df -P \\\"$replca_path\\\"\" > $RUN_DIR/osync_$FUNCNAME_$SCRIPT_PID 2>&1 &"
+	eval $cmd
+	WaitForTaskCompletion $! 0 1800
+	if [ $? != 0 ]; then
+		Logger "Cannot get free space on target [$replica_path]." "ERROR"
+		Logger "Command output:\n$(cat $RUN_DIR/osync_$FUNCNAME_$SCRIPT_PID)"
+        else
+		local target_space=$(cat $RUN_DIR/osync_$FUNCNAME_$SCRIPT_PID | tail -1 | awk '{print $4}')
+		if [ $target_space -lt $MINIMUM_SPACE ]; then
+	                Logger "There is not enough free space on target [$replica_path]." "WARN"
+		fi
+	fi
+}
+
+function CheckDiskSpace {
+        _CheckDiskSpaceLocal "$INITIATOR_SYNC_DIR"
+        if [ "$REMOTE_SYNC" == "no" ]; then
+                _CheckDiskSpaceLocal "$TARGET_SYNC_DIR"
+        else
+                _CheckDiskSpaceRemote "$TARGET_SYNC_DIR"
+        fi
+}
+
+function _LEGAGY_CheckMinimumSpace {
 	Logger "Checking minimum disk space on initiator and target." "NOTICE"
 
-	INITIATOR_SPACE=$(df -P "$INITIATOR_SYNC_DIR" | tail -1 | awk '{print $4}')
-	if [ $INITIATOR_SPACE -lt $MINIMUM_SPACE ]; then
-		Logger "There is not enough free space on initiator [$INITIATOR_SPACE KB]." "ERROR"
-	fi
+	
 
 	if [ "$REMOTE_SYNC" == "yes" ]; then
 		CheckConnectivity3rdPartyHosts
@@ -980,7 +1026,47 @@ function RsyncExcludeFrom {
 	fi
 }
 
+function _WriteLockFilesLocal {
+	local lockfile="${1}"
+	__CheckArguments 1 $# $FUNCNAME "$*"
+
+	echo "$SCRIPT_PID@$SYNC_ID" > "$lockfile" #TODO: Determine best format for lockfile for v2
+	if [ $?	!= 0 ]; then
+		Logger "Could not create lock file [$lockfile]." "CRITICAL"
+		exit 1
+	else
+		Logger "Locked replica on [$lockfile]." "NOTICE"
+	fi
+}
+
+function _WriteLockFilesRemote {
+	local lockfile="${1}"
+	__CheckArguments 1 $# $FUNCNAME "$*"
+
+	CheckConnectivity3rdPartyHosts
+	CheckConnectivityRemoteHosts
+
+	cmd="$SSH_CMD \"echo $SCRIPT_PID@$SYNC_ID | $COMMAND_SUDO tee \\\"$lock_file\\\" > /dev/null \"" &	
+	eval $cmd
+	WaitForTaskCompletion $? 0 1800
+	if [ $? != 0 ]; then
+		Logger "Could not set lock on remote target replica." "CRITICAL"
+		exit 1
+	else
+		Logger "Locked remote target replica." "NOTICE"
+	fi
+}
+
 function WriteLockFiles {
+	_WriteLockFilesLocal "$INITIATOR_LOCKFILE"
+	if [ "$REMOTE_SYNC" != "yes" ]; then
+		_WriteLockFilesLocal "$TARGET_LOCKFILE"
+	else
+		_WriteLockFilesRemote "$TARGET_LOCKFILE"
+	fi
+}	
+
+function _LEGAGY_WriteLockFiles {
 	echo $SCRIPT_PID > "$INITIATOR_LOCK"
 	if [ $? != 0 ]; then
 		Logger "Could not set lock on initiator replica." "CRITICAL"
@@ -1012,12 +1098,50 @@ function WriteLockFiles {
 	fi
 }
 
+function _CheckLocksLocal {
+	local lockfile="${1}"
+	__CheckArguments 1 $# $FUNCNAME "$*"
+
+	#WIP:deajan: Refactor here
+}
+
+function _CheckLocksRemote {
+	local lockfile="${1}"
+	__CheckArguments 1 $# $FUNCNAME "$*"
+
+	CheckConnectivity3rdPartyHosts
+	CheckConnectivityRemoteHosts
+
+	#WIP:deajan: Refactor here
+}
+
+function CheckLocks {
+	if [ $_NOLOCKS -eq 1 ]; then
+		return 0
+	fi
+
+	# Don't bother checking for locks when FORCE_UNLOCK is set
+	if [ $FORCE_UNLOCK -eq 1 ]; then
+		WriteLockFiles
+		if [ $? != 0 ]; then
+			exit 1
+		fi
+	fi
+	_CheckLocksLocal "$INITIATOR_LOCKFILE"
+	if [ "$REMOTE_SYNC" != "yes" ]; then
+		_CheckLocksLocal "$TARGET_LOCKFILE"
+	else
+		_CheckLocksRemote "$TARGET_LOCKFILE"
+	fi
+}
+
 function LockDirectories {
 	if [ $_NOLOCKS -eq 1 ]; then
 		return 0
 	fi
 
-	if [ $force_unlock -eq 1 ]; then
+	# Don't bother checking for locks when FORCE_UNLOCK is set
+	if [ $FORCE_UNLOCK -eq 1 ]; then
 		WriteLockFiles
 		if [ $? != 0 ]; then
 			exit 1
@@ -1026,8 +1150,8 @@ function LockDirectories {
 
 	Logger "Checking for replica locks." "NOTICE"
 
-	if [ -f "$INITIATOR_LOCK" ]; then
-		initiator_lock_pid=$(cat $INITIATOR_LOCK)
+	if [ -f "$INITIATOR_LOCKFILE" ]; then
+		initiator_lock_pid=$(cat $INITIATOR_LOCKFILE)
 		Logger "Master lock pid present: $initiator_lock_pid" "DEBUG"
 		ps -p$initiator_lock_pid > /dev/null 2>&1
 		if [ $? != 0 ]; then
@@ -1041,7 +1165,7 @@ function LockDirectories {
 	if [ "$REMOTE_SYNC" == "yes" ]; then
 		CheckConnectivity3rdPartyHosts
 		CheckConnectivityRemoteHost
-		eval "$SSH_CMD \"if [ -f \\\"$TARGET_LOCK\\\" ]; then cat \\\"$TARGET_LOCK\\\"; fi\" > $RUN_DIR/osync_remote_target_lock_$SCRIPT_PID" &
+		eval "$SSH_CMD \"if [ -f \\\"$TARGET_LOCKFILE\\\" ]; then cat \\\"$TARGET_LOCKFILE\\\"; fi\" > $RUN_DIR/osync_remote_target_lock_$SCRIPT_PID" &
 		child_pid=$!
 		WaitForTaskCompletion $child_pid 0 1800
 		if [ -f $RUN_DIR/osync_remote_target_lock_$SCRIPT_PID ]; then
@@ -1049,9 +1173,9 @@ function LockDirectories {
 			target_lock_id=$(cat $RUN_DIR/osync_remote_target_lock_$SCRIPT_PID | cut -d'@' -f2)
 		fi
 	else
-		if [ -f "$TARGET_LOCK" ]; then
-			target_lock_pid=$(cat "$TARGET_LOCK" | cut -d'@' -f1)
-			target_lock_id=$(cat "$TARGET_LOCK" | cut -d'@' -f2)
+		if [ -f "$TARGET_LOCKFILE" ]; then
+			target_lock_pid=$(cat "$TARGET_LOCKFILE" | cut -d'@' -f1)
+			target_lock_id=$(cat "$TARGET_LOCKFILE" | cut -d'@' -f2)
 		fi
 	fi
 
@@ -1839,8 +1963,8 @@ function Init {
 	INITIATOR_STATE_DIR="$INITIATOR_SYNC_DIR$OSYNC_DIR/state"
 	TARGET_STATE_DIR="$TARGET_SYNC_DIR$OSYNC_DIR/state"
 	STATE_DIR="$OSYNC_DIR/state"
-	INITIATOR_LOCK="$INITIATOR_STATE_DIR/lock"
-	TARGET_LOCK="$TARGET_STATE_DIR/lock"
+	INITIATOR_LOCKFILE="$INITIATOR_STATE_DIR/lock"
+	TARGET_LOCKFILE="$TARGET_STATE_DIR/lock"
 
 	## Working directories to keep backups of updated / deleted files
 	INITIATOR_BACKUP_DIR="$OSYNC_DIR/backups"
@@ -2141,7 +2265,7 @@ fi
 
 stats=0
 PARTIAL=0
-force_unlock=0
+FORCE_UNLOCK=0
 no_maxtime=0
 # Alert flags
 opts=""
@@ -2183,7 +2307,7 @@ do
 		opts=$opts" --partial"
 		;;
 		--force-unlock)
-		force_unlock=1
+		FORCE_UNLOCK=1
 		opts=$opts" --force-unlock"
 		;;
 		--no-maxtime)
@@ -2305,15 +2429,13 @@ then
 			HARD_MAX_EXEC_TIME=0
 		fi
 		CheckReplicaPaths
-		CheckMinimumSpace
+		CheckDiskSpace
+		RunBeforeHook
+		Main
 		if [ $? == 0 ]; then
-			RunBeforeHook
-			Main
-			if [ $? == 0 ]; then
-				SoftDelete
-			fi
-			RunAfterHook
+			SoftDelete
 		fi
+		RunAfterHook
 	fi
 else
 	Logger "Environment not suitable to run osync." "CRITICAL"

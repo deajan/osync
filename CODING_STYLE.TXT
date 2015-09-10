@@ -25,19 +25,21 @@ Transform old shell scripts using unexpand command
 
 ++++ Comments
 
-# Some comment
-## Some important comment for the next function
+Some command # comment
+## Some comment on a new line
 ################################################# Some separation
 
-++++ Todo comments
+++++ Work comments
 
-Whenever there is some idea to postpone, use #TODO: (exact match for searches)
+Whenever there is some idea to postpone, use #TODO:dev-name: some remark
+A marker must be left where on the line a dev is working (when the work isn't finished). Marker is #WIP:dev-name: some remark
+dev-name is mandatory if more than one person is coding
 
 ++++ Variables
 
 All local variables are lowercase, separated by _ (ex: low_wait)
 All global variables full upercase, separated by _ (ex: EXEC_TIME)
-All instance variables (verbose, silent, etc) have prefix _ and are full upercase, separated by _ (ex: _VERBOSE_INSTANCE)
+All environment variables (verbose, silent, debug, etc) have prefix _ and are full upercase, separated by _ (ex: _PARANOIA_DEBUG)
 
 ++++ Functions
 
