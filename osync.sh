@@ -4,7 +4,7 @@ PROGRAM="Osync" # Rsync based two way sync engine with fault tolerance
 AUTHOR="(L) 2013-2015 by Orsiris \"Ozy\" de Jong"
 CONTACT="http://www.netpower.fr/osync - ozy@netpower.fr"
 PROGRAM_VERSION=1.1-unstable
-PROGRAM_BUILD=2015091003
+PROGRAM_BUILD=2015091102
 
 ## type doesn't work on platforms other than linux (bash). If if doesn't work, always assume output is not a zero exitcode
 if ! type -p "$BASH" > /dev/null; then
@@ -138,12 +138,12 @@ function TrapQuit {
 		else
 			Logger "Debug mode, no alert mail will be sent." "NOTICE"
 		fi
-		UnlockDirectories
+		UnlockReplicas
 		CleanUp
 		Logger "Osync finished with errors." "WARN"
 		exitcode=1
 	else
-		UnlockDirectories
+		UnlockReplicas
 		CleanUp
 		Logger "Osync finished." "NOTICE"
 		exitcode=0
@@ -1030,7 +1030,7 @@ function _WriteLockFilesLocal {
 	local lockfile="${1}"
 	__CheckArguments 1 $# $FUNCNAME "$*"
 
-	echo "$SCRIPT_PID@$SYNC_ID" > "$lockfile" #TODO: Determine best format for lockfile for v2
+	$COMMAND_SUDO echo "$SCRIPT_PID@$SYNC_ID" > "$lockfile" #TODO: Determine best format for lockfile for v2
 	if [ $?	!= 0 ]; then
 		Logger "Could not create lock file [$lockfile]." "CRITICAL"
 		exit 1
@@ -1102,7 +1102,19 @@ function _CheckLocksLocal {
 	local lockfile="${1}"
 	__CheckArguments 1 $# $FUNCNAME "$*"
 
-	#WIP:deajan: Refactor here
+	if [ -f "$lockfile" ]; then
+		local lockfile_content=$(cat $lockfile)
+                Logger "Master lock pid present: $lockfile_content" "DEBUG"
+		local lock_pid=${lockfile_content%@*}
+		local lock_sync_id=${lockfile_content#*@}
+                ps -p$lock_pid > /dev/null 2>&1
+                if [ $? != 0 ]; then
+                        Logger "There is a dead osync lock in [$lockfile]. Instance [$lock_pid] no longer running. Resuming." "NOTICE"
+                else
+                        Logger "There is already a local instance of osync running [$lock_pid]. Cannot start." "CRITICAL"
+                        exit 1
+                fi
+        fi
 }
 
 function _CheckLocksRemote {
@@ -1112,7 +1124,43 @@ function _CheckLocksRemote {
 	CheckConnectivity3rdPartyHosts
 	CheckConnectivityRemoteHosts
 
-	#WIP:deajan: Refactor here
+	cmd="$SSH_CMD \"if [ -f \\\"$lockfile\\\" ]; then cat \\\"$lockfile\\\"; fi\" > $RUN_DIR/osync_$FUNCNAME_$SCRIPT_PID" &
+	eval $cmd
+	WaitForTaskCompletion $? 0 1800
+	if [ $? != 0 ]; then
+		if [ -f $RUN_DIR/osync_$FUNCNAME_$SCRIPT_PID ]; then
+			local lockfile_content=$(cat $RUN_DIR/osync_$FUNCNAME_$SCRIPT_PID)
+        	else
+			Logger "No remote lockfile found." "NOTICE"
+		fi
+	else
+		Logger "Cannot get remote lockfile." "CRITICAL"
+		exit 1
+	fi
+
+	local lock_pid=${lockfile_content%@*}
+	local lock_sync_id=${lockfile_content#*@}
+
+	if [ "$lock_pid" != "" ] && [ "$lock_sync_id" != "" ]; then
+                Logger "Remote lock is: $lock_pid@$lock_sync_id" "DEBUG"
+
+                ps -p$lock_pid > /dev/null 2>&1
+                if [ $? != 0 ]; then
+                        if [ "$lock_sync_id" == "$SYNC_ID" ]; then
+                                Logger "There is a dead osync lock on target replica that corresponds to this initiator sync id [$lock_sync_id]. Instance [$lock_pid] no longer running. Resuming." "NOTICE"
+                        else
+                                if [ "$FORCE_STRANGER_LOCK_RESUME" == "yes" ]; then
+                                        Logger "WARNING: There is a dead osync lock on target replica that does not correspond to this initiator sync-id [$lock_sync_id]. Forcing resume." "WARN"
+                                else
+                                        Logger "There is a dead osync lock on target replica that does not correspond to this initiator sync-id [$lock_sync_id]. Will not resume." "CRITICAL"
+                                        exit 1
+                                fi
+                        fi
+                else
+                        Logger "There is already a local instance of osync that locks target replica [$lock_pid@$lock_sync_id]. Cannot start." "CRITICAL"
+                        exit 1
+                fi
+        fi
 }
 
 function CheckLocks {
@@ -1133,6 +1181,8 @@ function CheckLocks {
 	else
 		_CheckLocksRemote "$TARGET_LOCKFILE"
 	fi
+
+	WriteLockFiles
 }
 
 function LockDirectories {
@@ -1203,7 +1253,52 @@ function LockDirectories {
 	WriteLockFiles
 }
 
-function UnlockDirectories {
+function _UnlockReplicasLocal {
+	local lockfile="${1}"
+	__CheckArguments 1 $# $FUNCNAME "$*"
+
+	if [ -f "$lockfile" ]; then
+                $COMMAND_SUDO rm "$lockfile"
+                if [ $? != 0 ]; then
+                        Logger "Could not unlock local replica." "ERROR"
+                else
+                        Logger "Removed local replica lock." "NOTICE"
+                fi
+        fi
+}
+
+function _UnlockReplicasRemote {
+	local lockfile="${1}"
+	__CheckArguments 1 $# $FUNCNAME "$*"
+
+	CheckConnectivity3rdPartyHosts
+	CheckConnectivityRemoteHost
+
+	cmd="$SSH_CMD \"if [ -f \\\"$localfile\\\" ]; then $COMMAND_SUDO rm \\\"$lockfile\\\"; fi 2>&1\"" > $RUN_DIR/osync_$FUNCNAME_$SCRIPT_PID &
+	eval $cmd
+        WaitForTaskCompletion $? 0 1800
+        if [ $? != 0 ]; then
+                Logger "Could not unlock remote replica." "ERROR"
+                Logger "Command Output:\n$(cat $RUN_DIR/osync_$FUNCNAME_$SCRIPT_PID)" "NOTICE"
+        else
+                Logger "Removed remote replica lock." "NOTICE"
+        fi
+}
+
+function UnlockReplicas {
+	if [ $_NOLOCKS -eq 1 ]; then
+		return 0
+	fi
+
+	_UnlockReplicasLocal "$INITIATOR_LOCKFILE"
+	if [ "$REMOTE_SYNC" != "yes" ]; then
+		_UnlockReplicasLocal "$TARGET_LOCKFILE"
+	else
+		_UnlockReplicasRemote "$TARGET_LOCKFILE"
+	fi
+}
+
+function _LEGAGY_UnlockDirectories {
 	if [ $_NOLOCKS -eq 1 ]; then
 		return 0
 	fi
@@ -1792,6 +1887,7 @@ function Sync {
 	echo "0" > "$INITIATOR_RESUME_COUNT"
 }
 
+#WIP: Need to refactor here (split local and remote code)
 function SoftDelete {
 	if [ "$CONFLICT_BACKUP" != "no" ] && [ $CONFLICT_BACKUP_DAYS -ne 0 ]; then
 		Logger "Running conflict backup cleanup." "NOTICE"
