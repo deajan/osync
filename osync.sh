@@ -4,7 +4,7 @@ PROGRAM="Osync" # Rsync based two way sync engine with fault tolerance
 AUTHOR="(L) 2013-2015 by Orsiris \"Ozy\" de Jong"
 CONTACT="http://www.netpower.fr/osync - ozy@netpower.fr"
 PROGRAM_VERSION=1.1-unstable
-PROGRAM_BUILD=2015091102
+PROGRAM_BUILD=2015091103
 
 ## type doesn't work on platforms other than linux (bash). If if doesn't work, always assume output is not a zero exitcode
 if ! type -p "$BASH" > /dev/null; then
@@ -767,34 +767,6 @@ function CreateStateDirs {
 	fi
 }
 
-function _LEGACY_CreateOsyncDirs {
-	if ! [ -d "$INITIATOR_STATE_DIR" ]; then
-		mkdir -p "$INITIATOR_STATE_DIR"
-		if [ $? != 0 ]; then
-			Logger "Cannot create initiator replica state dir [$INITIATOR_STATE_DIR]." "CRITICAL"
-			exit 1
-		fi
-	fi
-
-	if [ "$REMOTE_SYNC" == "yes" ]; then
-		CheckConnectivity3rdPartyHosts
-		CheckConnectivityRemoteHost
-		eval "$SSH_CMD \"if ! [ -d \\\"$TARGET_STATE_DIR\\\" ]; then $COMMAND_SUDO mkdir -p \\\"$TARGET_STATE_DIR\\\"; fi 2>&1\"" &
-		child_pid=$!
-		WaitForTaskCompletion $child_pid 0 1800
-	else
-		if ! [ -d "$TARGET_STATE_DIR" ]; then
-			mkdir -p "$TARGET_STATE_DIR" > $RUN_DIR/osync_createosyncdirs_$SCRIPT_PID 2>&1
-		fi
-	fi
-
-	if [ $? != 0 ]; then
-		Logger "Cannot create target replica state dir [$TARGET_STATE_DIR]." "CRITICAL"
-		Logger "Command output:\n$(cat $RUN_DIR/osync_createosyncdirs_$SCRIPT_PID)" "NOTICE"
-		exit 1
-	fi
-}
-
 function _CheckReplicaPathsLocal {
 	local replica_path="${1}"
 	__CheckArguments 1 $# $FUNCNAME "$*"
@@ -865,64 +837,6 @@ function CheckReplicaPaths {
 	fi
 }
 
-function _LEGACY_CheckMasterSlaveDirs {
-	#INITIATOR_SYNC_DIR_CANN=$(realpath "$INITIATOR_SYNC_DIR")	#TODO: investigate realpath & readlink issues on MSYS and busybox here
-	#TARGET_SYNC_DIR_CANN=$(realpath "$TARGET_SYNC_DIR")
-
-	if ! [ -d "$INITIATOR_SYNC_DIR" ]; then
-		if [ "$CREATE_DIRS" == "yes" ]; then
-			mkdir -p "$INITIATOR_SYNC_DIR" > $RUN_DIR/osync_checkinitiatortargetdirs_$SCRIPT_PID 2>&1
-			if [ $? != 0 ]; then
-				Logger "Cannot create initiator directory [$INITIATOR_SYNC_DIR]." "CRITICAL"
-				Logger "Command output:\n$(cat $RUN_DIR/osync_checkinitiatortargetdirs_$SCRIPT_PID)" "NOTICE"
-				exit 1
-			fi
-		else 
-			Logger "Master directory [$INITIATOR_SYNC_DIR] does not exist." "CRITICAL"
-			exit 1
-		fi
-	fi
-
-	if [ "$REMOTE_SYNC" == "yes" ]; then
-		CheckConnectivity3rdPartyHosts
-		CheckConnectivityRemoteHost
-		if [ "$CREATE_DIRS" == "yes" ]; then
-			eval "$SSH_CMD \"if ! [ -d \\\"$TARGET_SYNC_DIR\\\" ]; then $COMMAND_SUDO mkdir -p \\\"$TARGET_SYNC_DIR\\\"; fi 2>&1"\" > $RUN_DIR/osync_checkinitiatortargetdirs_$SCRIPT_PID &
-			child_pid=$!
-			WaitForTaskCompletion $child_pid 0 1800
-			if [ $? != 0 ]; then
-				Logger "Cannot create target directory [$TARGET_SYNC_DIR]." "CRITICAL"
-				Logger "Command output:\n$(cat $RUN_DIR/osync_checkinitiatortargetdirs_$SCRIPT_PID)" "NOTICE"
-				exit 1
-			fi
-		else
-			eval "$SSH_CMD \"if ! [ -d \\\"$TARGET_SYNC_DIR\\\" ]; then exit 1; fi"\" &
-			child_pid=$!
-			WaitForTaskCompletion $child_pid 0 1800
-			res=$?
-			if [ $res != 0 ]; then
-				Logger "Slave directory [$TARGET_SYNC_DIR] does not exist." "CRITICAL"
-				exit 1
-			fi
-		fi
-	else
-		if [ ! -d "$TARGET_SYNC_DIR" ]; then
-			if [ "$CREATE_DIRS" == "yes" ]; then
-				mkdir -p "$TARGET_SYNC_DIR"
-				if [ $? != 0 ]; then
-					Logger "Cannot create target directory [$TARGET_SYNC_DIR]." "CRITICAL"
-					exit 1
-				else
-					Logger "Created target directory [$TARGET_SYNC_DIR]." "NOTICE"
-				fi
-			else
-				Logger "Slave directory [$TARGET_SYNC_DIR] does not exist." "CRITICAL"
-				exit 1
-			fi
-		fi
-	fi
-}
-
 function _CheckDiskSpaceLocal {
 	local replica_path="${1}"
 	__CheckArguments 1 $# $FUNCNAME "$*"
@@ -965,27 +879,6 @@ function CheckDiskSpace {
         else
                 _CheckDiskSpaceRemote "$TARGET_SYNC_DIR"
         fi
-}
-
-function _LEGAGY_CheckMinimumSpace {
-	Logger "Checking minimum disk space on initiator and target." "NOTICE"
-
-	
-
-	if [ "$REMOTE_SYNC" == "yes" ]; then
-		CheckConnectivity3rdPartyHosts
-		CheckConnectivityRemoteHost
-		eval "$SSH_CMD \"$COMMAND_SUDO df -P \\\"$TARGET_SYNC_DIR\\\"\"" > $RUN_DIR/osync_target_space_$SCRIPT_PID &
-		child_pid=$!
-		WaitForTaskCompletion $child_pid 0 1800
-		TARGET_SPACE=$(cat $RUN_DIR/osync_target_space_$SCRIPT_PID | tail -1 | awk '{print $4}')
-	else
-		TARGET_SPACE=$(df -P "$TARGET_SYNC_DIR" | tail -1 | awk '{print $4}')
-	fi
-
-	if [ $TARGET_SPACE -lt $MINIMUM_SPACE ]; then
-		Logger "There is not enough free space on target [$TARGET_SPACE KB]." "ERROR"
-	fi
 }
 
 function RsyncExcludePattern {
@@ -1035,7 +928,7 @@ function _WriteLockFilesLocal {
 		Logger "Could not create lock file [$lockfile]." "CRITICAL"
 		exit 1
 	else
-		Logger "Locked replica on [$lockfile]." "NOTICE"
+		Logger "Locked replica on [$lockfile]." "DEBUG"
 	fi
 }
 
@@ -1053,7 +946,7 @@ function _WriteLockFilesRemote {
 		Logger "Could not set lock on remote target replica." "CRITICAL"
 		exit 1
 	else
-		Logger "Locked remote target replica." "NOTICE"
+		Logger "Locked remote target replica." "DEBUG"
 	fi
 }
 
@@ -1065,38 +958,6 @@ function WriteLockFiles {
 		_WriteLockFilesRemote "$TARGET_LOCKFILE"
 	fi
 }	
-
-function _LEGAGY_WriteLockFiles {
-	echo $SCRIPT_PID > "$INITIATOR_LOCK"
-	if [ $? != 0 ]; then
-		Logger "Could not set lock on initiator replica." "CRITICAL"
-		exit 1
-	else
-		Logger "Locked initiator replica." "NOTICE"
-	fi
-
-	if [ "$REMOTE_SYNC" == "yes" ]; then
-		CheckConnectivity3rdPartyHosts
-		CheckConnectivityRemoteHost
-		eval "$SSH_CMD \"echo $SCRIPT_PID@$SYNC_ID | $COMMAND_SUDO tee \\\"$TARGET_LOCK\\\" > /dev/null \"" &
-		child_pid=$!
-		WaitForTaskCompletion $child_pid 0 1800
-		if [ $? != 0 ]; then
-			Logger "Could not set lock on remote target replica." "CRITICAL"
-			exit 1
-		else
-			Logger "Locked remote target replica." "NOTICE"
-		fi
-	else
-		echo "$SCRIPT_PID@$SYNC_ID" > "$TARGET_LOCK"
-		if [ $? != 0 ]; then
-			Logger "Couuld not set lock on local target replica." "CRITICAL"
-			exit 1
-		else
-			Logger "Locked local target replica." "NOTICE"
-		fi
-	fi
-}
 
 function _CheckLocksLocal {
 	local lockfile="${1}"
@@ -1117,7 +978,7 @@ function _CheckLocksLocal {
         fi
 }
 
-function _CheckLocksRemote {
+function _CheckLocksRemote { #TODO: Rewrite this a bit more beautiful
 	local lockfile="${1}"
 	__CheckArguments 1 $# $FUNCNAME "$*"
 
@@ -1185,74 +1046,6 @@ function CheckLocks {
 	WriteLockFiles
 }
 
-function LockDirectories {
-	if [ $_NOLOCKS -eq 1 ]; then
-		return 0
-	fi
-
-	# Don't bother checking for locks when FORCE_UNLOCK is set
-	if [ $FORCE_UNLOCK -eq 1 ]; then
-		WriteLockFiles
-		if [ $? != 0 ]; then
-			exit 1
-		fi
-	fi
-
-	Logger "Checking for replica locks." "NOTICE"
-
-	if [ -f "$INITIATOR_LOCKFILE" ]; then
-		initiator_lock_pid=$(cat $INITIATOR_LOCKFILE)
-		Logger "Master lock pid present: $initiator_lock_pid" "DEBUG"
-		ps -p$initiator_lock_pid > /dev/null 2>&1
-		if [ $? != 0 ]; then
-			Logger "There is a dead osync lock on initiator. Instance $initiator_lock_pid no longer running. Resuming." "NOTICE"
-		else
-			Logger "There is already a local instance of osync that locks initiator replica. Cannot start. If your are sure this is an error, plaese kill instance $initiator_lock_pid of osync." "CRITICAL"
-			exit 1
-		fi
-	fi
-
-	if [ "$REMOTE_SYNC" == "yes" ]; then
-		CheckConnectivity3rdPartyHosts
-		CheckConnectivityRemoteHost
-		eval "$SSH_CMD \"if [ -f \\\"$TARGET_LOCKFILE\\\" ]; then cat \\\"$TARGET_LOCKFILE\\\"; fi\" > $RUN_DIR/osync_remote_target_lock_$SCRIPT_PID" &
-		child_pid=$!
-		WaitForTaskCompletion $child_pid 0 1800
-		if [ -f $RUN_DIR/osync_remote_target_lock_$SCRIPT_PID ]; then
-			target_lock_pid=$(cat $RUN_DIR/osync_remote_target_lock_$SCRIPT_PID | cut -d'@' -f1)
-			target_lock_id=$(cat $RUN_DIR/osync_remote_target_lock_$SCRIPT_PID | cut -d'@' -f2)
-		fi
-	else
-		if [ -f "$TARGET_LOCKFILE" ]; then
-			target_lock_pid=$(cat "$TARGET_LOCKFILE" | cut -d'@' -f1)
-			target_lock_id=$(cat "$TARGET_LOCKFILE" | cut -d'@' -f2)
-		fi
-	fi
-
-	if [ "$target_lock_pid" != "" ] && [ "$target_lock_id" != "" ]; then
-		Logger "Slave lock pid: $target_lock_pid" "DEBUG"
-
-		ps -p$target_lock_pid > /dev/null
-		if [ $? != 0 ]; then
-			if [ "$target_lock_id" == "$SYNC_ID" ]; then
-				Logger "There is a dead osync lock on target replica that corresponds to this initiator sync-id. Instance $target_lock_pid no longer running. Resuming." "NOTICE"
-			else
-				if [ "$FORCE_STRANGER_LOCK_RESUME" == "yes" ]; then
-					Logger "WARNING: There is a dead osync lock on target replica that does not correspond to this initiator sync-id. Forcing resume." "WARN"
-				else
-					Logger "There is a dead osync lock on target replica that does not correspond to this initiator sync-id. Will not resume." "CRITICAL"
-					exit 1
-				fi
-			fi
-		else
-			Logger "There is already a local instance of osync that locks target replica. Cannot start. If you are sure this is an error, please kill instance $target_lock_pid of osync." "CRITICAL"
-			exit 1
-		fi
-	fi
-
-	WriteLockFiles
-}
-
 function _UnlockReplicasLocal {
 	local lockfile="${1}"
 	__CheckArguments 1 $# $FUNCNAME "$*"
@@ -1262,7 +1055,7 @@ function _UnlockReplicasLocal {
                 if [ $? != 0 ]; then
                         Logger "Could not unlock local replica." "ERROR"
                 else
-                        Logger "Removed local replica lock." "NOTICE"
+                        Logger "Removed local replica lock." "DEBUG"
                 fi
         fi
 }
@@ -1281,7 +1074,7 @@ function _UnlockReplicasRemote {
                 Logger "Could not unlock remote replica." "ERROR"
                 Logger "Command Output:\n$(cat $RUN_DIR/osync_$FUNCNAME_$SCRIPT_PID)" "NOTICE"
         else
-                Logger "Removed remote replica lock." "NOTICE"
+                Logger "Removed remote replica lock." "DEBUG"
         fi
 }
 
@@ -1295,40 +1088,6 @@ function UnlockReplicas {
 		_UnlockReplicasLocal "$TARGET_LOCKFILE"
 	else
 		_UnlockReplicasRemote "$TARGET_LOCKFILE"
-	fi
-}
-
-function _LEGAGY_UnlockDirectories {
-	if [ $_NOLOCKS -eq 1 ]; then
-		return 0
-	fi
-
-	if [ "$REMOTE_SYNC" == "yes" ]; then
-		CheckConnectivity3rdPartyHosts
-		CheckConnectivityRemoteHost
-		eval "$SSH_CMD \"if [ -f \\\"$TARGET_LOCK\\\" ]; then $COMMAND_SUDO rm \\\"$TARGET_LOCK\\\"; fi 2>&1\"" > $RUN_DIR/osync_UnlockDirectories_$SCRIPT_PID &
-		child_pid=$!
-		WaitForTaskCompletion $child_pid 0 1800
-	else
-		if [ -f "$TARGET_LOCK" ]; then
-			rm "$TARGET_LOCK" > $RUN_DIR/osync_UnlockDirectories_$SCRIPT_PID 2>&1
-		fi
-	fi
-
-	if [ $? != 0 ]; then
-		Logger "Could not unlock target replica." "ERROR"
-		Logger "Command Output:\n$(cat $RUN_DIR/osync_UnlockDirectories_$SCRIPT_PID)" "NOTICE"
-	else
-		Logger "Removed target replica lock." "NOTICE"
-	fi
-
-	if [ -f "$INITIATOR_LOCK" ]; then
-		rm "$INITIATOR_LOCK"
-		if [ $? != 0 ]; then
-			Logger "Could not unlock initiator replica." "ERROR"
-		else
-			Logger "Removed initiator replica lock." "NOTICE"
-		fi
 	fi
 }
 
@@ -1888,18 +1647,21 @@ function Sync {
 }
 
 #WIP: Need to refactor here (split local and remote code)
-function SoftDelete {
-	if [ "$CONFLICT_BACKUP" != "no" ] && [ $CONFLICT_BACKUP_DAYS -ne 0 ]; then
-		Logger "Running conflict backup cleanup." "NOTICE"
-		_SoftDelete $CONFLICT_BACKUP_DAYS "$INITIATOR_SYNC_DIR$INITIATOR_BACKUP_DIR" "$TARGET_SYNC_DIR$TARGET_BACKUP_DIR"
-	fi
 
-	if [ "$SOFT_DELETE" != "no" ] && [ $SOFT_DELETE_DAYS -ne 0 ]; then
-		Logger "Running soft deletion cleanup." "NOTICE"
-		_SoftDelete $SOFT_DELETE_DAYS "$INITIATOR_SYNC_DIR$INITIATOR_DELETE_DIR" "$TARGET_SYNC_DIR$TARGET_DELETE_DIR"	
-	fi	
+function _SoftDeleteLocal {
+	local change_time="{1}"
+	local replica_deletion_path="{2}" # Contains the full path to softdelete / backup directory
+	__CheckArguments 2 $# $FUNCNAME "$*"
 }
 
+function _SoftDeleteRemote {
+	local change_time"${1}"
+	local replica_deletion_path="{2}" # Contains the full path to softdelete / backup directory
+	__CheckArguments 2 $# $FUNCNAME "$*"
+
+	CheckConnectivity3rdPartyHosts
+        CheckConnectivityRemoteHost
+}
 
 # Takes 3 arguments
 # $1 = ctime (CONFLICT_BACKUP_DAYS or SOFT_DELETE_DAYS), $2 = INITIATOR_(BACKUP/DELETED)_DIR, $3 = TARGET_(BACKUP/DELETED)_DIR
@@ -1999,6 +1761,18 @@ function _SoftDelete {
 		fi
 	fi
 	
+}
+
+function SoftDelete {
+	if [ "$CONFLICT_BACKUP" != "no" ] && [ $CONFLICT_BACKUP_DAYS -ne 0 ]; then
+		Logger "Running conflict backup cleanup." "NOTICE"
+		_SoftDelete $CONFLICT_BACKUP_DAYS "$INITIATOR_SYNC_DIR$INITIATOR_BACKUP_DIR" "$TARGET_SYNC_DIR$TARGET_BACKUP_DIR"
+	fi
+
+	if [ "$SOFT_DELETE" != "no" ] && [ $SOFT_DELETE_DAYS -ne 0 ]; then
+		Logger "Running soft deletion cleanup." "NOTICE"
+		_SoftDelete $SOFT_DELETE_DAYS "$INITIATOR_SYNC_DIR$INITIATOR_DELETE_DIR" "$TARGET_SYNC_DIR$TARGET_DELETE_DIR"	
+	fi	
 }
 
 function Init {
@@ -2270,7 +2044,7 @@ function InitRemoteOSSettings {
 
 function Main {
 	CreateStateDirs
-	LockDirectories
+	CheckLocks
 	Sync
 }
 
@@ -2461,7 +2235,7 @@ then
 
 	if [ $quick_sync -eq 2 ]; then
 		if [ "$SYNC_ID" == "" ]; then
-			SYNC_ID="quicksync task"
+			SYNC_ID="quicksync_task"
 		fi
 
 		# Let the possibility to initialize those values directly via command line like SOFT_DELETE_DAYS=60 ./osync.sh
