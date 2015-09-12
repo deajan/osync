@@ -4,7 +4,7 @@ PROGRAM="Osync" # Rsync based two way sync engine with fault tolerance
 AUTHOR="(L) 2013-2015 by Orsiris \"Ozy\" de Jong"
 CONTACT="http://www.netpower.fr/osync - ozy@netpower.fr"
 PROGRAM_VERSION=1.1-unstable
-PROGRAM_BUILD=2015091201
+PROGRAM_BUILD=2015091203
 
 ## type doesn't work on platforms other than linux (bash). If if doesn't work, always assume output is not a zero exitcode
 if ! type -p "$BASH" > /dev/null; then
@@ -47,7 +47,7 @@ else
 	RUN_DIR=.
 fi
 
-## Working directory. Will keep current file states, backups and soft deleted files.
+## Working directory. This is the name of the osync subdirectory contained in every replica.
 OSYNC_DIR=".osync_workdir"
 
 ## Log a state message every $KEEP_LOGGING seconds. Should not be equal to soft or hard execution time so your log won't be unnecessary big.
@@ -196,13 +196,13 @@ function Spinner {
 }
 
 function EscapeSpaces {
-	local string="${1}" # String on which space will be escaped
+	local string="${1}" # String on which spaces will be escaped
 	echo $(echo "$string" | sed 's/ /\\ /g')
 }
 
 function CleanUp {
 	if [ "$_DEBUG" != "yes" ]; then
-		rm -f $RUN_DIR/osync_*_$SCRIPT_PID
+		rm -f "$RUN_DIR/osync_*_$SCRIPT_PID"
 	fi
 }
 
@@ -260,6 +260,7 @@ function SendAlert {
 
 function LoadConfigFile {
 	local config_file="${1}"
+
 	if [ ! -f "$config_file" ]; then
 		Logger "Cannot load configuration file [$config_file]. Sync cannot start." "CRITICAL"
 		exit 1
@@ -267,8 +268,8 @@ function LoadConfigFile {
 		Logger "Wrong configuration file supplied [$config_file]. Sync cannot start." "CRITICAL"
 		exit 1
 	else
-		egrep '^#|^[^ ]*=[^;&]*'  "$config_file" > "$RUN_DIR/osync_config_$SCRIPT_PID"
-		source "$RUN_DIR/osync_config_$SCRIPT_PID"
+		egrep '^#|^[^ ]*=[^;&]*'  "$config_file" > $RUN_DIR/osync_$FUNCNAME_$SCRIPT_PID
+		source "$RUN_DIR/osync_$FUNCNAME_$SCRIPT_PID"
 	fi
 }
 
@@ -280,6 +281,7 @@ function CheckEnvironment {
 			return 1
 		fi
 	fi
+
 	if ! type -p rsync > /dev/null 2>&1
 	then
 		Logger "rsync not present. Sync cannot start." "CRITICAL"
@@ -288,15 +290,15 @@ function CheckEnvironment {
 }
 
 function GetLocalOS {
-	LOCAL_OS_VAR=$(uname -spio 2>&1)
+	local local_os_var=$(uname -spio 2>&1)
 	if [ $? != 0 ]; then
-		LOCAL_OS_VAR=$(uname -v 2>&1)
+		local local_os_var=$(uname -v 2>&1)
 		if [ $? != 0 ]; then
-			LOCAL_OS_VAR=($uname)
+			local local_os_var=($uname)
 		fi
 	fi
 
-	case $LOCAL_OS_VAR in
+	case $local_os_var in
 		*"Linux"*)
 		LOCAL_OS="Linux"
 		;;
@@ -310,28 +312,28 @@ function GetLocalOS {
 		LOCAL_OS="MacOSX"
 		;;
 		*)
-		Logger "Running on >> $LOCAL_OS_VAR << not supported. Please report to the author." "ERROR"
+		Logger "Running on >> $local_os_var << not supported. Please report to the author." "ERROR"
 		exit 1
 		;;
 	esac
-	Logger "Local OS: [$LOCAL_OS_VAR]." "DEBUG"
+	Logger "Local OS: [$local_os_var]." "DEBUG"
 }
 
 function GetRemoteOS {
 	if [ "$REMOTE_SYNC" == "yes" ]; then
 		CheckConnectivity3rdPartyHosts
 		CheckConnectivityRemoteHost
-		eval "$SSH_CMD \"uname -spio\" > $RUN_DIR/osync_remote_os_$SCRIPT_PID 2>&1" &
+		eval "$SSH_CMD \"uname -spio\" > $RUN_DIR/osync_$FUNCNAME_$SCRIPT_PID 2>&1" &
 		child_pid=$!
 		WaitForTaskCompletion $child_pid 120 240
 		retval=$?
 		if [ $retval != 0 ]; then
-			eval "$SSH_CMD \"uname -v\" > $RUN_DIR/osync_remote_os_$SCRIPT_PID 2>&1" &
+			eval "$SSH_CMD \"uname -v\" > $RUN_DIR/osync_$FUNCNAME_$SCRIPT_PID 2>&1" &
 			child_pid=$!
 			WaitForTaskCompletion $child_pid 120 240
 			retval=$?
 			if [ $retval != 0 ]; then
-				eval "$SSH_CMD \"uname\" > $RUN_DIR/osync_remote_os_$SCRIPT_PID 2>&1" &
+				eval "$SSH_CMD \"uname\" > $RUN_DIR/osync_$FUNCNAME_$SCRIPT_PID 2>&1" &
 				child_pid=$!
 				WaitForTaskCompletion $child_pid 120 240
 				retval=$?
@@ -341,9 +343,9 @@ function GetRemoteOS {
 			fi
 		fi
 
-		REMOTE_OS_VAR=$(cat $RUN_DIR/osync_remote_os_$SCRIPT_PID)
+		local remote_os_var=$(cat $RUN_DIR/osync_$FUNCNAME_$SCRIPT_PID)
 
-		case $REMOTE_OS_VAR in
+		case $remote_os_var in
 			*"Linux"*)
 			REMOTE_OS="Linux"
 			;;
@@ -362,11 +364,11 @@ function GetRemoteOS {
 			;;
 			*)
 			Logger "Running on remote OS failed. Please report to the author if the OS is not supported." "CRITICAL"
-			Logger "Remote OS said:\n$REMOTE_OS_VAR" "CRITICAL"
+			Logger "Remote OS said:\n$remote_os_var" "CRITICAL"
 			exit 1
 		esac
 
-		Logger "Remote OS: [$REMOTE_OS_VAR]." "DEBUG"
+		Logger "Remote OS: [$remote_os_var]." "DEBUG"
 	fi
 }
 
@@ -611,9 +613,7 @@ function __CheckArguments {
 	fi
 }
 
-############################################################################################
-
-### realpath.sh implementation from https://github.com/mkropat/sh-realpath
+###### realpath.sh implementation from https://github.com/mkropat/sh-realpath
 
 realpath() {
     canonicalize_path "$(resolve_symlinks "$1")"
@@ -725,7 +725,7 @@ _bsd_stat_readlink() {
     stat -f %Y -- "$1" 2>/dev/null
 }
 
-#### Osync specific functions (non shared)
+###### Osync specific functions (non shared)
 
 function _CreateStateDirsLocal {
 	local replica_state_dir="${1}"
@@ -801,21 +801,21 @@ function _CheckReplicaPathsRemote {
 	CheckConnectivityRemoteHost
 
 	cmd="$SSH_CMD \"if ! [ -d \\\"$replica_path\\\" ]; then if [ "$CREATE_DIRS" == "yes" ]; then $COMMAND_SUDO mkdir -p \\\"$replica_path\\\"; fi; fi 2>&1\" &" 
-        eval $cmd > $RUN_DIR/osync_$FUNCNAME_$SCRIPT_PID 2>&1
-        WaitForTaskCompletion $! 0 1800
-        if [ $? != 0 ]; then
-                Logger "Cannot create remote replica path [$replica_path]." "CRITICAL"
-                Logger "Command output:\n$RUN_DIR/osync_$FUNCNAME_$SCRIPT_PID" "ERROR"
-                exit 1
-        fi
+	eval $cmd > $RUN_DIR/osync_$FUNCNAME_$SCRIPT_PID 2>&1
+	WaitForTaskCompletion $! 0 1800
+	if [ $? != 0 ]; then
+		Logger "Cannot create remote replica path [$replica_path]." "CRITICAL"
+		Logger "Command output:\n$RUN_DIR/osync_$FUNCNAME_$SCRIPT_PID" "ERROR"
+		exit 1
+	fi
 
 	cmd="$SSH_CMD \"if [ ! -w "$replica_path" ];then exit 1; fi 2>&1\" &"
 	eval $cmd
-        WaitForTaskCompletion $! 0 1800
-        if [ $? != 0 ]; then
-                Logger "Remote replica path [$replica_path] is not writable." "CRITICAL"
-                exit 1
-        fi
+	WaitForTaskCompletion $! 0 1800
+	if [ $? != 0 ]; then
+		Logger "Remote replica path [$replica_path] is not writable." "CRITICAL"
+		exit 1
+	fi
 }
 
 function CheckReplicaPaths {
@@ -864,21 +864,21 @@ function _CheckDiskSpaceRemote {
 	if [ $? != 0 ]; then
 		Logger "Cannot get free space on target [$replica_path]." "ERROR"
 		Logger "Command output:\n$(cat $RUN_DIR/osync_$FUNCNAME_$SCRIPT_PID)"
-        else
+	else
 		local target_space=$(cat $RUN_DIR/osync_$FUNCNAME_$SCRIPT_PID | tail -1 | awk '{print $4}')
 		if [ $target_space -lt $MINIMUM_SPACE ]; then
-	                Logger "There is not enough free space on target [$replica_path]." "WARN"
+			Logger "There is not enough free space on target [$replica_path]." "WARN"
 		fi
 	fi
 }
 
 function CheckDiskSpace {
-        _CheckDiskSpaceLocal "$INITIATOR_SYNC_DIR"
-        if [ "$REMOTE_SYNC" == "no" ]; then
-                _CheckDiskSpaceLocal "$TARGET_SYNC_DIR"
-        else
-                _CheckDiskSpaceRemote "$TARGET_SYNC_DIR"
-        fi
+	_CheckDiskSpaceLocal "$INITIATOR_SYNC_DIR"
+	if [ "$REMOTE_SYNC" == "no" ]; then
+		_CheckDiskSpaceLocal "$TARGET_SYNC_DIR"
+	else
+		_CheckDiskSpaceRemote "$TARGET_SYNC_DIR"
+	fi
 }
 
 function RsyncExcludePattern {
@@ -965,17 +965,17 @@ function _CheckLocksLocal {
 
 	if [ -f "$lockfile" ]; then
 		local lockfile_content=$(cat $lockfile)
-                Logger "Master lock pid present: $lockfile_content" "DEBUG"
+		Logger "Master lock pid present: $lockfile_content" "DEBUG"
 		local lock_pid=${lockfile_content%@*}
 		local lock_sync_id=${lockfile_content#*@}
-                ps -p$lock_pid > /dev/null 2>&1
-                if [ $? != 0 ]; then
-                        Logger "There is a dead osync lock in [$lockfile]. Instance [$lock_pid] no longer running. Resuming." "NOTICE"
-                else
-                        Logger "There is already a local instance of osync running [$lock_pid]. Cannot start." "CRITICAL"
-                        exit 1
-                fi
-        fi
+		ps -p$lock_pid > /dev/null 2>&1
+		if [ $? != 0 ]; then
+			Logger "There is a dead osync lock in [$lockfile]. Instance [$lock_pid] no longer running. Resuming." "NOTICE"
+		else
+			Logger "There is already a local instance of osync running [$lock_pid]. Cannot start." "CRITICAL"
+			exit 1
+		fi
+	fi
 }
 
 function _CheckLocksRemote { #TODO: Rewrite this a bit more beautiful
@@ -991,7 +991,7 @@ function _CheckLocksRemote { #TODO: Rewrite this a bit more beautiful
 	if [ $? != 0 ]; then
 		if [ -f $RUN_DIR/osync_$FUNCNAME_$SCRIPT_PID ]; then
 			local lockfile_content=$(cat $RUN_DIR/osync_$FUNCNAME_$SCRIPT_PID)
-        	else
+		else
 			Logger "No remote lockfile found." "NOTICE"
 		fi
 	else
@@ -1003,25 +1003,25 @@ function _CheckLocksRemote { #TODO: Rewrite this a bit more beautiful
 	local lock_sync_id=${lockfile_content#*@}
 
 	if [ "$lock_pid" != "" ] && [ "$lock_sync_id" != "" ]; then
-                Logger "Remote lock is: $lock_pid@$lock_sync_id" "DEBUG"
+		Logger "Remote lock is: $lock_pid@$lock_sync_id" "DEBUG"
 
-                ps -p$lock_pid > /dev/null 2>&1
-                if [ $? != 0 ]; then
-                        if [ "$lock_sync_id" == "$SYNC_ID" ]; then
-                                Logger "There is a dead osync lock on target replica that corresponds to this initiator sync id [$lock_sync_id]. Instance [$lock_pid] no longer running. Resuming." "NOTICE"
-                        else
-                                if [ "$FORCE_STRANGER_LOCK_RESUME" == "yes" ]; then
-                                        Logger "WARNING: There is a dead osync lock on target replica that does not correspond to this initiator sync-id [$lock_sync_id]. Forcing resume." "WARN"
-                                else
-                                        Logger "There is a dead osync lock on target replica that does not correspond to this initiator sync-id [$lock_sync_id]. Will not resume." "CRITICAL"
-                                        exit 1
-                                fi
-                        fi
-                else
-                        Logger "There is already a local instance of osync that locks target replica [$lock_pid@$lock_sync_id]. Cannot start." "CRITICAL"
-                        exit 1
-                fi
-        fi
+		ps -p$lock_pid > /dev/null 2>&1
+		if [ $? != 0 ]; then
+			if [ "$lock_sync_id" == "$SYNC_ID" ]; then
+				Logger "There is a dead osync lock on target replica that corresponds to this initiator sync id [$lock_sync_id]. Instance [$lock_pid] no longer running. Resuming." "NOTICE"
+			else
+				if [ "$FORCE_STRANGER_LOCK_RESUME" == "yes" ]; then
+					Logger "WARNING: There is a dead osync lock on target replica that does not correspond to this initiator sync-id [$lock_sync_id]. Forcing resume." "WARN"
+				else
+					Logger "There is a dead osync lock on target replica that does not correspond to this initiator sync-id [$lock_sync_id]. Will not resume." "CRITICAL"
+					exit 1
+				fi
+			fi
+		else
+			Logger "There is already a local instance of osync that locks target replica [$lock_pid@$lock_sync_id]. Cannot start." "CRITICAL"
+			exit 1
+		fi
+	fi
 }
 
 function CheckLocks {
@@ -1051,13 +1051,13 @@ function _UnlockReplicasLocal {
 	__CheckArguments 1 $# $FUNCNAME "$*"
 
 	if [ -f "$lockfile" ]; then
-                $COMMAND_SUDO rm "$lockfile"
-                if [ $? != 0 ]; then
-                        Logger "Could not unlock local replica." "ERROR"
-                else
-                        Logger "Removed local replica lock." "DEBUG"
-                fi
-        fi
+		$COMMAND_SUDO rm "$lockfile"
+		if [ $? != 0 ]; then
+			Logger "Could not unlock local replica." "ERROR"
+		else
+			Logger "Removed local replica lock." "DEBUG"
+		fi
+	fi
 }
 
 function _UnlockReplicasRemote {
@@ -1069,13 +1069,13 @@ function _UnlockReplicasRemote {
 
 	cmd="$SSH_CMD \"if [ -f \\\"$localfile\\\" ]; then $COMMAND_SUDO rm \\\"$lockfile\\\"; fi 2>&1\"" > $RUN_DIR/osync_$FUNCNAME_$SCRIPT_PID &
 	eval $cmd
-        WaitForTaskCompletion $? 0 1800
-        if [ $? != 0 ]; then
-                Logger "Could not unlock remote replica." "ERROR"
-                Logger "Command Output:\n$(cat $RUN_DIR/osync_$FUNCNAME_$SCRIPT_PID)" "NOTICE"
-        else
-                Logger "Removed remote replica lock." "DEBUG"
-        fi
+	WaitForTaskCompletion $? 0 1800
+	if [ $? != 0 ]; then
+		Logger "Could not unlock remote replica." "ERROR"
+		Logger "Command Output:\n$(cat $RUN_DIR/osync_$FUNCNAME_$SCRIPT_PID)" "NOTICE"
+	else
+		Logger "Removed remote replica lock." "DEBUG"
+	fi
 }
 
 function UnlockReplicas {
@@ -1102,7 +1102,7 @@ function tree_list {
 	local replica_path="${1}" # path to the replica for which a tree needs to be constructed
 	local replica_type="${2}" # replica type: initiator, target
 	local tree_filename="${3}" # filename to output tree (will be prefixed with $replica_type)
-	__CheckArguments 3 "$#" "$FUNCNAME" "$*"
+	__CheckArguments 3 $# $FUNCNAME "$*"
 
 	local escaped_replica_path=$(EscapeSpaces "$replica_path") #TODO: See if escpaed still needed when using ' instead of " for command eval
 
@@ -1122,7 +1122,7 @@ function tree_list {
 	retval=$?
 	## Retval 24 = some files vanished while creating list
 	if ([ $retval == 0 ] || [ $retval == 24 ]) && [ -f $RUN_DIR/osync_$replica_type_$SCRIPT_PID ]; then
-		mv $RUN_DIR/osync_$replica_type_$SCRIPT_PID "$INITIATOR_STATE_DIR/$replica_type$tree_filename"
+		mv -f $RUN_DIR/osync_$replica_type_$SCRIPT_PID "$INITIATOR_STATE_DIR/$replica_type$tree_filename"
 		return $?
 	else
 		Logger "Cannot create replica file list." "CRITICAL"
@@ -1137,7 +1137,7 @@ function delete_list {
 	local tree_file_current="${3}" # tree-file-current, will be prefixed with replica type
 	local deleted_list_file="${4}" # file containing deleted file list, will be prefixed with replica type
 	local deleted_failed_list_file="${5}" # file containing files that couldn't be deleted on last run, will be prefixed with replica type
-	__CheckArguments 5 "$#" "$FUNCNAME" "$*"
+	__CheckArguments 5 $# $FUNCNAME "$*"
 
 	# TODO: Check why external filenames are used (see _DRYRUN option because of NOSUFFIX)
 
@@ -1174,7 +1174,7 @@ function sync_update {
 	local source_replica="${1}" # Contains replica type of source: initiator, target
 	local destination_replica="${2}" # Contains replica type of destination: initiator, target
 	local delete_list_filename="${3}" # Contains deleted list filename, will be prefixed with replica type
-	__CheckArguments 3 "$#" "$FUNCNAME" "$*"
+	__CheckArguments 3 $# $FUNCNAME "$*"
 
 	Logger "Updating $destination_replica replica." "NOTICE"
 	if [ "$source_replica" == "initiator" ]; then
@@ -1229,7 +1229,7 @@ function _delete_local {
 	local deleted_list_file="${2}" # file containing deleted file list, will be prefixed with replica type
 	local deletion_dir="${3}" # deletion dir in format .[workdir]/deleted
 	local deleted_failed_list_file="${4}" # file containing files that couldn't be deleted on last run, will be prefixed with replica type
-	__CheckArguments 4 "$#" "$FUNCNAME" "$*"
+	__CheckArguments 4 $# $FUNCNAME "$*"
 
 	## On every run, check wheter the next item is already deleted because it's included in a directory already deleted
 	previous_file=""
@@ -1291,7 +1291,7 @@ function _delete_remote {
 	local deleted_list_file="${2}" # file containing deleted file list, will be prefixed with replica type
 	local deletion_dir="${3}" # deletion dir in format .[workdir]/deleted
 	local deleted_failed_list_file="${4}" # file containing files that couldn't be deleted on last run, will be prefixed with replica type
-	__CheckArguments 4 "$#" "$FUNCNAME" "$*"
+	__CheckArguments 4 $# $FUNCNAME "$*"
 
 	## This is a special coded function. Need to redelcare local functions on remote host, passing all needed variables as escaped arguments to ssh command.
 	## Anything beetween << ENDSSH and ENDSSH will be executed remotely
@@ -1437,7 +1437,7 @@ function deletion_propagation {
 	local replica_type="${1}" # Contains replica type: initiator, target
 	local deleted_list_file="${2}" # file containing deleted file list, will be prefixed with replica type
 	local deleted_failed_list_file="${3}" # file containing files that couldn't be deleted on last run, will be prefixed with replica type
-	__CheckArguments 3 "$#" "$FUNCNAME" "$*"
+	__CheckArguments 3 $# $FUNCNAME "$*"
 
 	Logger "Propagating deletions to $replica_type replica." "NOTICE"
 
@@ -1690,7 +1690,7 @@ function _SoftDeleteRemote {
 	__CheckArguments 3 $# $FUNCNAME "$*"
 
 	CheckConnectivity3rdPartyHosts
-        CheckConnectivityRemoteHost
+	CheckConnectivityRemoteHost
 
 	if [ $_DRYRUN -eq 1 ]; then
 		Logger "Listing files older than $change_time days on target replica. Won't remove anything." "NOTICE"
@@ -2248,7 +2248,6 @@ then
 	else
 		LOG_FILE="$LOGFILE"
 	fi
-
 	GetLocalOS
 	InitLocalOSSettings
 	Init
