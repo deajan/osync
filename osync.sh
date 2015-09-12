@@ -4,7 +4,7 @@ PROGRAM="Osync" # Rsync based two way sync engine with fault tolerance
 AUTHOR="(L) 2013-2015 by Orsiris \"Ozy\" de Jong"
 CONTACT="http://www.netpower.fr/osync - ozy@netpower.fr"
 PROGRAM_VERSION=1.1-unstable
-PROGRAM_BUILD=2015091205
+PROGRAM_BUILD=2015091206
 
 ## type doesn't work on platforms other than linux (bash). If if doesn't work, always assume output is not a zero exitcode
 if ! type -p "$BASH" > /dev/null; then
@@ -957,7 +957,7 @@ function _WriteLockFilesRemote {
 	__CheckArguments 1 $# $FUNCNAME "$*"
 
 	CheckConnectivity3rdPartyHosts
-	CheckConnectivityRemoteHosts
+	CheckConnectivityRemoteHost
 
 	cmd="$SSH_CMD \"echo $SCRIPT_PID@$SYNC_ID | $COMMAND_SUDO tee \\\"$lock_file\\\" > /dev/null \"" &	
 	eval $cmd
@@ -1005,7 +1005,7 @@ function _CheckLocksRemote { #TODO: Rewrite this a bit more beautiful
 	__CheckArguments 1 $# $FUNCNAME "$*"
 
 	CheckConnectivity3rdPartyHosts
-	CheckConnectivityRemoteHosts
+	CheckConnectivityRemoteHost
 
 	cmd="$SSH_CMD \"if [ -f \\\"$lockfile\\\" ]; then cat \\\"$lockfile\\\"; fi\" > $RUN_DIR/osync_$FUNCNAME_$SCRIPT_PID" &
 	eval $cmd
