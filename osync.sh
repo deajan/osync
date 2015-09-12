@@ -4,7 +4,7 @@ PROGRAM="Osync" # Rsync based two way sync engine with fault tolerance
 AUTHOR="(L) 2013-2015 by Orsiris \"Ozy\" de Jong"
 CONTACT="http://www.netpower.fr/osync - ozy@netpower.fr"
 PROGRAM_VERSION=1.1-unstable
-PROGRAM_BUILD=2015091204
+PROGRAM_BUILD=2015091205
 
 ## type doesn't work on platforms other than linux (bash). If if doesn't work, always assume output is not a zero exitcode
 if ! type -p "$BASH" > /dev/null; then
@@ -843,11 +843,11 @@ function CheckReplicaPaths {
 	#	fi
 	#fi
 
-	_CheckReplicaPathsLocal "$INITIATOR_STATE_DIR"
+	_CheckReplicaPathsLocal "$INITIATOR_SYNC_DIR"
 	if [ "$REMOTE_SYNC" == "no" ]; then
-		_CheckReplicaPathsLocal "$TARGET_STATE_DIR"
+		_CheckReplicaPathsLocal "$TARGET_SYNC_DIR"
 	else
-		_CheckReplicaPathsRemote "$TARGET_STATE_DIR"
+		_CheckReplicaPathsRemote "$TARGET_SYNC_DIR"
 	fi
 }
 
@@ -872,12 +872,12 @@ function _CheckDiskSpaceRemote {
 	CheckConnectivity3rdPartyHosts
 	CheckConnectivityRemoteHost
 
-	cmd="$SSH_CMD \"$COMMAND_SUDO df -P \\\"$replca_path\\\"\" > $RUN_DIR/osync_$FUNCNAME_$SCRIPT_PID 2>&1 &"
+	cmd="$SSH_CMD \"$COMMAND_SUDO df -P \\\"$replica_path\\\"\" > $RUN_DIR/osync_$FUNCNAME_$SCRIPT_PID 2>&1 &"
 	eval $cmd
 	WaitForTaskCompletion $! 0 1800
 	if [ $? != 0 ]; then
 		Logger "Cannot get free space on target [$replica_path]." "ERROR"
-		Logger "Command output:\n$(cat $RUN_DIR/osync_$FUNCNAME_$SCRIPT_PID)"
+		Logger "Command output:\n$(cat $RUN_DIR/osync_$FUNCNAME_$SCRIPT_PID)" "NOTICE"
 	else
 		local target_space=$(cat $RUN_DIR/osync_$FUNCNAME_$SCRIPT_PID | tail -1 | awk '{print $4}')
 		if [ $target_space -lt $MINIMUM_SPACE ]; then
