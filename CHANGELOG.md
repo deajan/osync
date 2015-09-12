@@ -6,8 +6,11 @@ KNOWN ISSUES
 RECENT CHANGES
 --------------
 
-! Refactor [local master, local slave, remote slave] code to [local, remote][initiator, target]code
-- Added some automatic typo checks in code, for DEBUG mode (and PARANOIA_DEBUG now)
+! Check existing dirs before checking for state dirs
+! Add Logger DEBUG to all eval statements
+! Replace child_pid by $? directly
+- Refactor [local master, local slave, remote slave] code to [local, remote][initiator, target]code
+- Added some automatic typo checks in code, for _DEBUG mode (and _PARANOIA_DEBUG now)
 - Improved Logging
 - Updated osync to be fully compliant with coding style
 - Uploaded coding style manifest

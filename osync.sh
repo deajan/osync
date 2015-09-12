@@ -4,7 +4,7 @@ PROGRAM="Osync" # Rsync based two way sync engine with fault tolerance
 AUTHOR="(L) 2013-2015 by Orsiris \"Ozy\" de Jong"
 CONTACT="http://www.netpower.fr/osync - ozy@netpower.fr"
 PROGRAM_VERSION=1.1-unstable
-PROGRAM_BUILD=2015091103
+PROGRAM_BUILD=2015091201
 
 ## type doesn't work on platforms other than linux (bash). If if doesn't work, always assume output is not a zero exitcode
 if ! type -p "$BASH" > /dev/null; then
@@ -1646,132 +1646,100 @@ function Sync {
 	echo "0" > "$INITIATOR_RESUME_COUNT"
 }
 
-#WIP: Need to refactor here (split local and remote code)
-
 function _SoftDeleteLocal {
-	local change_time="{1}"
-	local replica_deletion_path="{2}" # Contains the full path to softdelete / backup directory
-	__CheckArguments 2 $# $FUNCNAME "$*"
+	local replica_type="${1}" # replica type (initiator, target)
+	local replica_deletion_path="${2}" # Contains the full path to softdelete / backup directory without ending slash
+	local change_time="${3}"
+	__CheckArguments 3 $# $FUNCNAME "$*"
+
+	if [ -d "$replica_deletion_path" ]; then
+		if [ $_DRYRUN -eq 1 ]; then
+			Logger "Listing files older than $change_time days on [$replica_type] replica. Won't remove anything." "NOTICE"
+		else
+			Logger "Removing files older than $change_time days on [$replica_type] replica." "NOTICE"
+		fi
+			if [ $_VERBOSE -eq 1 ]; then
+			# Cannot launch log function from xargs, ugly hack
+			$FIND_CMD "$replica_deletion_path/" -type f -ctime +$change_time -print0 | xargs -0 -I {} echo "Will delete file {}" > $RUN_DIR/osync_$FUNCNAME_$SCRIPT_PID
+			Logger "Command output:\n$(cat $RUN_DIR/osync_$FUNCNAME_$SCRIPT_PID)" "NOTICE"
+			$FIND_CMD "$replica_deletion_path/" -type d -empty -ctime +$change_time -print0 | xargs -0 -I {} echo "Will delete directory {}" > $RUN_DIR/osync_$FUNCNAME_$SCRIPT_PID
+			Logger "Command output:\n$(cat $RUN_DIR/osync_$FUNCNAME_$SCRIPT_PID)" "NOTICE"
+		fi
+			if [ $_DRYRUN -ne 1 ]; then
+			$FIND_CMD "$replica_deletion_path/" -type f -ctime +$change_time -print0 | xargs -0 -I {} rm -f "{}" && $FIND_CMD "$replica_deletion_path/" -type d -empty -ctime +$change_time -print0 | xargs -0 -I {} rm -rf "{}" > $RUN_DIR/osync_$FUNCNAME_$SCRIPT_PID 2>&1 &
+		else
+			Dummy &
+		fi
+		WaitForCompletion $? $SOFT_MAX_EXEC_TIME $HARD_MAX_EXEC_TIME
+		retval=$?
+		if [ $retval -ne 0 ]; then
+			Logger "Error while executing cleanup on [$replica_type] replica." "ERROR"
+			Logger "Command output:\n$(cat $RUN_DIR/osync_$FUNCNAME_$SCRIPT_PID)" "NOTICE"
+		else
+			Logger "Cleanup complete on [$replica_type] replica." "NOTICE"
+		fi
+	elif [ -d "$replica_deletion_path" ] && ! [ -w "$replica_deletion_path" ]; then
+		Logger "Warning: [$replica_type] replica dir [$replica_deletion_path] isn't writable. Cannot clean old files." "ERROR"
+	fi
 }
 
 function _SoftDeleteRemote {
-	local change_time"${1}"
-	local replica_deletion_path="{2}" # Contains the full path to softdelete / backup directory
-	__CheckArguments 2 $# $FUNCNAME "$*"
+	local replica_type="${1}"
+	local replica_deletion_path="${2}" # Contains the full path to softdelete / backup directory without ending slash
+	local change_time"${3}"
+	__CheckArguments 3 $# $FUNCNAME "$*"
 
 	CheckConnectivity3rdPartyHosts
         CheckConnectivityRemoteHost
-}
 
-# Takes 3 arguments
-# $1 = ctime (CONFLICT_BACKUP_DAYS or SOFT_DELETE_DAYS), $2 = INITIATOR_(BACKUP/DELETED)_DIR, $3 = TARGET_(BACKUP/DELETED)_DIR
-function _SoftDelete {
-	local change_time="${1}" # Contains the number of days a file needs to be old to be processed here (conflict or soft deletion)
-	local initiator_directory="${2}" # Master backup / deleted directory to search in
-	local target_directory="${3}" # Slave backup / deleted directory to search in 
-	__CheckArguments 3 "$#" "$FUNCNAME" "$*"
-
-	if [ -d "$initiator_directory" ]; then
-		if [ $_DRYRUN -eq 1 ]; then
-			Logger "Listing files older than $change_time days on initiator replica. Won't remove anything." "NOTICE"
-		else
-			Logger "Removing files older than $change_time days on initiator replica." "NOTICE"
-		fi
-			if [ $_VERBOSE -eq 1 ]; then
-			# Cannot launch log function from xargs, ugly hack
-			$FIND_CMD "$initiator_directory/" -type f -ctime +$change_time -print0 | xargs -0 -I {} echo "Will delete file {}" > $RUN_DIR/osync_soft_delete_initiator_$SCRIPT_PID
-			Logger "Command output:\n$(cat $RUN_DIR/osync_soft_delete_initiator_$SCRIPT_PID)" "NOTICE"
-			$FIND_CMD "$initiator_directory/" -type d -empty -ctime +$change_time -print0 | xargs -0 -I {} echo "Will delete directory {}" > $RUN_DIR/osync_soft_delete_initiator_$SCRIPT_PID
-			Logger "Command output:\n$(cat $RUN_DIR/osync_soft_delete_initiator_$SCRIPT_PID)" "NOTICE"
-		fi
-			if [ $_DRYRUN -ne 1 ]; then
-			$FIND_CMD "$initiator_directory/" -type f -ctime +$change_time -print0 | xargs -0 -I {} rm -f "{}" && $FIND_CMD "$initiator_directory/" -type d -empty -ctime +$change_time -print0 | xargs -0 -I {} rm -rf "{}" > $RUN_DIR/osync_soft_delete_initiator_$SCRIPT_PID 2>&1 &
-		else
-			Dummy &
-		fi
-		child_pid=$!
-		WaitForCompletion $child_pid $SOFT_MAX_EXEC_TIME $HARD_MAX_EXEC_TIME
-		retval=$?
-		if [ $retval -ne 0 ]; then
-			Logger "Error while executing cleanup on initiator replica." "ERROR"
-			Logger "Command output:\n$(cat $RUN_DIR/osync_soft_delete_initiator_$SCRIPT_PID)" "NOTICE"
-		else
-			Logger "Cleanup complete on initiator replica." "NOTICE"
-		fi
-	elif [ -d "$initiator_directory" ] && ! [ -w "$initiator_directory" ]; then
-		Logger "Warning: Master replica dir [$initiator_directory] isn't writable. Cannot clean old files." "ERROR"
-	fi
-
-	if [ "$REMOTE_SYNC" == "yes" ]; then
-		CheckConnectivity3rdPartyHosts
-		CheckConnectivityRemoteHost
-			if [ $_DRYRUN -eq 1 ]; then
-			Logger "Listing files older than $change_time days on target replica. Won't remove anything." "NOTICE"
-		else
-			Logger "Removing files older than $change_time days on target replica." "NOTICE"
-		fi
-			if [ $_VERBOSE -eq 1 ]; then
-			# Cannot launch log function from xargs, ugly hack
-			eval "$SSH_CMD \"if [ -w \\\"$target_directory\\\" ]; then $COMMAND_SUDO $REMOTE_FIND_CMD \\\"$target_directory/\\\" -type f -ctime +$change_time -print0 | xargs -0 -I {} echo Will delete file {} && $REMOTE_FIND_CMD \\\"$target_directory/\\\" -type d -empty -ctime $change_time -print0 | xargs -0 -I {} echo Will delete directory {}; fi\"" > $RUN_DIR/osync_soft_delete_target_$SCRIPT_PID
-			Logger "Command output:\n$(cat $RUN_DIR/osync_soft_delete_target_$SCRIPT_PID)" "NOTICE"
-		fi
-			if [ $_DRYRUN -ne 1 ]; then
-			eval "$SSH_CMD \"if [ -w \\\"$target_directory\\\" ]; then $COMMAND_SUDO $REMOTE_FIND_CMD \\\"$target_directory/\\\" -type f -ctime +$change_time -print0 | xargs -0 -I {} rm -f \\\"{}\\\" && $REMOTE_FIND_CMD \\\"$target_directory/\\\" -type d -empty -ctime $change_time -print0 | xargs -0 -I {} rm -rf \\\"{}\\\"; fi 2>&1\"" > $RUN_DIR/osync_soft_delete_target_$SCRIPT_PID &
-		else
-			Dummy &
-		fi
-		child_pid=$!
-			WaitForCompletion $child_pid $SOFT_MAX_EXEC_TIME $HARD_MAX_EXEC_TIME
-			retval=$?
-			if [ $retval -ne 0 ]; then
-				Logger "Error while executing cleanup on target replica." "ERROR"
-				Logger "Command output:\n$(cat $RUN_DIR/osync_soft_delete_target_$SCRIPT_PID)" "NOTICE"
-			else
-				Logger "Cleanup complete on target replica." "NOTICE"
-			fi
+	if [ $_DRYRUN -eq 1 ]; then
+		Logger "Listing files older than $change_time days on target replica. Won't remove anything." "NOTICE"
 	else
-	if [ -w "$target_directory" ]; then
-		if [ $_DRYRUN -eq 1 ]; then
-			Logger "Listing files older than $change_time days on target replica. Won't remove anything." "NOTICE"
-		else
-			Logger "Removing files older than $change_time days on target replica." "NOTICE"
-		fi
-			if [ $_VERBOSE -eq 1 ]; then
-			# Cannot launch log function from xargs, ugly hack
-			$FIND_CMD "$target_directory/" -type f -ctime +$change_time -print0 | xargs -0 -I {} echo "Will delete file {}" > $RUN_DIR/osync_soft_delete_target_$SCRIPT_PID
-			Logger "Command output:\n$(cat $RUN_DIR/osync_soft_delete_target_$SCRIPT_PID)" "NOTICE"
-			$FIND_CMD "$target_directory/" -type d -empty -ctime +$change_time -print0 | xargs -0 -I {} echo "Will delete directory {}" > $RUN_DIR/osync_soft_delete_target_$SCRIPT_PID
-			Logger "Command output:\n$(cat $RUN_DIR/osync_soft_delete_target_$SCRIPT_PID)" "NOTICE"
-			Dummy &
-		fi
-			if [ $_DRYRUN -ne 1 ]; then
-			$FIND_CMD "$target_directory/" -type f -ctime +$change_time -print0 | xargs -0 -I {} rm -f "{}" && $FIND_CMD "$target_directory/" -type d -empty -ctime +$change_time -print0 | xargs -0 -I {} rm -rf "{}" > $RUN_DIR/osync_soft_delete_target_$SCRIPT_PID &
-		fi
-		child_pid=$!
-		WaitForCompletion $child_pid $SOFT_MAX_EXEC_TIME $HARD_MAX_EXEC_TIME
-		retval=$?
-		if [ $retval -ne 0 ]; then
-			Logger "Error while executing cleanup on target replica." "ERROR"
-			Logger "Command output:\n$(cat $RUN_DIR/osync_soft_delete_target_$SCRIPT_PID)" "NOTICE"
-		else
-			Logger "Cleanup complete on target replica." "NOTICE"
-		fi
-		elif [ -d "$target_directory" ] && ! [ -w "$target_directory" ]; then
-			Logger "Warning: Slave replica dir [$target_directory] isn't writable. Cannot clean old files." "ERROR"
-		fi
+		Logger "Removing files older than $change_time days on target replica." "NOTICE"
 	fi
 	
+	if [ $_VERBOSE -eq 1 ]; then
+		# Cannot launch log function from xargs, ugly hack
+		eval "$SSH_CMD \"if [ -w \\\"$replica_deletion_path\\\" ]; then $COMMAND_SUDO $REMOTE_FIND_CMD \\\"$replica_deletion_path/\\\" -type f -ctime +$change_time -print0 | xargs -0 -I {} echo Will delete file {} && $REMOTE_FIND_CMD \\\"$replica_deletion_path/\\\" -type d -empty -ctime $change_time -print0 | xargs -0 -I {} echo Will delete directory {}; fi\"" > $RUN_DIR/osync_$FUNCNAME_$SCRIPT_PID
+		Logger "Command output:\n$(cat $RUN_DIR/osync_$FUNCNAME_$SCRIPT_PID)" "NOTICE"
+	fi
+
+	if [ $_DRYRUN -ne 1 ]; then
+		eval "$SSH_CMD \"if [ -w \\\"$replica_deletion_path\\\" ]; then $COMMAND_SUDO $REMOTE_FIND_CMD \\\"$replica_deletion_path/\\\" -type f -ctime +$change_time -print0 | xargs -0 -I {} rm -f \\\"{}\\\" && $REMOTE_FIND_CMD \\\"$replica_deletion_path/\\\" -type d -empty -ctime $change_time -print0 | xargs -0 -I {} rm -rf \\\"{}\\\"; fi 2>&1\"" > $RUN_DIR/osync_$FUNCNAME_$SCRIPT_PID &
+	else
+		Dummy &
+	fi
+	WaitForCompletion $? $SOFT_MAX_EXEC_TIME $HARD_MAX_EXEC_TIME
+	retval=$?
+	if [ $retval -ne 0 ]; then
+		Logger "Error while executing cleanup on remote target replica." "ERROR"
+		Logger "Command output:\n$(cat $RUN_DIR/osync_$FUNCNAME_$SCRIPT_PID)" "NOTICE"
+	else
+		Logger "Cleanup complete on target replica." "NOTICE"
+	fi
 }
 
 function SoftDelete {
 	if [ "$CONFLICT_BACKUP" != "no" ] && [ $CONFLICT_BACKUP_DAYS -ne 0 ]; then
 		Logger "Running conflict backup cleanup." "NOTICE"
-		_SoftDelete $CONFLICT_BACKUP_DAYS "$INITIATOR_SYNC_DIR$INITIATOR_BACKUP_DIR" "$TARGET_SYNC_DIR$TARGET_BACKUP_DIR"
+
+		_SoftDeleteLocal "intiator" "$INITIATOR_SYNC_DIR$INITIATOR_BACKUP_DIR" $CONFLICT_BACKUP_DAYS
+		if [ "$REMOTE_SYNC" != "yes" ]; then
+			_SoftDeleteLocal "target" "$TARGET_SYNC_DIR$TARGET_BACKUP_DIR" $CONFLICT_BACKUP_DAYS
+		else
+			_SoftDeleteRemote "target" "$TARGET_SYNC_DIR$TARGET_BACKUP_DIR" $CONFLICT_BACKUP_DAYS
+		fi
 	fi
 
 	if [ "$SOFT_DELETE" != "no" ] && [ $SOFT_DELETE_DAYS -ne 0 ]; then
 		Logger "Running soft deletion cleanup." "NOTICE"
-		_SoftDelete $SOFT_DELETE_DAYS "$INITIATOR_SYNC_DIR$INITIATOR_DELETE_DIR" "$TARGET_SYNC_DIR$TARGET_DELETE_DIR"	
+
+		_SoftDeleteLocal "initiator" "$INITIATOR_SYNC_DIR$INITIATOR_DELETE_DIR" $SOFT_DELETE_DAYS
+		if [ "$REMOTE_SYNC" != "yes" ]; then
+			_SoftDeleteLocal "target" "$TARGET_SYNC_DIR$TARGET_DELETE_DIR" $SOFT_DELETE_DAYS
+		else
+			_SoftDeleteRemote "target" "$TARGET_SYNC_DIR$TARGET_DELETE_DIR" $SOFT_DELETE_DAYS
+		fi
 	fi	
 }
 
