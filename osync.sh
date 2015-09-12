@@ -4,7 +4,7 @@ PROGRAM="Osync" # Rsync based two way sync engine with fault tolerance
 AUTHOR="(L) 2013-2015 by Orsiris \"Ozy\" de Jong"
 CONTACT="http://www.netpower.fr/osync - ozy@netpower.fr"
 PROGRAM_VERSION=1.1-unstable
-PROGRAM_BUILD=2015091207
+PROGRAM_BUILD=2015091208
 
 ## type doesn't work on platforms other than linux (bash). If if doesn't work, always assume output is not a zero exitcode
 if ! type -p "$BASH" > /dev/null; then
@@ -337,17 +337,17 @@ function GetRemoteOS {
 		CheckConnectivityRemoteHost
 		eval "$SSH_CMD \"uname -spio\" > $RUN_DIR/osync_$FUNCNAME_$SCRIPT_PID 2>&1" &
 		child_pid=$!
-		WaitForTaskCompletion $child_pid 120 240 $FUNCNAME_1
+		WaitForTaskCompletion $child_pid 120 240 $FUNCNAME"-1"
 		retval=$?
 		if [ $retval != 0 ]; then
 			eval "$SSH_CMD \"uname -v\" > $RUN_DIR/osync_$FUNCNAME_$SCRIPT_PID 2>&1" &
 			child_pid=$!
-			WaitForTaskCompletion $child_pid 120 240 $FUNCNAME_2
+			WaitForTaskCompletion $child_pid 120 240 $FUNCNAME"-2"
 			retval=$?
 			if [ $retval != 0 ]; then
 				eval "$SSH_CMD \"uname\" > $RUN_DIR/osync_$FUNCNAME_$SCRIPT_PID 2>&1" &
 				child_pid=$!
-				WaitForTaskCompletion $child_pid 120 240 $FUNCNAME_3
+				WaitForTaskCompletion $child_pid 120 240 $FUNCNAME"-3"
 				retval=$?
 				if [ $retval != 0 ]; then
 					Logger "Cannot Get remote OS type." "ERROR"
@@ -865,7 +865,7 @@ function CheckReplicaPaths {
 	#	fi
 	#fi
 
-	_CheckReplicaPathsLocal "$INITIATOR_SYNC_DIR"	
+	_CheckReplicaPathsLocal "$INITIATOR_SYNC_DIR"
 	if [ "$REMOTE_SYNC" == "no" ]; then
 		_CheckReplicaPathsLocal "$TARGET_SYNC_DIR"
 	else
@@ -981,7 +981,7 @@ function _WriteLockFilesRemote {
 	CheckConnectivity3rdPartyHosts
 	CheckConnectivityRemoteHost
 
-	cmd="$SSH_CMD \"echo $SCRIPT_PID@$SYNC_ID | $COMMAND_SUDO tee \\\"$lock_file\\\" > /dev/null \"" &	
+	cmd="$SSH_CMD \"echo $SCRIPT_PID@$SYNC_ID | $COMMAND_SUDO tee \\\"$lock_file\\\" > /dev/null \" &"	
 	eval $cmd
 	WaitForTaskCompletion $? 0 1800 $FUNCNAME
 	if [ $? != 0 ]; then
@@ -1029,7 +1029,7 @@ function _CheckLocksRemote { #TODO: Rewrite this a bit more beautiful
 	CheckConnectivity3rdPartyHosts
 	CheckConnectivityRemoteHost
 
-	cmd="$SSH_CMD \"if [ -f \\\"$lockfile\\\" ]; then cat \\\"$lockfile\\\"; fi\" > $RUN_DIR/osync_$FUNCNAME_$SCRIPT_PID" &
+	cmd="$SSH_CMD \"if [ -f \\\"$lockfile\\\" ]; then cat \\\"$lockfile\\\"; fi\" > $RUN_DIR/osync_$FUNCNAME_$SCRIPT_PID &"
 	eval $cmd
 	WaitForTaskCompletion $? 0 1800 $FUNCNAME
 	if [ $? != 0 ]; then
@@ -1113,7 +1113,7 @@ function _UnlockReplicasRemote {
 	CheckConnectivity3rdPartyHosts
 	CheckConnectivityRemoteHost
 
-	cmd="$SSH_CMD \"if [ -f \\\"$localfile\\\" ]; then $COMMAND_SUDO rm \\\"$lockfile\\\"; fi 2>&1\"" > $RUN_DIR/osync_$FUNCNAME_$SCRIPT_PID &
+	cmd="$SSH_CMD \"if [ -f \\\"$localfile\\\" ]; then $COMMAND_SUDO rm \\\"$lockfile\\\"; fi 2>&1\" > $RUN_DIR/osync_$FUNCNAME_$SCRIPT_PID &"
 	eval $cmd
 	WaitForTaskCompletion $? 0 1800 $FUNCNAME
 	if [ $? != 0 ]; then
