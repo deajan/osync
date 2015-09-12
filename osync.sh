@@ -4,7 +4,7 @@ PROGRAM="Osync" # Rsync based two way sync engine with fault tolerance
 AUTHOR="(L) 2013-2015 by Orsiris \"Ozy\" de Jong"
 CONTACT="http://www.netpower.fr/osync - ozy@netpower.fr"
 PROGRAM_VERSION=1.1-unstable
-PROGRAM_BUILD=2015091203
+PROGRAM_BUILD=2015091204
 
 ## type doesn't work on platforms other than linux (bash). If if doesn't work, always assume output is not a zero exitcode
 if ! type -p "$BASH" > /dev/null; then
@@ -290,6 +290,7 @@ function CheckEnvironment {
 }
 
 function GetLocalOS {
+	__CheckArguments 0 $# $FUNCNAME "$*"
 	local local_os_var=$(uname -spio 2>&1)
 	if [ $? != 0 ]; then
 		local local_os_var=$(uname -v 2>&1)
@@ -320,6 +321,8 @@ function GetLocalOS {
 }
 
 function GetRemoteOS {
+	__CheckArguments 0 $# $FUNCNAME "$*"
+
 	if [ "$REMOTE_SYNC" == "yes" ]; then
 		CheckConnectivity3rdPartyHosts
 		CheckConnectivityRemoteHost
@@ -552,6 +555,8 @@ function RunAfterHook {
 }
 
 function CheckConnectivityRemoteHost {
+	__CheckArguments 0 $# $FUNCNAME "$*"
+
 	if [ "$REMOTE_HOST_PING" != "no" ] && [ "$REMOTE_SYNC" != "no" ]; then
 		eval "$PING_CMD $REMOTE_HOST > /dev/null 2>&1"
 		if [ $? != 0 ]; then
@@ -562,6 +567,8 @@ function CheckConnectivityRemoteHost {
 }
 
 function CheckConnectivity3rdPartyHosts {
+	__CheckArguments 0 $# $FUNCNAME "$*"
+
 	if [ "$REMOTE_3RD_PARTY_HOSTS" != "" ]; then
 		remote_3rd_party_success=0
 		OLD_IFS=$IFS
@@ -593,14 +600,10 @@ function __CheckArguments {
 		local function_name="${3}" # Function name that called __CheckArguments
 		local arguments="${4}" # All other arguments
 
-		if [ $number_of_arguments -ne $number_of_given_arguments ]; then
-			Logger "Inconsistnent number of arguments in $function_name. Should have $number_of_arguments arguments, has $number_of_given_arguments arguments, see log file." "CRITICAL"
-			# Cannot user Logger here because $@ is a list of arguments
-			echo "Argumnt list: $4" >> "$LOG_FILE"
-		fi
-
 		if [ "$_PARANOIA_DEBUG" == "yes" ]; then
-			# Paranoia check... Can help finding empty arguments 
+			Logger "Entering function [$function_name]." "DEBUG"
+
+			# Paranoia check... Can help finding empty arguments. __CheckArguments should be grepped out in production builds.
 			local count=-3 # Number of arguments minus the function calls for __CheckArguments
 			for i in $@; do
 				count=$((count + 1))
@@ -610,6 +613,13 @@ function __CheckArguments {
 				echo "Argument list (including checks): $@" >> "$LOG_FILE"
 			fi
 		fi
+
+		if [ $number_of_arguments -ne $number_of_given_arguments ]; then
+			Logger "Inconsistnent number of arguments in $function_name. Should have $number_of_arguments arguments, has $number_of_given_arguments arguments, see log file." "CRITICAL"
+			# Cannot user Logger here because $@ is a list of arguments
+			echo "Argumnt list: $4" >> "$LOG_FILE"
+		fi
+
 	fi
 }
 
@@ -759,6 +769,8 @@ function _CreateStateDirsRemote {
 }
 
 function CreateStateDirs {
+	__CheckArguments 0 $# $FUNCNAME "$*"
+
 	_CreateStateDirsLocal "$INITIATOR_STATE_DIR"
 	if [ "$REMOTE_SYNC" == "no" ]; then
 		_CreateStateDirsLocal "$TARGET_STATE_DIR"
@@ -819,6 +831,8 @@ function _CheckReplicaPathsRemote {
 }
 
 function CheckReplicaPaths {
+	__CheckArguments 0 $# $FUNCNAME "$*"
+
 	#INITIATOR_SYNC_DIR_CANN=$(realpath "$INITIATOR_SYNC_DIR")	#TODO: investigate realpath & readlink issues on MSYS and busybox here
 	#TARGET_SYNC_DIR_CANN=$(realpath "$TARGET_SYNC_DIR")
 
@@ -873,6 +887,8 @@ function _CheckDiskSpaceRemote {
 }
 
 function CheckDiskSpace {
+	__CheckArguments 0 $# $FUNCNAME "$*"
+
 	_CheckDiskSpaceLocal "$INITIATOR_SYNC_DIR"
 	if [ "$REMOTE_SYNC" == "no" ]; then
 		_CheckDiskSpaceLocal "$TARGET_SYNC_DIR"
@@ -882,6 +898,8 @@ function CheckDiskSpace {
 }
 
 function RsyncExcludePattern {
+	__CheckArguments 0 $# $FUNCNAME "$*"
+
 	# Disable globbing so wildcards from exclusions don't get expanded
 	set -f
 	rest="$RSYNC_EXCLUDE_PATTERN"
@@ -907,6 +925,8 @@ function RsyncExcludePattern {
 }
 
 function RsyncExcludeFrom {
+	__CheckArguments 0 $# $FUNCNAME "$*"
+
 	if [ ! "$RSYNC_EXCLUDE_FROM" == "" ]; then
 		## Check if the exclude list has a full path, and if not, add the config file path if there is one
 		if [ "$(basename $RSYNC_EXCLUDE_FROM)" == "$RSYNC_EXCLUDE_FROM" ]; then
@@ -951,6 +971,8 @@ function _WriteLockFilesRemote {
 }
 
 function WriteLockFiles {
+	__CheckArguments 0 $# $FUNCNAME "$*"
+
 	_WriteLockFilesLocal "$INITIATOR_LOCKFILE"
 	if [ "$REMOTE_SYNC" != "yes" ]; then
 		_WriteLockFilesLocal "$TARGET_LOCKFILE"
@@ -1025,6 +1047,8 @@ function _CheckLocksRemote { #TODO: Rewrite this a bit more beautiful
 }
 
 function CheckLocks {
+	__CheckArguments 0 $# $FUNCNAME "$*"
+
 	if [ $_NOLOCKS -eq 1 ]; then
 		return 0
 	fi
@@ -1079,6 +1103,8 @@ function _UnlockReplicasRemote {
 }
 
 function UnlockReplicas {
+	__CheckArguments 0 $# $FUNCNAME "$*"
+
 	if [ $_NOLOCKS -eq 1 ]; then
 		return 0
 	fi
@@ -1489,6 +1515,8 @@ function deletion_propagation {
 ###### Step 5: Create after run tree list for initiator and target replicas (Steps 5M and 5S)
 
 function Sync {
+	__CheckArguments 0 $# $FUNCNAME "$*"
+
 	Logger "Starting synchronization task." "NOTICE"
 	CheckConnectivity3rdPartyHosts
 	CheckConnectivityRemoteHost
@@ -1720,6 +1748,8 @@ function _SoftDeleteRemote {
 }
 
 function SoftDelete {
+	__CheckArguments 0 $# $FUNCNAME "$*"
+
 	if [ "$CONFLICT_BACKUP" != "no" ] && [ $CONFLICT_BACKUP_DAYS -ne 0 ]; then
 		Logger "Running conflict backup cleanup." "NOTICE"
 
@@ -1744,6 +1774,8 @@ function SoftDelete {
 }
 
 function Init {
+	__CheckArguments 0 $# $FUNCNAME "$*"
+
 	# Set error exit code if a piped command fails
 	set -o pipefail
 	set -o errtrace
@@ -1972,6 +2004,8 @@ function Init {
 }
 
 function InitLocalOSSettings {
+	__CheckArguments 0 $# $FUNCNAME "$*"
+
 	## If running under Msys, some commands don't run the same way
 	## Using mingw version of find instead of windows one
 	## Getting running processes is quite different
@@ -1998,6 +2032,8 @@ function InitLocalOSSettings {
 }
 
 function InitRemoteOSSettings {
+	__CheckArguments 0 $# $FUNCNAME "$*"
+
 	## MacOSX does not use the -E parameter like Linux or BSD does (-E is mapped to extended attrs instead of preserve executability)
 	if [ "$LOCAL_OS" != "MacOSX" ] && [ "$REMOTE_OS" != "MacOSX" ]; then
 		RSYNC_ARGS=$RSYNC_ARGS" -E"
@@ -2011,6 +2047,8 @@ function InitRemoteOSSettings {
 }
 
 function Main {
+	__CheckArguments 0 $# $FUNCNAME "$*"
+
 	CreateStateDirs
 	CheckLocks
 	Sync
@@ -2050,6 +2088,8 @@ function Usage {
 }
 
 function SyncOnChanges {
+	__CheckArguments 0 $# $FUNCNAME "$*"
+
 	if ! type -p inotifywait > /dev/null 2>&1
 	then
 		Logger "No inotifywait command found. Cannot monitor changes." "CRITICAL"

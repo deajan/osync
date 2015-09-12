@@ -6,6 +6,8 @@ KNOWN ISSUES
 RECENT CHANGES
 --------------
 
+- Added (much) more verbose debugging
+- Force tree function to overwrite earlier tree files
 ! Check existing dirs before checking for state dirs
 ! Add Logger DEBUG to all eval statements
 ! Replace child_pid by $? directly
