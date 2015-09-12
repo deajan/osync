@@ -35,6 +35,12 @@ Whenever there is some idea to postpone, use #TODO:dev-name: some remark
 A marker must be left where on the line a dev is working (when the work isn't finished). Marker is #WIP:dev-name: some remark
 dev-name is mandatory if more than one person is coding
 
+++++ Pre-processor comments
+
+As debug / production environments cannot be set with bash, debug code can be removed easily by:
+- Removing all lines containting comment #__WITH_PARANOIA_DEBUG
+- Removing everying between comment #__BEGIN_WITH_PARANOIA_DEBUG and #__END_WITH_PARANOIRA_DEBUG
+
 ++++ Variables
 
 All local variables are lowercase, separated by _ (ex: low_wait)

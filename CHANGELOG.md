@@ -6,7 +6,7 @@ KNOWN ISSUES
 RECENT CHANGES
 --------------
 
-- Added (much) more verbose debugging
+- Added (much) more verbose debugging (and possibility to remove debug code to gain speed)
 - Force tree function to overwrite earlier tree files
 ! Check existing dirs before checking for state dirs
 ! Add Logger DEBUG to all eval statements
