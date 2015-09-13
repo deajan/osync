@@ -8,9 +8,8 @@ RECENT CHANGES
 
 - Added (much) more verbose debugging (and possibility to remove debug code to gain speed)
 - Force tree function to overwrite earlier tree files
-! Check existing dirs before checking for state dirs
 ! Add Logger DEBUG to all eval statements
-! Replace child_pid by $? directly
+- Replace child_pid by $? directly, add a better sub process killer in TrapQuit
 - Refactor [local master, local slave, remote slave] code to [local, remote][initiator, target]code
 - Added some automatic typo checks in code, for _DEBUG mode (and _PARANOIA_DEBUG now)
 - Improved Logging

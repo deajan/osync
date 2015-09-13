@@ -4,7 +4,7 @@ PROGRAM="Osync" # Rsync based two way sync engine with fault tolerance
 AUTHOR="(L) 2013-2015 by Orsiris \"Ozy\" de Jong"
 CONTACT="http://www.netpower.fr/osync - ozy@netpower.fr"
 PROGRAM_VERSION=1.1-unstable
-PROGRAM_BUILD=2015091209
+PROGRAM_BUILD=2015091301
 
 ## type doesn't work on platforms other than linux (bash). If if doesn't work, always assume output is not a zero exitcode
 if ! type -p "$BASH" > /dev/null; then
@@ -125,7 +125,7 @@ function TrapStop {
 	fi
 
 	if [ $soft_stop -eq 1 ]; then
-		Logger " /!\ WARNING: CTRL+C hit twice. Quitting osync. Please wait..." "WARN"
+		Logger " /!\ WARNING: CTRL+C hit twice. Exiting osync. Please wait while replicas get unlocked..." "WARN"
 		soft_stop=2
 		exit 1
 	fi
@@ -794,7 +794,7 @@ function CreateStateDirs {
 	__CheckArguments 0 $# $FUNCNAME "$*"	#__WITH_PARANOIA_DEBUG
 
 	_CreateStateDirsLocal "$INITIATOR_STATE_DIR"
-	if [ "$REMOTE_SYNC" == "no" ]; then
+	if [ "$REMOTE_SYNC" != "yes" ]; then
 		_CreateStateDirsLocal "$TARGET_STATE_DIR"
 	else
 		_CreateStateDirsRemote "$TARGET_STATE_DIR"
@@ -866,7 +866,7 @@ function CheckReplicaPaths {
 	#fi
 
 	_CheckReplicaPathsLocal "$INITIATOR_SYNC_DIR"
-	if [ "$REMOTE_SYNC" == "no" ]; then
+	if [ "$REMOTE_SYNC" != "yes" ]; then
 		_CheckReplicaPathsLocal "$TARGET_SYNC_DIR"
 	else
 		_CheckReplicaPathsRemote "$TARGET_SYNC_DIR"
@@ -912,7 +912,7 @@ function CheckDiskSpace {
 	__CheckArguments 0 $# $FUNCNAME "$*"	#__WITH_PARANOIA_DEBUG
 
 	_CheckDiskSpaceLocal "$INITIATOR_SYNC_DIR"
-	if [ "$REMOTE_SYNC" == "no" ]; then
+	if [ "$REMOTE_SYNC" != "yes" ]; then
 		_CheckDiskSpaceLocal "$TARGET_SYNC_DIR"
 	else
 		_CheckDiskSpaceRemote "$TARGET_SYNC_DIR"
@@ -983,7 +983,7 @@ function _WriteLockFilesRemote {
 
 	cmd="$SSH_CMD \"echo $SCRIPT_PID@$SYNC_ID | $COMMAND_SUDO tee \\\"$lockfile\\\" > /dev/null \" &"	
 	eval $cmd
-	WaitForTaskCompletion $? 0 1800 $FUNCNAME
+	WaitForTaskCompletion $! 0 1800 $FUNCNAME
 	if [ $? != 0 ]; then
 		Logger "Could not set lock on remote target replica." "CRITICAL"
 		exit 1
@@ -1031,16 +1031,14 @@ function _CheckLocksRemote { #TODO: Rewrite this a bit more beautiful
 
 	cmd="$SSH_CMD \"if [ -f \\\"$lockfile\\\" ]; then cat \\\"$lockfile\\\"; fi\" > $RUN_DIR/osync_$FUNCNAME_$SCRIPT_PID &"
 	eval $cmd
-	WaitForTaskCompletion $? 0 1800 $FUNCNAME
+	WaitForTaskCompletion $! 0 1800 $FUNCNAME
 	if [ $? != 0 ]; then
 		if [ -f $RUN_DIR/osync_$FUNCNAME_$SCRIPT_PID ]; then
 			local lockfile_content=$(cat $RUN_DIR/osync_$FUNCNAME_$SCRIPT_PID)
 		else
-			Logger "No remote lockfile found." "NOTICE"
+			Logger "Cannot get remote lockfile." "CRITICAL"
+			exit 1
 		fi
-	else
-		Logger "Cannot get remote lockfile." "CRITICAL"
-		exit 1
 	fi
 
 	local lock_pid=${lockfile_content%@*}
@@ -1113,9 +1111,9 @@ function _UnlockReplicasRemote {
 	CheckConnectivity3rdPartyHosts
 	CheckConnectivityRemoteHost
 
-	cmd="$SSH_CMD \"if [ -f \\\"$localfile\\\" ]; then $COMMAND_SUDO rm \\\"$lockfile\\\"; fi 2>&1\" > $RUN_DIR/osync_$FUNCNAME_$SCRIPT_PID &"
+	cmd="$SSH_CMD \"if [ -f \\\"$lockfile\\\" ]; then $COMMAND_SUDO rm -f \\\"$lockfile\\\"; fi 2>&1\" > $RUN_DIR/osync_$FUNCNAME_$SCRIPT_PID &"
 	eval $cmd
-	WaitForTaskCompletion $? 0 1800 $FUNCNAME
+	WaitForTaskCompletion $! 0 1800 $FUNCNAME
 	if [ $? != 0 ]; then
 		Logger "Could not unlock remote replica." "ERROR"
 		Logger "Command Output:\n$(cat $RUN_DIR/osync_$FUNCNAME_$SCRIPT_PID)" "NOTICE"
@@ -1720,7 +1718,7 @@ function _SoftDeleteLocal {
 		else
 			Dummy &
 		fi
-		WaitForCompletion $? $SOFT_MAX_EXEC_TIME $HARD_MAX_EXEC_TIME $FUNCNAME
+		WaitForCompletion $! $SOFT_MAX_EXEC_TIME $HARD_MAX_EXEC_TIME $FUNCNAME
 		retval=$?
 		if [ $retval -ne 0 ]; then
 			Logger "Error while executing cleanup on [$replica_type] replica." "ERROR"
@@ -1759,7 +1757,7 @@ function _SoftDeleteRemote {
 	else
 		Dummy &
 	fi
-	WaitForCompletion $? $SOFT_MAX_EXEC_TIME $HARD_MAX_EXEC_TIME $FUNCNAME
+	WaitForCompletion $! $SOFT_MAX_EXEC_TIME $HARD_MAX_EXEC_TIME $FUNCNAME
 	retval=$?
 	if [ $retval -ne 0 ]; then
 		Logger "Error while executing cleanup on remote target replica." "ERROR"
