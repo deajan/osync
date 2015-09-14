@@ -4,7 +4,7 @@ PROGRAM="Osync" # Rsync based two way sync engine with fault tolerance
 AUTHOR="(L) 2013-2015 by Orsiris \"Ozy\" de Jong"
 CONTACT="http://www.netpower.fr/osync - ozy@netpower.fr"
 PROGRAM_VERSION=1.1-unstable
-PROGRAM_BUILD=2015091301
+PROGRAM_BUILD=2015091401
 
 ## type doesn't work on platforms other than linux (bash). If if doesn't work, always assume output is not a zero exitcode
 if ! type -p "$BASH" > /dev/null; then
@@ -149,14 +149,33 @@ function TrapQuit {
 		exitcode=0
 	fi
 
-	if ps -p $child_pid > /dev/null 2>&1
+	#TODO: Replace the following basic code with some code that kills all child processes (this code only kills the current child pid it's aware of via WaitFor(Task)Completion
+	if ps -p $CHILD_PID > /dev/null 2>&1
 	then
-		kill -9 $child_pid
+		kill -s SIGTERM $CHILD_PID
+		if [ $? == 0 ]; then
+			Logger "Stopped child process [$CHILD_PID]." "DEBUG"
+		else
+			Logger "Could not terminate child process [$CHILD_PID]. Trying the hard way." "DEBUG"
+			kill -9 $CHILD_PID
+			if [ $? != 0 ]; then
+				Logger "Could not kill child process [$CHILD_PID]." "ERROR"
+			fi
+		fi
 	fi
 
-	if ps -p $sub_pid > /dev/null 2>&1
+	if ps -p $OSYNC_SUB_PID > /dev/null 2>&1
 	then
-		kill -9 $sub_pid
+		kill -s SIGTERM $OSYNC_SUB_PID
+		if [ $? == 0 ]; then
+			Logger "Stopped sub process [$OSYNC_SUB_PID]." "DEBUG"
+		else
+			Logger "Could not terminate sub process [$OSYNC_SUB_PID]. Trying the hard way." "DEBUG"
+			kill -9 $OSYNC_SUB_PID
+			if [ $? != 0 ]; then
+				Logger "Could not kill sub process [$OSYNC_SUB_PID]." "ERROR"
+			fi
+		fi
 	fi
 
 	exit $exitcode
@@ -336,18 +355,15 @@ function GetRemoteOS {
 		CheckConnectivity3rdPartyHosts
 		CheckConnectivityRemoteHost
 		eval "$SSH_CMD \"uname -spio\" > $RUN_DIR/osync_$FUNCNAME_$SCRIPT_PID 2>&1" &
-		child_pid=$!
-		WaitForTaskCompletion $child_pid 120 240 $FUNCNAME"-1"
+		WaitForTaskCompletion $! 120 240 $FUNCNAME"-1"
 		retval=$?
 		if [ $retval != 0 ]; then
 			eval "$SSH_CMD \"uname -v\" > $RUN_DIR/osync_$FUNCNAME_$SCRIPT_PID 2>&1" &
-			child_pid=$!
-			WaitForTaskCompletion $child_pid 120 240 $FUNCNAME"-2"
+			WaitForTaskCompletion $! 120 240 $FUNCNAME"-2"
 			retval=$?
 			if [ $retval != 0 ]; then
 				eval "$SSH_CMD \"uname\" > $RUN_DIR/osync_$FUNCNAME_$SCRIPT_PID 2>&1" &
-				child_pid=$!
-				WaitForTaskCompletion $child_pid 120 240 $FUNCNAME"-3"
+				WaitForTaskCompletion $! 120 240 $FUNCNAME"-3"
 				retval=$?
 				if [ $retval != 0 ]; then
 					Logger "Cannot Get remote OS type." "ERROR"
@@ -391,6 +407,8 @@ function WaitForTaskCompletion {
 	local caller_name="${4}" # Who called this function
 	Logger "$FUNCNAME called by [$caller_name]." "DEBUG"	#__WITH_PARANOIA_DEBUG
 	__CheckArguments 4 $# $FUNCNAME "$*"			#__WITH_PARANOIA_DEBUG
+
+	CHILD_PID=$pid
 
 	local soft_alert=0 # Does a soft alert need to be triggered
 	local log_ttime=0 # local time instance for comparaison
@@ -443,6 +461,8 @@ function WaitForCompletion {
 	local caller_name="${4}" # Who called this function
 	Logger "$FUNCNAME called by [$caller_name]" "DEBUG"	#__WITH_PARANOIA_DEBUG
 	__CheckArguments 4 $# $FUNCNAME "$*"			#__WITH_PARANOIA_DEBUG
+
+	CHILD_PID=$pid
 
 	local soft_alert=0 # Does a soft alert need to be triggered
 	local log_ttime=0 # local time instance for comparaison
@@ -498,8 +518,7 @@ function RunLocalCommand {
 	fi
 	Logger "Running command [$command] on local host." "NOTICE"
 	eval "$command" > $RUN_DIR/osync_run_local_$SCRIPT_PID 2>&1 &
-	child_pid=$!
-	WaitForTaskCompletion $child_pid 0 $hard_max_time $FUNCNAME
+	WaitForTaskCompletion $! 0 $hard_max_time $FUNCNAME
 	retval=$?
 	if [ $retval -eq 0 ]; then
 		Logger "Command succeded." "NOTICE"
@@ -531,8 +550,7 @@ function RunRemoteCommand {
 	fi
 	Logger "Running command [$command] on remote host." "NOTICE"
 	eval "$SSH_CMD \"$command\" > $RUN_DIR/osync_run_remote_$SCRIPT_PID 2>&1 &"
-	child_pid=$!
-	WaitForTaskCompletion $child_pid 0 $hard_max_time $FUNCNAME
+	WaitForTaskCompletion $! 0 $hard_max_time $FUNCNAME
 	retval=$?
 	if [ $retval -eq 0 ]; then
 		Logger "Command succeded." "NOTICE"
@@ -1163,8 +1181,7 @@ function tree_list {
 	Logger "RSYNC_CMD: $rsync_cmd" "DEBUG"
 	## Redirect commands stderr here to get rsync stderr output in logfile
 	eval $rsync_cmd 2>> "$LOG_FILE"
-	child_pid=$!
-	WaitForCompletion $child_pid $SOFT_MAX_EXEC_TIME $HARD_MAX_EXEC_TIME $FUNCNAME
+	WaitForCompletion $! $SOFT_MAX_EXEC_TIME $HARD_MAX_EXEC_TIME $FUNCNAME
 	retval=$?
 	## Retval 24 = some files vanished while creating list
 	if ([ $retval == 0 ] || [ $retval == 24 ]) && [ -f $RUN_DIR/osync_$replica_type_$SCRIPT_PID ]; then
@@ -1250,8 +1267,7 @@ function sync_update {
 	fi
 	Logger "RSYNC_CMD: $rsync_cmd" "DEBUG"
 	eval "$rsync_cmd"
-	child_pid=$!
-	WaitForCompletion $child_pid $SOFT_MAX_EXEC_TIME $HARD_MAX_EXEC_TIME $FUNCNAME
+	WaitForCompletion $! $SOFT_MAX_EXEC_TIME $HARD_MAX_EXEC_TIME $FUNCNAME
 	retval=$?
 	if [ $_VERBOSE -eq 1 ] && [ -f $RUN_DIR/osync_update_$destination_replica_replica_$SCRIPT_PID ]; then
 		Logger "List:\n$(cat $RUN_DIR/osync_update_$destination_replica_replica_$SCRIPT_PID)" "NOTICE"
@@ -1492,8 +1508,7 @@ function deletion_propagation {
 		DELETE_DIR="$INITIATOR_DELETE_DIR"
 
 		_delete_local "$REPLICA_DIR" "target$deleted_list_file" "$DELETE_DIR" "target$deleted_failed_list_file" &
-		child_pid=$!
-		WaitForCompletion $child_pid $SOFT_MAX_EXEC_TIME $HARD_MAX_EXEC_TIME $FUNCNAME
+		WaitForCompletion $! $SOFT_MAX_EXEC_TIME $HARD_MAX_EXEC_TIME $FUNCNAME
 		retval=$?
 		if [ $retval != 0 ]; then
 			Logger "Deletion on replica $replica_type failed." "CRITICAL"
@@ -1508,8 +1523,7 @@ function deletion_propagation {
 		else
 			_delete_local "$REPLICA_DIR" "initiator$deleted_list_file" "$DELETE_DIR" "initiator$deleted_failed_list_file" &
 		fi
-		child_pid=$!
-		WaitForCompletion $child_pid $SOFT_MAX_EXEC_TIME $HARD_MAX_EXEC_TIME $FUNCNAME
+		WaitForCompletion $! $SOFT_MAX_EXEC_TIME $HARD_MAX_EXEC_TIME $FUNCNAME
 		retval=$?
 		if [ $retval == 0 ]; then
 			if [ -f $RUN_DIR/osync_remote_deletion_$SCRIPT_PID ] && [ $_VERBOSE -eq 1 ]; then
@@ -2136,8 +2150,8 @@ function SyncOnChanges {
 
 		Logger "#### Monitoring now." "NOTICE"
 		inotifywait --exclude $OSYNC_DIR $RSYNC_EXCLUDE -qq -r -e create -e modify -e delete -e move -e attrib --timeout "$MAX_WAIT" "$INITIATOR_SYNC_DIR" &
-		sub_pid=$!
-		wait $sub_pid
+		OSYNC_SUB_PID=$!
+		wait $OSYNC_SUB_PID
 		retval=$?
 		if [ $retval == 0 ]; then
 			Logger "#### Changes detected, waiting $MIN_WAIT seconds before running next sync." "NOTICE"
