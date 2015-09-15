@@ -1,17 +1,20 @@
 #!/bin/bash
 
-TEST_BUILD=2015070201
-
-cd -P -- "$(dirname -- "$0")"
-OSYNC_EXECUTABLE=$(readlink -e ../osync.sh)
-declare -A sandbox_osync
-sandbox_osync[quickLocal]="--master=master --slave=slave"
-sandbox_osync[quickRemote]="--master=master --slave=ssh://localhost//tmp/osync_tests/quickRemote/slave"
-sandbox_osync[local]=$(readlink -e "conf/local.conf")
-sandbox_osync[remote]=$(readlink -e "conf/remote.conf")
-
-# Tmp dir
+# Test dir
 TMP="/tmp/osync_tests"
+# SSH port used for remote tests
+SSH_PORT=49999
+
+# Get dir the tests are stored in
+TEST_DIR=$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )
+cd "$TEST_DIR"
+
+OSYNC_EXECUTABLE="$(dirname $TEST_DIR)//osync.sh"
+declare -A sandbox_osync
+#sandbox_osync[quickLocal]="--master=master --slave=slave"
+#sandbox_osync[quickRemote]="--master=master --slave=ssh://localhost//tmp/osync_tests/quickRemote/slave"
+#sandbox_osync[local]="conf/local.conf"
+#sandbox_osync[remote]="conf/remote.conf"
 
 oneTimeSetUp()
 {
