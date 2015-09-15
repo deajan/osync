@@ -1571,7 +1571,7 @@ function Sync {
 				resume_sync=none
 			fi
 		else
-			Logger "Will not resume aborted osync execution. Too much resume tries [$resume_count]." "WARN"
+			Logger "Will not resume aborted osync execution. Too many resume tries [$resume_count]." "WARN"
 			echo "noresume" > "$INITIATOR_LAST_ACTION"
 			echo "0" > "$INITIATOR_RESUME_COUNT"
 			resume_sync=none
@@ -2117,7 +2117,7 @@ function Usage {
 	echo "--rsakey=\"\"	Alternative path to rsa private key for ssh connection to target replica"
 	echo "--sync-id=\"\"	Optional sync task name to identify this synchronization task when using multiple targets"
 	echo ""
-	echo "Additionnaly, you may set most osync options at runtime. eg:"
+	echo "Additionaly, you may set most osync options at runtime. eg:"
 	echo "SOFT_DELETE_DAYS=365 osync.sh --initiator=/path --target=/other/path"
 	echo ""
 	exit 128
