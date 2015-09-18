@@ -12,6 +12,7 @@ KNOWN ISSUES
 RECENT CHANGES
 --------------
 
+! Added v1.0x to v1.1 upgrade script
 - Added (much) more verbose debugging (and possibility to remove debug code to gain speed)
 - Force tree function to overwrite earlier tree files
 ! Add Logger DEBUG to all eval statements
