@@ -1,3 +1,9 @@
+NOTES FOR MY FUTURE SELF
+------------------------
+
+Have this kind of info written to state dir.
+inotifywait -m -r -e moved_from -e moved_to -e delete /home/git/osync/dir2/
+
 KNOWN ISSUES
 ------------
 
@@ -9,8 +15,8 @@ RECENT CHANGES
 - Added (much) more verbose debugging (and possibility to remove debug code to gain speed)
 - Force tree function to overwrite earlier tree files
 ! Add Logger DEBUG to all eval statements
-! Unlocking should only happen after TrapQuit has successfully killed any child processes
-!- Replace child_pid by $? directly, add a better sub process killer in TrapQuit
+- Unlocking happens after TrapQuit has successfully killed any child processes
+- Replace child_pid by $? directly, add a better sub process killer in TrapQuit
 - Refactor [local master, local slave, remote slave] code to [local, remote][initiator, target]code
 - Added some automatic typo checks in code, for _DEBUG mode (and _PARANOIA_DEBUG now)
 - Improved Logging

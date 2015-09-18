@@ -4,7 +4,7 @@ PROGRAM="Osync" # Rsync based two way sync engine with fault tolerance
 AUTHOR="(L) 2013-2015 by Orsiris \"Ozy\" de Jong"
 CONTACT="http://www.netpower.fr/osync - ozy@netpower.fr"
 PROGRAM_VERSION=1.1-unstable
-PROGRAM_BUILD=2015091401
+PROGRAM_BUILD=2015091801
 
 ## type doesn't work on platforms other than linux (bash). If if doesn't work, always assume output is not a zero exitcode
 if ! type -p "$BASH" > /dev/null; then
@@ -107,6 +107,22 @@ function Logger {
 	fi
 }
 
+# Portable child (and grandchild) kill function tester under Linux, BSD and MacOS X
+function KillChilds {
+	local pid="${1}"
+	local self="${2:-false}"
+
+	if children="$(pgrep -P "$pid")"; then
+		for child in $children; do
+			KillChilds "$child" true
+		done
+	fi
+
+	if [ "$self" == true ]; then
+		kill -s SIGTERM "$pid" || (sleep 10 && kill -9 "$pid" &)
+	fi
+}
+
 function TrapError {
 	local job="$0"
 	local line="$1"
@@ -149,34 +165,23 @@ function TrapQuit {
 		exitcode=0
 	fi
 
-	#TODO: Replace the following basic code with some code that kills all child processes (this code only kills the current child pid it's aware of via WaitFor(Task)Completion
-	if ps -p $CHILD_PID > /dev/null 2>&1
-	then
-		kill -s SIGTERM $CHILD_PID
-		if [ $? == 0 ]; then
-			Logger "Stopped child process [$CHILD_PID]." "DEBUG"
-		else
-			Logger "Could not terminate child process [$CHILD_PID]. Trying the hard way." "DEBUG"
-			kill -9 $CHILD_PID
-			if [ $? != 0 ]; then
-				Logger "Could not kill child process [$CHILD_PID]." "ERROR"
-			fi
-		fi
-	fi
+#TODO: Check new KillChilds function for service mode
 
-	if ps -p $OSYNC_SUB_PID > /dev/null 2>&1
-	then
-		kill -s SIGTERM $OSYNC_SUB_PID
-		if [ $? == 0 ]; then
-			Logger "Stopped sub process [$OSYNC_SUB_PID]." "DEBUG"
-		else
-			Logger "Could not terminate sub process [$OSYNC_SUB_PID]. Trying the hard way." "DEBUG"
-			kill -9 $OSYNC_SUB_PID
-			if [ $? != 0 ]; then
-				Logger "Could not kill sub process [$OSYNC_SUB_PID]." "ERROR"
-			fi
-		fi
-	fi
+#	if ps -p $OSYNC_SUB_PID > /dev/null 2>&1
+#	then
+#		kill -s SIGTERM $OSYNC_SUB_PID
+#		if [ $? == 0 ]; then
+#			Logger "Stopped sub process [$OSYNC_SUB_PID]." "DEBUG"
+#		else
+#			Logger "Could not terminate sub process [$OSYNC_SUB_PID]. Trying the hard way." "DEBUG"
+#			kill -9 $OSYNC_SUB_PID
+#			if [ $? != 0 ]; then
+#				Logger "Could not kill sub process [$OSYNC_SUB_PID]." "ERROR"
+#			fi
+#		fi
+#	fi
+
+	KillChilds $$ > /dev/null 2&>1
 
 	exit $exitcode
 }
