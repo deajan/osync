@@ -35,12 +35,6 @@ Whenever there is some idea to postpone, use #TODO:dev-name: some remark
 A marker must be left where on the line a dev is working (when the work isn't finished). Marker is #WIP:dev-name: some remark
 dev-name is mandatory if more than one person is coding
 
-++++ Pre-processor comments
-
-As debug / production environments cannot be set with bash, debug code can be removed easily by:
-- Removing all lines containting comment #__WITH_PARANOIA_DEBUG
-- Removing everying between comment #__BEGIN_WITH_PARANOIA_DEBUG and #__END_WITH_PARANOIRA_DEBUG
-
 ++++ Variables
 
 All local variables are lowercase, separated by _ (ex: low_wait)
@@ -112,7 +106,24 @@ A logging function is available with the following levels of logging:
 
 ++++ Eval
 
-The eval command should always contain 2>1&.
-There's a special case where this is needed:
-eval "some;commands" 2>> "$LOG_FILE" in order to get error messages into the log.
+Most commands should be logged to a tmp file.
+The basic way of doing is:
+
+cmd='something > some_file 2>&1'
+eval $cmd &
+WaitForTaskCompletion $! 0 0 "some function name"
+
+When executing rsync commands, errors should always be logged
+rsync_cmd='something > some_file'
+eval $cmd 2>> $LOG_FILE &
+WaitForTaskCompletion $! 0 0 "some other funcion"
+
+Remote commands should exist as:
+
+cmd=$SSH_CMD' "some; commands \"'$VARIABLE'\" some; other; commands" > some_file 2>&1'
+
+++++ File variables
+
+All eval cmd should exit their content to a file called "$RUNDIR/osync.$FUNCNAME.$SCRIPT_PID"
+Dots are used instead of '_' so variables can be separated with a forbidden char in variables, so they get detected.
 

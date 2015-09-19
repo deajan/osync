@@ -12,6 +12,7 @@ KNOWN ISSUES
 RECENT CHANGES
 --------------
 
+! Check for deletion failed list file before trying to copy it back
 ! Added v1.0x to v1.1 upgrade script
 - Added (much) more verbose debugging (and possibility to remove debug code to gain speed)
 - Force tree function to overwrite earlier tree files
