@@ -4,7 +4,7 @@ PROGRAM="Osync" # Rsync based two way sync engine with fault tolerance
 AUTHOR="(L) 2013-2015 by Orsiris \"Ozy\" de Jong"
 CONTACT="http://www.netpower.fr/osync - ozy@netpower.fr"
 PROGRAM_VERSION=1.1-unstable
-PROGRAM_BUILD=2015091902
+PROGRAM_BUILD=2015091903
 
 ## type doesn't work on platforms other than linux (bash). If if doesn't work, always assume output is not a zero exitcode
 if ! type -p "$BASH" > /dev/null; then
@@ -73,7 +73,7 @@ function _Logger {
 
 function Logger {
 	local value="${1}" # Sentence to log (in double quotes)
-	local level="${2}" # Log level: DEBUG, NOTICE, WARN, ERROR, CRITIAL
+	local level="${2}" # Log level: PARANOIA_DEBUG, DEBUG, NOTICE, WARN, ERROR, CRITIAL
 
 	# Special case in daemon mode we should timestamp instead of counting seconds
 	if [ $sync_on_changes -eq 1 ]; then
@@ -98,6 +98,11 @@ function Logger {
 		return
 	elif [ "$level" == "DEBUG" ]; then
 		if [ "$_DEBUG" == "yes" ]; then
+			_Logger "$prefix$value"
+			return
+		fi
+	elif [ "$level" == "PARANOIA_DEBUG" ]; then
+		if [ "$_PARANOIA_DEBUG" == "yes" ]; then
 			_Logger "$prefix$value"
 			return
 		fi
@@ -416,8 +421,8 @@ function WaitForTaskCompletion {
 	local soft_max_time="${2}" # If program with pid $pid takes longer than $soft_max_time seconds, will log a warning, unless $soft_max_time equals 0.
 	local hard_max_time="${3}" # If program with pid $pid takes longer than $hard_max_time seconds, will stop execution, unless $hard_max_time equals 0.
 	local caller_name="${4}" # Who called this function
-	Logger "$FUNCNAME called by [$caller_name]." "DEBUG"	#__WITH_PARANOIA_DEBUG
-	__CheckArguments 4 $# $FUNCNAME "$*"			#__WITH_PARANOIA_DEBUG
+	Logger "$FUNCNAME called by [$caller_name]." "PARANOIA_DEBUG"	#__WITH_PARANOIA_DEBUG
+	__CheckArguments 4 $# $FUNCNAME "$*"				#__WITH_PARANOIA_DEBUG
 
 	CHILD_PID=$pid
 
@@ -461,7 +466,7 @@ function WaitForTaskCompletion {
 	done
 	wait $pid
 	local retval=$?
-	Logger "$FUNCNAME ended for [$caller_name]." "DEBUG"	#__WITH_PARANOIA_DEBUG
+	Logger "$FUNCNAME ended for [$caller_name]." "PARANOIA_DEBUG"	#__WITH_PARANOIA_DEBUG
 	return $retval
 }
 
@@ -470,8 +475,8 @@ function WaitForCompletion {
 	local soft_max_time="${2}" # If program with pid $pid takes longer than $soft_max_time seconds, will log a warning, unless $soft_max_time equals 0.
 	local hard_max_time="${3}" # If program with pid $pid takes longer than $hard_max_time seconds, will stop execution, unless $hard_max_time equals 0.
 	local caller_name="${4}" # Who called this function
-	Logger "$FUNCNAME called by [$caller_name]" "DEBUG"	#__WITH_PARANOIA_DEBUG
-	__CheckArguments 4 $# $FUNCNAME "$*"			#__WITH_PARANOIA_DEBUG
+	Logger "$FUNCNAME called by [$caller_name]" "PARANOIA_DEBUG"	#__WITH_PARANOIA_DEBUG
+	__CheckArguments 4 $# $FUNCNAME "$*"				#__WITH_PARANOIA_DEBUG
 
 	CHILD_PID=$pid
 
@@ -514,7 +519,7 @@ function WaitForCompletion {
 	done
 	wait $pid
 	retval=$?
-	Logger "$FUNCNAME ended for [$caller_name]." "DEBUG"	#__WITH_PARANOIA_DEBUG
+	Logger "$FUNCNAME ended for [$caller_name]." "PARANOIA_DEBUG"	#__WITH_PARANOIA_DEBUG
 	return $retval
 }
 
