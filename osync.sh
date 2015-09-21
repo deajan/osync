@@ -565,7 +565,9 @@ function RunRemoteCommand {
 		return 1
 	fi
 	Logger "Running command [$command] on remote host." "NOTICE"
-	eval "$SSH_CMD \"$command\" > "$RUN_DIR/osync.$FUNCNAME.$SCRIPT_PID" 2>&1 &"
+	cmd=$SSH_CMD' "$command" > "'$RUN_DIR/osync.$FUNCNAME.$SCRIPT_PID'" 2>&1'
+	Logger "cmd: $cmd" "DEBUG"
+	eval $cmd &
 	WaitForTaskCompletion $! 0 $hard_max_time $FUNCNAME
 	retval=$?
 	if [ $retval -eq 0 ]; then
@@ -814,8 +816,9 @@ function _CreateStateDirsRemote {
 	CheckConnectivity3rdPartyHosts
 	CheckConnectivityRemoteHost
 
-	$cmd = "$SSH_CMD \"if ! [ -d \\\"$replica_state_dir\\\" ]; then $COMMAND_SUDO mkdir -p \\\"$replica_state_dir\\\"; fi 2>&1\" &"
-	eval $cmd > "$RUN_DIR/osync.$FUNCNAME.$SCRIPT_PID" 2>&1
+	$cmd=$SSH_CMD' "if ! [ -d \"$replica_state_dir\" ]; then $COMMAND_SUDO mkdir -p \"$replica_state_dir\"; fi" > "'$RUN_DIR/osync.$FUNCNAME.$SCRIPT_PID'" 2>&1'
+	Logger "cmd: $cmd" "DEBUG"
+	eval $cmd &
 	WaitForTaskCompletion $! 0 1800 $FUNCNAME
 	if [ $? != 0 ]; then
 		Logger "Cannot create remote state dir [$replica_state_dir]." "CRITICAL"
@@ -867,7 +870,7 @@ function _CheckReplicaPathsRemote {
 
 	CheckConnectivity3rdPartyHosts
 	CheckConnectivityRemoteHost
-
+#WIP: eval debug here
 	cmd="$SSH_CMD \"if ! [ -d \\\"$replica_path\\\" ]; then if [ "$CREATE_DIRS" == "yes" ]; then $COMMAND_SUDO mkdir -p \\\"$replica_path\\\"; fi; fi 2>&1\" &" 
 	eval $cmd > "$RUN_DIR/osync.$FUNCNAME.$SCRIPT_PID" 2>&1
 	WaitForTaskCompletion $! 0 1800 $FUNCNAME
@@ -1376,13 +1379,13 @@ function _delete_remote {
 
 	# Additionnaly, we need to copy the deletetion list to the remote state folder
 	ESC_DEST_DIR="$(EscapeSpaces "$TARGET_STATE_DIR")"
-	rsync_cmd="$(type -p $RSYNC_EXECUTABLE) --rsync-path=\"$RSYNC_PATH\" $SYNC_OPTS -e \"$RSYNC_SSH_CMD\" \"$INITIATOR_STATE_DIR/$2\" $REMOTE_USER@$REMOTE_HOST:\"$ESC_DEST_DIR/\" > $RUN_DIR/osync.$FUNCNAME.$SCRIPT_PID 2>&1"
+	rsync_cmd="$(type -p $RSYNC_EXECUTABLE) --rsync-path=\"$RSYNC_PATH\" $SYNC_OPTS -e \"$RSYNC_SSH_CMD\" \"$INITIATOR_STATE_DIR/$2\" $REMOTE_USER@$REMOTE_HOST:\"$ESC_DEST_DIR/\" > $RUN_DIR/osync.$FUNCNAME.precopy.$SCRIPT_PID 2>&1"
 	Logger "RSYNC_CMD: $rsync_cmd" "DEBUG"
 	eval $rsync_cmd 2>> "$LOG_FILE"
 	if [ $? != 0 ]; then
 		Logger "Cannot copy the deletion list to remote replica." "CRITICAL"
-		if [ -f $RUN_DIR/osync.$FUNCNAME.$SCRIPT_PID ]; then
-			Logger "$(cat $RUN_DIR/osync.$FUNCNAME.$SCRIPT_PID)" "CRITICAL" #TODO: remote deletion is critical. local deletion isn't. What to do ?
+		if [ -f $RUN_DIR/osync.$FUNCNAME.precopy.$SCRIPT_PID ]; then
+			Logger "$(cat $RUN_DIR/osync.$FUNCNAME.precopy.$SCRIPT_PID)" "CRITICAL" #TODO: remote deletion is critical. local deletion isn't. What to do ?
 		fi
 		exit 1
 	fi
