@@ -4,7 +4,7 @@ PROGRAM="Osync" # Rsync based two way sync engine with fault tolerance
 AUTHOR="(L) 2013-2015 by Orsiris \"Ozy\" de Jong"
 CONTACT="http://www.netpower.fr/osync - ozy@netpower.fr"
 PROGRAM_VERSION=1.1-unstable
-PROGRAM_BUILD=2015092305
+PROGRAM_BUILD=2015092306
 
 ## type doesn't work on platforms other than linux (bash). If if doesn't work, always assume output is not a zero exitcode
 if ! type -p "$BASH" > /dev/null; then
@@ -1739,9 +1739,9 @@ function _SoftDeleteLocal {
 
 	if [ -d "$replica_deletion_path" ]; then
 		if [ $_DRYRUN -eq 1 ]; then
-			Logger "Listing files older than $change_time days on [$replica_type] replica. Does not remove anything." "NOTICE"
+			Logger "Listing files older than $change_time days on $replica_type replica. Does not remove anything." "NOTICE"
 		else
-			Logger "Removing files older than $change_time days on [$replica_type] replica." "NOTICE"
+			Logger "Removing files older than $change_time days on $replica_type replica." "NOTICE"
 		fi
 			if [ $_VERBOSE -eq 1 ]; then
 			# Cannot launch log function from xargs, ugly hack
@@ -1758,13 +1758,13 @@ function _SoftDeleteLocal {
 		WaitForCompletion $! $SOFT_MAX_EXEC_TIME $HARD_MAX_EXEC_TIME $FUNCNAME
 		retval=$?
 		if [ $retval -ne 0 ]; then
-			Logger "Error while executing cleanup on [$replica_type] replica." "ERROR"
+			Logger "Error while executing cleanup on $replica_type replica." "ERROR"
 			Logger "Command output:\n$(cat $RUN_DIR/osync.$FUNCNAME.$SCRIPT_PID)" "NOTICE"
 		else
-			Logger "Cleanup complete on [$replica_type] replica." "NOTICE"
+			Logger "Cleanup complete on $replica_type replica." "NOTICE"
 		fi
 	elif [ -d "$replica_deletion_path" ] && ! [ -w "$replica_deletion_path" ]; then
-		Logger "Warning: [$replica_type] replica dir [$replica_deletion_path] is not writable. Cannot clean old files." "ERROR"
+		Logger "Warning: $replica_type replica dir [$replica_deletion_path] is not writable. Cannot clean old files." "ERROR"
 	fi
 }
 

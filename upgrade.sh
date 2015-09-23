@@ -6,11 +6,13 @@ CONTACT="http://www.netpower.fr/osync - ozy@netpower.fr"
 PROGRAM_VERSION="1.0x to v1.1"
 PROGRAM_BUILD=2015091801
 
-TREE_CURRENT_FILENAME="-tree-current-$SYNC_ID"
-TREE_AFTER_FILENAME="-tree-after-$SYNC_ID"
-TREE_AFTER_FILENAME_NO_SUFFIX="-tree-after-$SYNC_ID"
-DELETED_LIST_FILENAME="-deleted-list-$SYNC_ID$"
-FAILED_DELETE_LIST_FILENAME="-failed-delete-$SYNC_ID"
+function Init {
+	TREE_CURRENT_FILENAME="-tree-current-$SYNC_ID"
+	TREE_AFTER_FILENAME="-tree-after-$SYNC_ID"
+	TREE_AFTER_FILENAME_NO_SUFFIX="-tree-after-$SYNC_ID"
+	DELETED_LIST_FILENAME="-deleted-list-$SYNC_ID$"
+	FAILED_DELETE_LIST_FILENAME="-failed-delete-$SYNC_ID"
+}
 
 function Usage {
 	echo "DEV VERSION !!! DO NOT USE"
@@ -19,19 +21,17 @@ function Usage {
         echo $AUTHOR
         echo $CONTACT
         echo ""
-        echo "This script migrates osync v1.0x setups to v1.1 by updating config files and state directories"
-	echo "Usage: migrate.sh /path/to/config/directory"     
+        echo "This script migrates osync v1.0x setups to v1.1 by updating state filenames and config files."
+	echo ""
+	echo "Usage: migrate.sh /path/to/config_file.conf"
+	echo "Usage: migrate.sh --replica=/path/to/replica --sync-id=someid"
+	echo ""
+	echo "This script must be run manually on all replicas. If slave replica is remote, must be run locally on slave system."
+	echo "If sync-id is not specified, it will assume handling a quicksync task."
+	echo "Config files must also be updated if they exist."
+
 	exit 1
 }
-
-
-if [ "$1" == "" ] || [ ! -d "$1" ] || [ ! -w "$1" ]; then
-	Usage;
-else
-	CONF_DIR="$1"
-	# Make sure there is no ending slash
-	CONF_DIR="${CONF_DIR%/}"
-fi
 
 function RenameStateFiles {
 	local state_dir="${1}" # Absolute path to statedir
@@ -71,25 +71,24 @@ function RewriteConfigFiles {
 	sed -i 's/SLAVE/TARGET/g' "$config_file"
 }
 
-function ExtractInitiatorFromConfigFile {
-	local config_file="${1}"
+parameter="$1"
+second_param="$2"
 
-	#TODO: Extract initiator from config file
-	echo "$initiator_path"
-}
+if [ "${parameter:0,10}" == "--replica=" ]; then
+	if [ "${second_param:0,10}" == "--sync-id=" ]; then
+		$SYNC_ID=${second_param##*=}
+	else
+		$SYNC_ID="quicksync task"
+	fi
+	Init
+	REPLICA_DIR=${i##*=}
+	RenameStateFiles "$REPLICA_DIR"
 
-function ExtractTargetFromConfigFile {
-	local config_file="${1}"
-
-	#TODO: Extract target from config file
-	echo "$target_path"
-}
-
-for i in "$CONF_DIR/*.conf"; do
-	if [ "$i" != "$CONF_DIR/*.conf" ]; then
-		echo "Updating config file $i"
-		RewriteConfigFiles "$i"
-		echo "Updating master state dir for config $i"
-		RenameStateFilesLocal $(ExtractInitiatorFromConfigFile $i)
-		RenameStateFilesRemote $(ExtractTargetFromConfigFile $i)
-done
+elif [ "$parameter" != "" ] && [ -d "$parameter" ] && [ -w "$parameter" ]; then
+	CONF_DIR="$parameter"
+	# Make sure there is no ending slash
+	CONF_DIR="${CONF_DIR%/}"
+	RewriteConfigFiles "$CONF_DIR"
+else
+	Usage
+fi
