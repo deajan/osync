@@ -4,7 +4,7 @@ PROGRAM="Osync" # Rsync based two way sync engine with fault tolerance
 AUTHOR="(L) 2013-2015 by Orsiris \"Ozy\" de Jong"
 CONTACT="http://www.netpower.fr/osync - ozy@netpower.fr"
 PROGRAM_VERSION=1.1-unstable
-PROGRAM_BUILD=2015092303
+PROGRAM_BUILD=2015092305
 
 ## type doesn't work on platforms other than linux (bash). If if doesn't work, always assume output is not a zero exitcode
 if ! type -p "$BASH" > /dev/null; then
@@ -50,7 +50,7 @@ fi
 ## Working directory. This is the name of the osync subdirectory contained in every replica.
 OSYNC_DIR=".osync_workdir"
 
-## Log a state message every $KEEP_LOGGING seconds. Should not be equal to soft or hard execution time so your log won't be unnecessary big.
+## Log a state message every $KEEP_LOGGING seconds. Should not be equal to soft or hard execution time so your log will not be unnecessary big.
 KEEP_LOGGING=1801
 
 ## Correct output of sort command (language agnostic sorting)
@@ -897,7 +897,7 @@ function CheckReplicaPaths {
 
 	#if [ "$REMOTE_SYNC" != "yes" ]; then
 	#	if [ "$INITIATOR_SYNC_DIR_CANN" == "$TARGET_SYNC_DIR_CANN" ]; then
-	#		Logger "Master directory [$INITIATOR_SYNC_DIR] can't be the same as target directory." "CRITICAL"
+	#		Logger "Master directory [$INITIATOR_SYNC_DIR] cannot be the same as target directory." "CRITICAL"
 	#		exit 1
 	#	fi
 	#fi
@@ -960,7 +960,7 @@ function CheckDiskSpace {
 function RsyncExcludePattern {
 	__CheckArguments 0 $# $FUNCNAME "$*"	#__WITH_PARANOIA_DEBUG
 
-	# Disable globbing so wildcards from exclusions don't get expanded
+	# Disable globbing so wildcards from exclusions do not get expanded
 	set -f
 	rest="$RSYNC_EXCLUDE_PATTERN"
 	while [ -n "$rest" ]
@@ -1113,7 +1113,7 @@ function CheckLocks {
 		return 0
 	fi
 
-	# Don't bother checking for locks when FORCE_UNLOCK is set
+	# Do not bother checking for locks when FORCE_UNLOCK is set
 	if [ $FORCE_UNLOCK -eq 1 ]; then
 		WriteLockFiles
 		if [ $? != 0 ]; then
@@ -1182,7 +1182,7 @@ function UnlockReplicas {
 
 	## Rsync does not like spaces in directory names, considering it as two different directories. Handling this schema by escaping space.
 	## It seems this only happens when trying to execute an rsync command through weval $rsync_cmd on a remote host.
-	## So i'm using unescaped $INITIATOR_SYNC_DIR for local rsync calls and escaped $ESC_INITIATOR_SYNC_DIR for remote rsync calls like user@host:$ESC_INITIATOR_SYNC_DIR
+	## So I am using unescaped $INITIATOR_SYNC_DIR for local rsync calls and escaped $ESC_INITIATOR_SYNC_DIR for remote rsync calls like user@host:$ESC_INITIATOR_SYNC_DIR
 	## The same applies for target sync dir..............................................T.H.I.S..I.S..A..P.R.O.G.R.A.M.M.I.N.G..N.I.G.H.T.M.A.R.E
 
 function tree_list {
@@ -1191,7 +1191,7 @@ function tree_list {
 	local tree_filename="${3}" # filename to output tree (will be prefixed with $replica_type)
 	__CheckArguments 3 $# $FUNCNAME "$*"	#__WITH_PARANOIA_DEBUG
 
-	local escaped_replica_path=$(EscapeSpaces "$replica_path") #TODO: See if escpaed still needed when using ' instead of " for command eval
+	local escaped_replica_path=$(EscapeSpaces "$replica_path") #TODO: See if escpaed still needed when using singlequotes instead of doublequotes for command eval
 
 	Logger "Creating $replica_type replica file list [$replica_path]." "NOTICE"
 	if [ "$REMOTE_SYNC" == "yes" ] && [ "$replica_type" == "target" ]; then
@@ -1207,8 +1207,8 @@ function tree_list {
 	WaitForCompletion $! $SOFT_MAX_EXEC_TIME $HARD_MAX_EXEC_TIME $FUNCNAME
 	retval=$?
 	## Retval 24 = some files vanished while creating list
-	if ([ $retval == 0 ] || [ $retval == 24 ]) && [ -f $RUN_DIR/osync.$replica_type.$SCRIPT_PID ]; then
-		mv -f $RUN_DIR/osync.$replica_type.$SCRIPT_PID "$INITIATOR_STATE_DIR/$replica_type$tree_filename"
+	if ([ $retval == 0 ] || [ $retval == 24 ]) && [ -f "$RUN_DIR/osync.$replica_type.$SCRIPT_PID" ]; then
+		mv -f "$RUN_DIR/osync.$replica_type.$SCRIPT_PID" "$INITIATOR_STATE_DIR/$replica_type$tree_filename"
 		return $?
 	else
 		Logger "Cannot create replica file list." "CRITICAL"
@@ -1222,7 +1222,7 @@ function delete_list {
 	local tree_file_after="${2}" # tree-file-after, will be prefixed with replica type
 	local tree_file_current="${3}" # tree-file-current, will be prefixed with replica type
 	local deleted_list_file="${4}" # file containing deleted file list, will be prefixed with replica type
-	local deleted_failed_list_file="${5}" # file containing files that couldn't be deleted on last run, will be prefixed with replica type
+	local deleted_failed_list_file="${5}" # file containing files that could not be deleted on last run, will be prefixed with replica type
 	__CheckArguments 5 $# $FUNCNAME "$*"	#__WITH_PARANOIA_DEBUG
 
 	# TODO: Check why external filenames are used (see _DRYRUN option because of NOSUFFIX)
@@ -1292,13 +1292,13 @@ function sync_update {
 	eval "$rsync_cmd"
 	WaitForCompletion $! $SOFT_MAX_EXEC_TIME $HARD_MAX_EXEC_TIME $FUNCNAME
 	retval=$?
-	if [ $_VERBOSE -eq 1 ] && [ -f $RUN_DIR/osync.update.$destination_replica.$SCRIPT_PID ]; then
+	if [ $_VERBOSE -eq 1 ] && [ -f "$RUN_DIR/osync.update.$destination_replica.$SCRIPT_PID" ]; then
 		Logger "List:\n$(cat $RUN_DIR/osync.update.$destination_replica.$SCRIPT_PID)" "NOTICE"
 	fi
 
 	if [ $retval != 0 ] && [ $retval != 24 ]; then
 		Logger "Updating $destination_replica replica failed. Stopping execution." "CRITICAL"
-		if [ $_VERBOSE -eq 0 ] && [ -f $RUN_DIR/osync.update.$destination_replica.$SCRIPT_PID ]; then
+		if [ $_VERBOSE -eq 0 ] && [ -f "$RUN_DIR/osync.update.$destination_replica.$SCRIPT_PID" ]; then
 			Logger "Rsync output:\n$(cat $RUN_DIR/osync.update.$destination_replica.$SCRIPT_PID)" "NOTICE"
 		fi
 		exit $retval
@@ -1313,10 +1313,10 @@ function _delete_local {
 	local replica_dir="${1}" # Full path to replica
 	local deleted_list_file="${2}" # file containing deleted file list, will be prefixed with replica type
 	local deletion_dir="${3}" # deletion dir in format .[workdir]/deleted
-	local deleted_failed_list_file="${4}" # file containing files that couldn't be deleted on last run, will be prefixed with replica type
+	local deleted_failed_list_file="${4}" # file containing files that could not be deleted on last run, will be prefixed with replica type
 	__CheckArguments 4 $# $FUNCNAME "$*"	#__WITH_PARANOIA_DEBUG
 
-	## On every run, check wheter the next item is already deleted because it's included in a directory already deleted
+	## On every run, check wheter the next item is already deleted because it is included in a directory already deleted
 	previous_file=""
 	OLD_IFS=$IFS
 	IFS=$'\r\n'
@@ -1371,12 +1371,11 @@ function _delete_local {
 	IFS=$OLD_IFS
 }
 
-
 function _delete_remote {
 	local replica_dir="${1}" # Full path to replica
 	local deleted_list_file="${2}" # file containing deleted file list, will be prefixed with replica type
 	local deletion_dir="${3}" # deletion dir in format .[workdir]/deleted
-	local deleted_failed_list_file="${4}" # file containing files that couldn't be deleted on last run, will be prefixed with replica type
+	local deleted_failed_list_file="${4}" # file containing files that could not be deleted on last run, will be prefixed with replica type
 	__CheckArguments 4 $# $FUNCNAME "$*"	#__WITH_PARANOIA_DEBUG
 
 	## This is a special coded function. Need to redelcare local functions on remote host, passing all needed variables as escaped arguments to ssh command.
@@ -1389,8 +1388,8 @@ function _delete_remote {
 	eval "$rsync_cmd" 2>> "$LOG_FILE"
 	if [ $? != 0 ]; then
 		Logger "Cannot copy the deletion list to remote replica." "CRITICAL"
-		if [ -f $RUN_DIR/osync.$FUNCNAME.precopy.$SCRIPT_PID ]; then
-			Logger "$(cat $RUN_DIR/osync.$FUNCNAME.precopy.$SCRIPT_PID)" "CRITICAL" #TODO: remote deletion is critical. local deletion isn't. What to do ?
+		if [ -f "$RUN_DIR/osync.$FUNCNAME.precopy.$SCRIPT_PID" ]; then
+			Logger "$(cat $RUN_DIR/osync.$FUNCNAME.precopy.$SCRIPT_PID)" "CRITICAL" #TODO: remote deletion is critical. local deletion is not. What to do ?
 		fi
 		exit 1
 	fi
@@ -1441,7 +1440,7 @@ $SSH_CMD ERROR_ALERT=0 sync_on_changes=$sync_on_changes _SILENT=$_SILENT _DEBUG=
 	## Empty earlier failed delete list
 	> "$FAILED_DELETE_LIST"
 
-	## On every run, check wheter the next item is already deleted because it's included in a directory already deleted
+	## On every run, check wheter the next item is already deleted because it is included in a directory already deleted
 	previous_file=""
 	OLD_IFS=$IFS
 	IFS=$'\r\n'
@@ -1470,7 +1469,7 @@ $SSH_CMD ERROR_ALERT=0 sync_on_changes=$sync_on_changes _SILENT=$_SILENT _DEBUG=
 						$COMMAND_SUDO mkdir --parents "$REPLICA_DIR$DELETE_DIR/$parentdir"
 						$COMMAND_SUDO mv -f "$REPLICA_DIR$files" "$REPLICA_DIR$DELETE_DIR/$parentdir"
 					else
-						$COMMAND_SUDO mv -f "$REPLICA_DIR$files" "$REPLICA_DIR$DELETE_DIR"
+						$COMMAND_SUDO mv -f "$REPLICA_DIR$files" "$REPLICA_DIR$DELETE_DIR"1
 					fi
 					if [ $? != 0 ]; then
 						Logger "Cannot move $REPLICA_DIR$files to deletion directory." "ERROR"
@@ -1502,7 +1501,7 @@ ENDSSH
 	## Copy back the deleted failed file list
 	ESC_SOURCE_FILE="$(EscapeSpaces "$TARGET_STATE_DIR/$deleted_failed_list_file")"
 	#TODO: Need to check if file exists prior to copy (or add a filemask and copy all state files)
-	rsync_cmd="$(type -p $RSYNC_EXECUTABLE) --rsync-path=\"$RSYNC_PATH\" $SYNC_OPTS -e \"$RSYNC_SSH_CMD\" $REMOTE_USER@$REMOTE_HOST:\"$ESC_SOURCE_FILE\" \"$INITIATOR_STATE_DIR\" > "$RUN_DIR/osync.remote_failed_deletion_list_copy.$SCRIPT_PID"
+	rsync_cmd="$(type -p $RSYNC_EXECUTABLE) --rsync-path=\"$RSYNC_PATH\" $SYNC_OPTS -e \"$RSYNC_SSH_CMD\" $REMOTE_USER@$REMOTE_HOST:\"$ESC_SOURCE_FILE\" \"$INITIATOR_STATE_DIR\" > \"$RUN_DIR/osync.remote_failed_deletion_list_copy.$SCRIPT_PID\""
 	Logger "RSYNC_CMD: $rsync_cmd" "DEBUG"
 	eval "$rsync_cmd" 2>> "$LOG_FILE"
 	if [ $? != 0 ]; then
@@ -1522,7 +1521,7 @@ ENDSSH
 function deletion_propagation {
 	local replica_type="${1}" # Contains replica type: initiator, target
 	local deleted_list_file="${2}" # file containing deleted file list, will be prefixed with replica type
-	local deleted_failed_list_file="${3}" # file containing files that couldn't be deleted on last run, will be prefixed with replica type
+	local deleted_failed_list_file="${3}" # file containing files that could not be deleted on last run, will be prefixed with replica type
 	__CheckArguments 3 $# $FUNCNAME "$*"	#__WITH_PARANOIA_DEBUG
 
 	Logger "Propagating deletions to $replica_type replica." "NOTICE"
@@ -1740,7 +1739,7 @@ function _SoftDeleteLocal {
 
 	if [ -d "$replica_deletion_path" ]; then
 		if [ $_DRYRUN -eq 1 ]; then
-			Logger "Listing files older than $change_time days on [$replica_type] replica. Won't remove anything." "NOTICE"
+			Logger "Listing files older than $change_time days on [$replica_type] replica. Does not remove anything." "NOTICE"
 		else
 			Logger "Removing files older than $change_time days on [$replica_type] replica." "NOTICE"
 		fi
@@ -1765,7 +1764,7 @@ function _SoftDeleteLocal {
 			Logger "Cleanup complete on [$replica_type] replica." "NOTICE"
 		fi
 	elif [ -d "$replica_deletion_path" ] && ! [ -w "$replica_deletion_path" ]; then
-		Logger "Warning: [$replica_type] replica dir [$replica_deletion_path] isn't writable. Cannot clean old files." "ERROR"
+		Logger "Warning: [$replica_type] replica dir [$replica_deletion_path] is not writable. Cannot clean old files." "ERROR"
 	fi
 }
 
@@ -1779,7 +1778,7 @@ function _SoftDeleteRemote {
 	CheckConnectivityRemoteHost
 
 	if [ $_DRYRUN -eq 1 ]; then
-		Logger "Listing files older than $change_time days on target replica. Won't remove anything." "NOTICE"
+		Logger "Listing files older than $change_time days on target replica. Does not remove anything." "NOTICE"
 	else
 		Logger "Removing files older than $change_time days on target replica." "NOTICE"
 	fi
@@ -1832,7 +1831,7 @@ function SoftDelete {
 		else
 			_SoftDeleteRemote "target" "$TARGET_SYNC_DIR$TARGET_DELETE_DIR" $SOFT_DELETE_DAYS
 		fi
-	fi	
+	fi
 }
 
 function Init {
@@ -2068,10 +2067,10 @@ function Init {
 function InitLocalOSSettings {
 	__CheckArguments 0 $# $FUNCNAME "$*"	#__WITH_PARANOIA_DEBUG
 
-	## If running under Msys, some commands don't run the same way
+	## If running under Msys, some commands do not run the same way
 	## Using mingw version of find instead of windows one
 	## Getting running processes is quite different
-	## Ping command isn't the same
+	## Ping command is not the same
 	if [ "$LOCAL_OS" == "msys" ]; then
 		FIND_CMD=$(dirname $BASH)/find
 		#TODO: The following command needs to be checked on msys. Does the $1 variable substitution work ?
