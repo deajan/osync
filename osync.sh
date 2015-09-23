@@ -4,7 +4,7 @@ PROGRAM="Osync" # Rsync based two way sync engine with fault tolerance
 AUTHOR="(L) 2013-2015 by Orsiris \"Ozy\" de Jong"
 CONTACT="http://www.netpower.fr/osync - ozy@netpower.fr"
 PROGRAM_VERSION=1.1-unstable
-PROGRAM_BUILD=2015092101
+PROGRAM_BUILD=2015092301
 
 ## type doesn't work on platforms other than linux (bash). If if doesn't work, always assume output is not a zero exitcode
 if ! type -p "$BASH" > /dev/null; then
@@ -870,9 +870,9 @@ function _CheckReplicaPathsRemote {
 
 	CheckConnectivity3rdPartyHosts
 	CheckConnectivityRemoteHost
-#WIP: eval debug here
-	cmd="$SSH_CMD \"if ! [ -d \\\"$replica_path\\\" ]; then if [ "$CREATE_DIRS" == "yes" ]; then $COMMAND_SUDO mkdir -p \\\"$replica_path\\\"; fi; fi 2>&1\" &" 
-	eval $cmd > "$RUN_DIR/osync.$FUNCNAME.$SCRIPT_PID" 2>&1
+	cmd=$SSH_CMD' "if ! [ -d \"$replica_path\" ]; then if [ \"$CREATE_DIRS\" == \"yes\" ]; then $COMMAND_SUDO mkdir -p \"$replica_path\"; fi; fi" > "$RUN_DIR/osync.$FUNCNAME.$SCRIPT_PID" 2>&1' 
+	Logger "cmd: $cmd" "DEBUG"
+	eval $cmd &
 	WaitForTaskCompletion $! 0 1800 $FUNCNAME
 	if [ $? != 0 ]; then
 		Logger "Cannot create remote replica path [$replica_path]." "CRITICAL"
@@ -880,8 +880,9 @@ function _CheckReplicaPathsRemote {
 		exit 1
 	fi
 
-	cmd="$SSH_CMD \"if [ ! -w "$replica_path" ];then exit 1; fi 2>&1\" &"
-	eval $cmd
+	cmd=$SSH_CMD' "if [ ! -w \"$replica_path\" ];then exit 1; fi" 2>&1'
+	Logger "cmd: $cmd" "DEBUG"
+	eval $cmd &
 	WaitForTaskCompletion $! 0 1800 $FUNCNAME
 	if [ $? != 0 ]; then
 		Logger "Remote replica path [$replica_path] is not writable." "CRITICAL"
@@ -931,8 +932,9 @@ function _CheckDiskSpaceRemote {
 	CheckConnectivity3rdPartyHosts
 	CheckConnectivityRemoteHost
 
-	cmd="$SSH_CMD \"$COMMAND_SUDO df -P \\\"$replica_path\\\"\" > "$RUN_DIR/osync.$FUNCNAME.$SCRIPT_PID" 2>&1 &"
-	eval $cmd
+	cmd=$SSH_CMD' "$COMMAND_SUDO df -P \"$replica_path\"" > "$RUN_DIR/osync.$FUNCNAME.$SCRIPT_PID" 2>&1'
+	Logger "cmd: $cmd" "DEBUG"
+	eval $cmd &
 	WaitForTaskCompletion $! 0 1800 $FUNCNAME
 	if [ $? != 0 ]; then
 		Logger "Cannot get free space on target [$replica_path]." "ERROR"
@@ -1018,8 +1020,9 @@ function _WriteLockFilesRemote {
 	CheckConnectivity3rdPartyHosts
 	CheckConnectivityRemoteHost
 
-	cmd="$SSH_CMD \"echo $SCRIPT_PID@$SYNC_ID | $COMMAND_SUDO tee \\\"$lockfile\\\" > /dev/null \" &"	
-	eval $cmd
+	cmd=$SSH_CMD' "echo $SCRIPT_PID@$SYNC_ID | $COMMAND_SUDO tee \"$lockfile\"" > /dev/null 2>&1'
+	Logger "cmd: $cmd" "DEBUG"
+	eval $cmd &
 	WaitForTaskCompletion $! 0 1800 $FUNCNAME
 	if [ $? != 0 ]; then
 		Logger "Could not set lock on remote target replica." "CRITICAL"
@@ -1066,8 +1069,9 @@ function _CheckLocksRemote { #TODO: Rewrite this a bit more beautiful
 	CheckConnectivity3rdPartyHosts
 	CheckConnectivityRemoteHost
 
-	cmd="$SSH_CMD \"if [ -f \\\"$lockfile\\\" ]; then cat \\\"$lockfile\\\"; fi\" > "$RUN_DIR/osync.$FUNCNAME.$SCRIPT_PID" &"
-	eval $cmd
+	cmd=$SSH_CMD' "if [ -f \"$lockfile\" ]; then cat \"$lockfile\"; fi" > "$RUN_DIR/osync.$FUNCNAME.$SCRIPT_PID"'
+	Logger "cmd: $cmd" "DEBUG"
+	eval $cmd &
 	WaitForTaskCompletion $! 0 1800 $FUNCNAME
 	if [ $? != 0 ]; then
 		if [ -f "$RUN_DIR/osync.$FUNCNAME.$SCRIPT_PID" ]; then
@@ -1148,8 +1152,9 @@ function _UnlockReplicasRemote {
 	CheckConnectivity3rdPartyHosts
 	CheckConnectivityRemoteHost
 
-	cmd="$SSH_CMD \"if [ -f \\\"$lockfile\\\" ]; then $COMMAND_SUDO rm -f \\\"$lockfile\\\"; fi 2>&1\" > "$RUN_DIR/osync.$FUNCNAME.$SCRIPT_PID" &"
-	eval $cmd
+	cmd=$SSH_CMD' "if [ -f \"$lockfile\" ]; then $COMMAND_SUDO rm -f \"$lockfile\"; fi" > "$RUN_DIR/osync.$FUNCNAME.$SCRIPT_PID" 2>&1'
+	Logger "cmd: $cmd" "DEBUG"
+	eval $cmd &
 	WaitForTaskCompletion $! 0 1800 $FUNCNAME
 	if [ $? != 0 ]; then
 		Logger "Could not unlock remote replica." "ERROR"
