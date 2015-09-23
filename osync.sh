@@ -4,7 +4,7 @@ PROGRAM="Osync" # Rsync based two way sync engine with fault tolerance
 AUTHOR="(L) 2013-2015 by Orsiris \"Ozy\" de Jong"
 CONTACT="http://www.netpower.fr/osync - ozy@netpower.fr"
 PROGRAM_VERSION=1.1-unstable
-PROGRAM_BUILD=2015092301
+PROGRAM_BUILD=2015092303
 
 ## type doesn't work on platforms other than linux (bash). If if doesn't work, always assume output is not a zero exitcode
 if ! type -p "$BASH" > /dev/null; then
@@ -65,7 +65,7 @@ function Dummy {
 function _Logger {
 	local value="${1}" # What to log
 	echo -e "$value" >> "$LOG_FILE"
-	
+
 	if [ $_SILENT -eq 0 ]; then
 		echo -e "$value"
 	fi
@@ -153,7 +153,7 @@ function TrapStop {
 }
 
 function TrapQuit {
-	if [ $error_alert -ne 0 ]; then
+	if [ $ERROR_ALERT -ne 0 ]; then
 		if [ "$_DEBUG" != "yes" ]; then
 			SendAlert
 		else
@@ -245,10 +245,10 @@ function SendAlert {
 		return 0
 	fi
 	eval "cat \"$LOG_FILE\" $COMPRESSION_PROGRAM > $ALERT_LOG_FILE"
-	MAIL_ALERT_MSG=$MAIL_ALERT_MSG$'\n\n'$(tail -n 25 "$LOG_FILE")
+	MAIL_ALERT_MSG="$MAIL_ALERT_MSG"$'\n\n'$(tail -n 25 "$LOG_FILE")
 	if type -p mutt > /dev/null 2>&1
 	then
-		echo $MAIL_ALERT_MSG | $(type -p mutt) -x -s "Sync alert for $SYNC_ID" $DESTINATION_MAILS -a "$ALERT_LOG_FILE"
+		echo "$MAIL_ALERT_MSG" | $(type -p mutt) -x -s "Sync alert for $SYNC_ID" $DESTINATION_MAILS -a "$ALERT_LOG_FILE"
 		if [ $? != 0 ]; then
 			Logger "WARNING: Cannot send alert email via $(type -p mutt) !!!" "WARN"
 		else
@@ -256,7 +256,7 @@ function SendAlert {
 		fi
 	elif type -p mail > /dev/null 2>&1
 	then
-		echo $MAIL_ALERT_MSG | $(type -p mail) -a "$ALERT_LOG_FILE" -s "Sync alert for $SYNC_ID" $DESTINATION_MAILS
+		echo "$MAIL_ALERT_MSG" | $(type -p mail) -a "$ALERT_LOG_FILE" -s "Sync alert for $SYNC_ID" $DESTINATION_MAILS
 		if [ $? != 0 ]; then
 			Logger "WARNING: Cannot send alert email via $(type -p mail) with attachments !!!" "WARN"
 			echo $MAIL_ALERT_MSG | $(type -p mail) -s "Sync alert for $SYNC_ID" $DESTINATION_MAILS
@@ -271,11 +271,11 @@ function SendAlert {
 	elif type -p sendemail > /dev/null 2>&1
 	then
 		if [ "$SMTP_USER" != "" ] && [ "$SMTP_PASSWORD" != "" ]; then
-			$SMTP_OPTIONS="-xu $SMTP_USER -xp $SMTP_PASSWORD"
+			SMTP_OPTIONS="-xu $SMTP_USER -xp $SMTP_PASSWORD"
 		else
-			$SMTP_OPTIONS=""
+			SMTP_OPTIONS=""
 		fi
-		$(type -p sendemail) -f $SENDER_MAIL -t $DESTINATION_MAILS -u "Backup alert for $BACKUP_ID" -m "$MAIL_ALERT_MSG" -s $SMTP_SERVER $SMTP_OPTIONS > /dev/null 2>&1
+		$(type -p sendemail) -f $SENDER_MAIL -t $DESTINATION_MAILS -u "Sync alert for $SYNC_ID" -m "$MAIL_ALERT_MSG" -s $SMTP_SERVER $SMTP_OPTIONS > /dev/null 2>&1
 		if [ $? != 0 ]; then
 			Logger "WARNING: Cannot send alert email via $(type -p sendemail) !!!" "WARN"
 		else
@@ -304,6 +304,7 @@ function LoadConfigFile {
 		exit 1
 	else
 		egrep '^#|^[^ ]*=[^;&]*'  "$config_file" > "$RUN_DIR/osync.$FUNCNAME.$SCRIPT_PID"
+		# Shellcheck source=./sync.conf
 		source "$RUN_DIR/osync.$FUNCNAME.$SCRIPT_PID"
 	fi
 }
@@ -366,19 +367,19 @@ function GetRemoteOS {
 		CheckConnectivityRemoteHost
 		local cmd=$SSH_CMD' "uname -spio" > "'$RUN_DIR/osync.$FUNCNAME.$SCRIPT_PID'" 2>&1'
 		Logger "cmd: $cmd" "DEBUG"
-		eval $cmd &
+		eval "$cmd" &
 		WaitForTaskCompletion $! 120 240 $FUNCNAME"-1"
 		retval=$?
 		if [ $retval != 0 ]; then
 			local cmd=$SSH_CMD' "uname -v" > "'$RUN_DIR/osync.$FUNCNAME.$SCRIPT_PID'" 2>&1'
 			Logger "cmd: $cmd" "DEBUG"
-			eval $cmd &
+			eval "$cmd" &
 			WaitForTaskCompletion $! 120 240 $FUNCNAME"-2"
 			retval=$?
 			if [ $retval != 0 ]; then
 				local cmd=$SSH_CMD' "uname" > "'$RUN_DIR/osync.$FUNCNAME.$SCRIPT_PID'" 2>&1'
 				Logger "cmd: $cmd" "DEBUG"
-				eval $cmd &
+				eval "$cmd" &
 				WaitForTaskCompletion $! 120 240 $FUNCNAME"-3"
 				retval=$?
 				if [ $retval != 0 ]; then
@@ -423,8 +424,6 @@ function WaitForTaskCompletion {
 	local caller_name="${4}" # Who called this function
 	Logger "$FUNCNAME called by [$caller_name]." "PARANOIA_DEBUG"	#__WITH_PARANOIA_DEBUG
 	__CheckArguments 4 $# $FUNCNAME "$*"				#__WITH_PARANOIA_DEBUG
-
-	CHILD_PID=$pid
 
 	local soft_alert=0 # Does a soft alert need to be triggered
 	local log_ttime=0 # local time instance for comparaison
@@ -567,7 +566,7 @@ function RunRemoteCommand {
 	Logger "Running command [$command] on remote host." "NOTICE"
 	cmd=$SSH_CMD' "$command" > "'$RUN_DIR/osync.$FUNCNAME.$SCRIPT_PID'" 2>&1'
 	Logger "cmd: $cmd" "DEBUG"
-	eval $cmd &
+	eval "$cmd" &
 	WaitForTaskCompletion $! 0 $hard_max_time $FUNCNAME
 	retval=$?
 	if [ $retval -eq 0 ]; then
@@ -662,7 +661,7 @@ function __CheckArguments {
 
 			# Paranoia check... Can help finding empty arguments. __CheckArguments should be grepped out in production builds.
 			local count=-3 # Number of arguments minus the function calls for __CheckArguments
-			for i in $@; do
+			for i in "$@"; do
 				count=$((count + 1))
 			done
 			if [ $count -ne $1 ]; then
@@ -803,7 +802,7 @@ function _CreateStateDirsLocal {
 		$COMMAND_SUDO mkdir -p "$replica_state_dir" > "$RUN_DIR/osync.$FUNCNAME.$SCRIPT_PID" 2>&1
 		if [ $? != 0 ]; then
 			Logger "Cannot create state dir [$replica_state_dir]." "CRITICAL"
-			Logger "Command output:\n$(cat RUN_DIR/osync.$FUNCNAME.$SCRIPT_PID)" "ERROR"
+			Logger "Command output:\n$(cat $RUN_DIR/osync.$FUNCNAME.$SCRIPT_PID)" "ERROR"
 			exit 1
 		fi
 	fi
@@ -816,13 +815,13 @@ function _CreateStateDirsRemote {
 	CheckConnectivity3rdPartyHosts
 	CheckConnectivityRemoteHost
 
-	$cmd=$SSH_CMD' "if ! [ -d \"$replica_state_dir\" ]; then $COMMAND_SUDO mkdir -p \"$replica_state_dir\"; fi" > "'$RUN_DIR/osync.$FUNCNAME.$SCRIPT_PID'" 2>&1'
+	cmd=$SSH_CMD' "if ! [ -d \"'$replica_state_dir'\" ]; then '$COMMAND_SUDO' mkdir -p \"'$replica_state_dir'\"; fi" > "'$RUN_DIR/osync.$FUNCNAME.$SCRIPT_PID'" 2>&1'
 	Logger "cmd: $cmd" "DEBUG"
-	eval $cmd &
+	eval "$cmd" &
 	WaitForTaskCompletion $! 0 1800 $FUNCNAME
 	if [ $? != 0 ]; then
 		Logger "Cannot create remote state dir [$replica_state_dir]." "CRITICAL"
-		Logger "Command output:\n$(cat RUN_DIR/osync.$FUNCNAME.$SCRIPT_PID)" "ERROR"
+		Logger "Command output:\n$(cat $RUN_DIR/osync.$FUNCNAME.$SCRIPT_PID)" "ERROR"
 		exit 1
 	fi
 }
@@ -841,7 +840,7 @@ function CreateStateDirs {
 function _CheckReplicaPathsLocal {
 	local replica_path="${1}"
 	__CheckArguments 1 $# $FUNCNAME "$*"	#__WITH_PARANOIA_DEBUG
-		
+
 	if [ ! -d "$replica_path" ]; then
 		if [ "$CREATE_DIRS" == "yes" ]; then
 			$COMMAND_SUDO mkdir -p "$replica_path" > "$RUN_DIR/osync.$FUNCNAME.$SCRIPT_PID" 2>&1
@@ -870,19 +869,19 @@ function _CheckReplicaPathsRemote {
 
 	CheckConnectivity3rdPartyHosts
 	CheckConnectivityRemoteHost
-	cmd=$SSH_CMD' "if ! [ -d \"$replica_path\" ]; then if [ \"$CREATE_DIRS\" == \"yes\" ]; then $COMMAND_SUDO mkdir -p \"$replica_path\"; fi; fi" > "$RUN_DIR/osync.$FUNCNAME.$SCRIPT_PID" 2>&1' 
+	cmd=$SSH_CMD' "if ! [ -d \"'$replica_path'\" ]; then if [ \"'$CREATE_DIRS'\" == \"yes\" ]; then '$COMMAND_SUDO' mkdir -p \"'$replica_path'\"; fi; fi" > "'$RUN_DIR/osync.$FUNCNAME.$SCRIPT_PID'" 2>&1'
 	Logger "cmd: $cmd" "DEBUG"
-	eval $cmd &
+	eval "$cmd" &
 	WaitForTaskCompletion $! 0 1800 $FUNCNAME
 	if [ $? != 0 ]; then
 		Logger "Cannot create remote replica path [$replica_path]." "CRITICAL"
-		Logger "Command output:\n$(cat RUN_DIR/osync.$FUNCNAME.$SCRIPT_PID)" "ERROR"
+		Logger "Command output:\n$(cat $RUN_DIR/osync.$FUNCNAME.$SCRIPT_PID)" "ERROR"
 		exit 1
 	fi
 
-	cmd=$SSH_CMD' "if [ ! -w \"$replica_path\" ];then exit 1; fi" 2>&1'
+	cmd=$SSH_CMD' "if [ ! -w \"'$replica_path'\" ];then exit 1; fi" 2>&1'
 	Logger "cmd: $cmd" "DEBUG"
-	eval $cmd &
+	eval "$cmd" &
 	WaitForTaskCompletion $! 0 1800 $FUNCNAME
 	if [ $? != 0 ]; then
 		Logger "Remote replica path [$replica_path] is not writable." "CRITICAL"
@@ -928,13 +927,13 @@ function _CheckDiskSpaceRemote {
 	__CheckArguments 1 $# $FUNCNAME "$*"	#__WITH_PARANOIA_DEBUG
 
 	Logger "Checking minimum disk space on target [$replica_path]." "NOTICE"
-	
+
 	CheckConnectivity3rdPartyHosts
 	CheckConnectivityRemoteHost
 
-	cmd=$SSH_CMD' "$COMMAND_SUDO df -P \"$replica_path\"" > "$RUN_DIR/osync.$FUNCNAME.$SCRIPT_PID" 2>&1'
+	cmd=$SSH_CMD' "'$COMMAND_SUDO' df -P \"'$replica_path'\"" > "'$RUN_DIR/osync.$FUNCNAME.$SCRIPT_PID'" 2>&1'
 	Logger "cmd: $cmd" "DEBUG"
-	eval $cmd &
+	eval "$cmd" &
 	WaitForTaskCompletion $! 0 1800 $FUNCNAME
 	if [ $? != 0 ]; then
 		Logger "Cannot get free space on target [$replica_path]." "ERROR"
@@ -1020,9 +1019,9 @@ function _WriteLockFilesRemote {
 	CheckConnectivity3rdPartyHosts
 	CheckConnectivityRemoteHost
 
-	cmd=$SSH_CMD' "echo $SCRIPT_PID@$SYNC_ID | $COMMAND_SUDO tee \"$lockfile\"" > /dev/null 2>&1'
+	cmd=$SSH_CMD' "echo '$SCRIPT_PID@$SYNC_ID' | '$COMMAND_SUDO' tee \"'$lockfile'\"" > /dev/null 2>&1'
 	Logger "cmd: $cmd" "DEBUG"
-	eval $cmd &
+	eval "$cmd" &
 	WaitForTaskCompletion $! 0 1800 $FUNCNAME
 	if [ $? != 0 ]; then
 		Logger "Could not set lock on remote target replica." "CRITICAL"
@@ -1041,7 +1040,7 @@ function WriteLockFiles {
 	else
 		_WriteLockFilesRemote "$TARGET_LOCKFILE"
 	fi
-}	
+}
 
 function _CheckLocksLocal {
 	local lockfile="${1}"
@@ -1069,9 +1068,9 @@ function _CheckLocksRemote { #TODO: Rewrite this a bit more beautiful
 	CheckConnectivity3rdPartyHosts
 	CheckConnectivityRemoteHost
 
-	cmd=$SSH_CMD' "if [ -f \"$lockfile\" ]; then cat \"$lockfile\"; fi" > "$RUN_DIR/osync.$FUNCNAME.$SCRIPT_PID"'
+	cmd=$SSH_CMD' "if [ -f \"'$lockfile'\" ]; then cat \"'$lockfile'\"; fi" > "'$RUN_DIR/osync.$FUNCNAME.$SCRIPT_PID'"'
 	Logger "cmd: $cmd" "DEBUG"
-	eval $cmd &
+	eval "$cmd" &
 	WaitForTaskCompletion $! 0 1800 $FUNCNAME
 	if [ $? != 0 ]; then
 		if [ -f "$RUN_DIR/osync.$FUNCNAME.$SCRIPT_PID" ]; then
@@ -1152,9 +1151,9 @@ function _UnlockReplicasRemote {
 	CheckConnectivity3rdPartyHosts
 	CheckConnectivityRemoteHost
 
-	cmd=$SSH_CMD' "if [ -f \"$lockfile\" ]; then $COMMAND_SUDO rm -f \"$lockfile\"; fi" > "$RUN_DIR/osync.$FUNCNAME.$SCRIPT_PID" 2>&1'
+	cmd=$SSH_CMD' "if [ -f \"'$lockfile'\" ]; then '$COMMAND_SUDO' rm -f \"'$lockfile'\"; fi" > "'$RUN_DIR/osync.$FUNCNAME.$SCRIPT_PID'" 2>&1'
 	Logger "cmd: $cmd" "DEBUG"
-	eval $cmd &
+	eval "$cmd" &
 	WaitForTaskCompletion $! 0 1800 $FUNCNAME
 	if [ $? != 0 ]; then
 		Logger "Could not unlock remote replica." "ERROR"
@@ -1182,7 +1181,7 @@ function UnlockReplicas {
 ###### Sync core functions
 
 	## Rsync does not like spaces in directory names, considering it as two different directories. Handling this schema by escaping space.
-	## It seems this only happens when trying to execute an rsync command through eval $rsync_cmd on a remote host.
+	## It seems this only happens when trying to execute an rsync command through weval $rsync_cmd on a remote host.
 	## So i'm using unescaped $INITIATOR_SYNC_DIR for local rsync calls and escaped $ESC_INITIATOR_SYNC_DIR for remote rsync calls like user@host:$ESC_INITIATOR_SYNC_DIR
 	## The same applies for target sync dir..............................................T.H.I.S..I.S..A..P.R.O.G.R.A.M.M.I.N.G..N.I.G.H.T.M.A.R.E
 
@@ -1204,7 +1203,7 @@ function tree_list {
 	fi
 	Logger "RSYNC_CMD: $rsync_cmd" "DEBUG"
 	## Redirect commands stderr here to get rsync stderr output in logfile
-	eval $rsync_cmd 2>> "$LOG_FILE"
+	eval "$rsync_cmd" 2>> "$LOG_FILE"
 	WaitForCompletion $! $SOFT_MAX_EXEC_TIME $HARD_MAX_EXEC_TIME $FUNCNAME
 	retval=$?
 	## Retval 24 = some files vanished while creating list
@@ -1240,7 +1239,7 @@ function delete_list {
 		fi
 
 		Logger "CMD: $cmd" "DEBUG"
-		eval $cmd 2>> "$LOG_FILE"
+		eval "$cmd" 2>> "$LOG_FILE"
 		retval=$?
 
 		# Add delete failed file list to current delete list and then empty it
@@ -1338,7 +1337,7 @@ function _delete_local {
 
 				if [ $_DRYRUN -ne 1 ]; then
 					if [ -e "$replica_dir$deletion_dir/$files" ]; then
-						rm -rf "$replica_dir$deletion_dir/$files"
+						rm -rf "${replica_dir:?}$deletion_dir/$files"
 					fi
 					# In order to keep full path on soft deletion, create parent directories before move
 					parentdir="$(dirname "$files")"
@@ -1372,6 +1371,7 @@ function _delete_local {
 	IFS=$OLD_IFS
 }
 
+
 function _delete_remote {
 	local replica_dir="${1}" # Full path to replica
 	local deleted_list_file="${2}" # file containing deleted file list, will be prefixed with replica type
@@ -1386,7 +1386,7 @@ function _delete_remote {
 	ESC_DEST_DIR="$(EscapeSpaces "$TARGET_STATE_DIR")"
 	rsync_cmd="$(type -p $RSYNC_EXECUTABLE) --rsync-path=\"$RSYNC_PATH\" $SYNC_OPTS -e \"$RSYNC_SSH_CMD\" \"$INITIATOR_STATE_DIR/$2\" $REMOTE_USER@$REMOTE_HOST:\"$ESC_DEST_DIR/\" > $RUN_DIR/osync.$FUNCNAME.precopy.$SCRIPT_PID 2>&1"
 	Logger "RSYNC_CMD: $rsync_cmd" "DEBUG"
-	eval $rsync_cmd 2>> "$LOG_FILE"
+	eval "$rsync_cmd" 2>> "$LOG_FILE"
 	if [ $? != 0 ]; then
 		Logger "Cannot copy the deletion list to remote replica." "CRITICAL"
 		if [ -f $RUN_DIR/osync.$FUNCNAME.precopy.$SCRIPT_PID ]; then
@@ -1395,7 +1395,7 @@ function _delete_remote {
 		exit 1
 	fi
 
-$SSH_CMD error_alert=0 sync_on_changes=$sync_on_changes _SILENT=$_SILENT _DEBUG=$_DEBUG _DRYRUN=$_DRYRUN _VERBOSE=$_VERBOSE COMMAND_SUDO=$COMMAND_SUDO FILE_LIST="$(EscapeSpaces "$TARGET_STATE_DIR/$deleted_list_file")" REPLICA_DIR="$(EscapeSpaces "$replica_dir")" DELETE_DIR="$(EscapeSpaces "$deletion_dir")" FAILED_DELETE_LIST="$(EscapeSpaces "$TARGET_STATE_DIR/$deleted_failed_list_file")" 'bash -s' << 'ENDSSH' > "$RUN_DIR/osync.remote_deletion.$SCRIPT_PID" 2>&1 &
+$SSH_CMD ERROR_ALERT=0 sync_on_changes=$sync_on_changes _SILENT=$_SILENT _DEBUG=$_DEBUG _DRYRUN=$_DRYRUN _VERBOSE=$_VERBOSE COMMAND_SUDO=$COMMAND_SUDO FILE_LIST="$(EscapeSpaces "$TARGET_STATE_DIR/$deleted_list_file")" REPLICA_DIR="$(EscapeSpaces "$replica_dir")" DELETE_DIR="$(EscapeSpaces "$deletion_dir")" FAILED_DELETE_LIST="$(EscapeSpaces "$TARGET_STATE_DIR/$deleted_failed_list_file")" 'bash -s' << 'ENDSSH' > "$RUN_DIR/osync.remote_deletion.$SCRIPT_PID" 2>&1 &
 
 	## The following lines are executed remotely
 	function _logger {
@@ -1437,7 +1437,7 @@ $SSH_CMD error_alert=0 sync_on_changes=$sync_on_changes _SILENT=$_SILENT _DEBUG=
 			_logger "$prefix$value"
 		fi
 	}
-	
+
 	## Empty earlier failed delete list
 	> "$FAILED_DELETE_LIST"
 
@@ -1504,11 +1504,11 @@ ENDSSH
 	#TODO: Need to check if file exists prior to copy (or add a filemask and copy all state files)
 	rsync_cmd="$(type -p $RSYNC_EXECUTABLE) --rsync-path=\"$RSYNC_PATH\" $SYNC_OPTS -e \"$RSYNC_SSH_CMD\" $REMOTE_USER@$REMOTE_HOST:\"$ESC_SOURCE_FILE\" \"$INITIATOR_STATE_DIR\" > "$RUN_DIR/osync.remote_failed_deletion_list_copy.$SCRIPT_PID"
 	Logger "RSYNC_CMD: $rsync_cmd" "DEBUG"
-	eval $rsync_cmd 2>> "$LOG_FILE"
+	eval "$rsync_cmd" 2>> "$LOG_FILE"
 	if [ $? != 0 ]; then
 		Logger "Cannot copy back the failed deletion list to initiator replica." "CRITICAL"
-		if [ -f "$RUN_DIR/osync.remote_failed_deletion_list_copy.$SCRIPT_PID ]; then
-			Logger "$(cat $RUN_DIR/osync.remote_failed_deletion_list_copy.$SCRIPT_PID)" "NOTICE"
+		if [ -f "$RUN_DIR/osync.remote_failed_deletion_list_copy.$SCRIPT_PID" ]; then
+			Logger "Comand output: $(cat $RUN_DIR/osync.remote_failed_deletion_list_copy.$SCRIPT_PID)" "NOTICE"
 		fi
 		exit 1
 	fi
@@ -1517,7 +1517,6 @@ ENDSSH
 
 	exit $?
 }
-
 
 # delete_propagation(replica name, deleted_list_filename, deleted_failed_file_list)
 function deletion_propagation {
@@ -1551,13 +1550,13 @@ function deletion_propagation {
 		WaitForCompletion $! $SOFT_MAX_EXEC_TIME $HARD_MAX_EXEC_TIME $FUNCNAME
 		retval=$?
 		if [ $retval == 0 ]; then
-			if [ -f "$RUN_DIR/osync._delete_remote.$SCRIPT_PID ] && [ $_VERBOSE -eq 1 ]; then
+			if [ -f "$RUN_DIR/osync._delete_remote.$SCRIPT_PID" ] && [ $_VERBOSE -eq 1 ]; then
 				Logger "Remote:\n$(cat $RUN_DIR/osync._delete_remote.$SCRIPT_PID)" "DEBUG"
 			fi
 			return $retval
 		else
 			Logger "Deletion on remote system failed." "CRITICAL"
-			if [ -f $RUN_DIR/osync_remote_deletion_$SCRIPT_PID ]; then
+			if [ -f "$RUN_DIR/osync_remote_deletion_$SCRIPT_PID" ]; then
 				Logger "Remote:\n$(cat $RUN_DIR/osync._delete_remote.$SCRIPT_PID)" "CRITICAL"
 			fi
 			exit 1
@@ -1784,15 +1783,19 @@ function _SoftDeleteRemote {
 	else
 		Logger "Removing files older than $change_time days on target replica." "NOTICE"
 	fi
-	
+
 	if [ $_VERBOSE -eq 1 ]; then
 		# Cannot launch log function from xargs, ugly hack
-		eval "$SSH_CMD \"if [ -w \\\"$replica_deletion_path\\\" ]; then $COMMAND_SUDO $REMOTE_FIND_CMD \\\"$replica_deletion_path/\\\" -type f -ctime +$change_time -print0 | xargs -0 -I {} echo Will delete file {} && $REMOTE_FIND_CMD \\\"$replica_deletion_path/\\\" -type d -empty -ctime $change_time -print0 | xargs -0 -I {} echo Will delete directory {}; fi\"" > "$RUN_DIR/osync.$FUNCNAME.$SCRIPT_PID"
+		cmd=$SSH_CMD' "if [ -w \"'$replica_deletion_path'\" ]; then '$COMMAND_SUDO' '$REMOTE_FIND_CMD' \"'$replica_deletion_path'/\" -type f -ctime +'$change_time' -print0 | xargs -0 -I {} echo Will delete file {} && '$REMOTE_FIND_CMD' \"'$replica_deletion_path'/\" -type d -empty -ctime '$change_time' -print0 | xargs -0 -I {} echo Will delete directory {}; fi" > "'$RUN_DIR/osync.$FUNCNAME.$SCRIPT_PID'" 2>&1'
+		Logger "cmd: $cmd" "DEBUG"
+		eval "$cmd" &
 		Logger "Command output:\n$(cat $RUN_DIR/osync.$FUNCNAME.$SCRIPT_PID)" "NOTICE"
 	fi
 
 	if [ $_DRYRUN -ne 1 ]; then
-		eval "$SSH_CMD \"if [ -w \\\"$replica_deletion_path\\\" ]; then $COMMAND_SUDO $REMOTE_FIND_CMD \\\"$replica_deletion_path/\\\" -type f -ctime +$change_time -print0 | xargs -0 -I {} rm -f \\\"{}\\\" && $REMOTE_FIND_CMD \\\"$replica_deletion_path/\\\" -type d -empty -ctime $change_time -print0 | xargs -0 -I {} rm -rf \\\"{}\\\"; fi 2>&1\"" > "$RUN_DIR/osync.$FUNCNAME.$SCRIPT_PID" &
+		cmd=$SSH_CMD' "if [ -w \"'$replica_deletion_path'\" ]; then '$COMMAND_SUDO' '$REMOTE_FIND_CMD' \"'$replica_deletion_path'/\" -type f -ctime +'$change_time' -print0 | xargs -0 -I {} rm -f \"{}\" && '$REMOTE_FIND_CMD' \"'$replica_deletion_path'/\" -type d -empty -ctime '$change_time' -print0 | xargs -0 -I {} rm -rf \"{}\"; fi" > "'$RUN_DIR/osync.$FUNCNAME.$SCRIPT_PID'" 2>&1'
+		Logger "cmd: $cmd" "DEBUG"
+		eval "$cmd" &
 	else
 		Dummy &
 	fi
@@ -2162,11 +2165,12 @@ function SyncOnChanges {
 	while true
 	do
 		if [ "$ConfigFile" != "" ]; then
-			cmd="bash $osync_cmd \"$ConfigFile\" $opts"
+			cmd='bash '$osync_cmd' "'$ConfigFile'" '$opts
 		else
-			cmd="bash $osync_cmd $opts"
+			cmd='bash '$osync_cmd' '$opts
 		fi
-		eval $cmd
+		Logger "daemon cmd: $cmd" "DEBUG"
+		eval "$cmd"
 		retval=$?
 		if [ $retval != 0 ]; then
 			Logger "osync child exited with error." "CRITICAL"
@@ -2209,7 +2213,7 @@ no_maxtime=0
 # Alert flags
 opts=""
 soft_alert_total=0
-error_alert=0
+ERROR_ALERT=0
 soft_stop=0
 quick_sync=0
 sync_on_changes=0
