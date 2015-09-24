@@ -4,9 +4,9 @@ PROGRAM="Osync" # Rsync based two way sync engine with fault tolerance
 AUTHOR="(L) 2013-2015 by Orsiris \"Ozy\" de Jong"
 CONTACT="http://www.netpower.fr/osync - ozy@netpower.fr"
 PROGRAM_VERSION=1.1-unstable
-PROGRAM_BUILD=2015092306
+PROGRAM_BUILD=2015092402
 
-## type doesn't work on platforms other than linux (bash). If if doesn't work, always assume output is not a zero exitcode
+## type does not work on platforms other than linux (bash). If if does not work, always assume output is not a zero exitcode
 if ! type -p "$BASH" > /dev/null; then
 	echo "Please run this script only with bash shell. Tested on bash >= 3.2"
 	exit 127
@@ -225,6 +225,11 @@ function Spinner {
 }
 
 function EscapeSpaces {
+	local string="${1}" # String on which spaces will be escaped
+	echo "${string// /\ }"
+}
+
+function _Legacy_EscapeSpaces {
 	local string="${1}" # String on which spaces will be escaped
 	echo $(echo "$string" | sed 's/ /\\ /g')
 }
@@ -614,7 +619,8 @@ function CheckConnectivityRemoteHost {
 	__CheckArguments 0 $# $FUNCNAME "$*"	#__WITH_PARANOIA_DEBUG
 
 	if [ "$REMOTE_HOST_PING" != "no" ] && [ "$REMOTE_SYNC" != "no" ]; then
-		eval "$PING_CMD $REMOTE_HOST > /dev/null 2>&1"
+		eval "$PING_CMD $REMOTE_HOST > /dev/null 2>&1" &
+		WaitForTaskCompletion $! 180 180 $FUNCNAME
 		if [ $? != 0 ]; then
 			Logger "Cannot ping $REMOTE_HOST" "CRITICAL"
 			exit 1
@@ -631,7 +637,8 @@ function CheckConnectivity3rdPartyHosts {
 		IFS=$' \t\n'
 		for i in $REMOTE_3RD_PARTY_HOSTS
 		do
-			eval "$PING_CMD $i > /dev/null 2>&1"
+			eval "$PING_CMD $i > /dev/null 2>&1" &
+			WaitForTaskCompletion $! 360 360 $FUNCNAME
 			if [ $? != 0 ]; then
 				Logger "Cannot ping 3rd party host $i" "WARN"
 			else
@@ -666,7 +673,7 @@ function __CheckArguments {
 			done
 			if [ $count -ne $1 ]; then
 				Logger "Function $function_name may have inconsistent number of arguments. Expected: $number_of_arguments, count: $count, see log file." "WARN"
-				echo "Argument list (including checks): $@" >> "$LOG_FILE"
+				echo "Argument list (including checks): $*" >> "$LOG_FILE"
 			fi
 		fi
 
