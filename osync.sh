@@ -4,7 +4,7 @@ PROGRAM="Osync" # Rsync based two way sync engine with fault tolerance
 AUTHOR="(L) 2013-2015 by Orsiris \"Ozy\" de Jong"
 CONTACT="http://www.netpower.fr/osync - ozy@netpower.fr"
 PROGRAM_VERSION=1.1-unstable
-PROGRAM_BUILD=2015092402
+PROGRAM_BUILD=2015092501
 
 ## type does not work on platforms other than linux (bash). If if does not work, always assume output is not a zero exitcode
 if ! type -p "$BASH" > /dev/null; then
@@ -186,7 +186,7 @@ function TrapQuit {
 #		fi
 #	fi
 
-	KillChilds $$ > /dev/null 2&>1
+	KillChilds $$ > /dev/null 2>&1
 
 	exit $exitcode
 }
@@ -668,7 +668,7 @@ function __CheckArguments {
 
 			# Paranoia check... Can help finding empty arguments. __CheckArguments should be grepped out in production builds.
 			local count=-3 # Number of arguments minus the function calls for __CheckArguments
-			for i in "$@"; do
+			for i in $@; do
 				count=$((count + 1))
 			done
 			if [ $count -ne $1 ]; then
