@@ -24,7 +24,7 @@ progexec=osync.sh
 progpath=/usr/local/bin
 confdir=/etc/osync
 pidfile=/var/run/$prog
-SCRIPT_BUILD=1304201502
+SCRIPT_BUILD=2015092701
 
 if [ ! -f $progpath/$progexec ] && [ ! -f $progexec ]; then
 	echo "Cannot find $prog executable in $progpath nor in local path."
@@ -47,8 +47,6 @@ start() {
 	do
 		if [ -f $progpath/$progexec ]; then
 			$progpath/$progexec $cfgfile --on-changes > /dev/null 2>&1 &
-		elif [ -f ./$progexec ]; then
-			./$progexec $cfgfile --on-changes > /dev/null 2>&1 &
 		else
 			echo "Cannot find $prog executable in $progpath"
 			exit 1
