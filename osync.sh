@@ -3,8 +3,8 @@
 PROGRAM="Osync" # Rsync based two way sync engine with fault tolerance
 AUTHOR="(L) 2013-2015 by Orsiris \"Ozy\" de Jong"
 CONTACT="http://www.netpower.fr/osync - ozy@netpower.fr"
-PROGRAM_VERSION=1.1-unstable
-PROGRAM_BUILD=2015092501
+PROGRAM_VERSION=1.1-pre
+PROGRAM_BUILD=2015092801
 
 ## type does not work on platforms other than linux (bash). If if does not work, always assume output is not a zero exitcode
 if ! type -p "$BASH" > /dev/null; then
@@ -245,7 +245,7 @@ function CleanUp {
 function SendAlert {
 	__CheckArguments 0 $# $FUNCNAME "$*"	#__WITH_PARANOIA_DEBUG
 
-	if [ "$quick_sync" == "2" ]; then
+	if [ $_QUICK_SYNC -eq 2 ]; then
 		Logger "Current task is a quicksync task. Will not send any alert." "NOTICE"
 		return 0
 	fi
@@ -1778,7 +1778,7 @@ function _SoftDeleteLocal {
 function _SoftDeleteRemote {
 	local replica_type="${1}"
 	local replica_deletion_path="${2}" # Contains the full path to softdelete / backup directory without ending slash
-	local change_time"${3}"
+	local change_time="${3}"
 	__CheckArguments 3 $# $FUNCNAME "$*"	#__WITH_PARANOIA_DEBUG
 
 	CheckConnectivity3rdPartyHosts
@@ -2221,7 +2221,7 @@ opts=""
 soft_alert_total=0
 ERROR_ALERT=0
 soft_stop=0
-quick_sync=0
+_QUICK_SYNC=0
 sync_on_changes=0
 _NOLOCKS=0
 osync_cmd=$0
@@ -2267,13 +2267,13 @@ do
 		Usage
 		;;
 		--initiator=*)
-		quick_sync=$(($quick_sync + 1))
+		_QUICK_SYNC=$(($_QUICK_SYNC + 1))
 		no_maxtime=1
 		INITIATOR_SYNC_DIR=${i##*=}
 		opts=$opts" --initiator=\"$INITIATOR_SYNC_DIR\""
 		;;
 		--target=*)
-		quick_sync=$(($quick_sync + 1))
+		_QUICK_SYNC=$(($_QUICK_SYNC + 1))
 		TARGET_SYNC_DIR=${i##*=}
 		opts=$opts" --target=\"$TARGET_SYNC_DIR\""
 		no_maxtime=1
@@ -2312,7 +2312,7 @@ then
 
 	## Here we set default options for quicksync tasks when no configuration file is provided.
 
-	if [ $quick_sync -eq 2 ]; then
+	if [ $_QUICK_SYNC -eq 2 ]; then
 		if [ "$SYNC_ID" == "" ]; then
 			SYNC_ID="quicksync_task"
 		fi
