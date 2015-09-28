@@ -3,7 +3,7 @@
 PROGRAM="Osync-batch" # Batch program to run osync instances sequentially and rerun failed ones
 AUTHOR="(L) 2013-2014 by Orsiris \"Ozy\" de Jong"
 CONTACT="http://www.netpower.fr/osync - ozy@netpower.fr"
-PROGRAM_BUILD=2015092801
+PROGRAM_BUILD=2015092802
 
 ## Runs an osync instance for every conf file found
 ## If an instance fails, run it again if time permits
@@ -39,12 +39,7 @@ function Logger {
 	local value="${1}" # What to log
 	local level="${2}" # Log level: DEBUG, NOTICE, WARN, ERROR, CRITIAL
 
-	# Special case in daemon mode we should timestamp instead of counting seconds
-	if [ $sync_on_changes -eq 1 ]; then
-		prefix="$(date) - "
-	else
-		prefix="TIME: $SECONDS - "
-	fi
+	prefix="$(date) - "
 
 	if [ "$level" == "CRITICAL" ]; then
 		_logger "$prefix\e[41m$value\e[0m"
