@@ -3,7 +3,7 @@
 PROGRAM="Osync-batch" # Batch program to run osync instances sequentially and rerun failed ones
 AUTHOR="(L) 2013-2014 by Orsiris \"Ozy\" de Jong"
 CONTACT="http://www.netpower.fr/osync - ozy@netpower.fr"
-PROGRAM_BUILD=2015090801
+PROGRAM_BUILD=2015092801
 
 ## Runs an osync instance for every conf file found
 ## If an instance fails, run it again if time permits
@@ -73,9 +73,6 @@ function CheckEnvironment {
 		if [ -f /usr/local/bin/osync.sh ]
 		then
 			OSYNC_EXECUTABLE=/usr/local/bin/osync.sh
-		elif [ -f ./osync.sh ]
-		then
-			OSYNC_EXECUTABLE=./osync.sh
 		else
 			Logger "Could not find osync.sh" "CRITICAL"
 			exit 1
@@ -88,7 +85,7 @@ function CheckEnvironment {
 	if [ ! -d "$CONF_FILE_PATH" ]; then
 		Logger "Cannot find conf file path $CONF_FILE_PATH" "CRITICAL"
 		Usage
-	fi	
+	fi
 }
 
 function Batch {
