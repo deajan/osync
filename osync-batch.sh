@@ -3,7 +3,7 @@
 PROGRAM="Osync-batch" # Batch program to run osync instances sequentially and rerun failed ones
 AUTHOR="(L) 2013-2014 by Orsiris \"Ozy\" de Jong"
 CONTACT="http://www.netpower.fr/osync - ozy@netpower.fr"
-PROGRAM_BUILD=2015092802
+PROGRAM_BUILD=2015092901
 
 ## Runs an osync instance for every conf file found
 ## If an instance fails, run it again if time permits
@@ -100,7 +100,8 @@ function Batch {
 		Logger "Osync instances will be run for: $RUN" "NOTICE"
 		for i in $RUN
 		do
-			$OSYNC_EXECUTABLE "$i" $opts
+			$OSYNC_EXECUTABLE "$i" $opts &
+			wait $!
 			if [ $? != 0 ]; then
 				Logger "Run instance $(basename $i) failed" "ERROR"
 				if [ "RUN_AGAIN" == "" ]; then
