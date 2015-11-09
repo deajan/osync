@@ -1750,15 +1750,14 @@ function _SoftDeleteLocal {
 		else
 			Logger "Removing files older than $change_time days on $replica_type replica." "NOTICE"
 		fi
-			if [ $_VERBOSE -eq 1 ]; then
+		if [ $_VERBOSE -eq 1 ]; then
 			# Cannot launch log function from xargs, ugly hack
-			$FIND_CMD "$replica_deletion_path/" -type f -mtime +$change_time -print0 | xargs -0 -I {} echo "Will delete file {}" > "$RUN_DIR/osync.$FUNCNAME.$SCRIPT_PID"
-			Logger "Command output:\n$(cat $RUN_DIR/osync.$FUNCNAME.$SCRIPT_PID)" "NOTICE"
-			$FIND_CMD "$replica_deletion_path/" -type d -empty -mtime +$change_time -print0 | xargs -0 -I {} echo "Will delete directory {}" > "$RUN_DIR/osync.$FUNCNAME.$SCRIPT_PID"
-			Logger "Command output:\n$(cat $RUN_DIR/osync.$FUNCNAME.$SCRIPT_PID)" "NOTICE"
+			$FIND_CMD "$replica_deletion_path/" -type f -mtime +$change_time -print0 | while read filename; do Logger "Command output:\nWill delete file $filename" "NOTICE"; done
+			$FIND_CMD "$replica_deletion_path/" -type d -empty -mtime +$change_time -print0 | while read filename; do Logger "Command output:\nWill delete directory $filename" "NOTICE"; done
 		fi
-			if [ $_DRYRUN -ne 1 ]; then
-			$FIND_CMD "$replica_deletion_path/" -type f -mtime +$change_time -print0 | xargs -0 -I {} rm -f "{}" && $FIND_CMD "$replica_deletion_path/" -type d -empty -mtime +$change_time -print0 | xargs -0 -I {} rm -rf "{}" > "$RUN_DIR/osync.$FUNCNAME.$SCRIPT_PID" 2>&1 &
+		if [ $_DRYRUN -ne 1 ]; then
+			$FIND_CMD "$replica_deletion_path/" -type f -mtime +$change_time -print0 | while read filename; do rm -f "$filename" > "$RUN_DIR/osync.$FUNCNAME.$SCRIPT_PID" 2>&1 &; done
+			$FIND_CMD "$replica_deletion_path/" -type d -empty -mtime +$change_time -print0 | while read filename; do rm -rf "$filename" > "$RUN_DIR/osync.$FUNCNAME.$SCRIPT_PID" 2>&1 &; done
 		else
 			Dummy &
 		fi
