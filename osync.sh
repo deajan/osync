@@ -690,71 +690,71 @@ function __CheckArguments {
 ###### realpath.sh implementation from https://github.com/mkropat/sh-realpath
 
 realpath() {
-    canonicalize_path "$(resolve_symlinks "$1")"
+	canonicalize_path "$(resolve_symlinks "$1")"
 }
 
 resolve_symlinks() {
-    _resolve_symlinks "$1"
+	_resolve_symlinks "$1"
 }
 
 _resolve_symlinks() {
-    _assert_no_path_cycles "$@" || return
+	_assert_no_path_cycles "$@" || return
 
-    local dir_context path
-    path=$(readlink -- "$1")
-    if [ $? -eq 0 ]; then
+	local dir_context path
+	path=$(readlink -- "$1")
+	if [ $? -eq 0 ]; then
 	dir_context=$(dirname -- "$1")
 	_resolve_symlinks "$(_prepend_dir_context_if_necessary "$dir_context" "$path")" "$@"
-    else
+	else
 	printf '%s\n' "$1"
-    fi
+	fi
 }
 
 _prepend_dir_context_if_necessary() {
-    if [ "$1" = . ]; then
+	if [ "$1" = . ]; then
 	printf '%s\n' "$2"
-    else
+	else
 	_prepend_path_if_relative "$1" "$2"
-    fi
+	fi
 }
 
 _prepend_path_if_relative() {
-    case "$2" in
+	case "$2" in
 	/* ) printf '%s\n' "$2" ;;
 	 * ) printf '%s\n' "$1/$2" ;;
-    esac
+	esac
 }
 
 _assert_no_path_cycles() {
-    local target path
+	local target path
 
-    target=$1
-    shift
+	target=$1
+	shift
 
-    for path in "$@"; do
+	for path in "$@"; do
 	if [ "$path" = "$target" ]; then
-	    return 1
+		return 1
 	fi
-    done
+	done
 }
 
 canonicalize_path() {
-    if [ -d "$1" ]; then
+	if [ -d "$1" ]; then
 	_canonicalize_dir_path "$1"
-    else
+	else
 	_canonicalize_file_path "$1"
-    fi
+	fi
 }
 
 _canonicalize_dir_path() {
-    (cd "$1" 2>/dev/null && pwd -P)
+	(cd "$1" 2>/dev/null && pwd -P)
 }
 
 _canonicalize_file_path() {
-    local dir file
-    dir=$(dirname -- "$1")
-    file=$(basename -- "$1")
-    (cd "$dir" 2>/dev/null && printf '%s/%s\n' "$(pwd -P)" "$file")
+	local dir file
+	dir=$(dirname -- "$1")
+	file=$(basename -- "$1")
+	(cd "$dir" 2>/dev/null && printf '%s/%s\n' "$(pwd -P)" "$file")
 }
 
 # Optionally, you may also want to include:
@@ -762,41 +762,41 @@ _canonicalize_file_path() {
 ### readlink emulation ###
 
 readlink() {
-    if  _has_command readlink; then
+	if  _has_command readlink; then
 	_system_readlink "$@"
-    else
+	else
 	_emulated_readlink "$@"
-    fi
+	fi
 }
 
 _has_command() {
-    hash -- "$1" 2>/dev/null
+	hash -- "$1" 2>/dev/null
 }
 
 _system_readlink() {
-    command readlink "$@"
+	command readlink "$@"
 }
 
 _emulated_readlink() {
-    if [ "$1" = -- ]; then
+	if [ "$1" = -- ]; then
 	shift
-    fi
+	fi
 
-    _gnu_stat_readlink "$@" || _bsd_stat_readlink "$@"
+	_gnu_stat_readlink "$@" || _bsd_stat_readlink "$@"
 }
 
 _gnu_stat_readlink() {
-    local output
-    output=$(stat -c %N -- "$1" 2>/dev/null) &&
+	local output
+	output=$(stat -c %N -- "$1" 2>/dev/null) &&
 
-    printf '%s\n' "$output" |
+	printf '%s\n' "$output" |
 	sed "s/^‘[^’]*’ -> ‘\(.*\)’/\1/
-	     s/^'[^']*' -> '\(.*\)'/\1/"
-    # FIXME: handle newlines
+		 s/^'[^']*' -> '\(.*\)'/\1/"
+	# FIXME: handle newlines
 }
 
 _bsd_stat_readlink() {
-    stat -f %Y -- "$1" 2>/dev/null
+	stat -f %Y -- "$1" 2>/dev/null
 }
 
 ###### Osync specific functions (non shared)
@@ -923,7 +923,15 @@ function _CheckDiskSpaceLocal {
 
 	Logger "Checking minimum disk space in [$replica_path]." "NOTICE"
 
-	local initiator_space=$(df -P "$replica_path" | tail -1 | awk '{print $4}')
+	local isbusybox=$(ls --help 2>&1 | grep BusyBox)
+	local pFlag=""
+	if [[ $isbusybox != *"BusyBox"* ]]; then
+		pFlag="-P "
+	fi
+
+	local initiator_space=$(df $pFlag"$replica_path" | tail -1 | awk '{print $4}')
+	initiator_space=$(GetSpace "$initiator_space")
+
 	if [ $initiator_space -lt $MINIMUM_SPACE ]; then
 		Logger "There is not enough free space on initiator [$initiator_space KB]." "WARN"
 	fi
@@ -938,7 +946,13 @@ function _CheckDiskSpaceRemote {
 	CheckConnectivity3rdPartyHosts
 	CheckConnectivityRemoteHost
 
-	cmd=$SSH_CMD' "'$COMMAND_SUDO' df -P \"'$replica_path'\"" > "'$RUN_DIR/osync.$FUNCNAME.$SCRIPT_PID'" 2>&1'
+	local isbusybox=$(echo "ls --help 2>&1 | grep BusyBox" | $SSH_CMD)
+	local pFlag=""
+	if [[ $isbusybox != *"BusyBox"* ]]; then
+		pFlag="-P "
+	fi
+
+	cmd=$SSH_CMD' "'$COMMAND_SUDO' df $pFlag\"'$replica_path'\"" > "'$RUN_DIR/osync.$FUNCNAME.$SCRIPT_PID'" 2>&1'
 	Logger "cmd: $cmd" "DEBUG"
 	eval "$cmd" &
 	WaitForTaskCompletion $! 0 1800 $FUNCNAME
@@ -947,6 +961,8 @@ function _CheckDiskSpaceRemote {
 		Logger "Command output:\n$(cat $RUN_DIR/osync.$FUNCNAME.$SCRIPT_PID)" "NOTICE"
 	else
 		local target_space=$(cat $RUN_DIR/osync.$FUNCNAME.$SCRIPT_PID | tail -1 | awk '{print $4}')
+		target_space=$(GetSpace "$target_space")
+
 		if [ $target_space -lt $MINIMUM_SPACE ]; then
 			Logger "There is not enough free space on target [$replica_path]." "WARN"
 		fi
@@ -1751,13 +1767,12 @@ function _SoftDeleteLocal {
 			Logger "Removing files older than $change_time days on $replica_type replica." "NOTICE"
 		fi
 		if [ $_VERBOSE -eq 1 ]; then
-			# Cannot launch log function from xargs, ugly hack
 			$FIND_CMD "$replica_deletion_path/" -type f -mtime +$change_time -print0 | while read filename; do Logger "Command output:\nWill delete file $filename" "NOTICE"; done
 			$FIND_CMD "$replica_deletion_path/" -type d -empty -mtime +$change_time -print0 | while read filename; do Logger "Command output:\nWill delete directory $filename" "NOTICE"; done
 		fi
 		if [ $_DRYRUN -ne 1 ]; then
-			$FIND_CMD "$replica_deletion_path/" -type f -mtime +$change_time -print0 | while read filename; do rm -f "$filename" > "$RUN_DIR/osync.$FUNCNAME.$SCRIPT_PID" 2>&1 &; done
-			$FIND_CMD "$replica_deletion_path/" -type d -empty -mtime +$change_time -print0 | while read filename; do rm -rf "$filename" > "$RUN_DIR/osync.$FUNCNAME.$SCRIPT_PID" 2>&1 &; done
+			$FIND_CMD "$replica_deletion_path/" -type f -mtime +$change_time -print0 | while read filename; do rm -f "$filename" > "$RUN_DIR/osync.$FUNCNAME.$SCRIPT_PID" 2>&1 & done
+			$FIND_CMD "$replica_deletion_path/" -type d -empty -mtime +$change_time -print0 | while read filename; do rm -rf "$filename" > "$RUN_DIR/osync.$FUNCNAME.$SCRIPT_PID" 2>&1 & done
 		else
 			Dummy &
 		fi
@@ -1790,15 +1805,14 @@ function _SoftDeleteRemote {
 	fi
 
 	if [ $_VERBOSE -eq 1 ]; then
-		# Cannot launch log function from xargs, ugly hack
-		cmd=$SSH_CMD' "if [ -w \"'$replica_deletion_path'\" ]; then '$COMMAND_SUDO' '$REMOTE_FIND_CMD' \"'$replica_deletion_path'/\" -type f -mtime +'$change_time' -print0 | xargs -0 -I {} echo Will delete file {} && '$REMOTE_FIND_CMD' \"'$replica_deletion_path'/\" -type d -empty -mtime '$change_time' -print0 | xargs -0 -I {} echo Will delete directory {}; fi" > "'$RUN_DIR/osync.$FUNCNAME.$SCRIPT_PID'" 2>&1'
+		cmd=$SSH_CMD' "if [ -w \"'$replica_deletion_path'\" ]; then '$COMMAND_SUDO' '$REMOTE_FIND_CMD' \"'$replica_deletion_path'/\" -type f -mtime +'$change_time' -print0 | while read filename; do echo Will delete file $filename; done && '$REMOTE_FIND_CMD' \"'$replica_deletion_path'/\" -type d -empty -mtime '$change_time' -print0 | while read filename; do echo Will delete directory $filename; done; fi" > "'$RUN_DIR/osync.$FUNCNAME.$SCRIPT_PID'" 2>&1'
 		Logger "cmd: $cmd" "DEBUG"
 		eval "$cmd" &
 		Logger "Command output:\n$(cat $RUN_DIR/osync.$FUNCNAME.$SCRIPT_PID)" "NOTICE"
 	fi
 
 	if [ $_DRYRUN -ne 1 ]; then
-		cmd=$SSH_CMD' "if [ -w \"'$replica_deletion_path'\" ]; then '$COMMAND_SUDO' '$REMOTE_FIND_CMD' \"'$replica_deletion_path'/\" -type f -mtime +'$change_time' -print0 | xargs -0 -I {} rm -f \"{}\" && '$REMOTE_FIND_CMD' \"'$replica_deletion_path'/\" -type d -empty -mtime '$change_time' -print0 | xargs -0 -I {} rm -rf \"{}\"; fi" > "'$RUN_DIR/osync.$FUNCNAME.$SCRIPT_PID'" 2>&1'
+		cmd=$SSH_CMD' "if [ -w \"'$replica_deletion_path'\" ]; then '$COMMAND_SUDO' '$REMOTE_FIND_CMD' \"'$replica_deletion_path'/\" -type f -mtime +'$change_time' -print0 | while read filename; do rm -f \"$filename\"; done && '$REMOTE_FIND_CMD' \"'$replica_deletion_path'/\" -type d -empty -mtime '$change_time' -print0 | while read filename; do rm -rf \"$filename\"; done; fi" > "'$RUN_DIR/osync.$FUNCNAME.$SCRIPT_PID'" 2>&1'
 		Logger "cmd: $cmd" "DEBUG"
 		eval "$cmd" &
 	else
@@ -2131,18 +2145,18 @@ function Usage {
 	echo -e "\e[41mWARNING: This is an unstable dev build\e[0m"
 	echo "You may use Osync with a full blown configuration file, or use its default options for quick command line sync."
 	echo "Usage: osync.sh /path/to/config/file [OPTIONS]"
-	echo "or     osync.sh --initiator=/path/to/initiator/replica --target=/path/to/target/replica [OPTIONS] [QUICKSYNC OPTIONS]"
-	echo "or     osync.sh --initiator=/path/to/initiator/replica --target=ssh://[backupuser]@remotehost.com[:portnumber]//path/to/target/replica [OPTIONS] [QUICKSYNC OPTIONS]"
+	echo "or	 osync.sh --initiator=/path/to/initiator/replica --target=/path/to/target/replica [OPTIONS] [QUICKSYNC OPTIONS]"
+	echo "or	 osync.sh --initiator=/path/to/initiator/replica --target=ssh://[backupuser]@remotehost.com[:portnumber]//path/to/target/replica [OPTIONS] [QUICKSYNC OPTIONS]"
 	echo ""
 	echo "[OPTIONS]"
-	echo "--dry             Will run osync without actually doing anything; just testing"
-	echo "--silent          Will run osync without any output to stdout, used for cron jobs"
-	echo "--verbose         Increases output"
-	echo "--stats           Adds rsync transfer statistics to verbose output"
-	echo "--partial         Allows rsync to keep partial downloads that can be resumed later (experimental)"
-	echo "--no-maxtime      Disables any soft and hard execution time checks"
-	echo "--force-unlock    Will override any existing active or dead locks on initiator and target replica"
-	echo "--on-changes      Will launch a sync task after a short wait period if there is some file activity on initiator replica. You should try daemon mode instead"
+	echo "--dry			 Will run osync without actually doing anything; just testing"
+	echo "--silent		  Will run osync without any output to stdout, used for cron jobs"
+	echo "--verbose		 Increases output"
+	echo "--stats		   Adds rsync transfer statistics to verbose output"
+	echo "--partial		 Allows rsync to keep partial downloads that can be resumed later (experimental)"
+	echo "--no-maxtime	  Disables any soft and hard execution time checks"
+	echo "--force-unlock	Will override any existing active or dead locks on initiator and target replica"
+	echo "--on-changes	  Will launch a sync task after a short wait period if there is some file activity on initiator replica. You should try daemon mode instead"
 	echo ""
 	echo "[QUICKSYNC OPTIONS]"
 	echo "--initiator=\"\"	Master replica path. Will contain state and backup directory (is mandatory)"
@@ -2198,6 +2212,34 @@ function SyncOnChanges {
 		fi
 	done
 
+}
+
+#Floating point sizes may not be 100% accurate, as Busybox may round the number
+function GetSpace {
+	__CheckArguments 0 $# $FUNCNAME "$*"	#__WITH_PARANOIA_DEBUG
+
+	local num=$1
+	local unit="${num: -1}"
+	local size="${num:0:-1}"
+	case $unit in
+		"K")
+		awk -v size="$size" 'BEGIN{printf "%.0f",  size * 1024}'
+		;;
+		"M")
+		awk -v size="$size" 'BEGIN{printf "%.0f",  size * 1024 * 1024}'
+		;;
+		"G")
+		awk -v size="$size" 'BEGIN{printf "%.0f",  size * 1024 * 1024 * 1024}'
+		;;
+		"T")
+		awk -v size="$size" 'BEGIN{printf "%.0f",  size * 1024 * 1024 * 1024 * 1024}'
+		;;
+		*)
+		echo $num
+		;;
+	esac
+
+	return 1
 }
 
 # Comand line argument flags
