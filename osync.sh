@@ -1767,12 +1767,32 @@ function _SoftDeleteLocal {
 			Logger "Removing files older than $change_time days on $replica_type replica." "NOTICE"
 		fi
 		if [ $_VERBOSE -eq 1 ]; then
-			$FIND_CMD "$replica_deletion_path/" -type f -mtime +$change_time -print0 | while read filename; do Logger "Command output:\nWill delete file $filename" "NOTICE"; done
-			$FIND_CMD "$replica_deletion_path/" -type d -empty -mtime +$change_time -print0 | while read filename; do Logger "Command output:\nWill delete directory $filename" "NOTICE"; done
+			$FIND_CMD "$replica_deletion_path/" -type f -print0 | while read filename
+			do
+				if DaysHavePassed $filename $change_time; then
+					Logger "Command output:\nWill delete file $filename" "NOTICE"
+				fi
+			done
+			$FIND_CMD "$replica_deletion_path/" -type d -empty -print0 | while read filename
+			do
+				if DaysHavePassed $filename $change_time; then
+					Logger "Command output:\nWill delete directory $filename" "NOTICE"
+				fi
+			done
 		fi
 		if [ $_DRYRUN -ne 1 ]; then
-			$FIND_CMD "$replica_deletion_path/" -type f -mtime +$change_time -print0 | while read filename; do rm -f "$filename" > "$RUN_DIR/osync.$FUNCNAME.$SCRIPT_PID" 2>&1 & done
-			$FIND_CMD "$replica_deletion_path/" -type d -empty -mtime +$change_time -print0 | while read filename; do rm -rf "$filename" > "$RUN_DIR/osync.$FUNCNAME.$SCRIPT_PID" 2>&1 & done
+			$FIND_CMD "$replica_deletion_path/" -type f -print0 | while read filename
+			do
+				if DaysHavePassed $filename $change_time; then
+					rm -f "$filename" > "$RUN_DIR/osync.$FUNCNAME.$SCRIPT_PID" 2>&1 &
+				fi
+			done
+			$FIND_CMD "$replica_deletion_path/" -type d -empty -print0 | while read filename
+			do
+				if DaysHavePassed $filename $change_time; then
+					rm -rf "$filename" > "$RUN_DIR/osync.$FUNCNAME.$SCRIPT_PID" 2>&1 &
+				fi
+			done
 		else
 			Dummy &
 		fi
@@ -1805,14 +1825,14 @@ function _SoftDeleteRemote {
 	fi
 
 	if [ $_VERBOSE -eq 1 ]; then
-		cmd=$SSH_CMD' "if [ -w \"'$replica_deletion_path'\" ]; then '$COMMAND_SUDO' '$REMOTE_FIND_CMD' \"'$replica_deletion_path'/\" -type f -mtime +'$change_time' -print0 | while read filename; do echo Will delete file $filename; done && '$REMOTE_FIND_CMD' \"'$replica_deletion_path'/\" -type d -empty -mtime '$change_time' -print0 | while read filename; do echo Will delete directory $filename; done; fi" > "'$RUN_DIR/osync.$FUNCNAME.$SCRIPT_PID'" 2>&1'
+		cmd=$SSH_CMD' "if [ -w \"'$replica_deletion_path'\" ]; then '$COMMAND_SUDO' '$REMOTE_FIND_CMD' \"'$replica_deletion_path'/\" -type f -print0 | while read filename; do; if DaysHavePassed $filename $change_time; then echo Will delete file $filename; fi; done && '$REMOTE_FIND_CMD' \"'$replica_deletion_path'/\" -type d -empty -print0 | while read filename; do; if DaysHavePassed $filename $change_time; then echo Will delete directory $filename; fi; done; fi" > "'$RUN_DIR/osync.$FUNCNAME.$SCRIPT_PID'" 2>&1'
 		Logger "cmd: $cmd" "DEBUG"
 		eval "$cmd" &
 		Logger "Command output:\n$(cat $RUN_DIR/osync.$FUNCNAME.$SCRIPT_PID)" "NOTICE"
 	fi
 
 	if [ $_DRYRUN -ne 1 ]; then
-		cmd=$SSH_CMD' "if [ -w \"'$replica_deletion_path'\" ]; then '$COMMAND_SUDO' '$REMOTE_FIND_CMD' \"'$replica_deletion_path'/\" -type f -mtime +'$change_time' -print0 | while read filename; do rm -f \"$filename\"; done && '$REMOTE_FIND_CMD' \"'$replica_deletion_path'/\" -type d -empty -mtime '$change_time' -print0 | while read filename; do rm -rf \"$filename\"; done; fi" > "'$RUN_DIR/osync.$FUNCNAME.$SCRIPT_PID'" 2>&1'
+		cmd=$SSH_CMD' "if [ -w \"'$replica_deletion_path'\" ]; then '$COMMAND_SUDO' '$REMOTE_FIND_CMD' \"'$replica_deletion_path'/\" -type f -print0 | while read filename; do; if DaysHavePassed $filename $change_time; then rm -f \"$filename\"; fi; done && '$REMOTE_FIND_CMD' \"'$replica_deletion_path'/\" -type d -empty -print0 | while read filename; do; if DaysHavePassed $filename $change_time; then rm -rf \"$filename\"; fi; done; fi" > "'$RUN_DIR/osync.$FUNCNAME.$SCRIPT_PID'" 2>&1'
 		Logger "cmd: $cmd" "DEBUG"
 		eval "$cmd" &
 	else
@@ -2240,6 +2260,27 @@ function GetSpace {
 	esac
 
 	return 1
+}
+
+function DaysHavePassed {
+	__CheckArguments 0 $# $FUNCNAME "$*"	#__WITH_PARANOIA_DEBUG
+
+	local filename=$1
+	local days=$2
+
+	local seconds_since_epoch
+	seconds_since_epoch=$(date +%s)
+
+	local file_last_changed
+	file_last_changed=$(stat -c %Z -- "$filename")
+	file_last_changed=$(($file_last_changed - $seconds_since_epoch))
+	file_last_changed=$(($file_last_changed / 86400000)) #Days since last changed
+
+	if [[ $days -gt $file_last_changed ]]; then
+		return 1
+	else
+		return 0
+	fi
 }
 
 # Comand line argument flags
