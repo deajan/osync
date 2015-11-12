@@ -1,15 +1,15 @@
 #!/usr/bin/env bash
+SUBPROGRAM=osync
+PROGRAM="$SUBPROGRAM-batch" # Batch program to run osync / obackup instances sequentially and rerun failed ones
+AUTHOR="(L) 2013-2015 by Orsiris \"Ozy\" de Jong"
+CONTACT="http://www.netpower.fr - ozy@netpower.fr"
+PROGRAM_BUILD=2015103001
 
-PROGRAM="Osync-batch" # Batch program to run osync instances sequentially and rerun failed ones
-AUTHOR="(L) 2013-2014 by Orsiris \"Ozy\" de Jong"
-CONTACT="http://www.netpower.fr/osync - ozy@netpower.fr"
-PROGRAM_BUILD=2015092901
-
-## Runs an osync instance for every conf file found
+## Runs an osync /obackup instance for every conf file found
 ## If an instance fails, run it again if time permits
 
-## Configuration file path. The path where all the osync conf files are, usually /etc/osync
-CONF_FILE_PATH=/etc/osync
+## Configuration file path. The path where all the osync / obackup conf files are, usually /etc/osync or /etc/obackup
+CONF_FILE_PATH=/etc/$SUBPROGRAM
 
 ## If maximum execution time is not reached, failed instances will be rerun. Max exec time is in seconds. Example is set to 10 hours.
 MAX_EXECUTION_TIME=36000
@@ -19,9 +19,9 @@ MAX_RERUNS=3
 
 ## Log file path
 if [ -w /var/log ]; then
-	LOG_FILE=/var/log/osync-batch.log
+	LOG_FILE=/var/log/$SUBPROGRAM-batch.log
 else
-	LOG_FILE=./osync-batch.log
+	LOG_FILE=./$SUBPROGRAM-batch.log
 fi
 
 # No need to edit under this line ##############################################################
@@ -30,7 +30,7 @@ function _logger {
 	local value="${1}" # What to log
 	echo -e "$value" >> "$LOG_FILE"
 
-	if [ $silent -eq 0 ]; then
+	if [ $_SILENT -eq 0 ]; then
 		echo -e "$value"
 	fi
 }
@@ -62,18 +62,18 @@ function Logger {
 }
 
 function CheckEnvironment {
-	## Osync executable full path can be set here if it cannot be found on the system
-	if ! type -p osync.sh > /dev/null 2>&1
+	## osync / obackup executable full path can be set here if it cannot be found on the system
+	if ! type -p $SUBPROGRAM.sh > /dev/null 2>&1
 	then
-		if [ -f /usr/local/bin/osync.sh ]
+		if [ -f /usr/local/bin/$SUBPROGRAM.sh ]
 		then
-			OSYNC_EXECUTABLE=/usr/local/bin/osync.sh
+			SUBPROGRAM_EXECUTABLE=/usr/local/bin/$SUBPROGRAM.sh
 		else
-			Logger "Could not find osync.sh" "CRITICAL"
+			Logger "Could not find $SUBPROGRAM.sh" "CRITICAL"
 			exit 1
 		fi
 	else
-		OSYNC_EXECUTABLE=$(type -p osync.sh)
+		SUBPROGRAM_EXECUTABLE=$(type -p $SUBPROGRAM.sh)
 	fi
 
 	## Check for CONF_FILE_PATH
@@ -97,10 +97,10 @@ function Batch {
 	RERUNS=0
 	while ([ $MAX_EXECUTION_TIME -gt $SECONDS ] || [ $MAX_EXECUTION_TIME -eq 0 ]) && [ "$RUN" != "" ] && [ $MAX_RERUNS -gt $RERUNS ]
 	do
-		Logger "Osync instances will be run for: $RUN" "NOTICE"
+		Logger "$SUBPROGRAM instances will be run for: $RUN" "NOTICE"
 		for i in $RUN
 		do
-			$OSYNC_EXECUTABLE "$i" $opts &
+			$SUBPROGRAM_EXECUTABLE "$i" $opts &
 			wait $!
 			if [ $? != 0 ]; then
 				Logger "Run instance $(basename $i) failed" "ERROR"
@@ -124,37 +124,37 @@ function Usage {
 	echo $AUTHOR
 	echo $CONTACT
 	echo ""
-	echo "Batch script to sequentially run osync instances and rerun failed ones."
-	echo "Usage: osync-batch.sh [OPTIONS]"
+	echo "Batch script to sequentially run osync or obackup instances and rerun failed ones."
+	echo "Usage: $SUBPROGRAM-batch.sh [OPTIONS]"
 	echo ""
 	echo "[OPTIONS]"
-	echo "--path=/path/to/conf      Path to osync conf files, defaults to /etc/osync"
+	echo "--path=/path/to/conf      Path to osync / obackup conf files, defaults to /etc/osync or /etc/obackup"
 	echo "--max-reruns=X            Number of runs  max for failed instances, (defaults to 3)"
 	echo "--max-exec-time=X         Retry failed instances only if max execution time not reached (defaults to 36000 seconds). Set to 0 to bypass execution time check."
-	echo "--no-maxtime		Run osync without honoring conf file defined timeouts"
-	echo "--dry                     Will run osync without actually doing anything; just testing"
-	echo "--silent                  Will run osync without any output to stdout, used for cron jobs"
+	echo "--no-maxtime		Run osync / obackup without honoring conf file defined timeouts"
+	echo "--dry                     Will run osync / obackup without actually doing anything; just testing"
+	echo "--silent                  Will run osync / obackup without any output to stdout, used for cron jobs"
 	echo "--verbose                 Increases output"
 	exit 128
 }
 
-silent=0
-dry=0
-verbose=0
+_SILENT=0
+_DRY=0
+_VERBOSE=0
 opts=""
 for i in "$@"
 do
 	case $i in
 		--silent)
-		silent=1
+		_SILENT=1
 		opts=$opts" --silent"
 		;;
 		--dry)
-		dry=1
+		_DRY=1
 		opts=$opts" --dry"
 		;;
 		--verbose)
-		verbose=1
+		_VERBOSE=1
 		opts=$opts" --verbose"
 		;;
 		--no-maxtime)
@@ -180,5 +180,5 @@ do
 done
 
 CheckEnvironment
-Logger "$(date) Osync batch run" "NOTICE"
+Logger "$(date) $SUBPROGRAM batch run" "NOTICE"
 Batch

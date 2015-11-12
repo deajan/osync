@@ -24,6 +24,10 @@ _SILENT=0
 ERROR_ALERT=0
 WARN_ALERT=0
 
+## allow function call checks			#__WITH_PARANOIA_DEBUG
+if [ "$_PARANOIA_DEBUG" == "yes" ];then		#__WITH_PARANOIA_DEBUG
+	_DEBUG=yes				#__WITH_PARANOIA_DEBUG
+fi						#__WITH_PARANOIA_DEBUG
 
 ## allow debugging from command line with _DEBUG=yes
 if [ ! "$_DEBUG" == "yes" ]; then
@@ -75,6 +79,7 @@ ALERT_LOG_FILE="$RUN_DIR/$PROGRAM.last.log"
 
 
 function Dummy {
+	__CheckArguments 0 $# $FUNCNAME "$@"	#__WITH_PARANOIA_DEBUG
 	sleep .1
 }
 
@@ -120,6 +125,11 @@ function Logger {
 			_Logger "$prefix$value"
 			return
 		fi
+	elif [ "$level" == "PARANOIA_DEBUG" ]; then		#__WITH_PARANOIA_DEBUG
+		if [ "$_PARANOIA_DEBUG" == "yes" ]; then	#__WITH_PARANOIA_DEBUG
+			_Logger "$prefix$value"			#__WITH_PARANOIA_DEBUG
+			return					#__WITH_PARANOIA_DEBUG
+		fi						#__WITH_PARANOIA_DEBUG
 	else
 		_Logger "\e[41mLogger function called without proper loglevel.\e[0m"
 		_Logger "$prefix$value"
@@ -225,6 +235,7 @@ function IsNumeric {
 }
 
 function CleanUp {
+	__CheckArguments 0 $# $FUNCNAME "$@"	#__WITH_PARANOIA_DEBUG
 
 	if [ "$_DEBUG" != "yes" ]; then
 		rm -f "$RUN_DIR/$PROGRAM."*".$SCRIPT_PID"
@@ -232,6 +243,7 @@ function CleanUp {
 }
 
 function SendAlert {
+	__CheckArguments 0 $# $FUNCNAME "$@"	#__WITH_PARANOIA_DEBUG
 
 	if [ "$_DEBUG" == "yes" ]; then
 		Logger "Debug mode, no warning email will be sent." "NOTICE"
@@ -318,6 +330,7 @@ function SendAlert {
 }
 
 function LoadConfigFile {
+	__CheckArguments 1 $# $FUNCNAME "$@"	#__WITH_PARANOIA_DEBUG
 
 	local config_file="${1}"
 
@@ -335,6 +348,7 @@ function LoadConfigFile {
 }
 
 function GetLocalOS {
+	__CheckArguments 0 $# $FUNCNAME "$@"	#__WITH_PARANOIA_DEBUG
 
 	local local_os_var=$(uname -spio 2>&1)
 	if [ $? != 0 ]; then
@@ -366,6 +380,7 @@ function GetLocalOS {
 }
 
 function GetRemoteOS {
+	__CheckArguments 0 $# $FUNCNAME "$@"	#__WITH_PARANOIA_DEBUG
 
 	if [ "$REMOTE_OPERATION" == "yes" ]; then
 		CheckConnectivity3rdPartyHosts
@@ -427,6 +442,8 @@ function WaitForTaskCompletion {
 	local soft_max_time="${2}" # If program with pid $pid takes longer than $soft_max_time seconds, will log a warning, unless $soft_max_time equals 0.
 	local hard_max_time="${3}" # If program with pid $pid takes longer than $hard_max_time seconds, will stop execution, unless $hard_max_time equals 0.
 	local caller_name="${4}" # Who called this function
+	Logger "$FUNCNAME called by [$caller_name]." "PARANOIA_DEBUG"	#__WITH_PARANOIA_DEBUG
+	__CheckArguments 4 $# $FUNCNAME "$@"				#__WITH_PARANOIA_DEBUG
 
 	local soft_alert=0 # Does a soft alert need to be triggered, if yes, send an alert once
 	local log_ttime=0 # local time instance for comparaison
@@ -470,6 +487,7 @@ function WaitForTaskCompletion {
 	done
 	wait $pid
 	local retval=$?
+	Logger "$FUNCNAME ended for [$caller_name] with status $retval." "PARANOIA_DEBUG"	#__WITH_PARANOIA_DEBUG
 	return $retval
 }
 
@@ -478,6 +496,8 @@ function WaitForCompletion {
 	local soft_max_time="${2}" # If program with pid $pid takes longer than $soft_max_time seconds, will log a warning, unless $soft_max_time equals 0.
 	local hard_max_time="${3}" # If program with pid $pid takes longer than $hard_max_time seconds, will stop execution, unless $hard_max_time equals 0.
 	local caller_name="${4}" # Who called this function
+	Logger "$FUNCNAME called by [$caller_name]" "PARANOIA_DEBUG"	#__WITH_PARANOIA_DEBUG
+	__CheckArguments 4 $# $FUNCNAME "$@"				#__WITH_PARANOIA_DEBUG
 
 	local soft_alert=0 # Does a soft alert need to be triggered, if yes, send an alert once
 	local log_ttime=0 # local time instance for comparaison
@@ -519,12 +539,14 @@ function WaitForCompletion {
 	done
 	wait $pid
 	retval=$?
+	Logger "$FUNCNAME ended for [$caller_name] with status $retval." "PARANOIA_DEBUG"	#__WITH_PARANOIA_DEBUG
 	return $retval
 }
 
 function RunLocalCommand {
 	local command="${1}" # Command to run
 	local hard_max_time="${2}" # Max time to wait for command to compleet
+	__CheckArguments 2 $# $FUNCNAME "$@"	#__WITH_PARANOIA_DEBUG
 
 	if [ $_DRYRUN -ne 0 ]; then
 		Logger "Dryrun: Local command [$command] not run." "NOTICE"
@@ -554,6 +576,7 @@ function RunLocalCommand {
 function RunRemoteCommand {
 	local command="${1}" # Command to run
 	local hard_max_time="${2}" # Max time to wait for command to compleet
+	__CheckArguments 2 $# $FUNCNAME "$@"	#__WITH_PARANOIA_DEBUG
 
 	CheckConnectivity3rdPartyHosts
 	CheckConnectivityRemoteHost
@@ -585,6 +608,7 @@ function RunRemoteCommand {
 }
 
 function RunBeforeHook {
+	__CheckArguments 0 $# $FUNCNAME "$@"	#__WITH_PARANOIA_DEBUG
 
 	if [ "$LOCAL_RUN_BEFORE_CMD" != "" ]; then
 		RunLocalCommand "$LOCAL_RUN_BEFORE_CMD" $MAX_EXEC_TIME_PER_CMD_BEFORE
@@ -596,6 +620,7 @@ function RunBeforeHook {
 }
 
 function RunAfterHook {
+	__CheckArguments 0 $# $FUNCNAME "$@"	#__WITH_PARANOIA_DEBUG
 
 	if [ "$LOCAL_RUN_AFTER_CMD" != "" ]; then
 		RunLocalCommand "$LOCAL_RUN_AFTER_CMD" $MAX_EXEC_TIME_PER_CMD_AFTER
@@ -607,6 +632,7 @@ function RunAfterHook {
 }
 
 function CheckConnectivityRemoteHost {
+	__CheckArguments 0 $# $FUNCNAME "$@"	#__WITH_PARANOIA_DEBUG
 
 	if [ "$_PARANOIA_DEBUG" != "yes" ]; then # Do not loose time in paranoia debug
 
@@ -622,6 +648,7 @@ function CheckConnectivityRemoteHost {
 }
 
 function CheckConnectivity3rdPartyHosts {
+	__CheckArguments 0 $# $FUNCNAME "$@"	#__WITH_PARANOIA_DEBUG
 
 	if [ "$_PARANOIA_DEBUG" != "yes" ]; then # Do not loose time in paranoia debug
 
@@ -649,9 +676,80 @@ function CheckConnectivity3rdPartyHosts {
 }
 
 #__BEGIN_WITH_PARANOIA_DEBUG
+function __CheckArguments {
+	# Checks the number of arguments of a function and raises an error if some are missing
+
+	if [ "$_DEBUG" == "yes" ]; then
+                local number_of_arguments="${1}" # Number of arguments the tested function should have
+                local number_of_given_arguments="${2}" # Number of arguments that have been passed
+                local function_name="${3}" # Function name that called __CheckArguments
+
+		if [ "$_PARANOIA_DEBUG" == "yes" ]; then
+			Logger "Entering function [$function_name]." "DEBUG"
+		fi
+
+                # All arguments of the function to check are passed as array in ${4} (the function call waits for $@)
+                # If any of the arguments contains spaces, bash things there are two aguments
+                # In order to avoid this, we need to iterate over ${4} and count
+
+                local iterate=4
+                local fetch_arguments=1
+                local arg_list=""
+                while [ $fetch_arguments -eq 1 ]; do
+                        cmd='argument=${'$iterate'}'
+                        eval $cmd
+                        if [ "$argument" = "" ]; then
+                                fetch_arguments=0
+                        else
+                                arg_list="$arg_list [Argument $(($iterate-3)): $argument]"
+                                iterate=$(($iterate+1))
+                        fi
+                done
+                local counted_arguments=$((iterate-4))
+
+                if [ $counted_arguments -ne $number_of_arguments ]; then
+                        Logger "Function $function_name may have inconsistent number of arguments. Expected: $number_of_arguments, count: $counted_arguments, see log file." "ERROR"
+                        Logger "Arguments passed: $arg_list" "ERROR"
+                fi
+	fi
+}
+
+
+function old__CheckArguments {
+	# Checks the number of arguments and raises an error if some are missing
+	if [ "$_DEBUG" == "yes" ]; then
+
+		local number_of_arguments="${1}" # Number of arguments a function should have
+		local number_of_given_arguments="${2}" # Number of arguments that have been passed
+		local function_name="${3}" # Function name that called __CheckArguments
+		local arguments="${4}" # All other arguments
+
+		if [ "$_PARANOIA_DEBUG" == "yes" ]; then
+			Logger "Entering function [$function_name]." "DEBUG"
+
+			# Paranoia check... Can help finding empty arguments. __CheckArguments should be grepped out in production builds.
+			local count=-3 # Number of arguments minus the function calls for __CheckArguments
+			for i in $@; do
+				count=$((count + 1))
+			done
+			if [ $count -ne $1 ]; then
+				Logger "Function $function_name may have inconsistent number of arguments. Expected: $number_of_arguments, count: $count, see log file." "WARN"
+				echo "Argument list (including checks): $*" >> "$LOG_FILE"
+			fi
+		fi
+
+		if [ $number_of_arguments -ne $number_of_given_arguments ]; then
+			Logger "Inconsistnent number of arguments in $function_name. Should have $number_of_arguments arguments, has $number_of_given_arguments arguments, see log file." "CRITICAL"
+			# Cannot user Logger here because $@ is a list of arguments
+			echo "Argumnt list: $4" >> "$LOG_FILE"
+		fi
+
+	fi
+}
 #__END_WITH_PARANOIA_DEBUG
 
 function PreInit {
+	 __CheckArguments 0 $# $FUNCNAME "$@"    #__WITH_PARANOIA_DEBUG
 
 	## SSH compression
         if [ "$SSH_COMPRESSION" != "no" ]; then
@@ -742,6 +840,7 @@ function PreInit {
 }
 
 function PostInit {
+        __CheckArguments 0 $# $FUNCNAME "$@"    #__WITH_PARANOIA_DEBUG
 
 	# Define remote commands
         SSH_CMD="$(type -p ssh) $SSH_COMP -i $SSH_RSA_PRIVATE_KEY $REMOTE_USER@$REMOTE_HOST -p $REMOTE_PORT"
@@ -750,6 +849,7 @@ function PostInit {
 }
 
 function InitLocalOSSettings {
+        __CheckArguments 0 $# $FUNCNAME "$@"    #__WITH_PARANOIA_DEBUG
 
         ## If running under Msys, some commands do not run the same way
         ## Using mingw version of find instead of windows one
@@ -777,6 +877,7 @@ function InitLocalOSSettings {
 }
 
 function InitRemoteOSSettings {
+        __CheckArguments 0 $# $FUNCNAME "$@"    #__WITH_PARANOIA_DEBUG
 
         ## MacOSX does not use the -E parameter like Linux or BSD does (-E is mapped to extended attrs instead of preserve executability)
         if [ "$LOCAL_OS" != "MacOSX" ] && [ "$REMOTE_OS" != "MacOSX" ]; then
@@ -849,6 +950,7 @@ function TrapQuit {
 }
 
 function CheckEnvironment {
+	__CheckArguments 0 $# $FUNCNAME "$@"    #__WITH_PARANOIA_DEBUG
 
 	if [ "$REMOTE_OPERATION" == "yes" ]; then
 		if ! type ssh > /dev/null 2>&1 ; then
@@ -867,6 +969,7 @@ function CheckEnvironment {
 
 function _CreateStateDirsLocal {
 	local replica_state_dir="${1}"
+	__CheckArguments 1 $# $FUNCNAME "$@"	#__WITH_PARANOIA_DEBUG
 
 	if ! [ -d "$replica_state_dir" ]; then
 		$COMMAND_SUDO mkdir -p "$replica_state_dir" > "$RUN_DIR/$PROGRAM.$FUNCNAME.$SCRIPT_PID" 2>&1
@@ -880,6 +983,7 @@ function _CreateStateDirsLocal {
 
 function _CreateStateDirsRemote {
 	local replica_state_dir="${1}"
+	__CheckArguments 1 $# $FUNCNAME "$@"	#__WITH_PARANOIA_DEBUG
 
 	CheckConnectivity3rdPartyHosts
 	CheckConnectivityRemoteHost
@@ -896,6 +1000,7 @@ function _CreateStateDirsRemote {
 }
 
 function CreateStateDirs {
+	__CheckArguments 0 $# $FUNCNAME "$@"	#__WITH_PARANOIA_DEBUG
 
 	_CreateStateDirsLocal "$INITIATOR_STATE_DIR"
 	if [ "$REMOTE_OPERATION" != "yes" ]; then
@@ -907,6 +1012,7 @@ function CreateStateDirs {
 
 function _CheckReplicaPathsLocal {
 	local replica_path="${1}"
+	__CheckArguments 1 $# $FUNCNAME "$@"	#__WITH_PARANOIA_DEBUG
 
 	if [ ! -d "$replica_path" ]; then
 		if [ "$CREATE_DIRS" == "yes" ]; then
@@ -932,6 +1038,7 @@ function _CheckReplicaPathsLocal {
 
 function _CheckReplicaPathsRemote {
 	local replica_path="${1}"
+	__CheckArguments 1 $# $FUNCNAME "$@"	#__WITH_PARANOIA_DEBUG
 
 	CheckConnectivity3rdPartyHosts
 	CheckConnectivityRemoteHost
@@ -956,6 +1063,7 @@ function _CheckReplicaPathsRemote {
 }
 
 function CheckReplicaPaths {
+	__CheckArguments 0 $# $FUNCNAME "$@"	#__WITH_PARANOIA_DEBUG
 
 	#INITIATOR_SYNC_DIR_CANN=$(realpath "$INITIATOR_SYNC_DIR")	#TODO: investigate realpath & readlink issues on MSYS and busybox here
 	#TARGET_SYNC_DIR_CANN=$(realpath "$TARGET_SYNC_DIR")
@@ -977,6 +1085,7 @@ function CheckReplicaPaths {
 
 function _CheckDiskSpaceLocal {
 	local replica_path="${1}"
+	__CheckArguments 1 $# $FUNCNAME "$@"	#__WITH_PARANOIA_DEBUG
 
 	Logger "Checking minimum disk space in [$replica_path]." "NOTICE"
 
@@ -988,6 +1097,7 @@ function _CheckDiskSpaceLocal {
 
 function _CheckDiskSpaceRemote {
 	local replica_path="${1}"
+	__CheckArguments 1 $# $FUNCNAME "$@"	#__WITH_PARANOIA_DEBUG
 
 	Logger "Checking minimum disk space on target [$replica_path]." "NOTICE"
 
@@ -1010,6 +1120,7 @@ function _CheckDiskSpaceRemote {
 }
 
 function CheckDiskSpace {
+	__CheckArguments 0 $# $FUNCNAME "$@"	#__WITH_PARANOIA_DEBUG
 
 	_CheckDiskSpaceLocal "$INITIATOR_SYNC_DIR"
 	if [ "$REMOTE_OPERATION" != "yes" ]; then
@@ -1020,6 +1131,7 @@ function CheckDiskSpace {
 }
 
 function RsyncExcludePattern {
+	__CheckArguments 0 $# $FUNCNAME "$@"	#__WITH_PARANOIA_DEBUG
 
 	# Disable globbing so wildcards from exclusions do not get expanded
 	set -f
@@ -1046,6 +1158,7 @@ function RsyncExcludePattern {
 }
 
 function RsyncExcludeFrom {
+	__CheckArguments 0 $# $FUNCNAME "$@"	#__WITH_PARANOIA_DEBUG
 
 	if [ ! "$RSYNC_EXCLUDE_FROM" == "" ]; then
 		## Check if the exclude list has a full path, and if not, add the config file path if there is one
@@ -1061,6 +1174,7 @@ function RsyncExcludeFrom {
 
 function _WriteLockFilesLocal {
 	local lockfile="${1}"
+	__CheckArguments 1 $# $FUNCNAME "$@"	#__WITH_PARANOIA_DEBUG
 
 	$COMMAND_SUDO echo "$SCRIPT_PID@$INSTANCE_ID" > "$lockfile" #TODO: Determine best format for lockfile for v2
 	if [ $?	!= 0 ]; then
@@ -1073,6 +1187,7 @@ function _WriteLockFilesLocal {
 
 function _WriteLockFilesRemote {
 	local lockfile="${1}"
+	__CheckArguments 1 $# $FUNCNAME "$@"	#__WITH_PARANOIA_DEBUG
 
 	CheckConnectivity3rdPartyHosts
 	CheckConnectivityRemoteHost
@@ -1090,6 +1205,7 @@ function _WriteLockFilesRemote {
 }
 
 function WriteLockFiles {
+	__CheckArguments 0 $# $FUNCNAME "$@"	#__WITH_PARANOIA_DEBUG
 
 	_WriteLockFilesLocal "$INITIATOR_LOCKFILE"
 	if [ "$REMOTE_OPERATION" != "yes" ]; then
@@ -1101,6 +1217,7 @@ function WriteLockFiles {
 
 function _CheckLocksLocal {
 	local lockfile="${1}"
+	__CheckArguments 1 $# $FUNCNAME "$@"	#__WITH_PARANOIA_DEBUG
 
 	if [ -f "$lockfile" ]; then
 		local lockfile_content=$(cat $lockfile)
@@ -1119,6 +1236,7 @@ function _CheckLocksLocal {
 
 function _CheckLocksRemote { #TODO: Rewrite this a bit more beautiful
 	local lockfile="${1}"
+	__CheckArguments 1 $# $FUNCNAME "$@"	#__WITH_PARANOIA_DEBUG
 
 	CheckConnectivity3rdPartyHosts
 	CheckConnectivityRemoteHost
@@ -1162,6 +1280,7 @@ function _CheckLocksRemote { #TODO: Rewrite this a bit more beautiful
 }
 
 function CheckLocks {
+	__CheckArguments 0 $# $FUNCNAME "$@"	#__WITH_PARANOIA_DEBUG
 
 	if [ $_NOLOCKS -eq 1 ]; then
 		return 0
@@ -1186,6 +1305,7 @@ function CheckLocks {
 
 function _UnlockReplicasLocal {
 	local lockfile="${1}"
+	__CheckArguments 1 $# $FUNCNAME "$@"	#__WITH_PARANOIA_DEBUG
 
 	if [ -f "$lockfile" ]; then
 		$COMMAND_SUDO rm "$lockfile"
@@ -1199,6 +1319,7 @@ function _UnlockReplicasLocal {
 
 function _UnlockReplicasRemote {
 	local lockfile="${1}"
+	__CheckArguments 1 $# $FUNCNAME "$@"	#__WITH_PARANOIA_DEBUG
 
 	CheckConnectivity3rdPartyHosts
 	CheckConnectivityRemoteHost
@@ -1216,6 +1337,7 @@ function _UnlockReplicasRemote {
 }
 
 function UnlockReplicas {
+	__CheckArguments 0 $# $FUNCNAME "$@"	#__WITH_PARANOIA_DEBUG
 
 	if [ $_NOLOCKS -eq 1 ]; then
 		return 0
@@ -1240,6 +1362,7 @@ function tree_list {
 	local replica_path="${1}" # path to the replica for which a tree needs to be constructed
 	local replica_type="${2}" # replica type: initiator, target
 	local tree_filename="${3}" # filename to output tree (will be prefixed with $replica_type)
+	__CheckArguments 3 $# $FUNCNAME "$@"	#__WITH_PARANOIA_DEBUG
 
 	local escaped_replica_path=$(EscapeSpaces "$replica_path") #TODO: See if escpaed still needed when using singlequotes instead of doublequotes for command eval
 
@@ -1273,6 +1396,7 @@ function delete_list {
 	local tree_file_current="${3}" # tree-file-current, will be prefixed with replica type
 	local deleted_list_file="${4}" # file containing deleted file list, will be prefixed with replica type
 	local deleted_failed_list_file="${5}" # file containing files that could not be deleted on last run, will be prefixed with replica type
+	__CheckArguments 5 $# $FUNCNAME "$@"	#__WITH_PARANOIA_DEBUG
 
 	# TODO: Check why external filenames are used (see _DRYRUN option because of NOSUFFIX)
 
@@ -1308,6 +1432,7 @@ function sync_update {
 	local source_replica="${1}" # Contains replica type of source: initiator, target
 	local destination_replica="${2}" # Contains replica type of destination: initiator, target
 	local delete_list_filename="${3}" # Contains deleted list filename, will be prefixed with replica type
+	__CheckArguments 3 $# $FUNCNAME "$@"	#__WITH_PARANOIA_DEBUG
 
 	Logger "Updating $destination_replica replica." "NOTICE"
 	if [ "$source_replica" == "initiator" ]; then
@@ -1361,6 +1486,7 @@ function _delete_local {
 	local deleted_list_file="${2}" # file containing deleted file list, will be prefixed with replica type
 	local deletion_dir="${3}" # deletion dir in format .[workdir]/deleted
 	local deleted_failed_list_file="${4}" # file containing files that could not be deleted on last run, will be prefixed with replica type
+	__CheckArguments 4 $# $FUNCNAME "$@"	#__WITH_PARANOIA_DEBUG
 
 	## On every run, check wheter the next item is already deleted because it is included in a directory already deleted
 	previous_file=""
@@ -1422,6 +1548,7 @@ function _delete_remote {
 	local deleted_list_file="${2}" # file containing deleted file list, will be prefixed with replica type
 	local deletion_dir="${3}" # deletion dir in format .[workdir]/deleted
 	local deleted_failed_list_file="${4}" # file containing files that could not be deleted on last run, will be prefixed with replica type
+	__CheckArguments 4 $# $FUNCNAME "$@"	#__WITH_PARANOIA_DEBUG
 
 	## This is a special coded function. Need to redelcare local functions on remote host, passing all needed variables as escaped arguments to ssh command.
 	## Anything beetween << ENDSSH and ENDSSH will be executed remotely
@@ -1567,6 +1694,7 @@ function deletion_propagation {
 	local replica_type="${1}" # Contains replica type: initiator, target
 	local deleted_list_file="${2}" # file containing deleted file list, will be prefixed with replica type
 	local deleted_failed_list_file="${3}" # file containing files that could not be deleted on last run, will be prefixed with replica type
+	__CheckArguments 3 $# $FUNCNAME "$@"	#__WITH_PARANOIA_DEBUG
 
 	Logger "Propagating deletions to $replica_type replica." "NOTICE"
 
@@ -1616,6 +1744,7 @@ function deletion_propagation {
 ###### Step 5: Create after run tree list for initiator and target replicas (Steps 5M and 5S)
 
 function Sync {
+	__CheckArguments 0 $# $FUNCNAME "$@"	#__WITH_PARANOIA_DEBUG
 
 	Logger "Starting synchronization task." "NOTICE"
 	CheckConnectivity3rdPartyHosts
@@ -1778,6 +1907,7 @@ function _SoftDeleteLocal {
 	local replica_type="${1}" # replica type (initiator, target)
 	local replica_deletion_path="${2}" # Contains the full path to softdelete / backup directory without ending slash
 	local change_time="${3}"
+	__CheckArguments 3 $# $FUNCNAME "$@"	#__WITH_PARANOIA_DEBUG
 
 	if [ -d "$replica_deletion_path" ]; then
 		if [ $_DRYRUN -eq 1 ]; then
@@ -1814,6 +1944,7 @@ function _SoftDeleteRemote {
 	local replica_type="${1}"
 	local replica_deletion_path="${2}" # Contains the full path to softdelete / backup directory without ending slash
 	local change_time="${3}"
+	__CheckArguments 3 $# $FUNCNAME "$@"	#__WITH_PARANOIA_DEBUG
 
 	CheckConnectivity3rdPartyHosts
 	CheckConnectivityRemoteHost
@@ -1850,6 +1981,7 @@ function _SoftDeleteRemote {
 }
 
 function SoftDelete {
+	__CheckArguments 0 $# $FUNCNAME "$@"	#__WITH_PARANOIA_DEBUG
 
 	if [ "$CONFLICT_BACKUP" != "no" ] && [ $CONFLICT_BACKUP_DAYS -ne 0 ]; then
 		Logger "Running conflict backup cleanup." "NOTICE"
@@ -1875,6 +2007,7 @@ function SoftDelete {
 }
 
 function Init {
+	__CheckArguments 0 $# $FUNCNAME "$@"	#__WITH_PARANOIA_DEBUG
 
 	# Set error exit code if a piped command fails
 	set -o pipefail
@@ -2003,6 +2136,7 @@ function Init {
 }
 
 function Main {
+	__CheckArguments 0 $# $FUNCNAME "$@"	#__WITH_PARANOIA_DEBUG
 
 	CreateStateDirs
 	CheckLocks
@@ -2010,6 +2144,7 @@ function Main {
 }
 
 function Usage {
+	__CheckArguments 0 $# $FUNCNAME "$@"	#__WITH_PARANOIA_DEBUG
 
 	if [ "$IS_STABLE" != "yes" ]; then
 		echo -e "\e[93mThis is an unstable dev build. Please use with caution.\e[0m"
@@ -2048,6 +2183,7 @@ function Usage {
 }
 
 function SyncOnChanges {
+	__CheckArguments 0 $# $FUNCNAME "$@"	#__WITH_PARANOIA_DEBUG
 
 	if ! type inotifywait > /dev/null 2>&1 ; then
 		Logger "No inotifywait command found. Cannot monitor changes." "CRITICAL"

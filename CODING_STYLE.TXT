@@ -1,8 +1,9 @@
-Coding style used for my bash projects (v2 Sep 2015)
+Coding style used for my bash projects (v2.1 Oct 2015)
 
-++++ Header
+++++++ Header
 
 Always use the following header
+
 ----BEGIN HEADER
 #!/usr/bin/env bash
 
@@ -17,31 +18,38 @@ PROGRAM_BUILD=YYYYMMDDVV
 Using bind style versionning:
 YYYYMMDDVV (Year, Month, Day, Revision): Example: 2015012402 = 2nd revision of 24 Jan 2015
 
+#!/usr/bin/env bash instead of #!/bin/bash
 
-++++ Indentation
+Change old scripts with
+for i in $(grep -r '#!/bin/bash' * |cut -f1 -d':'); do sed -i 's&#!/bin/bash&#!/usr/bin/env bash&g' $i; done
+
+
+type instead of type -p for bash test (other shells don't know -p)
+++++++ Indentation
 
 Using tabs
 Transform old shell scripts using unexpand command
 
-++++ Comments
+++++++ Comments
 
 Some command # comment
 ## Some comment on a new line
 ################################################# Some separation
 
-++++ Work comments
+++++++ Work comments
 
-Whenever there is some idea to postpone, use #TODO:dev-name: some remark
+Whenever there is some idea to postpone, use #TODO[-version]:[dev-name:] some remark
 A marker must be left where on the line a dev is working (when the work isn't finished). Marker is #WIP:dev-name: some remark
 dev-name is mandatory if more than one person is coding
+Example: #TODO-v2.1:deajan: need to do something
 
-++++ Variables
+++++++ Variables
 
 All local variables are lowercase, separated by _ (ex: low_wait)
 All global variables full upercase, separated by _ (ex: EXEC_TIME)
 All environment variables (verbose, silent, debug, etc) have prefix _ and are full upercase, separated by _ (ex: _PARANOIA_DEBUG)
 
-++++ Functions
+++++++ Functions
 
 Every word in a function begins with an uppercase (ex: SomeFunctionDoesThings)
 
@@ -64,11 +72,11 @@ function thirdthing {
 	return $?
 }
 
-++++ Sub functions
+++++++ Sub functions
 
 When a function is a subroutine of another function, it is called _SomethingAsSubFunction
 
-++++ Function argument check
+++++++ Function argument check
 
 Bash does not provide any checks against missing function arguments. Also, missing quotes can lead to an inconsistent number of arguments.
 Every function call will be checked by __CheckArguments which takes the number of arguments, $# (the real number of args given), the parent function name and the parent function's arguments.
@@ -84,7 +92,7 @@ function Something {
 __CheckArguments will only trigger if script is called with DEBUG=yes
 Also, with PARANOIA_DEBUG=yes, __CheckArguments will recount all arguments given by "$*" and compare. This can mislead if arguments contain spaces.
 
-++++ If statements
+++++++ If statements
 
 If statements will be fully written (word "if" must be used). then is written on the same line.
 (Use sed ':a;N;$!ba;s/]\n\t*then/]; then/g' to convert files to this format... Replace "],new line, zero or more tabs, then" by "; then")
@@ -94,7 +102,7 @@ else
 	other stuff
 fi
 
-++++ Logging
+++++++ Logging
 
 A logging function is available with the following levels of logging:
 
@@ -104,26 +112,36 @@ A logging function is available with the following levels of logging:
 - ERROR: Program produced an error but continues execution
 - CRITICAL: Program execution is halted
 
-++++ Eval
+++++++ Eval
 
 Most commands should be logged to a tmp file.
 The basic way of doing is:
 
-cmd='something > some_file 2>&1'
+cmd='"something '$somevar'" > some_file 2>&1'
 eval $cmd &
-WaitForTaskCompletion $! 0 0 "some function name"
-
-When executing rsync commands, errors should always be logged
-rsync_cmd='something > some_file'
-eval $cmd 2>> $LOG_FILE &
-WaitForTaskCompletion $! 0 0 "some other funcion"
+WaitForTaskCompletion $! 0 0 $FUNCNAME
 
 Remote commands should exist as:
 
 cmd=$SSH_CMD' "some; commands \"'$VARIABLE'\" some; other; commands" > some_file 2>&1'
 
-++++ File variables
+++++++ File variables
 
 All eval cmd should exit their content to a file called "$RUNDIR/osync.$FUNCNAME.$SCRIPT_PID"
 Dots are used instead of '_' so variables can be separated with a forbidden char in variables, so they get detected.
+
+++++++ Finding code errors
+
+Use shellcheck.net now and then (ignore SC2086 in our case)
+
+Use a low tech approach to find uneven number of quotes per line
+
+tr -cd "'\n" < my_bash_file.sh | awk 'length%2==1 {print NR, $0}'
+tr -cd "\"\n" < my_bash_file.sh | awk 'length%2==1 {print NR, $0}'
+
+++++++ ofunctions
+
+As obackup and osync share alot of common functions, ofunctions.sh will host all shared code.
+Dev programs n_osync.sh and n_obackup.sh will source ofunctions.sh
+Release programs will still include ofunctions.sh in order to enhance ease of use.
 
