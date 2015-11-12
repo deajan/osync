@@ -12,7 +12,8 @@ KNOWN ISSUES
 RECENT CHANGES
 --------------
 
-! Check for deletion failed list file before trying to copy it back (normally empty file is created anyway)
+! XX Dec 2015: osync v1.1 released
+- Fully merged codebase with obackup
 - Passed shellCheck.net
 	- Simplified EscapeSpaces to simple bash substitution
 	- Corrected a lot of minor warnings in order to make code more bullet proof
@@ -23,6 +24,7 @@ RECENT CHANGES
 - Unlocking happens after TrapQuit has successfully killed any child processes
 - Replace child_pid by $? directly, add a better sub process killer in TrapQuit
 - Refactor [local master, local slave, remote slave] code to [local, remote][initiator, target]code
+- Renamed a lot of code in order to prepare v2 code (master becomes initiator, slave becomes target, sync_id becomes instance_id)
 - Added some automatic checks in code, for _DEBUG mode (and _PARANOIA_DEBUG now)
 - Improved Logging
 - Updated osync to be fully compliant with coding style

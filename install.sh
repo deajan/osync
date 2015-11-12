@@ -1,12 +1,15 @@
 #!/usr/bin/env bash
 
-SCRIPT_BUILD=2015092801
+PROGRAM=osync
+PROGRAM_BINARY=$PROGRAM".sh"
+PROGRAM_BATCH=$PROGRAM"-batch.sh"
+SCRIPT_BUILD=2015102701
 
-## Osync daemon install script
+## osync / obackup daemon install script
 ## Tested on RHEL / CentOS 6 & 7 and Mint 17
 ## Please adapt this to fit your distro needs
 
-OSYNC_CONF_DIR=/etc/osync
+CONF_DIR=/etc/$PROGRAM
 BIN_DIR=/usr/local/bin
 SERVICE_DIR=/etc/init.d
 
@@ -15,28 +18,41 @@ if [ "$(whoami)" != "root" ]; then
   exit 1
 fi
 
-if [ ! -d "$OSYNC_CONF_DIR" ]; then
-	mkdir "$OSYNC_CONF_DIR"
+if [ ! -d "$CONF_DIR" ]; then
+	mkdir "$CONF_DIR"
 	if [ $? == 0 ]; then
-		echo "Created directory [$OSYNC_CONF_DIR]."
+		echo "Created directory [$CONF_DIR]."
+	else
+		echo "Cannot create directory [$CONF_DIR]."
+		exit 1
 	fi
 else
-	echo "Config directory [$OSYNC_CONF_DIR] exists."
+	echo "Config directory [$CONF_DIR] exists."
 fi
 
-cp ./sync.conf /etc/osync/sync.conf.example
-cp ./exclude.list.example /etc/osync
-cp ./osync.sh "$BIN_DIR"
-if [ $? != 0 ]; then
-	echo "Cannot copy osync.sh to [$BIN_DIR]."
-else
-	echo "Copied osync.sh to [$BIN_DIR]."
+if [ -f ./sync.conf ]; then
+	cp ./sync.conf /etc/$PROGRAM/sync.conf.example
 fi
-cp ./osync-batch.sh /usr/local/bin
+
+if [ -f ./host_backup.conf ]; then
+	cp ./host_backup.conf /etc/$PROGRAM/host_backup.conf.example
+fi
+
+if [ -f ./exlude.list.example ]; then
+	cp ./exclude.list.example /etc/$PROGRAM
+fi
+
+cp ./$PROGRAM_BINARY "$BIN_DIR"
 if [ $? != 0 ]; then
-	echo "Cannot copy osync-batch.sh to [$BIN_DIR]."
+	echo "Cannot copy $PROGRAM_BINARY to [$BIN_DIR]."
 else
-	echo "Copied osync-batch.sh to [$BIN_DIR]."
+	echo "Copied $PROGRAM_BINARY to [$BIN_DIR]."
+fi
+cp ./$PROGRAM_BATCH /usr/local/bin
+if [ $? != 0 ]; then
+	echo "Cannot copy $PROGRAM_BATCH to [$BIN_DIR]."
+else
+	echo "Copied $PROGRAM_BATCH to [$BIN_DIR]."
 fi
 cp ./ssh_filter.sh /usr/local/bin
 if [ $? != 0 ]; then
@@ -44,16 +60,18 @@ if [ $? != 0 ]; then
 else
 	echo "Copied ssh_filter.sh to [$BIN_DIR]."
 fi
-cp ./osync-srv "$SERVICE_DIR"
-if [ $? != 0 ]; then
-	echo "Cannot copy osync-srv to [$SERVICE_DIR]."
-else
-	echo "Created osync-srv service in [$SERVICE_DIR]."
+
+if [ -f ./osync-srv ]; then
+	cp ./osync-srv "$SERVICE_DIR"
+	if [ $? != 0 ]; then
+		echo "Cannot copy osync-srv to [$SERVICE_DIR]."
+	else
+		echo "Created osync-srv service in [$SERVICE_DIR]."
+		chmod 755 /etc/init.d/osync-srv
+	fi
 fi
-chmod 755 /usr/local/bin/osync.sh
-chmod 755 /usr/local/bin/osync-batch.sh
+
+chmod 755 /usr/local/bin/$PROGRAM_BINARY
+chmod 755 /usr/local/bin/$PROGRAM_BATCH
 chmod 755 /usr/local/bin/ssh_filter.sh
 chown root:root /usr/local/bin/ssh_filter.sh
-chmod 755 /etc/init.d/osync-srv
-
-
