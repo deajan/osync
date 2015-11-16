@@ -4,7 +4,7 @@ PROGRAM="osync" # Rsync based two way sync engine with fault tolerance
 AUTHOR="(L) 2013-2015 by Orsiris \"Ozy\" de Jong"
 CONTACT="http://www.netpower.fr/osync - ozy@netpower.fr"
 PROGRAM_VERSION=1.1-pre
-PROGRAM_BUILD=2015111102
+PROGRAM_BUILD=2015111601
 IS_STABLE=no
 
 FUNC_BUILD=2015111102
@@ -1432,9 +1432,9 @@ function _delete_remote {
 	Logger "RSYNC_CMD: $rsync_cmd" "DEBUG"
 	eval "$rsync_cmd" 2>> "$LOG_FILE"
 	if [ $? != 0 ]; then
-		Logger "Cannot copy the deletion list to remote replica." "CRITICAL"
+		Logger "Cannot copy the deletion list to remote replica." "ERROR"
 		if [ -f "$RUN_DIR/$PROGRAM.$FUNCNAME.precopy.$SCRIPT_PID" ]; then
-			Logger "$(cat $RUN_DIR/$PROGRAM.$FUNCNAME.precopy.$SCRIPT_PID)" "CRITICAL" #TODO: remote deletion is critical. local deletion is not. What to do ?
+			Logger "$(cat $RUN_DIR/$PROGRAM.$FUNCNAME.precopy.$SCRIPT_PID)" "ERROR"
 		fi
 		exit 1
 	fi
