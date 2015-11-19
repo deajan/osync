@@ -4,10 +4,10 @@ PROGRAM="osync" # Rsync based two way sync engine with fault tolerance
 AUTHOR="(L) 2013-2015 by Orsiris \"Ozy\" de Jong"
 CONTACT="http://www.netpower.fr/osync - ozy@netpower.fr"
 PROGRAM_VERSION=1.1-pre
-PROGRAM_BUILD=2015111601
+PROGRAM_BUILD=2015111901
 IS_STABLE=no
 
-source "/home/git/common/ofunctions.sh"
+source "./ofunctions.sh"
 
 ## Working directory. This is the name of the osync subdirectory contained in every replica.
 OSYNC_DIR=".osync_workdir"
@@ -1270,7 +1270,6 @@ function Usage {
 	echo $AUTHOR
 	echo $CONTACT
 	echo ""
-	echo -e "\e[41mWARNING: This is an unstable dev build\e[0m"
 	echo "You may use osync with a full blown configuration file, or use its default options for quick command line sync."
 	echo "Usage: osync.sh /path/to/config/file [OPTIONS]"
 	echo "or     osync.sh --initiator=/path/to/initiator/replica --target=/path/to/target/replica [OPTIONS] [QUICKSYNC OPTIONS]"

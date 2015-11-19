@@ -1,4 +1,4 @@
-FUNC_BUILD=2015111102
+FUNC_BUILD=2015111901
 ## BEGIN Generic functions for osync & obackup written in 2013-2015 by Orsiris de Jong - http://www.netpower.fr - ozy@netpower.fr
 
 ## type -p does not work on platforms other than linux (bash). If if does not work, always assume output is not a zero exitcode
@@ -249,7 +249,7 @@ function SendAlert {
 	# </OSYNC SPECIFIC>
 
 	eval "cat \"$LOG_FILE\" $COMPRESSION_PROGRAM > $ALERT_LOG_FILE"
-	MAIL_ALERT_MSG="$MAIL_ALERT_MSG"$'\n\n'$(tail -n 25 "$LOG_FILE")
+	MAIL_ALERT_MSG="$MAIL_ALERT_MSG"$'\n\n'$(tail -n 50 "$LOG_FILE")
 	if [ $ERROR_ALERT -eq 1 ]; then
 		subject="Error alert for $INSTANCE_ID"
 	elif [ $WARN_ALERT -eq 1 ]; then
@@ -541,8 +541,9 @@ function RunLocalCommand {
 
 	if [ $_DRYRUN -ne 0 ]; then
 		Logger "Dryrun: Local command [$command] not run." "NOTICE"
-		return 1
+		return 0
 	fi
+
 	Logger "Running command [$command] on local host." "NOTICE"
 	eval "$command" > "$RUN_DIR/$PROGRAM.$FUNCNAME.$SCRIPT_PID" 2>&1 &
 	WaitForTaskCompletion $! 0 $hard_max_time $FUNCNAME
@@ -573,8 +574,9 @@ function RunRemoteCommand {
 	CheckConnectivityRemoteHost
 	if [ $_DRYRUN -ne 0 ]; then
 		Logger "Dryrun: Local command [$command] not run." "NOTICE"
-		return 1
+		return 0
 	fi
+
 	Logger "Running command [$command] on remote host." "NOTICE"
 	cmd=$SSH_CMD' "$command" > "'$RUN_DIR/$PROGRAM.$FUNCNAME.$SCRIPT_PID'" 2>&1'
 	Logger "cmd: $cmd" "DEBUG"
