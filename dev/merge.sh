@@ -15,7 +15,7 @@ function Unexpand {
 
 function Merge {
 
-        sed "/source \"\/home\/git\/common\/ofunctions.sh\"/r /home/git/common/ofunctions.sh" tmp_$PROGRAM.sh | grep -v 'source "/home/git/common/ofunctions.sh"' > debug_$PROGRAM.sh
+	sed "/source \"\.\/ofunctions.sh\"/r /home/git/common/ofunctions.sh" tmp_$PROGRAM.sh | grep -v 'source "./ofunctions.sh"' > debug_$PROGRAM.sh
         chmod +x debug_$PROGRAM.sh
 }
 

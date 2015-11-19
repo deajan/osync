@@ -4,10 +4,10 @@ PROGRAM="osync" # Rsync based two way sync engine with fault tolerance
 AUTHOR="(L) 2013-2015 by Orsiris \"Ozy\" de Jong"
 CONTACT="http://www.netpower.fr/osync - ozy@netpower.fr"
 PROGRAM_VERSION=1.1-pre
-PROGRAM_BUILD=2015111601
+PROGRAM_BUILD=2015111901
 IS_STABLE=no
 
-FUNC_BUILD=2015111102
+FUNC_BUILD=2015111901
 ## BEGIN Generic functions for osync & obackup written in 2013-2015 by Orsiris de Jong - http://www.netpower.fr - ozy@netpower.fr
 
 ## type -p does not work on platforms other than linux (bash). If if does not work, always assume output is not a zero exitcode
@@ -246,7 +246,7 @@ function SendAlert {
 	# </OSYNC SPECIFIC>
 
 	eval "cat \"$LOG_FILE\" $COMPRESSION_PROGRAM > $ALERT_LOG_FILE"
-	MAIL_ALERT_MSG="$MAIL_ALERT_MSG"$'\n\n'$(tail -n 25 "$LOG_FILE")
+	MAIL_ALERT_MSG="$MAIL_ALERT_MSG"$'\n\n'$(tail -n 50 "$LOG_FILE")
 	if [ $ERROR_ALERT -eq 1 ]; then
 		subject="Error alert for $INSTANCE_ID"
 	elif [ $WARN_ALERT -eq 1 ]; then
@@ -528,8 +528,9 @@ function RunLocalCommand {
 
 	if [ $_DRYRUN -ne 0 ]; then
 		Logger "Dryrun: Local command [$command] not run." "NOTICE"
-		return 1
+		return 0
 	fi
+
 	Logger "Running command [$command] on local host." "NOTICE"
 	eval "$command" > "$RUN_DIR/$PROGRAM.$FUNCNAME.$SCRIPT_PID" 2>&1 &
 	WaitForTaskCompletion $! 0 $hard_max_time $FUNCNAME
@@ -559,8 +560,9 @@ function RunRemoteCommand {
 	CheckConnectivityRemoteHost
 	if [ $_DRYRUN -ne 0 ]; then
 		Logger "Dryrun: Local command [$command] not run." "NOTICE"
-		return 1
+		return 0
 	fi
+
 	Logger "Running command [$command] on remote host." "NOTICE"
 	cmd=$SSH_CMD' "$command" > "'$RUN_DIR/$PROGRAM.$FUNCNAME.$SCRIPT_PID'" 2>&1'
 	Logger "cmd: $cmd" "DEBUG"
@@ -2019,7 +2021,6 @@ function Usage {
 	echo $AUTHOR
 	echo $CONTACT
 	echo ""
-	echo -e "\e[41mWARNING: This is an unstable dev build\e[0m"
 	echo "You may use osync with a full blown configuration file, or use its default options for quick command line sync."
 	echo "Usage: osync.sh /path/to/config/file [OPTIONS]"
 	echo "or     osync.sh --initiator=/path/to/initiator/replica --target=/path/to/target/replica [OPTIONS] [QUICKSYNC OPTIONS]"
