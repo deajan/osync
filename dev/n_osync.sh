@@ -4,7 +4,7 @@ PROGRAM="osync" # Rsync based two way sync engine with fault tolerance
 AUTHOR="(L) 2013-2015 by Orsiris \"Ozy\" de Jong"
 CONTACT="http://www.netpower.fr/osync - ozy@netpower.fr"
 PROGRAM_VERSION=1.1-pre
-PROGRAM_BUILD=2015111901
+PROGRAM_BUILD=2015112702
 IS_STABLE=no
 
 source "./ofunctions.sh"
@@ -246,12 +246,14 @@ function CheckDiskSpace {
 	fi
 }
 
-function RsyncExcludePattern {
-	__CheckArguments 0 $# $FUNCNAME "$@"	#__WITH_PARANOIA_DEBUG
+function RsyncPatternsAdd {
+	local pattern="${1}"
+
+	__CheckArguments 1 $# $FUNCNAME "$@"	#__WITH_PARANOIA_DEBUG
 
 	# Disable globbing so wildcards from exclusions do not get expanded
 	set -f
-	rest="$RSYNC_EXCLUDE_PATTERN"
+	rest="$pattern"
 	while [ -n "$rest" ]
 	do
 		# Take the string until first occurence until $PATH_SEPARATOR_CHAR
@@ -263,28 +265,47 @@ function RsyncExcludePattern {
 			# Cut everything before the first occurence of $PATH_SEPARATOR_CHAR
 			rest=${rest#*$PATH_SEPARATOR_CHAR}
 		fi
-
-		if [ "$RSYNC_EXCLUDE" == "" ]; then
-			RSYNC_EXCLUDE="--exclude=\"$str\""
+			if [ "$RSYNC_PATTERNS" == "" ]; then
+			RSYNC_PATTERNS="--exclude=\"$str\""
 		else
-			RSYNC_EXCLUDE="$RSYNC_EXCLUDE --exclude=\"$str\""
+			RSYNC_PATTERNS="$RSYNC_PATTERNS --exclude=\"$str\""
 		fi
 	done
 	set +f
 }
 
-function RsyncExcludeFrom {
+function RsyncPatternsFromAdd {
+	local pattern_from="${1}"
+
+	__CheckArguments 1 $# $FUNCNAME "$@"	#__WITH_PARANOIA_DEBUG
+
+	if [ ! "$pattern_from" == "" ]; then
+		## Check if the exclude list has a full path, and if not, add the config file path if there is one
+		if [ "$(basename $pattern_from)" == "$pattern_from" ]; then
+			pattern_from=$(dirname $ConfigFile)/$pattern_ffrom
+		fi
+
+		if [ -e "$pattern_from" ]; then
+			RSYNC_PATTERNS="$RSYNC_PATTERNS --exclude-from=\"$pattern_from\""
+		fi
+	fi
+}
+
+function RsyncPatterns {
 	__CheckArguments 0 $# $FUNCNAME "$@"	#__WITH_PARANOIA_DEBUG
 
-	if [ ! "$RSYNC_EXCLUDE_FROM" == "" ]; then
-		## Check if the exclude list has a full path, and if not, add the config file path if there is one
-		if [ "$(basename $RSYNC_EXCLUDE_FROM)" == "$RSYNC_EXCLUDE_FROM" ]; then
-			RSYNC_EXCLUDE_FROM=$(dirname $ConfigFile)/$RSYNC_EXCLUDE_FROM
-		fi
-
-		if [ -e "$RSYNC_EXCLUDE_FROM" ]; then
-			RSYNC_EXCLUDE="$RSYNC_EXCLUDE --exclude-from=\"$RSYNC_EXCLUDE_FROM\""
-		fi
+	if [ "$RSYNC_PATTERN_ORDER" == "exclude" ]; then
+		RsyncPatternsAdd "$RSYNC_EXCLUDE_PATTERN"
+		RsyncPatternsFromAdd "$RSYNC_EXCLUDE_FROM"
+		RsyncPatternsAdd "$RSYNC_INCLUDE_PATTERN"
+		RsyncPatternsFromAdd "$RSYNC_INCLUDE_FROM"
+	elif [ "$RSYNC_PATTERN_ORDER" == "include" ]; then
+		RsyncPatternsAdd "$RSYNC_INCLUDE_PATTERN"
+		RsyncPatternsFromAdd "$RSYNC_EXCLUDE_FROM"
+		RsyncPatternsAdd "$RSYNC_EXCLUDE_PATTERN"
+		RsyncPatternsFromAdd "$RSYNC_EXCLUDE_FROM"
+	else
+		Logger "Bogus RSYNC_PATTERN_ORDER in config file" "WARN"
 	fi
 }
 
@@ -486,9 +507,9 @@ function tree_list {
 	if [ "$REMOTE_OPERATION" == "yes" ] && [ "$replica_type" == "target" ]; then
 		CheckConnectivity3rdPartyHosts
 		CheckConnectivityRemoteHost
-		rsync_cmd="$(type -p $RSYNC_EXECUTABLE) --rsync-path=\"$RSYNC_PATH\" $RSYNC_ARGS -8 --exclude \"$OSYNC_DIR\" $RSYNC_EXCLUDE -e \"$RSYNC_SSH_CMD\" --list-only $REMOTE_USER@$REMOTE_HOST:\"$escaped_replica_path/\" | grep \"^-\|^d\" | awk '{\$1=\$2=\$3=\$4=\"\" ;print}' | awk '{\$1=\$1 ;print}' | (grep -v \"^\.$\" || :) | sort > \"$RUN_DIR/$PROGRAM.$replica_type.$SCRIPT_PID\" &"
+		rsync_cmd="$(type -p $RSYNC_EXECUTABLE) --rsync-path=\"$RSYNC_PATH\" $RSYNC_ARGS -8 --exclude \"$OSYNC_DIR\" $RSYNC_PATTERNS -e \"$RSYNC_SSH_CMD\" --list-only $REMOTE_USER@$REMOTE_HOST:\"$escaped_replica_path/\" | grep \"^-\|^d\" | awk '{\$1=\$2=\$3=\$4=\"\" ;print}' | awk '{\$1=\$1 ;print}' | (grep -v \"^\.$\" || :) | sort > \"$RUN_DIR/$PROGRAM.$replica_type.$SCRIPT_PID\" &"
 	else
-		rsync_cmd="$(type -p $RSYNC_EXECUTABLE) --rsync-path=\"$RSYNC_PATH\" $RSYNC_ARGS -8 --exclude \"$OSYNC_DIR\" $RSYNC_EXCLUDE --list-only \"$replica_path/\" | grep \"^-\|^d\" | awk '{\$1=\$2=\$3=\$4=\"\" ;print}' | awk '{\$1=\$1 ;print}' | (grep -v \"^\.$\" || :) | sort > \"$RUN_DIR/$PROGRAM.$replica_type.$SCRIPT_PID\" &"
+		rsync_cmd="$(type -p $RSYNC_EXECUTABLE) --rsync-path=\"$RSYNC_PATH\" $RSYNC_ARGS -8 --exclude \"$OSYNC_DIR\" $RSYNC_PATTERNS --list-only \"$replica_path/\" | grep \"^-\|^d\" | awk '{\$1=\$2=\$3=\$4=\"\" ;print}' | awk '{\$1=\$1 ;print}' | (grep -v \"^\.$\" || :) | sort > \"$RUN_DIR/$PROGRAM.$replica_type.$SCRIPT_PID\" &"
 	fi
 	Logger "RSYNC_CMD: $rsync_cmd" "DEBUG"
 	## Redirect commands stderr here to get rsync stderr output in logfile
@@ -569,12 +590,12 @@ function sync_update {
 		CheckConnectivity3rdPartyHosts
 		CheckConnectivityRemoteHost
 		if [ "$source_replica" == "initiator" ]; then
-			rsync_cmd="$(type -p $RSYNC_EXECUTABLE) --rsync-path=\"$RSYNC_PATH\" $RSYNC_ARGS $SYNC_OPTS -e \"$RSYNC_SSH_CMD\" $BACKUP_DIR --exclude \"$OSYNC_DIR\" $RSYNC_EXCLUDE --exclude-from=\"$INITIATOR_STATE_DIR/$source_replica$delete_list_filename\" --exclude-from=\"$INITIATOR_STATE_DIR/$destination_replica$delete_list_filename\" \"$SOURCE_DIR/\" $REMOTE_USER@$REMOTE_HOST:\"$ESC_DEST_DIR/\" > $RUN_DIR/$PROGRAM.update.$destination_replica.$SCRIPT_PID 2>&1 &"
+			rsync_cmd="$(type -p $RSYNC_EXECUTABLE) --rsync-path=\"$RSYNC_PATH\" $RSYNC_ARGS $SYNC_OPTS -e \"$RSYNC_SSH_CMD\" $BACKUP_DIR --exclude \"$OSYNC_DIR\" $RSYNC_PATTERNS --exclude-from=\"$INITIATOR_STATE_DIR/$source_replica$delete_list_filename\" --exclude-from=\"$INITIATOR_STATE_DIR/$destination_replica$delete_list_filename\" \"$SOURCE_DIR/\" $REMOTE_USER@$REMOTE_HOST:\"$ESC_DEST_DIR/\" > $RUN_DIR/$PROGRAM.update.$destination_replica.$SCRIPT_PID 2>&1 &"
 		else
-			rsync_cmd="$(type -p $RSYNC_EXECUTABLE) --rsync-path=\"$RSYNC_PATH\" $RSYNC_ARGS $SYNC_OPTS -e \"$RSYNC_SSH_CMD\" $BACKUP_DIR --exclude \"$OSYNC_DIR\" $RSYNC_EXCLUDE --exclude-from=\"$INITIATOR_STATE_DIR/$destination_replica$delete_list_filename\" --exclude-from=\"$INITIATOR_STATE_DIR/$source_replica$delete_list_filename\" $REMOTE_USER@$REMOTE_HOST:\"$ESC_SOURCE_DIR/\" \"$DEST_DIR/\" > $RUN_DIR/$PROGRAM.update.$destination_replica.$SCRIPT_PID 2>&1 &"
+			rsync_cmd="$(type -p $RSYNC_EXECUTABLE) --rsync-path=\"$RSYNC_PATH\" $RSYNC_ARGS $SYNC_OPTS -e \"$RSYNC_SSH_CMD\" $BACKUP_DIR --exclude \"$OSYNC_DIR\" $RSYNC_PATTERNS --exclude-from=\"$INITIATOR_STATE_DIR/$destination_replica$delete_list_filename\" --exclude-from=\"$INITIATOR_STATE_DIR/$source_replica$delete_list_filename\" $REMOTE_USER@$REMOTE_HOST:\"$ESC_SOURCE_DIR/\" \"$DEST_DIR/\" > $RUN_DIR/$PROGRAM.update.$destination_replica.$SCRIPT_PID 2>&1 &"
 		fi
 	else
-		rsync_cmd="$(type -p $RSYNC_EXECUTABLE) --rsync-path=\"$RSYNC_PATH\" $RSYNC_ARGS $SYNC_OPTS $BACKUP_DIR --exclude \"$OSYNC_DIR\" $RSYNC_EXCLUDE --exclude-from=\"$INITIATOR_STATE_DIR/$source_replica$delete_list_filename\" --exclude-from=\"$INITIATOR_STATE_DIR/$destination_replica$delete_list_filename\" \"$SOURCE_DIR/\" \"$DEST_DIR/\" > $RUN_DIR/$PROGRAM.update.$destination_replica.$SCRIPT_PID 2>&1 &"
+		rsync_cmd="$(type -p $RSYNC_EXECUTABLE) --rsync-path=\"$RSYNC_PATH\" $RSYNC_ARGS $SYNC_OPTS $BACKUP_DIR --exclude \"$OSYNC_DIR\" $RSYNC_PATTERNS --exclude-from=\"$INITIATOR_STATE_DIR/$source_replica$delete_list_filename\" --exclude-from=\"$INITIATOR_STATE_DIR/$destination_replica$delete_list_filename\" \"$SOURCE_DIR/\" \"$DEST_DIR/\" > $RUN_DIR/$PROGRAM.update.$destination_replica.$SCRIPT_PID 2>&1 &"
 	fi
 	Logger "RSYNC_CMD: $rsync_cmd" "DEBUG"
 	eval "$rsync_cmd"
@@ -1201,7 +1222,7 @@ function Init {
 
 	if [ "$PARTIAL" == "yes" ]; then
 		SYNC_OPTS=$SYNC_OPTS" --partial --partial-dir=\"$PARTIAL_DIR\""
-		RSYNC_EXCLUDE="$RSYNC_EXCLUDE --exclude=\"$PARTIAL_DIR\""
+		RSYNC_PATTERNS="$RSYNC_PATTERNS --exclude=\"$PARTIAL_DIR\""
 	fi
 
 	## Conflict options
@@ -1217,10 +1238,8 @@ function Init {
 		TARGET_BACKUP=
 	fi
 
-	## Add Rsync exclude patterns
-	RsyncExcludePattern
-	## Add Rsync exclude from file
-	RsyncExcludeFrom
+	## Add Rsync include / exclude patterns
+	RsyncPatterns
 
 	## Filenames for state files
 	if [ $_DRYRUN -eq 1 ]; then
@@ -1323,7 +1342,7 @@ function SyncOnChanges {
 		fi
 
 		Logger "#### Monitoring now." "NOTICE"
-		inotifywait --exclude $OSYNC_DIR $RSYNC_EXCLUDE -qq -r -e create -e modify -e delete -e move -e attrib --timeout "$MAX_WAIT" "$INITIATOR_SYNC_DIR" &
+		inotifywait --exclude $OSYNC_DIR $RSYNC_PATTERNS -qq -r -e create -e modify -e delete -e move -e attrib --timeout "$MAX_WAIT" "$INITIATOR_SYNC_DIR" &
 		OSYNC_SUB_PID=$!
 		wait $OSYNC_SUB_PID
 		retval=$?

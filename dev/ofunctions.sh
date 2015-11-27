@@ -74,6 +74,7 @@ function Dummy {
 	sleep .1
 }
 
+#__FUNC:Logger
 function _Logger {
 	local svalue="${1}" # What to log to screen
 	local lvalue="${2:-$svalue}" # What to log to logfile, defaults to screen value
@@ -126,6 +127,7 @@ function Logger {
 		_Logger "$prefix$value"
 	fi
 }
+#__ENDFUNC
 
 # Portable child (and grandchild) kill function tester under Linux, BSD and MacOS X
 function KillChilds {
