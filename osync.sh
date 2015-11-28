@@ -4,7 +4,7 @@ PROGRAM="osync" # Rsync based two way sync engine with fault tolerance
 AUTHOR="(L) 2013-2015 by Orsiris \"Ozy\" de Jong"
 CONTACT="http://www.netpower.fr/osync - ozy@netpower.fr"
 PROGRAM_VERSION=1.1-pre
-PROGRAM_BUILD=2015112702
+PROGRAM_BUILD=2015112801
 IS_STABLE=no
 
 FUNC_BUILD=2015111901
@@ -1025,6 +1025,7 @@ function CheckDiskSpace {
 
 function RsyncPatternsAdd {
 	local pattern="${1}"
+	local pattern_type="${2}"	# exclude or include
 
 
 	# Disable globbing so wildcards from exclusions do not get expanded
@@ -1042,9 +1043,9 @@ function RsyncPatternsAdd {
 			rest=${rest#*$PATH_SEPARATOR_CHAR}
 		fi
 			if [ "$RSYNC_PATTERNS" == "" ]; then
-			RSYNC_PATTERNS="--exclude=\"$str\""
+			RSYNC_PATTERNS="--"$pattern_type"=\"$str\""
 		else
-			RSYNC_PATTERNS="$RSYNC_PATTERNS --exclude=\"$str\""
+			RSYNC_PATTERNS="$RSYNC_PATTERNS --"$pattern_type"=\"$str\""
 		fi
 	done
 	set +f
@@ -1052,6 +1053,7 @@ function RsyncPatternsAdd {
 
 function RsyncPatternsFromAdd {
 	local pattern_from="${1}"
+	local pattern_type="${2}"
 
 
 	if [ ! "$pattern_from" == "" ]; then
@@ -1061,7 +1063,7 @@ function RsyncPatternsFromAdd {
 		fi
 
 		if [ -e "$pattern_from" ]; then
-			RSYNC_PATTERNS="$RSYNC_PATTERNS --exclude-from=\"$pattern_from\""
+			RSYNC_PATTERNS="$RSYNC_PATTERNS --"$pattern_type"-from=\"$pattern_from\""
 		fi
 	fi
 }
@@ -1069,15 +1071,15 @@ function RsyncPatternsFromAdd {
 function RsyncPatterns {
 
 	if [ "$RSYNC_PATTERN_ORDER" == "exclude" ]; then
-		RsyncPatternsAdd "$RSYNC_EXCLUDE_PATTERN"
-		RsyncPatternsFromAdd "$RSYNC_EXCLUDE_FROM"
-		RsyncPatternsAdd "$RSYNC_INCLUDE_PATTERN"
-		RsyncPatternsFromAdd "$RSYNC_INCLUDE_FROM"
+		RsyncPatternsAdd "$RSYNC_EXCLUDE_PATTERN" "exclude"
+		RsyncPatternsFromAdd "$RSYNC_EXCLUDE_FROM" "exclude"
+		RsyncPatternsAdd "$RSYNC_INCLUDE_PATTERN" "include"
+		RsyncPatternsFromAdd "$RSYNC_INCLUDE_FROM" "include"
 	elif [ "$RSYNC_PATTERN_ORDER" == "include" ]; then
-		RsyncPatternsAdd "$RSYNC_INCLUDE_PATTERN"
-		RsyncPatternsFromAdd "$RSYNC_EXCLUDE_FROM"
-		RsyncPatternsAdd "$RSYNC_EXCLUDE_PATTERN"
-		RsyncPatternsFromAdd "$RSYNC_EXCLUDE_FROM"
+		RsyncPatternsAdd "$RSYNC_INCLUDE_PATTERN" "include"
+		RsyncPatternsFromAdd "$RSYNC_EXCLUDE_FROM" "include"
+		RsyncPatternsAdd "$RSYNC_EXCLUDE_PATTERN" "exclude"
+		RsyncPatternsFromAdd "$RSYNC_EXCLUDE_FROM" "exclude"
 	else
 		Logger "Bogus RSYNC_PATTERN_ORDER in config file" "WARN"
 	fi
