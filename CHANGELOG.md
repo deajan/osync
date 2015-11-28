@@ -13,6 +13,9 @@ RECENT CHANGES
 --------------
 
 ! XX Dec 2015: osync v1.1 released
+- Added bogus config file checks & environment checks
+- Added delta copies disable option
+- Revamped rsync patterns to allow include and exclude patterns
 - Fully merged codebase with obackup
 - Passed shellCheck.net
 	- Simplified EscapeSpaces to simple bash substitution

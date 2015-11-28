@@ -4,7 +4,7 @@ PROGRAM="osync" # Rsync based two way sync engine with fault tolerance
 AUTHOR="(L) 2013-2015 by Orsiris \"Ozy\" de Jong"
 CONTACT="http://www.netpower.fr/osync - ozy@netpower.fr"
 PROGRAM_VERSION=1.1-pre
-PROGRAM_BUILD=2015112802
+PROGRAM_BUILD=2015112803
 IS_STABLE=no
 
 source "./ofunctions.sh"
@@ -79,6 +79,41 @@ function CheckEnvironment {
                 Logger "rsync not present. Sync cannot start." "CRITICAL"
                 exit 1
         fi
+}
+
+function CheckCurrentConfig {
+        __CheckArguments 0 $# $FUNCNAME "$@"    #__WITH_PARANOIA_DEBUG
+
+        if [ "$INSTANCE_ID" == "" ]; then
+                Logger "No INSTANCE_ID defined in config file." "CRITICAL"
+                exit 1
+        fi
+
+	if [ "$INITIATOR_SYNC_DIR" == "" ]; then
+		Logger "No INITIATOR_SYNC_DIR set in config file." "CRITICAL"
+		exit 1
+	fi
+
+	if [ "$TARGET_SYNC_DIR" == "" ]; then
+		Logger "Not TARGET_SYNC_DIR set in config file." "CRITICAL"
+		exit 1
+	fi
+
+        # Check all variables that should contain "yes" or "no"
+        declare -a yes_no_vars=(CREATE_DIRS SUDO_EXEC SSH_COMPRESSION REMOTE_HOST_PING PRESERVE_ACL PRESERVE_XATTR COPY_SYMLINKS KEEP_DIRLINKS PRESERVE_HARDLINKS CHECKSUM RSYNC_COMPRESS CONFLICT_BACKUP CONFLICT_BACKUP_MULTIPLE SOFT_DELETE RESUME_SYNC FORCE_STRANGER_LOCK_RESUME PARTIAL DELTA_COPIES STOP_ON_CMD_ERROR)
+        for i in ${yes_no_vars[@]}; do
+                test="if [ \"\$$i\" != \"yes\" ] && [ \"\$$i\" != \"no\" ]; then Logger \"Bogus $i value defined in config file.\" \"CRITICAL\"; exit 1; fi"
+                eval "$test"
+        done
+
+        # Check all variables that should contain a numerical value >= 0
+        declare -a num_vars=(MINIMUM_SPACE BANDWIDTH SOFT_MAX_EXEC_TIME HARD_MAX_EXEC_TIME MIN_WAIT MAX_WAIT CONFLICT_BACKUP_DAYS SOFT_DELETE_DAYS RESUME_TRY)
+        for i in ${num_vars[@]}; do
+		test="if [ $(IsNumeric \"\$$i\") -eq 0 ]; then Logger \"Bogus $i value defined in config file.\" \"CRITICAL\"; exit 1; fi"
+                eval "$test"
+        done
+
+        #TODO-v2.1: Add runtime variable tests (RSYNC_ARGS etc)
 }
 
 ###### Osync specific functions (non shared)
@@ -1227,6 +1262,12 @@ function Init {
 		RSYNC_PATTERNS="$RSYNC_PATTERNS --exclude=\"$PARTIAL_DIR\""
 	fi
 
+	if [ "$DELTA_COPIES" != "no" ]; then
+                RSYNC_ARGS=$RSYNC_ARGS" --no-whole-file"
+        else
+                RSYNC_ARGS=$RSYNC_ARGS" --whole-file"
+        fi
+
 	## Conflict options
 	if [ "$CONFLICT_BACKUP" != "no" ]; then
 		INITIATOR_BACKUP="--backup --backup-dir=\"$INITIATOR_BACKUP_DIR\""
@@ -1514,6 +1555,7 @@ opts="${opts# *}"
 	PreInit
 	Init
 	PostInit
+	CheckCurrentConfig
 	GetRemoteOS
 	InitRemoteOSSettings
 
