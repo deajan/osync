@@ -7,7 +7,7 @@ PROGRAM_VERSION=1.1-pre
 PROGRAM_BUILD=2015112805
 IS_STABLE=no
 
-FUNC_BUILD=2015111901
+FUNC_BUILD=2015113001
 ## BEGIN Generic functions for osync & obackup written in 2013-2015 by Orsiris de Jong - http://www.netpower.fr - ozy@netpower.fr
 
 ## type -p does not work on platforms other than linux (bash). If if does not work, always assume output is not a zero exitcode
@@ -83,7 +83,6 @@ function Dummy {
 	sleep .1
 }
 
-#__FUNC:Logger
 function _Logger {
 	local svalue="${1}" # What to log to screen
 	local lvalue="${2:-$svalue}" # What to log to logfile, defaults to screen value
@@ -136,7 +135,6 @@ function Logger {
 		_Logger "$prefix$value"
 	fi
 }
-#__ENDFUNC
 
 # Portable child (and grandchild) kill function tester under Linux, BSD and MacOS X
 function KillChilds {
@@ -269,7 +267,6 @@ function SendAlert {
 		subject="Alert for $INSTANCE_ID"
 	fi
 
-	# Need better fallback if mail sending does not succeed
 	if type mutt > /dev/null 2>&1 ; then
 		echo "$MAIL_ALERT_MSG" | $(type -p mutt) -x -s "$subject" $DESTINATION_MAILS -a "$ALERT_LOG_FILE"
 		if [ $? != 0 ]; then
@@ -298,7 +295,7 @@ function SendAlert {
 	fi
 
 	if type sendmail > /dev/null 2>&1 ; then
-		echo -e "$subject\r\n$MAIL_ALERT_MSG" | $(type -p sendmail) $DESTINATION_MAILS
+		echo -e "Subject:$subject\r\n$MAIL_ALERT_MSG" | $(type -p sendmail) $DESTINATION_MAILS
 		if [ $? != 0 ]; then
 			Logger "WARNING: Cannot send alert email via $(type -p sendmail) !!!" "WARN"
 		else
@@ -347,6 +344,8 @@ function LoadConfigFile {
 		# Shellcheck source=./sync.conf
 		source "$RUN_DIR/$PROGRAM.$FUNCNAME.$SCRIPT_PID"
 	fi
+
+	CONFIG_FILE="$config_file"
 }
 
 function GetLocalOS {
