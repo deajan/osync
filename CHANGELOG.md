@@ -8,11 +8,14 @@ KNOWN ISSUES
 ------------
 
 - Cannot finish sync if one replica contains a directory and the other replica contains a file named the same way (Unix doesn't allow this)
+- Soft deletion does not honor exclusion lists
+
 
 RECENT CHANGES
 --------------
 
 ! XX Dec 2015: osync v1.1 released
+- More fixes for GNU / non-GNU versions of mail command
 - Added bogus config file checks & environment checks
 - Added delta copies disable option
 - Revamped rsync patterns to allow include and exclude patterns
