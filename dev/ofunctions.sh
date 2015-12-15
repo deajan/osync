@@ -275,6 +275,7 @@ function SendAlert {
 			attachment_command="-a $ALERT_LOG_FILE"
 		else
 			attachment_command=""
+		fi
 		echo "$MAIL_ALERT_MSG" | $(type -p mail) $attachment_command -s "$subject" $DESTINATION_MAILS
 		if [ $? != 0 ]; then
 			Logger "WARNING: Cannot send alert email via $(type -p mail) with attachments !!!" "WARN"
