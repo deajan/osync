@@ -6,7 +6,7 @@ AUTHOR="(L) 2015 by Orsiris \"Ozy\" de Jong"
 CONTACT="http://www.netpower.fr/osync - ozy@netpower.fr"
 OLD_PROGRAM_VERSION="1.0x"
 NEW_PROGRAM_VERSION="v1.1x"
-PROGRAM_BUILD=2015121501
+PROGRAM_BUILD=2015121502
 
 function Init {
 	OSYNC_DIR=".osync_workdir"
@@ -322,17 +322,17 @@ function RewriteConfigFiles {
 
 	#TODO: exclude occurences between doublequotes
 
-	sed -i 's/MASTER_SYNC_DIR/INITIATOR_SYNC_DIR/g' "$config_file"
-	sed -i 's/SLAVE_SYNC_DIR/TARGET_SYNC_DIR/g' "$config_file"
-	sed -i 's/CONFLICT_PREVALANCE=master/CONFLICT_PREVALANCE=initiator/g' "$config_file"
-	sed -i 's/CONFLICT_PREVALANCE=slave/CONFLICT_PREVALANCE=target/g' "$config_file"
-	sed -i 's/SYNC_ID=/INSTANCE_ID=/g' "$config_file"
+	sed -i 's/^MASTER_SYNC_DIR/INITIATOR_SYNC_DIR/g' "$config_file"
+	sed -i 's/^SLAVE_SYNC_DIR/TARGET_SYNC_DIR/g' "$config_file"
+	sed -i 's/^CONFLICT_PREVALANCE=master/CONFLICT_PREVALANCE=initiator/g' "$config_file"
+	sed -i 's/^CONFLICT_PREVALANCE=slave/CONFLICT_PREVALANCE=target/g' "$config_file"
+	sed -i 's/^SYNC_ID=/INSTANCE_ID=/g' "$config_file"
 
 	# Add missing config file values
-	sed -i '/RSYNC_REMOTE_PATH=*/a RSYNC_PATTERN_FIRST=include' "$config_file"
-	sed -i '/RSYNC_PATTERN_FIRST=*/a RSYNC_INCLUDE_PATTERN=""' "$config_file"
-	sed -i '/RSYNC_EXCLUDE_FROM=*/a RSYNC_INCLUDE_FROM=""' "$config_file"
-	sed -i '/PARTIAL=*/a DELTA_COPIES=yes' "$config_file"
+	sed -i '/^LOGFILE=*/a RSYNC_PATTERN_FIRST=include' "$config_file"
+	sed -i '/^RSYNC_EXCLUDE_PATTERN=*/a RSYNC_INCLUDE_PATTERN=""' "$config_file"
+	sed -i '/^RSYNC_EXCLUDE_FROM=*/a RSYNC_INCLUDE_FROM=""' "$config_file"
+	sed -i '/^PARTIAL=*/a DELTA_COPIES=yes' "$config_file"
 }
 
 _QUICKSYNC=0
