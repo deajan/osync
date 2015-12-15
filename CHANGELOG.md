@@ -15,6 +15,7 @@ RECENT CHANGES
 --------------
 
 ! XX Dec 2015: osync v1.1 released
+- Better upgrade script (adding missing new config values)
 - More fixes for GNU / non-GNU versions of mail command
 - Added bogus config file checks & environment checks
 - Added delta copies disable option

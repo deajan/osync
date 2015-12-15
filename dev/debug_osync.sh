@@ -7,7 +7,7 @@ PROGRAM_VERSION=1.1-pre
 PROGRAM_BUILD=2015112805
 IS_STABLE=no
 
-FUNC_BUILD=2015121501
+FUNC_BUILD=2015121502
 ## BEGIN Generic functions for osync & obackup written in 2013-2015 by Orsiris de Jong - http://www.netpower.fr - ozy@netpower.fr
 
 ## type -p does not work on platforms other than linux (bash). If if does not work, always assume output is not a zero exitcode
@@ -280,7 +280,7 @@ function SendAlert {
 	if type mail > /dev/null 2>&1 ; then
 		if $(type -p mail) -V | grep "GNU" > /dev/null; then echo ok; fi
 			attachment_command="-A $ALERT_LOG_FILE"
-		elif ($type -p mail) -V; then
+		elif $(type -p mail) -V; then
 			attachment_command="-a $ALERT_LOG_FILE"
 		else
 			attachment_command=""

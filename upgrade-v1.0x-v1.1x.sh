@@ -1,10 +1,12 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
-PROGRAM="Osync instance upagrade script" # Rsync based two way sync engine with fault tolerance
+PROGRAM="osync instance upgrade script"
+SUBPROGRAM="osync"
 AUTHOR="(L) 2015 by Orsiris \"Ozy\" de Jong"
 CONTACT="http://www.netpower.fr/osync - ozy@netpower.fr"
-PROGRAM_VERSION="1.0x to v1.1"
-PROGRAM_BUILD=2015092601
+OLD_PROGRAM_VERSION="1.0x"
+NEW_PROGRAM_VERSION="v1.1x"
+PROGRAM_BUILD=2015121501
 
 function Init {
 	OSYNC_DIR=".osync_workdir"
@@ -51,15 +53,15 @@ function Init {
 }
 
 function Usage {
-	echo "$PROGRAM $PROGRAM_VERSION $PROGRAM_BUILD"
+	echo "$PROGRAM $PROGRAM_BUILD"
 	echo $AUTHOR
 	echo $CONTACT
 	echo ""
-	echo "This script migrates osync v1.0x setups to v1.1 by updating state filenames and config files."
+	echo "This script migrates osync $OLD_PROGRAM_VERSION setups to $NEW_PROGRAM_VERSION by updating state filenames and config files."
 	echo ""
-	echo "Usage: upgrade.sh /path/to/config_file.conf"
-	echo "Usage: upgrade.sh --master=/path/to/master/replica --slave=/path/to/local/slave/replica --sync-id=existing_id"
-	echo "Usage: upgrade.sh --master=/path/to/master/replica --slave=ssh://[backupuser]@remotehost.com[:portnumber]//path/to/slave/replica --sync-id=existing_id --rsakey=/path/to/rsa/key"
+	echo "Usage: $0 /path/to/config_file.conf"
+	echo "Usage: $0 --master=/path/to/master/replica --slave=/path/to/local/slave/replica --sync-id=existing_id"
+	echo "Usage: $0 --master=/path/to/master/replica --slave=ssh://[backupuser]@remotehost.com[:portnumber]//path/to/slave/replica --sync-id=existing_id --rsakey=/path/to/rsa/key"
 	echo ""
 	echo "If config file is provided, the config file itself and both replicas from config file will be updated."
 	echo "If no config file provided, assume you run  the update script just like any other quicksync task."
@@ -93,10 +95,10 @@ function LoadConfigFile {
 		echo "Wrong configuration file supplied [$config_file]. Sync cannot start."
 		exit 1
 	else
-		egrep '^#|^[^ ]*=[^;&]*'  "$config_file" > "./osync.$FUNCNAME.$$"
+		egrep '^#|^[^ ]*=[^;&]*'  "$config_file" > "./$SUBPROGRAM.$FUNCNAME.$$"
 		# Shellcheck source=./sync.conf
-		source "./osync.$FUNCNAME.$$"
-		rm -f "./osync.$FUNCNAME.$$"
+		source "./$SUBPROGRAM.$FUNCNAME.$$"
+		rm -f "./$SUBPROGRAM.$FUNCNAME.$$"
 	fi
 }
 
@@ -305,9 +307,16 @@ function RewriteConfigFiles {
 	local config_file="${1}"
 
 	if ! grep "MASTER_SYNC_DIR=" "$config_file" > /dev/null; then
-		echo "Config file $config_file does not seem like an osync v1.0x file."
-		exit
+		echo "Config file [$config_file] does not seem to be an osync v1.0x file."
+		exit 1
 	fi
+
+        echo "Backing up [$config_file] as [$config_file.save]"
+        cp --preserve "$config_file" "$config_file.save"
+        if [ $? != 0 ]; then
+                echo "Cannot backup config file."
+                exit 1
+        fi
 
 	echo "Rewriting config file $config_file"
 
@@ -317,6 +326,13 @@ function RewriteConfigFiles {
 	sed -i 's/SLAVE_SYNC_DIR/TARGET_SYNC_DIR/g' "$config_file"
 	sed -i 's/CONFLICT_PREVALANCE=master/CONFLICT_PREVALANCE=initiator/g' "$config_file"
 	sed -i 's/CONFLICT_PREVALANCE=slave/CONFLICT_PREVALANCE=target/g' "$config_file"
+	sed -i 's/SYNC_ID=/INSTANCE_ID=/g' "$config_file"
+
+	# Add missing config file values
+	sed -i '/RSYNC_REMOTE_PATH=*/a RSYNC_PATTERN_FIRST=include' "$config_file"
+	sed -i '/RSYNC_PATTERN_FIRST=*/a RSYNC_INCLUDE_PATTERN=""' "$config_file"
+	sed -i '/RSYNC_EXCLUDE_FROM=*/a RSYNC_INCLUDE_FROM=""' "$config_file"
+	sed -i '/PARTIAL=*/a DELTA_COPIES=yes' "$config_file"
 }
 
 _QUICKSYNC=0
