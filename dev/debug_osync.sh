@@ -4,7 +4,7 @@ PROGRAM="osync" # Rsync based two way sync engine with fault tolerance
 AUTHOR="(L) 2013-2015 by Orsiris \"Ozy\" de Jong"
 CONTACT="http://www.netpower.fr/osync - ozy@netpower.fr"
 PROGRAM_VERSION=1.1-pre
-PROGRAM_BUILD=2015121501
+PROGRAM_BUILD=2015121601
 IS_STABLE=no
 
 FUNC_BUILD=2015121503
@@ -2341,13 +2341,13 @@ do
 		_DRYRUN=1
 		opts=$opts" --dry"
 		;;
-		--_SILENT)
+		--silent)
 		_SILENT=1
-		opts=$opts" --_SILENT"
+		opts=$opts" --silent"
 		;;
 		--verbose)
 		_VERBOSE=1
-		opts=$opts" --_VERBOSE"
+		opts=$opts" --verbose"
 		;;
 		--stats)
 		stats=1
