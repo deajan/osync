@@ -4,7 +4,7 @@ PROGRAM="osync" # Rsync based two way sync engine with fault tolerance
 AUTHOR="(L) 2013-2015 by Orsiris \"Ozy\" de Jong"
 CONTACT="http://www.netpower.fr/osync - ozy@netpower.fr"
 PROGRAM_VERSION=1.1-pre
-PROGRAM_BUILD=2015121601
+PROGRAM_BUILD=2015122101
 IS_STABLE=no
 
 source "./ofunctions.sh"
@@ -34,7 +34,7 @@ function TrapQuit {
 		then
 			SendAlert
 		else
-			Log "Debug mode, no alert mail will be sent."
+			Logger "Debug mode, no alert mail will be sent." "NOTICE"
 		fi
 		CleanUp
 		Logger "$PROGRAM finished with errors." "ERROR"
@@ -45,7 +45,7 @@ function TrapQuit {
 		then
 			SendAlert
 		else
-			Log "Debug mode, no alert mail will be sent."
+			Logger "Debug mode, no alert mail will be sent." "NOTICE"
 		fi
 		CleanUp
 		Logger "$PROGRAM finished with warnings." "WARN"
