@@ -4,7 +4,7 @@ PROGRAM="osync" # Rsync based two way sync engine with fault tolerance
 AUTHOR="(L) 2013-2015 by Orsiris de Jong"
 CONTACT="http://www.netpower.fr/osync - ozy@netpower.fr"
 PROGRAM_VERSION=1.1-pre
-PROGRAM_BUILD=2016020201
+PROGRAM_BUILD=2016020202
 IS_STABLE=no
 
 FUNC_BUILD=2015122101
@@ -2194,7 +2194,9 @@ function Init {
 	fi
 
 	## Add Rsync include / exclude patterns
-	RsyncPatterns
+	if [ $_QUICK_SYNC -lt 2 ]; then
+		RsyncPatterns
+	fi
 
 	## Filenames for state files
 	if [ $_DRYRUN -eq 1 ]; then
