@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
 
 PROGRAM="osync" # Rsync based two way sync engine with fault tolerance
-AUTHOR="(L) 2013-2015 by Orsiris \"Ozy\" de Jong"
+AUTHOR="(L) 2013-2015 by Orsiris de Jong"
 CONTACT="http://www.netpower.fr/osync - ozy@netpower.fr"
 PROGRAM_VERSION=1.1-pre
-PROGRAM_BUILD=2015122101
+PROGRAM_BUILD=2016020201
 IS_STABLE=no
 
 source "./ofunctions.sh"
@@ -1573,7 +1573,9 @@ opts="${opts# *}"
 	PreInit
 	Init
 	PostInit
-	CheckCurrentConfig
+	if [ $_QUICK_SYNC -lt 2 ]; then
+		CheckCurrentConfig
+	fi
 	GetRemoteOS
 	InitRemoteOSSettings
 

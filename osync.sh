@@ -1,13 +1,13 @@
 #!/usr/bin/env bash
 
 PROGRAM="osync" # Rsync based two way sync engine with fault tolerance
-AUTHOR="(L) 2013-2015 by Orsiris \"Ozy\" de Jong"
+AUTHOR="(L) 2013-2015 by Orsiris de Jong"
 CONTACT="http://www.netpower.fr/osync - ozy@netpower.fr"
 PROGRAM_VERSION=1.1-pre
-PROGRAM_BUILD=2015122101
+PROGRAM_BUILD=2016020201
 IS_STABLE=no
 
-FUNC_BUILD=2015121503
+FUNC_BUILD=2015122101
 ## BEGIN Generic functions for osync & obackup written in 2013-2015 by Orsiris de Jong - http://www.netpower.fr - ozy@netpower.fr
 
 ## type -p does not work on platforms other than linux (bash). If if does not work, always assume output is not a zero exitcode
@@ -315,7 +315,7 @@ function SendAlert {
 	fi
 
 	# If function has not returned 0 yet, assume it's critical that no alert can be sent
-	Logger "/!\ CRITICAL: Cannot send alert" "ERROR" # Is not marked critical because execution must continue
+	Logger "/!\ CRITICAL: Cannot send alert (neither mutt, mail, sendmail nor sendemail found)." "ERROR" # Is not marked critical because execution must continue
 
 	# Delete tmp log file
 	if [ -f "$ALERT_LOG_FILE" ]; then
@@ -2329,7 +2329,9 @@ opts="${opts# *}"
 	PreInit
 	Init
 	PostInit
-	CheckCurrentConfig
+	if [ $_QUICK_SYNC -lt 2 ]; then
+		CheckCurrentConfig
+	fi
 	GetRemoteOS
 	InitRemoteOSSettings
 
