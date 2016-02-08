@@ -6,7 +6,7 @@ AUTHOR="(L) 2015 by Orsiris \"Ozy\" de Jong"
 CONTACT="http://www.netpower.fr/osync - ozy@netpower.fr"
 OLD_PROGRAM_VERSION="1.0x"
 NEW_PROGRAM_VERSION="v1.1x"
-PROGRAM_BUILD=2016020801
+PROGRAM_BUILD=2016020802
 
 function Init {
 	OSYNC_DIR=".osync_workdir"
@@ -311,8 +311,8 @@ function RewriteConfigFiles {
 		exit 1
 	fi
 
-        echo "Backing up [$config_file] as [$config_file.save]"
-        cp --preserve "$config_file" "$config_file.save"
+        echo "Backing up [$config_file] as [$config_file.v1.0x.save]"
+        cp --preserve "$config_file" "$config_file.v1.0x.save"
         if [ $? != 0 ]; then
                 echo "Cannot backup config file."
                 exit 1
@@ -328,7 +328,7 @@ function RewriteConfigFiles {
 	sed -i 's/^CONFLICT_PREVALANCE=slave/CONFLICT_PREVALANCE=target/g' "$config_file"
 	sed -i 's/^SYNC_ID=/INSTANCE_ID=/g' "$config_file"
 
-	# Add missing config file values
+	# Add new config file values from v1.1x
 	if ! grep "RSYNC_PATTERN_FIRST=" "$config_file" > /dev/null; then
 		sed -i '/^LOGFILE=*/a RSYNC_PATTERN_FIRST=include' "$config_file"
 	fi
@@ -339,6 +339,14 @@ function RewriteConfigFiles {
 
 	if ! grep "RSYNC_INCLUDE_FROM=" "$config_file" > /dev/null; then
 		sed -i '/^RSYNC_EXCLUDE_FROM=*/a RSYNC_INCLUDE_FROM=""' "$config_file"
+	fi
+
+	if ! grep "CHECKSUM=" "$config_file" > /dev/null; then
+		sed -i '/^PRESERVE_HARDLINKS=*/a CHECKSUM=no' "$config_file"
+	fi
+
+	if ! grep "MAX_WAIT=" "$config_file" > /dev/null; then
+		sed -i '/^MIN_WAIT=*/a MAX_WAIT=300' "$config_file"
 	fi
 
 	if ! grep "PARTIAL=" "$config_file" > /dev/null; then
