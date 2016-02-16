@@ -1,5 +1,5 @@
-FUNC_BUILD=2016021603
-## BEGIN Generic functions for osync & obackup written in 2013-2015 by Orsiris de Jong - http://www.netpower.fr - ozy@netpower.fr
+FUNC_BUILD=2016021604
+## BEGIN Generic functions for osync & obackup written in 2013-2016 by Orsiris de Jong - http://www.netpower.fr - ozy@netpower.fr
 
 ## type -p does not work on platforms other than linux (bash). If if does not work, always assume output is not a zero exitcode
 if ! type "$BASH" > /dev/null; then
@@ -249,6 +249,12 @@ function SendAlert {
 	# </OSYNC SPECIFIC>
 
 	eval "cat \"$LOG_FILE\" $COMPRESSION_PROGRAM > $ALERT_LOG_FILE"
+	if [ $? != 0 ]; then
+		Logger "Cannot create [$ALERT_LOG_FILE]" "WARN"
+		mail_no_attachment=1
+	else
+		mail_no_attachment=0
+	fi
 	MAIL_ALERT_MSG="$MAIL_ALERT_MSG"$'\n\n'$(tail -n 50 "$LOG_FILE")
 	if [ $ERROR_ALERT -eq 1 ]; then
 		subject="Error alert for $INSTANCE_ID"
@@ -258,8 +264,11 @@ function SendAlert {
 		subject="Alert for $INSTANCE_ID"
 	fi
 
+	if [ mail_no_attachment -eq 0 ]; then
+		attachment_command="-a $ALERT_LOG_FILE"
+	fi
 	if type mutt > /dev/null 2>&1 ; then
-		echo "$MAIL_ALERT_MSG" | $(type -p mutt) -x -s "$subject" $DESTINATION_MAILS -a "$ALERT_LOG_FILE"
+		echo "$MAIL_ALERT_MSG" | $(type -p mutt) -x -s "$subject" $DESTINATION_MAILS $attachment_command
 		if [ $? != 0 ]; then
 			Logger "WARNING: Cannot send alert email via $(type -p mutt) !!!" "WARN"
 		else
@@ -269,9 +278,9 @@ function SendAlert {
 	fi
 
 	if type mail > /dev/null 2>&1 ; then
-		if $(type -p mail) -V | grep "GNU" > /dev/null; then
+		if [ $mail_no_attachment -eq 0 ] && $(type -p mail) -V | grep "GNU" > /dev/null; then
 			attachment_command="-A $ALERT_LOG_FILE"
-		elif $(type -p mail) -V > /dev/null; then
+		elif [ $mail_no_attachment -eq 0 ] && $(type -p mail) -V > /dev/null; then
 			attachment_command="-a $ALERT_LOG_FILE"
 		else
 			attachment_command=""
