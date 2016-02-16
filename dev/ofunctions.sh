@@ -1,4 +1,4 @@
-FUNC_BUILD=2015121503
+FUNC_BUILD=2016021603
 ## BEGIN Generic functions for osync & obackup written in 2013-2015 by Orsiris de Jong - http://www.netpower.fr - ozy@netpower.fr
 
 ## type -p does not work on platforms other than linux (bash). If if does not work, always assume output is not a zero exitcode
@@ -318,7 +318,7 @@ function SendAlert {
 	fi
 
 	# If function has not returned 0 yet, assume it's critical that no alert can be sent
-	Logger "/!\ CRITICAL: Cannot send alert" "ERROR" # Is not marked critical because execution must continue
+	Logger "/!\ CRITICAL: Cannot send alert (neither mutt, mail, sendmail nor sendemail found)." "ERROR" # Is not marked critical because execution must continue
 
 	# Delete tmp log file
 	if [ -f "$ALERT_LOG_FILE" ]; then
@@ -782,13 +782,14 @@ function PreInit {
         fi
 
 	 ## Set rsync default arguments
-        RSYNC_ARGS="-rlptgoD"
+        RSYNC_ARGS="-rltD"
+	RSYNC_ATTR_ARGS="-pgo"
 
         if [ "$PRESERVE_ACL" == "yes" ]; then
-                RSYNC_ARGS=$RSYNC_ARGS" -A"
+                RSYNC_ATTR_ARGS=$RSYNC_ATTR_ARGS" -A"
         fi
         if [ "$PRESERVE_XATTR" == "yes" ]; then
-                RSYNC_ARGS=$RSYNC_ARGS" -X"
+                RSYNC_ATTR_ARGS=$RSYNC_ATTR_ARGS" -X"
         fi
         if [ "$RSYNC_COMPRESS" == "yes" ]; then
                 RSYNC_ARGS=$RSYNC_ARGS" -z"
@@ -803,7 +804,7 @@ function PreInit {
                 RSYNC_ARGS=$RSYNC_ARGS" -H"
         fi
         if [ "$CHECKSUM" == "yes" ]; then
-                RSYNC_ARGS=$RSYNC_ARGS" --checksum"
+                RSYNC_TYPE_ARGS=$RSYNC_TYPE_ARGS" --checksum"
         fi
 	if [ $_DRYRUN -eq 1 ]; then
                 RSYNC_ARGS=$RSYNC_ARGS" -n"
@@ -811,6 +812,17 @@ function PreInit {
         fi
         if [ "$BANDWIDTH" != "" ] && [ "$BANDWIDTH" != "0" ]; then
                 RSYNC_ARGS=$RSYNC_ARGS" --bwlimit=$BANDWIDTH"
+        fi
+
+        if [ "$PARTIAL" == "yes" ]; then
+                RSYNC_ARGS=$RSYNC_ARGS" --partial --partial-dir=\"$PARTIAL_DIR\""
+                RSYNC_PARTIAL_EXCLUDE="--exclude=\"$PARTIAL_DIR\""
+        fi
+
+	if [ "$DELTA_COPIES" != "no" ]; then
+                RSYNC_ARGS=$RSYNC_ARGS" --no-whole-file"
+        else
+            	RSYNC_ARGS=$RSYNC_ARGS" --whole-file"
         fi
 
 	 ## Set compression executable and extension
@@ -882,7 +894,7 @@ function InitRemoteOSSettings {
 
         ## MacOSX does not use the -E parameter like Linux or BSD does (-E is mapped to extended attrs instead of preserve executability)
         if [ "$LOCAL_OS" != "MacOSX" ] && [ "$REMOTE_OS" != "MacOSX" ]; then
-                RSYNC_ARGS=$RSYNC_ARGS" -E"
+                RSYNC_ATTR_ARGS=$RSYNC_ATTR_ARGS" -E"
         fi
 
         if [ "$REMOTE_OS" == "msys" ]; then

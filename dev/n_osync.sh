@@ -3,8 +3,8 @@
 PROGRAM="osync" # Rsync based two way sync engine with fault tolerance
 AUTHOR="(L) 2013-2015 by Orsiris de Jong"
 CONTACT="http://www.netpower.fr/osync - ozy@netpower.fr"
-PROGRAM_VERSION=1.1-pre
-PROGRAM_BUILD=2016020804
+PROGRAM_VERSION=1.1-dev
+PROGRAM_BUILD=2016021602
 IS_STABLE=no
 
 source "./ofunctions.sh"
@@ -556,15 +556,15 @@ function tree_list {
 	local tree_filename="${3}" # filename to output tree (will be prefixed with $replica_type)
 	__CheckArguments 3 $# $FUNCNAME "$@"	#__WITH_PARANOIA_DEBUG
 
-	local escaped_replica_path=$(EscapeSpaces "$replica_path") #TODO: See if escpaed still needed when using singlequotes instead of doublequotes for command eval
+	local escaped_replica_path=$(EscapeSpaces "$replica_path")
 
 	Logger "Creating $replica_type replica file list [$replica_path]." "NOTICE"
 	if [ "$REMOTE_OPERATION" == "yes" ] && [ "$replica_type" == "target" ]; then
 		CheckConnectivity3rdPartyHosts
 		CheckConnectivityRemoteHost
-		rsync_cmd="$(type -p $RSYNC_EXECUTABLE) --rsync-path=\"$RSYNC_PATH\" $RSYNC_ARGS -8 --exclude \"$OSYNC_DIR\" $RSYNC_PATTERNS $RSYNC_PARTIAL_EXCLUDE -e \"$RSYNC_SSH_CMD\" --list-only $REMOTE_USER@$REMOTE_HOST:\"$escaped_replica_path/\" | grep \"^-\|^d\" | awk '{\$1=\$2=\$3=\$4=\"\" ;print}' | awk '{\$1=\$1 ;print}' | (grep -v \"^\.$\" || :) | sort > \"$RUN_DIR/$PROGRAM.$replica_type.$SCRIPT_PID\" &"
+		rsync_cmd="$(type -p $RSYNC_EXECUTABLE) --rsync-path=\"$RSYNC_PATH\" $RSYNC_ARGS $RSYNC_ATTR_ARGS $RSNYC_TYPE_ARGS -8 --exclude \"$OSYNC_DIR\" $RSYNC_PATTERNS $RSYNC_PARTIAL_EXCLUDE -e \"$RSYNC_SSH_CMD\" --list-only $REMOTE_USER@$REMOTE_HOST:\"$escaped_replica_path/\" | grep \"^-\|^d\" | awk '{\$1=\$2=\$3=\$4=\"\" ;print}' | awk '{\$1=\$1 ;print}' | (grep -v \"^\.$\" || :) | sort > \"$RUN_DIR/$PROGRAM.$replica_type.$SCRIPT_PID\" &"
 	else
-		rsync_cmd="$(type -p $RSYNC_EXECUTABLE) --rsync-path=\"$RSYNC_PATH\" $RSYNC_ARGS -8 --exclude \"$OSYNC_DIR\" $RSYNC_PATTERNS $RSYNC_PARTIAL_EXCLUDE --list-only \"$replica_path/\" | grep \"^-\|^d\" | awk '{\$1=\$2=\$3=\$4=\"\" ;print}' | awk '{\$1=\$1 ;print}' | (grep -v \"^\.$\" || :) | sort > \"$RUN_DIR/$PROGRAM.$replica_type.$SCRIPT_PID\" &"
+		rsync_cmd="$(type -p $RSYNC_EXECUTABLE) --rsync-path=\"$RSYNC_PATH\" $RSYNC_ARGS $RSYNC_ATTR_ARGS $RSNYC_TYPE_ARGS -8 --exclude \"$OSYNC_DIR\" $RSYNC_PATTERNS $RSYNC_PARTIAL_EXCLUDE --list-only \"$replica_path/\" | grep \"^-\|^d\" | awk '{\$1=\$2=\$3=\$4=\"\" ;print}' | awk '{\$1=\$1 ;print}' | (grep -v \"^\.$\" || :) | sort > \"$RUN_DIR/$PROGRAM.$replica_type.$SCRIPT_PID\" &"
 	fi
 	Logger "RSYNC_CMD: $rsync_cmd" "DEBUG"
 	## Redirect commands stderr here to get rsync stderr output in logfile
@@ -619,6 +619,58 @@ function delete_list {
 	fi
 }
 
+function _get_file_attrs_local {
+	__CheckArguments 2 $# $FUNCNAME "$@"	#__WITH_PARANOIA_DEBUG
+}
+
+function _get_file_attrs_remote {
+	__CheckArguments 2 $# $FUNCNAME "$@"	#__WITH_PARANOIA_DEBUG
+}
+
+function sync_attrs {
+	local initiator_replica="${1}" # Contains #TODO: Write ACL update function, check other ctime related attributes (xattr ?)
+	local target_replica="${2}"
+	__CheckArguments 2 $# $FUNCNAME "$@"	#__WITH_PARANOIA_DEBUG
+
+	if [ "$REMOTE_OPERATION" == "yes" ]; then
+		CheckConnectivity3rdPartyHosts
+		CheckConnectivityRemoteHost
+		rsync_cmd="$(type -p $RSYNC_EXECUTABLE) --rsync-path=\"$RSYNC_PATH\" -i $RSYNC_ARGS $RSYNC_ATTR_ARGS $RSYNC_PARTIAL_EXCLUDE -e \"$RSYNC_SSH_CMD\" $BACKUP_DIR --exclude \"$OSYNC_DIR\" $RSYNC_PATTERNS $RSYNC_PARTIAL_EXCLUDE --exclude-from=\"$INITIATOR_STATE_DIR/$source_replica$delete_list_filename\" --exclude-from=\"$INITIATOR_STATE_DIR/$destination_replica$delete_list_filename\" \"$initiator_replica/\" $REMOTE_USER@$REMOTE_HOST:\"$target_replica/\" | grep -Ev \"^[^ ]*(c|s|t)[^ ]* \" | grep -E \"^[^ ]*(p|o|g|a)[^ ]* \" | sed -e 's/^[^ ]* //' > $RUN_DIR/$PROGRAM.$FUNCNAME.$SCRIPT_PID 2>&1 &"
+	else
+		rsync_cmd="$(type -p $RSYNC_EXECUTABLE) --rsync-path=\"$RSYNC_PATH\" -i $RSYNC_ARGS $RSYNC_ATTR_ARGS $RSYNC_PARTIAL_EXCLUDE --exclude \"$OSYNC_DIR\" $RSYNC_PATTERNS $RSYNC_PARTIAL_EXCLUDE --exclude-from=\"$INITIATOR_STATE_DIR/$source_replica$delete_list_filename\" --exclude-from=\"$INITIATOR_STATE_DIR/$destination_replica$delete_list_filename\" \"$initiator_replica/\" \"$target_replica/\" | grep -Ev \"^[^ ]*(c|s|t)[^ ]* \" | grep -E \"^[^ ]*(p|o|g|a)[^ ]* \" | sed -e 's/^[^ ]* //' > $RUN_DIR/$PROGRAM.$FUNCNAME.$SCRIPT_PID 2>&1 &"
+	fi
+	Logger "RSYNC_CMD: $rsync_cmd" "DEBUG"
+	eval "$rsync_cmd"
+	WaitForCompletion $! $SOFT_MAX_EXEC_TIME $HARD_MAX_EXEC_TIME $FUNCNAME
+	retval=$?
+	if [ $_VERBOSE -eq 1 ] && [ -f "$RUN_DIR/$PROGRAM.$FUNCNAME.$SCRIPT_PID" ]; then
+		Logger "List:\n$(cat $RUN_DIR/$PROGRAM.$FUNCNAME.$SCRIPT_PID)" "NOTICE"
+	fi
+
+	if [ $retval != 0 ] && [ $retval != 24 ]; then
+		Logger "Getting file attributes failed. Stopping execution." "CRITICAL"
+		if [ $_VERBOSE -eq 0 ] && [ -f "$RUN_DIR/$PROGRAM.$FUNCNAME.$SCRIPT_PID" ]; then
+			Logger "Rsync output:\n$(cat $RUN_DIR/$PROGRAM.$FUNCNAME.$SCRIPT_PID)" "NOTICE"
+		fi
+		exit $retval
+	else
+		Logger "Getting file attributes on replicas succeded." "NOTICE"
+		return 0
+	fi
+
+	_get_file_attrs_local "$INITIATOR_SYNC_DIR"
+	if [ "$REMOTE_OPERATION" != "yes" ]; then
+		_get_file_attrs_remote "$TARGET_SYNC_DIR"
+	else
+		_get_file_attrs_local "$TARGET_SYNC_DIR"
+	fi
+
+	#WIP
+	# Join both files into tmp file
+	# Rsync file from tmp file
+
+}
+
 # sync_update(source replica, destination replica, delete_list_filename)
 function sync_update {
 	local source_replica="${1}" # Contains replica type of source: initiator, target
@@ -645,12 +697,12 @@ function sync_update {
 		CheckConnectivity3rdPartyHosts
 		CheckConnectivityRemoteHost
 		if [ "$source_replica" == "initiator" ]; then
-			rsync_cmd="$(type -p $RSYNC_EXECUTABLE) --rsync-path=\"$RSYNC_PATH\" $RSYNC_ARGS $SYNC_OPTS -e \"$RSYNC_SSH_CMD\" $BACKUP_DIR --exclude \"$OSYNC_DIR\" $RSYNC_PATTERNS $RSYNC_PARTIAL_EXCLUDE --exclude-from=\"$INITIATOR_STATE_DIR/$source_replica$delete_list_filename\" --exclude-from=\"$INITIATOR_STATE_DIR/$destination_replica$delete_list_filename\" \"$SOURCE_DIR/\" $REMOTE_USER@$REMOTE_HOST:\"$ESC_DEST_DIR/\" > $RUN_DIR/$PROGRAM.update.$destination_replica.$SCRIPT_PID 2>&1 &"
+			rsync_cmd="$(type -p $RSYNC_EXECUTABLE) --rsync-path=\"$RSYNC_PATH\" $RSYNC_ARGS $RSYNC_ATTR_ARGS $RSYNC_TYPE_ARGS $SYNC_OPTS -e \"$RSYNC_SSH_CMD\" $BACKUP_DIR --exclude \"$OSYNC_DIR\" $RSYNC_PATTERNS $RSYNC_PARTIAL_EXCLUDE --exclude-from=\"$INITIATOR_STATE_DIR/$source_replica$delete_list_filename\" --exclude-from=\"$INITIATOR_STATE_DIR/$destination_replica$delete_list_filename\" \"$SOURCE_DIR/\" $REMOTE_USER@$REMOTE_HOST:\"$ESC_DEST_DIR/\" > $RUN_DIR/$PROGRAM.update.$destination_replica.$SCRIPT_PID 2>&1 &"
 		else
-			rsync_cmd="$(type -p $RSYNC_EXECUTABLE) --rsync-path=\"$RSYNC_PATH\" $RSYNC_ARGS $SYNC_OPTS -e \"$RSYNC_SSH_CMD\" $BACKUP_DIR --exclude \"$OSYNC_DIR\" $RSYNC_PATTERNS $RSYNC_PARTIAL_EXCLUDE --exclude-from=\"$INITIATOR_STATE_DIR/$destination_replica$delete_list_filename\" --exclude-from=\"$INITIATOR_STATE_DIR/$source_replica$delete_list_filename\" $REMOTE_USER@$REMOTE_HOST:\"$ESC_SOURCE_DIR/\" \"$DEST_DIR/\" > $RUN_DIR/$PROGRAM.update.$destination_replica.$SCRIPT_PID 2>&1 &"
+			rsync_cmd="$(type -p $RSYNC_EXECUTABLE) --rsync-path=\"$RSYNC_PATH\" $RSYNC_ARGS $RSYNC_ATTR_ARGS $RSNYC_TYPE_ARGS $SYNC_OPTS -e \"$RSYNC_SSH_CMD\" $BACKUP_DIR --exclude \"$OSYNC_DIR\" $RSYNC_PATTERNS $RSYNC_PARTIAL_EXCLUDE --exclude-from=\"$INITIATOR_STATE_DIR/$destination_replica$delete_list_filename\" --exclude-from=\"$INITIATOR_STATE_DIR/$source_replica$delete_list_filename\" $REMOTE_USER@$REMOTE_HOST:\"$ESC_SOURCE_DIR/\" \"$DEST_DIR/\" > $RUN_DIR/$PROGRAM.update.$destination_replica.$SCRIPT_PID 2>&1 &"
 		fi
 	else
-		rsync_cmd="$(type -p $RSYNC_EXECUTABLE) --rsync-path=\"$RSYNC_PATH\" $RSYNC_ARGS $SYNC_OPTS $BACKUP_DIR --exclude \"$OSYNC_DIR\" $RSYNC_PATTERNS $RSYNC_PARTIAL_EXCLUDE --exclude-from=\"$INITIATOR_STATE_DIR/$source_replica$delete_list_filename\" --exclude-from=\"$INITIATOR_STATE_DIR/$destination_replica$delete_list_filename\" \"$SOURCE_DIR/\" \"$DEST_DIR/\" > $RUN_DIR/$PROGRAM.update.$destination_replica.$SCRIPT_PID 2>&1 &"
+		rsync_cmd="$(type -p $RSYNC_EXECUTABLE) --rsync-path=\"$RSYNC_PATH\" $RSYNC_ARGS $RSYNC_ATTR_ARGS $RSNYC_TYPE_ARGS $SYNC_OPTS $BACKUP_DIR --exclude \"$OSYNC_DIR\" $RSYNC_PATTERNS $RSYNC_PARTIAL_EXCLUDE --exclude-from=\"$INITIATOR_STATE_DIR/$source_replica$delete_list_filename\" --exclude-from=\"$INITIATOR_STATE_DIR/$destination_replica$delete_list_filename\" \"$SOURCE_DIR/\" \"$DEST_DIR/\" > $RUN_DIR/$PROGRAM.update.$destination_replica.$SCRIPT_PID 2>&1 &"
 	fi
 	Logger "RSYNC_CMD: $rsync_cmd" "DEBUG"
 	eval "$rsync_cmd"
@@ -931,7 +983,8 @@ function deletion_propagation {
 ######
 ###### Step 1: Create current tree list for initiator and target replicas (Steps 1M and 1S)
 ###### Step 2: Create deleted file list for initiator and target replicas (Steps 2M and 2S)
-###### Step 3: Update initiator and target replicas (Steps 3M and 3S, order depending on conflict prevalence)
+###### Step 3a: Update initiator and target file attributes only
+###### Step 3b: Update initiator and target replicas (Steps 3M and 3S, order depending on conflict prevalence)
 ###### Step 4: Deleted file propagation to initiator and target replicas (Steps 4M and 4S)
 ###### Step 5: Create after run tree list for initiator and target replicas (Steps 5M and 5S)
 
@@ -1009,6 +1062,8 @@ function Sync {
 		fi
 		resume_sync="resumed"
 	fi
+	#TODO write resume step
+	#sync_attrs "$INITIATOR_SYNC_DIR" "$TARGET_SYNC_DIR" #TODO: escapespaces if remote... need to refactor with sync_update
 	if [ "$resume_sync" == "resumed" ] || [ "$resume_sync" == "${SYNC_ACTION[3]}.success" ] || [ "$resume_sync" == "${SYNC_ACTION[4]}.fail" ] || [ "$resume_sync" == "${SYNC_ACTION[5]}.fail" ] || [ "$resume_sync" == "${SYNC_ACTION[4]}.success" ] || [ "$resume_sync" == "${SYNC_ACTION[5]}.success" ]; then
 		if [ "$CONFLICT_PREVALANCE" != "initiator" ]; then
 			if [ "$resume_sync" == "resumed" ] || [ "$resume_sync" == "${SYNC_ACTION[3]}.success" ] || [ "$resume_sync" == "${SYNC_ACTION[4]}.fail" ]; then
@@ -1266,6 +1321,8 @@ function Init {
 	## Partial downloads dirs
 	PARTIAL_DIR=$OSYNC_DIR"_partial"
 
+	## TODO: checksum=no / yes not implemented, be careful with sync_attrs which must itemize based on mtime
+
 	## Set sync only function arguments for rsync
 	SYNC_OPTS="-u"
 
@@ -1276,17 +1333,6 @@ function Init {
 	if [ $stats -eq 1 ]; then
 		SYNC_OPTS=$SYNC_OPTS" --stats"
 	fi
-
-	if [ "$PARTIAL" == "yes" ]; then
-		SYNC_OPTS=$SYNC_OPTS" --partial --partial-dir=\"$PARTIAL_DIR\""
-		RSYNC_PARTIAL_EXCLUDE="--exclude=\"$PARTIAL_DIR\""
-	fi
-
-	if [ "$DELTA_COPIES" != "no" ]; then
-                RSYNC_ARGS=$RSYNC_ARGS" --no-whole-file"
-        else
-                RSYNC_ARGS=$RSYNC_ARGS" --whole-file"
-        fi
 
 	## Conflict options
 	if [ "$CONFLICT_BACKUP" != "no" ]; then
