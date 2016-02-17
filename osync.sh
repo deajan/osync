@@ -4,7 +4,7 @@ PROGRAM="osync" # Rsync based two way sync engine with fault tolerance
 AUTHOR="(L) 2013-2016 by Orsiris de Jong"
 CONTACT="http://www.netpower.fr/osync - ozy@netpower.fr"
 PROGRAM_VERSION=1.1-dev
-PROGRAM_BUILD=2016021703
+PROGRAM_BUILD=2016021704
 IS_STABLE=no
 
 FUNC_BUILD=2016021604
@@ -1409,16 +1409,16 @@ function delete_list {
 	fi
 }
 
-function _get_file_attrs_local {
+function _get_file_ctime_mtime_local {
 	local replica_path="${1}" # Contains replica path
 	local replica_type="${2}" # Initiator / Target
 	local file_list="${3}" # Contains list of files to get time attrs
 
-	cd "$replica_path"
-	cat "$file_list" | xargs -I {} stat -c '%n|%Z|%Y' "{}" | sort > "$RUN_DIR/$PROGRAM.$FUNCNAME.$replica_type.$SCRIPT_PID"
+	# TODO: make this more beautiful (include path in stat command ?)
+	cat "$file_list" | xargs -I {} stat -c '%n|%Z|%Y' "$replica_path{}" | sort > "$RUN_DIR/$PROGRAM.$FUNCNAME.$replica_type.$SCRIPT_PID"
 }
 
-function _get_file_attrs_remote {
+function _get_file_ctime_mtime_remote {
 	local replica_path="${1}" # Contains replica path
 	local replica_type="${2}"
 	local file_list="${3}"
@@ -1431,6 +1431,8 @@ function _get_file_attrs_remote {
 function sync_attrs {
 	local initiator_replica="${1}" # Contains #TODO: Write ACL update function, check other ctime related attributes (xattr ?)
 	local target_replica="${2}"
+
+	local rsync_cmd=
 
 	Logger "Getting file attributes." "NOTICE"
 
@@ -1463,17 +1465,37 @@ function sync_attrs {
 		fi
 	fi
 
-	_get_file_attrs_local "${INITIATOR[1]}" "${INITIATOR[0]}" "$RUN_DIR/$PROGRAM.$FUNCNAME-cleaned.$SCRIPT_PID"
+	_get_file_ctime_mtime_local "${INITIATOR[1]}" "${INITIATOR[0]}" "$RUN_DIR/$PROGRAM.$FUNCNAME-cleaned.$SCRIPT_PID"
 	if [ "$REMOTE_OPERATION" != "yes" ]; then
-		_get_file_attrs_remote "${TARGET[1]}" "${TARGET[0]}" "$RUN_DIR/$PROGRAM.$FUNCNAME-cleaned.$SCRIPT_PID"
+		_get_file_ctime_mtime_local "${TARGET[1]}" "${TARGET[0]}" "$RUN_DIR/$PROGRAM.$FUNCNAME-cleaned.$SCRIPT_PID"
 	else
-		_get_file_attrs_local "${TARGET[1]}" "${TARGET[0]}" "$RUN_DIR/$PROGRAM.$FUNCNAME-cleaned.$SCRIPT_PID"
+		_get_file_ctime_mtime_remote "${TARGET[1]}" "${TARGET[0]}" "$RUN_DIR/$PROGRAM.$FUNCNAME-cleaned.$SCRIPT_PID"
 	fi
 
 	#WIP
-	# Join both files into tmp file
-	# Rsync file from tmp file
+	join -j 1 -t ';' -o 1.1,1.2,2.2 init targ | awk -F';' '{if ($2 < $3) print $1}' > "$RUN_DIR/$PROGRAM.$FUNCNAME-attrfiles.$SCRIPT_PID"
+	if [ "$REMOTE_OPERATION" != "yes" ]; then
+		rsync_cmd=""
+	else
+		rsync_cmd=""
+	fi
+	Logger "RSYNC_CMD: $rsync_cmd" "DEBUG"
+	eval "$rsync_cmd"
+	WaitForCompletion $! $SOFT_MAX_EXEC_TIME $HARD_MAX_EXEC_TIME $FUNCNAME
+	retval=$?
+	if [ $_VERBOSE -eq 1 ] && [ -f "$RUN_DIR/$PROGRAM.$FUNCNAME-attrfiles.$SCRIPT_PID" ]; then
+		Logger "List:\n$(cat $RUN_DIR/$PROGRAM.$FUNCNAM-attrfiles.$SCRIPT_PID)" "NOTICE"
+	fi
 
+	if [ $retval != 0 ] && [ $retval != 24 ]; then
+		Logger "Getting file attributes failed [$retval]. Stopping execution." "CRITICAL"
+		if [ $_VERBOSE -eq 0 ] && [ -f "$RUN_DIR/$PROGRAM.$FUNCNAME-attrfiles.$SCRIPT_PID" ]; then
+			Logger "Rsync output:\n$(cat $RUN_DIR/$PROGRAM.$FUNCNAME-attrfiles.$SCRIPT_PID)" "NOTICE"
+		fi
+		exit $retval
+	else
+		Logger "Successfully updated file attributes on target replica." "NOTICE"
+	fi
 }
 
 # sync_update(source replica, destination replica, delete_list_filename)
