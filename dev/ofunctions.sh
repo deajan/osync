@@ -1,4 +1,4 @@
-FUNC_BUILD=2016021604
+## FUNC_BUILD=2016021801
 ## BEGIN Generic functions for osync & obackup written in 2013-2016 by Orsiris de Jong - http://www.netpower.fr - ozy@netpower.fr
 
 ## type -p does not work on platforms other than linux (bash). If if does not work, always assume output is not a zero exitcode
@@ -70,7 +70,7 @@ ALERT_LOG_FILE="$RUN_DIR/$PROGRAM.last.log"
 
 
 function Dummy {
-	__CheckArguments 0 $# $FUNCNAME "$@"	#__WITH_PARANOIA_DEBUG
+	__CheckArguments 0 $# ${FUNCNAME[0]} "$@"	#__WITH_PARANOIA_DEBUG
 	sleep .1
 }
 
@@ -226,7 +226,7 @@ function IsNumeric {
 }
 
 function CleanUp {
-	__CheckArguments 0 $# $FUNCNAME "$@"	#__WITH_PARANOIA_DEBUG
+	__CheckArguments 0 $# ${FUNCNAME[0]} "$@"	#__WITH_PARANOIA_DEBUG
 
 	if [ "$_DEBUG" != "yes" ]; then
 		rm -f "$RUN_DIR/$PROGRAM."*".$SCRIPT_PID"
@@ -234,7 +234,10 @@ function CleanUp {
 }
 
 function SendAlert {
-	__CheckArguments 0 $# $FUNCNAME "$@"	#__WITH_PARANOIA_DEBUG
+	__CheckArguments 0 $# ${FUNCNAME[0]} "$@"	#__WITH_PARANOIA_DEBUG
+
+	local main_no_attachment=
+	local attachment_command=
 
 	if [ "$_DEBUG" == "yes" ]; then
 		Logger "Debug mode, no warning email will be sent." "NOTICE"
@@ -264,7 +267,7 @@ function SendAlert {
 		subject="Alert for $INSTANCE_ID"
 	fi
 
-	if [ mail_no_attachment -eq 0 ]; then
+	if [ "$mail_no_attachment" -eq 0 ]; then
 		attachment_command="-a $ALERT_LOG_FILE"
 	fi
 	if type mutt > /dev/null 2>&1 ; then
@@ -278,9 +281,9 @@ function SendAlert {
 	fi
 
 	if type mail > /dev/null 2>&1 ; then
-		if [ $mail_no_attachment -eq 0 ] && $(type -p mail) -V | grep "GNU" > /dev/null; then
+		if [ "$mail_no_attachment" -eq 0 ] && $(type -p mail) -V | grep "GNU" > /dev/null; then
 			attachment_command="-A $ALERT_LOG_FILE"
-		elif [ $mail_no_attachment -eq 0 ] && $(type -p mail) -V > /dev/null; then
+		elif [ "$mail_no_attachment" -eq 0 ] && $(type -p mail) -V > /dev/null; then
 			attachment_command="-a $ALERT_LOG_FILE"
 		else
 			attachment_command=""
@@ -336,9 +339,9 @@ function SendAlert {
 }
 
 function LoadConfigFile {
-	__CheckArguments 1 $# $FUNCNAME "$@"	#__WITH_PARANOIA_DEBUG
-
 	local config_file="${1}"
+	__CheckArguments 1 $# ${FUNCNAME[0]} "$@"	#__WITH_PARANOIA_DEBUG
+
 
 	if [ ! -f "$config_file" ]; then
 		Logger "Cannot load configuration file [$config_file]. Cannot start." "CRITICAL"
@@ -347,22 +350,24 @@ function LoadConfigFile {
 		Logger "Wrong configuration file supplied [$config_file]. Cannot start." "CRITICAL"
 		exit 1
 	else
-		grep '^[^ ]*=[^;&]*' "$config_file" > "$RUN_DIR/$PROGRAM.$FUNCNAME.$SCRIPT_PID" # WITHOUT COMMENTS
+		grep '^[^ ]*=[^;&]*' "$config_file" > "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$SCRIPT_PID" # WITHOUT COMMENTS
 		# Shellcheck source=./sync.conf
-		source "$RUN_DIR/$PROGRAM.$FUNCNAME.$SCRIPT_PID"
+		source "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$SCRIPT_PID"
 	fi
 
 	CONFIG_FILE="$config_file"
 }
 
 function GetLocalOS {
-	__CheckArguments 0 $# $FUNCNAME "$@"	#__WITH_PARANOIA_DEBUG
+	__CheckArguments 0 $# ${FUNCNAME[0]} "$@"	#__WITH_PARANOIA_DEBUG
 
-	local local_os_var=$(uname -spio 2>&1)
+	local local_os_var=
+
+	local_os_var=$(uname -spio 2>&1)
 	if [ $? != 0 ]; then
-		local local_os_var=$(uname -v 2>&1)
+		local_os_var=$(uname -v 2>&1)
 		if [ $? != 0 ]; then
-			local local_os_var=($uname)
+			local_os_var=($uname)
 		fi
 	fi
 
@@ -388,27 +393,31 @@ function GetLocalOS {
 }
 
 function GetRemoteOS {
-	__CheckArguments 0 $# $FUNCNAME "$@"	#__WITH_PARANOIA_DEBUG
+	__CheckArguments 0 $# ${FUNCNAME[0]} "$@"	#__WITH_PARANOIA_DEBUG
+
+	local cmd=
+	local remote_os_var=
+
 
 	if [ "$REMOTE_OPERATION" == "yes" ]; then
 		CheckConnectivity3rdPartyHosts
 		CheckConnectivityRemoteHost
-		local cmd=$SSH_CMD' "uname -spio" > "'$RUN_DIR/$PROGRAM.$FUNCNAME.$SCRIPT_PID'" 2>&1'
+		cmd=$SSH_CMD' "uname -spio" > "'$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$SCRIPT_PID'" 2>&1'
 		Logger "cmd: $cmd" "DEBUG"
 		eval "$cmd" &
-		WaitForTaskCompletion $! 120 240 $FUNCNAME"-1"
+		WaitForTaskCompletion $! 120 240 ${FUNCNAME[0]}"-1"
 		retval=$?
 		if [ $retval != 0 ]; then
-			local cmd=$SSH_CMD' "uname -v" > "'$RUN_DIR/$PROGRAM.$FUNCNAME.$SCRIPT_PID'" 2>&1'
+			cmd=$SSH_CMD' "uname -v" > "'$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$SCRIPT_PID'" 2>&1'
 			Logger "cmd: $cmd" "DEBUG"
 			eval "$cmd" &
-			WaitForTaskCompletion $! 120 240 $FUNCNAME"-2"
+			WaitForTaskCompletion $! 120 240 ${FUNCNAME[0]}"-2"
 			retval=$?
 			if [ $retval != 0 ]; then
-				local cmd=$SSH_CMD' "uname" > "'$RUN_DIR/$PROGRAM.$FUNCNAME.$SCRIPT_PID'" 2>&1'
+				cmd=$SSH_CMD' "uname" > "'$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$SCRIPT_PID'" 2>&1'
 				Logger "cmd: $cmd" "DEBUG"
 				eval "$cmd" &
-				WaitForTaskCompletion $! 120 240 $FUNCNAME"-3"
+				WaitForTaskCompletion $! 120 240 ${FUNCNAME[0]}"-3"
 				retval=$?
 				if [ $retval != 0 ]; then
 					Logger "Cannot Get remote OS type." "ERROR"
@@ -416,7 +425,7 @@ function GetRemoteOS {
 			fi
 		fi
 
-		local remote_os_var=$(cat $RUN_DIR/$PROGRAM.$FUNCNAME.$SCRIPT_PID)
+		remote_os_var=$(cat $RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$SCRIPT_PID)
 
 		case $remote_os_var in
 			*"Linux"*)
@@ -450,8 +459,8 @@ function WaitForTaskCompletion {
 	local soft_max_time="${2}" # If program with pid $pid takes longer than $soft_max_time seconds, will log a warning, unless $soft_max_time equals 0.
 	local hard_max_time="${3}" # If program with pid $pid takes longer than $hard_max_time seconds, will stop execution, unless $hard_max_time equals 0.
 	local caller_name="${4}" # Who called this function
-	Logger "$FUNCNAME called by [$caller_name]." "PARANOIA_DEBUG"	#__WITH_PARANOIA_DEBUG
-	__CheckArguments 4 $# $FUNCNAME "$@"				#__WITH_PARANOIA_DEBUG
+	Logger "${FUNCNAME[0]} called by [$caller_name]." "PARANOIA_DEBUG"	#__WITH_PARANOIA_DEBUG
+	__CheckArguments 4 $# ${FUNCNAME[0]} "$@"				#__WITH_PARANOIA_DEBUG
 
 	local soft_alert=0 # Does a soft alert need to be triggered, if yes, send an alert once
 	local log_ttime=0 # local time instance for comparaison
@@ -495,7 +504,7 @@ function WaitForTaskCompletion {
 	done
 	wait $pid
 	local retval=$?
-	Logger "$FUNCNAME ended for [$caller_name] with status $retval." "PARANOIA_DEBUG"	#__WITH_PARANOIA_DEBUG
+	Logger "${FUNCNAME[0]} ended for [$caller_name] with status $retval." "PARANOIA_DEBUG"	#__WITH_PARANOIA_DEBUG
 	return $retval
 }
 
@@ -504,8 +513,8 @@ function WaitForCompletion {
 	local soft_max_time="${2}" # If program with pid $pid takes longer than $soft_max_time seconds, will log a warning, unless $soft_max_time equals 0.
 	local hard_max_time="${3}" # If program with pid $pid takes longer than $hard_max_time seconds, will stop execution, unless $hard_max_time equals 0.
 	local caller_name="${4}" # Who called this function
-	Logger "$FUNCNAME called by [$caller_name]" "PARANOIA_DEBUG"	#__WITH_PARANOIA_DEBUG
-	__CheckArguments 4 $# $FUNCNAME "$@"				#__WITH_PARANOIA_DEBUG
+	Logger "${FUNCNAME[0]} called by [$caller_name]" "PARANOIA_DEBUG"	#__WITH_PARANOIA_DEBUG
+	__CheckArguments 4 $# ${FUNCNAME[0]} "$@"				#__WITH_PARANOIA_DEBUG
 
 	local soft_alert=0 # Does a soft alert need to be triggered, if yes, send an alert once
 	local log_ttime=0 # local time instance for comparaison
@@ -547,14 +556,14 @@ function WaitForCompletion {
 	done
 	wait $pid
 	retval=$?
-	Logger "$FUNCNAME ended for [$caller_name] with status $retval." "PARANOIA_DEBUG"	#__WITH_PARANOIA_DEBUG
+	Logger "${FUNCNAME[0]} ended for [$caller_name] with status $retval." "PARANOIA_DEBUG"	#__WITH_PARANOIA_DEBUG
 	return $retval
 }
 
 function RunLocalCommand {
 	local command="${1}" # Command to run
 	local hard_max_time="${2}" # Max time to wait for command to compleet
-	__CheckArguments 2 $# $FUNCNAME "$@"	#__WITH_PARANOIA_DEBUG
+	__CheckArguments 2 $# ${FUNCNAME[0]} "$@"	#__WITH_PARANOIA_DEBUG
 
 	if [ $_DRYRUN -ne 0 ]; then
 		Logger "Dryrun: Local command [$command] not run." "NOTICE"
@@ -562,8 +571,8 @@ function RunLocalCommand {
 	fi
 
 	Logger "Running command [$command] on local host." "NOTICE"
-	eval "$command" > "$RUN_DIR/$PROGRAM.$FUNCNAME.$SCRIPT_PID" 2>&1 &
-	WaitForTaskCompletion $! 0 $hard_max_time $FUNCNAME
+	eval "$command" > "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$SCRIPT_PID" 2>&1 &
+	WaitForTaskCompletion $! 0 $hard_max_time ${FUNCNAME[0]}
 	retval=$?
 	if [ $retval -eq 0 ]; then
 		Logger "Command succeded." "NOTICE"
@@ -572,7 +581,7 @@ function RunLocalCommand {
 	fi
 
 	if [ $_VERBOSE -eq 1 ] || [ $retval -ne 0 ]; then
-		Logger "Command output:\n$(cat $RUN_DIR/$PROGRAM.$FUNCNAME.$SCRIPT_PID)" "NOTICE"
+		Logger "Command output:\n$(cat $RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$SCRIPT_PID)" "NOTICE"
 	fi
 
 	if [ "$STOP_ON_CMD_ERROR" == "yes" ] && [ $retval -ne 0 ]; then
@@ -585,7 +594,7 @@ function RunLocalCommand {
 function RunRemoteCommand {
 	local command="${1}" # Command to run
 	local hard_max_time="${2}" # Max time to wait for command to compleet
-	__CheckArguments 2 $# $FUNCNAME "$@"	#__WITH_PARANOIA_DEBUG
+	__CheckArguments 2 $# ${FUNCNAME[0]} "$@"	#__WITH_PARANOIA_DEBUG
 
 	CheckConnectivity3rdPartyHosts
 	CheckConnectivityRemoteHost
@@ -595,10 +604,10 @@ function RunRemoteCommand {
 	fi
 
 	Logger "Running command [$command] on remote host." "NOTICE"
-	cmd=$SSH_CMD' "$command" > "'$RUN_DIR/$PROGRAM.$FUNCNAME.$SCRIPT_PID'" 2>&1'
+	cmd=$SSH_CMD' "$command" > "'$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$SCRIPT_PID'" 2>&1'
 	Logger "cmd: $cmd" "DEBUG"
 	eval "$cmd" &
-	WaitForTaskCompletion $! 0 $hard_max_time $FUNCNAME
+	WaitForTaskCompletion $! 0 $hard_max_time ${FUNCNAME[0]}
 	retval=$?
 	if [ $retval -eq 0 ]; then
 		Logger "Command succeded." "NOTICE"
@@ -606,9 +615,9 @@ function RunRemoteCommand {
 		Logger "Command failed." "ERROR"
 	fi
 
-	if [ -f "$RUN_DIR/$PROGRAM.$FUNCNAME.$SCRIPT_PID" ] && ([ $_VERBOSE -eq 1 ] || [ $retval -ne 0 ])
+	if [ -f "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$SCRIPT_PID" ] && ([ $_VERBOSE -eq 1 ] || [ $retval -ne 0 ])
 	then
-		Logger "Command output:\n$(cat $RUN_DIR/$PROGRAM.$FUNCNAME.$SCRIPT_PID)" "NOTICE"
+		Logger "Command output:\n$(cat $RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$SCRIPT_PID)" "NOTICE"
 	fi
 
 	if [ "$STOP_ON_CMD_ERROR" == "yes" ] && [ $retval -ne 0 ]; then
@@ -618,7 +627,7 @@ function RunRemoteCommand {
 }
 
 function RunBeforeHook {
-	__CheckArguments 0 $# $FUNCNAME "$@"	#__WITH_PARANOIA_DEBUG
+	__CheckArguments 0 $# ${FUNCNAME[0]} "$@"	#__WITH_PARANOIA_DEBUG
 
 	if [ "$LOCAL_RUN_BEFORE_CMD" != "" ]; then
 		RunLocalCommand "$LOCAL_RUN_BEFORE_CMD" $MAX_EXEC_TIME_PER_CMD_BEFORE
@@ -630,7 +639,7 @@ function RunBeforeHook {
 }
 
 function RunAfterHook {
-	__CheckArguments 0 $# $FUNCNAME "$@"	#__WITH_PARANOIA_DEBUG
+	__CheckArguments 0 $# ${FUNCNAME[0]} "$@"	#__WITH_PARANOIA_DEBUG
 
 	if [ "$LOCAL_RUN_AFTER_CMD" != "" ]; then
 		RunLocalCommand "$LOCAL_RUN_AFTER_CMD" $MAX_EXEC_TIME_PER_CMD_AFTER
@@ -642,13 +651,13 @@ function RunAfterHook {
 }
 
 function CheckConnectivityRemoteHost {
-	__CheckArguments 0 $# $FUNCNAME "$@"	#__WITH_PARANOIA_DEBUG
+	__CheckArguments 0 $# ${FUNCNAME[0]} "$@"	#__WITH_PARANOIA_DEBUG
 
 	if [ "$_PARANOIA_DEBUG" != "yes" ]; then # Do not loose time in paranoia debug
 
 		if [ "$REMOTE_HOST_PING" != "no" ] && [ "$REMOTE_OPERATION" != "no" ]; then
 			eval "$PING_CMD $REMOTE_HOST > /dev/null 2>&1" &
-			WaitForTaskCompletion $! 180 180 $FUNCNAME
+			WaitForTaskCompletion $! 180 180 ${FUNCNAME[0]}
 			if [ $? != 0 ]; then
 				Logger "Cannot ping $REMOTE_HOST" "CRITICAL"
 				return 1
@@ -658,7 +667,7 @@ function CheckConnectivityRemoteHost {
 }
 
 function CheckConnectivity3rdPartyHosts {
-	__CheckArguments 0 $# $FUNCNAME "$@"	#__WITH_PARANOIA_DEBUG
+	__CheckArguments 0 $# ${FUNCNAME[0]} "$@"	#__WITH_PARANOIA_DEBUG
 
 	if [ "$_PARANOIA_DEBUG" != "yes" ]; then # Do not loose time in paranoia debug
 
@@ -669,7 +678,7 @@ function CheckConnectivity3rdPartyHosts {
 			for i in $REMOTE_3RD_PARTY_HOSTS
 			do
 				eval "$PING_CMD $i > /dev/null 2>&1" &
-				WaitForTaskCompletion $! 360 360 $FUNCNAME
+				WaitForTaskCompletion $! 360 360 ${FUNCNAME[0]}
 				if [ $? != 0 ]; then
 					Logger "Cannot ping 3rd party host $i" "WARN"
 				else
@@ -759,7 +768,7 @@ function old__CheckArguments {
 #__END_WITH_PARANOIA_DEBUG
 
 function PreInit {
-	 __CheckArguments 0 $# $FUNCNAME "$@"    #__WITH_PARANOIA_DEBUG
+	 __CheckArguments 0 $# ${FUNCNAME[0]} "$@"    #__WITH_PARANOIA_DEBUG
 
 	## SSH compression
         if [ "$SSH_COMPRESSION" != "no" ]; then
@@ -862,7 +871,7 @@ function PreInit {
 }
 
 function PostInit {
-        __CheckArguments 0 $# $FUNCNAME "$@"    #__WITH_PARANOIA_DEBUG
+        __CheckArguments 0 $# ${FUNCNAME[0]} "$@"    #__WITH_PARANOIA_DEBUG
 
 	# Define remote commands
         SSH_CMD="$(type -p ssh) $SSH_COMP -i $SSH_RSA_PRIVATE_KEY $REMOTE_USER@$REMOTE_HOST -p $REMOTE_PORT"
@@ -871,7 +880,7 @@ function PostInit {
 }
 
 function InitLocalOSSettings {
-        __CheckArguments 0 $# $FUNCNAME "$@"    #__WITH_PARANOIA_DEBUG
+        __CheckArguments 0 $# ${FUNCNAME[0]} "$@"    #__WITH_PARANOIA_DEBUG
 
         ## If running under Msys, some commands do not run the same way
         ## Using mingw version of find instead of windows one
@@ -899,7 +908,7 @@ function InitLocalOSSettings {
 }
 
 function InitRemoteOSSettings {
-        __CheckArguments 0 $# $FUNCNAME "$@"    #__WITH_PARANOIA_DEBUG
+        __CheckArguments 0 $# ${FUNCNAME[0]} "$@"    #__WITH_PARANOIA_DEBUG
 
         ## MacOSX does not use the -E parameter like Linux or BSD does (-E is mapped to extended attrs instead of preserve executability)
         if [ "$LOCAL_OS" != "MacOSX" ] && [ "$REMOTE_OS" != "MacOSX" ]; then
