@@ -1,12 +1,12 @@
 #!/usr/bin/env bash
 
-#TODO: terminer funcname present dasn osync et non dans ofunc
+#TODO: test if trapquit works on kill (sigterm)
 
 PROGRAM="osync" # Rsync based two way sync engine with fault tolerance
 AUTHOR="(L) 2013-2016 by Orsiris de Jong"
 CONTACT="http://www.netpower.fr/osync - ozy@netpower.fr"
 PROGRAM_VERSION=1.1-dev
-PROGRAM_BUILD=2016021803
+PROGRAM_BUILD=2016021804
 IS_STABLE=no
 
 source "./ofunctions.sh"
@@ -257,9 +257,11 @@ function _CheckDiskSpaceLocal {
 	local replica_path="${1}"
 	__CheckArguments 1 $# ${FUNCNAME[0]} "$@"	#__WITH_PARANOIA_DEBUG
 
+	local disk_space=
+
 	Logger "Checking minimum disk space in [$replica_path]." "NOTICE"
 
-	local disk_space=$(df -P "$replica_path" | tail -1 | awk '{print $4}')
+	disk_space=$(df -P "$replica_path" | tail -1 | awk '{print $4}')
 	if [ $disk_space -lt $MINIMUM_SPACE ]; then
 		Logger "There is not enough free space on replica [$replica_path] ($disk_space KB)." "WARN"
 	fi
@@ -272,6 +274,7 @@ function _CheckDiskSpaceRemote {
 	Logger "Checking minimum disk space on target [$replica_path]." "NOTICE"
 
 	local cmd=
+	local disk_space=
 
 	CheckConnectivity3rdPartyHosts
 	CheckConnectivityRemoteHost
@@ -284,8 +287,8 @@ function _CheckDiskSpaceRemote {
 		Logger "Cannot get free space on target [$replica_path]." "ERROR"
 		Logger "Command output:\n$(cat $RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$SCRIPT_PID)" "NOTICE"
 	else
-		local disk_space=$(cat $RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$SCRIPT_PID | tail -1 | awk '{print $4}')
-		if [ $tdisk_space -lt $MINIMUM_SPACE ]; then
+		disk_space=$(cat $RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$SCRIPT_PID | tail -1 | awk '{print $4}')
+		if [ $disk_space -lt $MINIMUM_SPACE ]; then
 			Logger "There is not enough free space on replica [$replica_path] ($disk_space KB)." "WARN"
 		fi
 	fi
@@ -450,6 +453,7 @@ function _CheckLocksRemote { #TODO: Rewrite this a bit more beautiful
 	local cmd=
 	local lock_pid=
 	local lock_instance_id=
+	local lockfile_content=
 
 	CheckConnectivity3rdPartyHosts
 	CheckConnectivityRemoteHost
@@ -460,7 +464,7 @@ function _CheckLocksRemote { #TODO: Rewrite this a bit more beautiful
 	WaitForTaskCompletion $! 720 1800 ${FUNCNAME[0]}
 	if [ $? != 0 ]; then
 		if [ -f "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$SCRIPT_PID" ]; then
-			local lockfile_content=$(cat $RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$SCRIPT_PID)
+			lockfile_content=$(cat $RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$SCRIPT_PID)
 		else
 			Logger "Cannot get remote lockfile." "CRITICAL"
 			exit 1
@@ -589,9 +593,9 @@ function tree_list {
 	if [ "$REMOTE_OPERATION" == "yes" ] && [ "$replica_type" == "target" ]; then
 		CheckConnectivity3rdPartyHosts
 		CheckConnectivityRemoteHost
-		rsync_cmd="$(type -p $RSYNC_EXECUTABLE) --rsync-path=\"$RSYNC_PATH\" $RSYNC_ARGS $RSYNC_ATTR_ARGS $RSNYC_TYPE_ARGS -8 --exclude \"$OSYNC_DIR\" $RSYNC_PATTERNS $RSYNC_PARTIAL_EXCLUDE -e \"$RSYNC_SSH_CMD\" --list-only $REMOTE_USER@$REMOTE_HOST:\"$escaped_replica_path/\" | grep \"^-\|^d\" | awk '{\$1=\$2=\$3=\$4=\"\" ;print}' | awk '{\$1=\$1 ;print}' | (grep -v \"^\.$\" || :) | sort > \"$RUN_DIR/$PROGRAM.$replica_type.$SCRIPT_PID\" &"
+		rsync_cmd="$(type -p $RSYNC_EXECUTABLE) --rsync-path=\"$RSYNC_PATH\" $RSYNC_ARGS $RSYNC_ATTR_ARGS $RSYNC_TYPE_ARGS -8 --exclude \"$OSYNC_DIR\" $RSYNC_PATTERNS $RSYNC_PARTIAL_EXCLUDE -e \"$RSYNC_SSH_CMD\" --list-only $REMOTE_USER@$REMOTE_HOST:\"$escaped_replica_path/\" | grep \"^-\|^d\" | awk '{\$1=\$2=\$3=\$4=\"\" ;print}' | awk '{\$1=\$1 ;print}' | (grep -v \"^\.$\" || :) | sort > \"$RUN_DIR/$PROGRAM.$replica_type.$SCRIPT_PID\" &"
 	else
-		rsync_cmd="$(type -p $RSYNC_EXECUTABLE) --rsync-path=\"$RSYNC_PATH\" $RSYNC_ARGS $RSYNC_ATTR_ARGS $RSNYC_TYPE_ARGS -8 --exclude \"$OSYNC_DIR\" $RSYNC_PATTERNS $RSYNC_PARTIAL_EXCLUDE --list-only \"$replica_path/\" | grep \"^-\|^d\" | awk '{\$1=\$2=\$3=\$4=\"\" ;print}' | awk '{\$1=\$1 ;print}' | (grep -v \"^\.$\" || :) | sort > \"$RUN_DIR/$PROGRAM.$replica_type.$SCRIPT_PID\" &"
+		rsync_cmd="$(type -p $RSYNC_EXECUTABLE) --rsync-path=\"$RSYNC_PATH\" $RSYNC_ARGS $RSYNC_ATTR_ARGS $RSYNC_TYPE_ARGS -8 --exclude \"$OSYNC_DIR\" $RSYNC_PATTERNS $RSYNC_PARTIAL_EXCLUDE --list-only \"$replica_path/\" | grep \"^-\|^d\" | awk '{\$1=\$2=\$3=\$4=\"\" ;print}' | awk '{\$1=\$1 ;print}' | (grep -v \"^\.$\" || :) | sort > \"$RUN_DIR/$PROGRAM.$replica_type.$SCRIPT_PID\" &"
 	fi
 	Logger "RSYNC_CMD: $rsync_cmd" "DEBUG"
 	## Redirect commands stderr here to get rsync stderr output in logfile
@@ -611,7 +615,7 @@ function tree_list {
 # delete_list(replica, tree-file-after, tree-file-current, deleted-list-file, deleted-failed-list-file): Creates a list of files vanished from last run on replica $1 (initiator/target)
 function delete_list {
 	local replica_type="${1}" # replica type: initiator, target
-	local tree_file_after="${2}" # tree-file-after, will be prefixed with replica type
+	local tree_file_after="${2}" # tree-file-after, will be prefixed with replica type #TODO: use this
 	local tree_file_current="${3}" # tree-file-current, will be prefixed with replica type
 	local deleted_list_file="${4}" # file containing deleted file list, will be prefixed with replica type
 	local deleted_failed_list_file="${5}" # file containing files that could not be deleted on last run, will be prefixed with replica type
@@ -693,7 +697,7 @@ function sync_attrs {
 	if [ "$REMOTE_OPERATION" == "yes" ]; then
 		CheckConnectivity3rdPartyHosts
 		CheckConnectivityRemoteHost
-		rsync_cmd="$(type -p $RSYNC_EXECUTABLE) --rsync-path=\"$RSYNC_PATH\" -i $RSYNC_ARGS $RSYNC_ATTR_ARGS $RSYNC_PARTIAL_EXCLUDE -e \"$RSYNC_SSH_CMD\" $BACKUP_DIR --exclude \"$OSYNC_DIR\" $RSYNC_PATTERNS $RSYNC_PARTIAL_EXCLUDE \"$initiator_replica\" $REMOTE_USER@$REMOTE_HOST:\"$target_replica\" > $RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$SCRIPT_PID 2>&1 &"
+		rsync_cmd="$(type -p $RSYNC_EXECUTABLE) --rsync-path=\"$RSYNC_PATH\" -i $RSYNC_ARGS $RSYNC_ATTR_ARGS $RSYNC_PARTIAL_EXCLUDE -e \"$RSYNC_SSH_CMD\" --exclude \"$OSYNC_DIR\" $RSYNC_PATTERNS $RSYNC_PARTIAL_EXCLUDE \"$initiator_replica\" $REMOTE_USER@$REMOTE_HOST:\"$target_replica\" > $RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$SCRIPT_PID 2>&1 &"
 	else
 		rsync_cmd="$(type -p $RSYNC_EXECUTABLE) --rsync-path=\"$RSYNC_PATH\" -i $RSYNC_ARGS $RSYNC_ATTR_ARGS $RSYNC_PARTIAL_EXCLUDE --exclude \"$OSYNC_DIR\" $RSYNC_PATTERNS $RSYNC_PARTIAL_EXCLUDE \"$initiator_replica\" \"$target_replica\" > $RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$SCRIPT_PID 2>&1 &"
 	fi
@@ -797,10 +801,10 @@ function sync_update {
 		if [ "$source_replica" == "${INITIATOR[0]}" ]; then
 			rsync_cmd="$(type -p $RSYNC_EXECUTABLE) --rsync-path=\"$RSYNC_PATH\" $RSYNC_ARGS $RSYNC_ATTR_ARGS $RSYNC_TYPE_ARGS $SYNC_OPTS -e \"$RSYNC_SSH_CMD\" $backup_args --exclude \"$OSYNC_DIR\" $RSYNC_PATTERNS $RSYNC_PARTIAL_EXCLUDE --exclude-from=\"${INITIATOR[1]}${INITIATOR[3]}/$source_replica$delete_list_filename\" --exclude-from=\"${INITIATOR[1]}${INITIATOR[3]}/$destination_replica$delete_list_filename\" \"$source_dir\" $REMOTE_USER@$REMOTE_HOST:\"$esc_dest_dir\" > $RUN_DIR/$PROGRAM.update.$destination_replica.$SCRIPT_PID 2>&1 &"
 		else
-			rsync_cmd="$(type -p $RSYNC_EXECUTABLE) --rsync-path=\"$RSYNC_PATH\" $RSYNC_ARGS $RSYNC_ATTR_ARGS $RSNYC_TYPE_ARGS $SYNC_OPTS -e \"$RSYNC_SSH_CMD\" $backup_args --exclude \"$OSYNC_DIR\" $RSYNC_PATTERNS $RSYNC_PARTIAL_EXCLUDE --exclude-from=\"${INITIATOR[1]}${INITIATOR[3]}/$destination_replica$delete_list_filename\" --exclude-from=\"${INITIATOR[1]}${INITIATOR[3]}/$source_replica$delete_list_filename\" $REMOTE_USER@$REMOTE_HOST:\"$esc_source_dir\" \"$dest_dir\" > $RUN_DIR/$PROGRAM.update.$destination_replica.$SCRIPT_PID 2>&1 &"
+			rsync_cmd="$(type -p $RSYNC_EXECUTABLE) --rsync-path=\"$RSYNC_PATH\" $RSYNC_ARGS $RSYNC_ATTR_ARGS $RSYNC_TYPE_ARGS $SYNC_OPTS -e \"$RSYNC_SSH_CMD\" $backup_args --exclude \"$OSYNC_DIR\" $RSYNC_PATTERNS $RSYNC_PARTIAL_EXCLUDE --exclude-from=\"${INITIATOR[1]}${INITIATOR[3]}/$destination_replica$delete_list_filename\" --exclude-from=\"${INITIATOR[1]}${INITIATOR[3]}/$source_replica$delete_list_filename\" $REMOTE_USER@$REMOTE_HOST:\"$esc_source_dir\" \"$dest_dir\" > $RUN_DIR/$PROGRAM.update.$destination_replica.$SCRIPT_PID 2>&1 &"
 		fi
 	else
-		rsync_cmd="$(type -p $RSYNC_EXECUTABLE) --rsync-path=\"$RSYNC_PATH\" $RSYNC_ARGS $RSYNC_ATTR_ARGS $RSNYC_TYPE_ARGS $SYNC_OPTS $backup_args --exclude \"$OSYNC_DIR\" $RSYNC_PATTERNS $RSYNC_PARTIAL_EXCLUDE --exclude-from=\"${INITIATOR[1]}${INITIATOR[3]}/$source_replica$delete_list_filename\" --exclude-from=\"${INITIATOR[1]}${INITIATOR[3]}/$destination_replica$delete_list_filename\" \"$source_dir\" \"$dest_dir\" > $RUN_DIR/$PROGRAM.update.$destination_replica.$SCRIPT_PID 2>&1 &"
+		rsync_cmd="$(type -p $RSYNC_EXECUTABLE) --rsync-path=\"$RSYNC_PATH\" $RSYNC_ARGS $RSYNC_ATTR_ARGS $RSYNC_TYPE_ARGS $SYNC_OPTS $backup_args --exclude \"$OSYNC_DIR\" $RSYNC_PATTERNS $RSYNC_PARTIAL_EXCLUDE --exclude-from=\"${INITIATOR[1]}${INITIATOR[3]}/$source_replica$delete_list_filename\" --exclude-from=\"${INITIATOR[1]}${INITIATOR[3]}/$destination_replica$delete_list_filename\" \"$source_dir\" \"$dest_dir\" > $RUN_DIR/$PROGRAM.update.$destination_replica.$SCRIPT_PID 2>&1 &"
 	fi
 	Logger "RSYNC_CMD: $rsync_cmd" "DEBUG"
 	eval "$rsync_cmd"
@@ -1380,10 +1384,10 @@ function Init {
 
 	# Do not use exit and quit traps if osync runs in monitor mode
 	if [ $sync_on_changes -eq 0 ]; then
-		trap TrapStop SIGINT SIGKILL SIGHUP SIGTERM SIGQUIT
-		trap TrapQuit SIGKILL EXIT
+		trap TrapStop SIGINT SIGHUP SIGTERM SIGQUIT
+		trap TrapQuit EXIT
 	else
-		trap TrapQuit SIGTERM EXIT SIGKILL SIGHUP SIGQUIT
+		trap TrapQuit SIGTERM EXIT SIGHUP SIGQUIT
 	fi
 
 	local uri
@@ -1538,6 +1542,7 @@ function Main {
 
 	CreateStateDirs
 	CheckLocks
+	sleep 900
 	Sync
 }
 

@@ -1,4 +1,4 @@
-## FUNC_BUILD=2016021801
+## FUNC_BUILD=2016021802
 ## BEGIN Generic functions for osync & obackup written in 2013-2016 by Orsiris de Jong - http://www.netpower.fr - ozy@netpower.fr
 
 ## type -p does not work on platforms other than linux (bash). If if does not work, always assume output is not a zero exitcode
@@ -236,7 +236,7 @@ function CleanUp {
 function SendAlert {
 	__CheckArguments 0 $# ${FUNCNAME[0]} "$@"	#__WITH_PARANOIA_DEBUG
 
-	local main_no_attachment=
+	local mail_no_attachment=
 	local attachment_command=
 
 	if [ "$_DEBUG" == "yes" ]; then
@@ -363,11 +363,11 @@ function GetLocalOS {
 
 	local local_os_var=
 
-	local_os_var=$(uname -spio 2>&1)
+	local_os_var="$(uname -spio 2>&1)"
 	if [ $? != 0 ]; then
-		local_os_var=$(uname -v 2>&1)
+		local_os_var="$(uname -v 2>&1)"
 		if [ $? != 0 ]; then
-			local_os_var=($uname)
+			local_os_var="$(uname)"
 		fi
 	fi
 
@@ -425,7 +425,7 @@ function GetRemoteOS {
 			fi
 		fi
 
-		remote_os_var=$(cat $RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$SCRIPT_PID)
+		remote_os_var=$(cat "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$SCRIPT_PID")
 
 		case $remote_os_var in
 			*"Linux"*)
@@ -856,12 +856,14 @@ function PreInit {
         elif type pigz > /dev/null 2>&1
         then
                 COMPRESSION_PROGRAM="| pigz -$COMPRESSION_LEVEL"
-                COMPRESSION_EXTENSION=.gz
+              	COMPRESSION_EXTENSION=.gz
+		# obackup specific
                 COMPRESSION_OPTIONS=--rsyncable
         elif type gzip > /dev/null 2>&1
         then
                 COMPRESSION_PROGRAM="| gzip -$COMPRESSION_LEVEL"
                 COMPRESSION_EXTENSION=.gz
+		# obackup specific
                 COMPRESSION_OPTIONS=--rsyncable
         else
                 COMPRESSION_PROGRAM=
