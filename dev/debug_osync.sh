@@ -1584,7 +1584,7 @@ function _get_file_ctime_mtime_local {
 	local file_list="${3}" # Contains list of files to get time attrs
 	__CheckArguments 3 $# ${FUNCNAME[0]} "$@"	#__WITH_PARANOIA_DEBUG
 
-	cat "$file_list" | xargs -I {} stat -c '%n|%Z|%Y' "$replica_path{}" | sort > "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$replica_type.$SCRIPT_PID"
+	cat "$file_list" | xargs -I {} stat -c '%n|%Z|%Y' "$replica_path{}" | sort > "$RUN_DIR/$PROGRAM.ctime_mtime.$replica_type.$SCRIPT_PID"
 }
 
 function _get_file_ctime_mtime_remote {
@@ -1595,14 +1595,14 @@ function _get_file_ctime_mtime_remote {
 
 	local cmd=
 
-	cmd='cat "'$file_list'" | '$SSH_CMD' xargs -I "'$replica_path'"{} stat -c "%n|%Z|%Y" "{}" | sort > "'$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$replica_type.$SCRIPT_PID'"'
+	cmd='cat "'$file_list'" | '$SSH_CMD' xargs -I "'$replica_path'"{} stat -c "%n|%Z|%Y" "{}" | sort > "'$RUN_DIR/$PROGRAM.ctime_mtime.$replica_type.$SCRIPT_PID'"'
 	Logger "CMD: $cmd" "DEBUG"
 	eval "$cmd"
 	WaitForCompletion $! $SOFT_MAX_EXEC_TIME $HARD_MAX_EXEC_TIME ${FUNCNAME[0]}
 	if [ $? != 0 ]; then
 		Logger "Getting file attributes failed [$retval] on $replica_type. Stopping execution." "CRITICAL"
-		if [ $_VERBOSE -eq 0 ] && [ -f "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$replica_type.$SCRIPT_PID" ]; then
-			Logger "Command output:\n$(cat $RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$replica_type.$SCRIPT_PID)" "NOTICE"
+		if [ $_VERBOSE -eq 0 ] && [ -f "$RUN_DIR/$PROGRAM.ctime_mtime.$replica_type.$SCRIPT_PID" ]; then
+			Logger "Command output:\n$(cat $RUN_DIR/$PROGRAM.ctime_mtime.$replica_type.$SCRIPT_PID)" "NOTICE"
 		fi
 		exit 1
 	fi
@@ -1613,6 +1613,7 @@ function _get_file_ctime_mtime_remote {
 function sync_attrs {
 	local initiator_replica="${1}"
 	local target_replica="${2}"
+	local delete_list_filename="$DELETED_LIST_FILENAME" # Contains deleted list filename, will be prefixed with replica type #TODO: replace all those with ${INITIATOR[x]}
 	__CheckArguments 2 $# ${FUNCNAME[0]} "$@"	#__WITH_PARANOIA_DEBUG
 
 	local rsync_cmd=
@@ -1649,6 +1650,8 @@ function sync_attrs {
 		fi
 	fi
 
+	Logger "Getting ctimes for pending files." "NOTICE"
+
 	_get_file_ctime_mtime_local "${INITIATOR[1]}" "${INITIATOR[0]}" "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}-cleaned.$SCRIPT_PID"
 	if [ "$REMOTE_OPERATION" != "yes" ]; then
 		_get_file_ctime_mtime_local "${TARGET[1]}" "${TARGET[0]}" "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}-cleaned.$SCRIPT_PID"
@@ -1656,27 +1659,41 @@ function sync_attrs {
 		_get_file_ctime_mtime_remote "${TARGET[1]}" "${TARGET[0]}" "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}-cleaned.$SCRIPT_PID"
 	fi
 
+
 	# If target gets updated first, then sync_attr must update initiator's attrs first
 	# Also, change replica paths of the two file lists so rsync will know what to sync
 	if [ "$CONFLICT_PREVALANCE" == "${INITIATOR[0]}" ]; then
-		source=targ
-		dest=ini
-		sed -i "s;^${INITIATOR[1]};${TARGET[1]};g" "$RUN_DIR/$PROGRAM.syncattr.$SCRIPT_PID"
-		join -j 1 -t ';' -o 1.1,1.2,2.2 targ init | awk -F';' '{if ($2 < $3) print $1}' > "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}-attrfiles.$SCRIPT_PID"
+		local source_dir="${TARGET[1]}"
+		local dest_dir="${INITIATOR[1]}"
+		local dest_replica="${INITIATOR[0]}"
+		sed -i "s;^${INITIATOR[1]};${TARGET[1]};g" "$RUN_DIR/$PROGRAM.ctime_mtime.${INITIATOR[0]}.$SCRIPT_PID"
+		join -j 1 -t ';' -o 1.1,1.2,2.2 "$RUN_DIR/$PROGRAM.ctime_mtime.${TARGET[0]}.$SCRIPT_PID" "$RUN_DIR/$PROGRAM.ctime_mtime.${INITIATOR[0]}.$SCRIPT_PID" | awk -F';' '{if ($2 < $3) print $1}' > "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}-ctime_files.$SCRIPT_PID"
 
 	else
 
-		source=ini
-		dest=tar
-		sed -i "s;^${TARGET[1]};${INITIATOR[1]};g" "$RUN_DIR/$PROGRAM.syncattr.$SCRIPT_PID"
-		join -j 1 -t ';' -o 1.1,1.2,2.2 init targ | awk -F';' '{if ($2 < $3) print $1}' > "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}-attrfiles.$SCRIPT_PID"
+		local source_dir="${INITIATOR[1]}"
+		local dest_dir="${TARGET[1]}"
+		local dest_replica="${TARGET[0]}"
+		sed -i "s;^${TARGET[1]};${INITIATOR[1]};g" "$RUN_DIR/$PROGRAM.ctime_mtime.${TARGET[0]}.$SCRIPT_PID"
+		join -j 1 -t ';' -o 1.1,1.2,2.2 "$RUN_DIR/$PROGRAM.ctime_mtime.${INITIATOR[0]}.$SCRIPT_PID" "$RUN_DIR/$PROGRAM.ctime_mtime.${TARGET[0]}.$SCRIPT_PID" | awk -F';' '{if ($2 < $3) print $1}' > "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}-ctime_files.$SCRIPT_PID"
 	fi
 
-	if [ "$REMOTE_OPERATION" != "yes" ]; then
-		rsync_cmd=""
+	Logger "Updating file attributes on $dest_replica." "NOTICE"
+
+	if [ "$REMOTE_OPERATION" == "yes" ]; then
+		CheckConnectivity3rdPartyHosts
+		CheckConnectivityRemoteHost
+
+		if [ "$dest" == "${INITIATOR[0]}" ]; then
+			rsync_cmd="$(type -p $RSYNC_EXECUTABLE) --rsync-path=\"$RSYNC_PATH\" $RSYNC_ATTR_ARGS $SYNC_OPTS -e \"$RSYNC_SSH_CMD\" --exclude \"$OSYNC_DIR\" $RSYNC_PATTERNS $RSYNC_PARTIAL_EXCLUDE --exclude-from=\"${INITIATOR[1]}${INITIATOR[3]}/${INITIATOR[0]}$delete_list_filename\" --exclude-from=\"${INITIATOR[1]}${INITIATOR[3]}/${TARGET[0]}$delete_list_filename\" $REMOTE_USER@REMOTE_HOST:\"$esc_source_dir\" \"$dest_dir\" > $RUN_DIR/$PROGRAM.attr-update.$dest_replica.$SCRIPT_PID 2>&1 &"
+		else
+			rsync_cmd="$(type -p $RSYNC_EXECUTABLE) --rsync-path=\"$RSYNC_PATH\" $RSYNC_ATTR_ARGS $SYNC_OPTS -e \"$RSYNC_SSH_CMD\" --exclude \"$OSYNC_DIR\" $RSYNC_PATTERNS $RSYNC_PARTIAL_EXCLUDE --exclude-from=\"${INITIATOR[1]}${INITIATOR[3]}/${INITIATOR[0]}$delete_list_filename\" --exclude-from=\"${INITIATOR[1]}${INITIATOR[3]}/${TARGET[0]}$delete_list_filename\" \"$source_dir\" $REMOTE_USER@$REMOTE_HOST:\"$esc_dest_dir\" > $RUN_DIR/$PROGRAM.attr-update.$dest_replica.$SCRIPT_PID 2>&1 &"
+		fi
 	else
-		rsync_cmd=""
+		rsync_cmd="$(type -p $RSYNC_EXECUTABLE) --rsync-path=\"$RSYNC_PATH\" $RSYNC_ATTR_ARGS $SYNC_OPTS --exclude \"$OSYNC_DIR\" $RSYNC_PATTERNS $RSYNC_PARTIAL_EXCLUDE --exclude-from=\"${INITIATOR[1]}${INITIATOR[3]}/${INITIATOR[0]}$delete_list_filename\" --exclude-from=\"${INITIATOR[1]}${INITIATOR[3]}/${TARGET[0]}$delete_list_filename\" \"$source_dir\" \"$dest_dir\" > $RUN_DIR/$PROGRAM.attr-update.$dest_replica.$SCRIPT_PID 2>&1 &"
+
 	fi
+
 	Logger "RSYNC_CMD: $rsync_cmd" "DEBUG"
 	eval "$rsync_cmd"
 	WaitForCompletion $! $SOFT_MAX_EXEC_TIME $HARD_MAX_EXEC_TIME ${FUNCNAME[0]}
@@ -1692,7 +1709,7 @@ function sync_attrs {
 		fi
 		exit $retval
 	else
-		Logger "Successfully updated file attributes on $dest replica." "NOTICE"
+		Logger "Successfully updated file attributes on $dest_replica replica." "NOTICE"
 	fi
 }
 
@@ -2468,7 +2485,6 @@ function Main {
 
 	CreateStateDirs
 	CheckLocks
-	sleep 900
 	Sync
 }
 
