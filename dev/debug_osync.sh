@@ -4,7 +4,7 @@ PROGRAM="osync" # Rsync based two way sync engine with fault tolerance
 AUTHOR="(L) 2013-2016 by Orsiris de Jong"
 CONTACT="http://www.netpower.fr/osync - ozy@netpower.fr"
 PROGRAM_VERSION=1.1-dev
-PROGRAM_BUILD=2016021704
+PROGRAM_BUILD=2016021802
 IS_STABLE=no
 
 FUNC_BUILD=2016021604
@@ -1064,10 +1064,12 @@ function _CreateStateDirsRemote {
 	local replica_state_dir="${1}"
 	__CheckArguments 1 $# $FUNCNAME "$@"	#__WITH_PARANOIA_DEBUG
 
+	local cmd=
+
 	CheckConnectivity3rdPartyHosts
 	CheckConnectivityRemoteHost
 
-	local cmd=$SSH_CMD' "if ! [ -d \"'$replica_state_dir'\" ]; then '$COMMAND_SUDO' mkdir -p \"'$replica_state_dir'\"; fi" > "'$RUN_DIR/$PROGRAM.$FUNCNAME.$SCRIPT_PID'" 2>&1'
+	cmd=$SSH_CMD' "if ! [ -d \"'$replica_state_dir'\" ]; then '$COMMAND_SUDO' mkdir -p \"'$replica_state_dir'\"; fi" > "'$RUN_DIR/$PROGRAM.$FUNCNAME.$SCRIPT_PID'" 2>&1'
 	Logger "cmd: $cmd" "DEBUG"
 	eval "$cmd" &
 	WaitForTaskCompletion $! 720 1800 $FUNCNAME
@@ -1119,9 +1121,11 @@ function _CheckReplicaPathsRemote {
 	local replica_path="${1}"
 	__CheckArguments 1 $# $FUNCNAME "$@"	#__WITH_PARANOIA_DEBUG
 
+	local cmd=
+
 	CheckConnectivity3rdPartyHosts
 	CheckConnectivityRemoteHost
-	local cmd=$SSH_CMD' "if ! [ -d \"'$replica_path'\" ]; then if [ \"'$CREATE_DIRS'\" == \"yes\" ]; then '$COMMAND_SUDO' mkdir -p \"'$replica_path'\"; fi; fi" > "'$RUN_DIR/$PROGRAM.$FUNCNAME.$SCRIPT_PID'" 2>&1'
+	cmd=$SSH_CMD' "if ! [ -d \"'$replica_path'\" ]; then if [ \"'$CREATE_DIRS'\" == \"yes\" ]; then '$COMMAND_SUDO' mkdir -p \"'$replica_path'\"; fi; fi" > "'$RUN_DIR/$PROGRAM.$FUNCNAME.$SCRIPT_PID'" 2>&1'
 	Logger "cmd: $cmd" "DEBUG"
 	eval "$cmd" &
 	WaitForTaskCompletion $! 720 1800 $FUNCNAME
@@ -1131,7 +1135,7 @@ function _CheckReplicaPathsRemote {
 		exit 1
 	fi
 
-	local cmd=$SSH_CMD' "if [ ! -w \"'$replica_path'\" ];then exit 1; fi" 2>&1'
+	cmd=$SSH_CMD' "if [ ! -w \"'$replica_path'\" ];then exit 1; fi" 2>&1'
 	Logger "cmd: $cmd" "DEBUG"
 	eval "$cmd" &
 	WaitForTaskCompletion $! 720 1800 $FUNCNAME
@@ -1180,10 +1184,12 @@ function _CheckDiskSpaceRemote {
 
 	Logger "Checking minimum disk space on target [$replica_path]." "NOTICE"
 
+	local cmd=
+
 	CheckConnectivity3rdPartyHosts
 	CheckConnectivityRemoteHost
 
-	local cmd=$SSH_CMD' "'$COMMAND_SUDO' df -P \"'$replica_path'\"" > "'$RUN_DIR/$PROGRAM.$FUNCNAME.$SCRIPT_PID'" 2>&1'
+	cmd=$SSH_CMD' "'$COMMAND_SUDO' df -P \"'$replica_path'\"" > "'$RUN_DIR/$PROGRAM.$FUNCNAME.$SCRIPT_PID'" 2>&1'
 	Logger "cmd: $cmd" "DEBUG"
 	eval "$cmd" &
 	WaitForTaskCompletion $! 720 1800 $FUNCNAME
@@ -1212,12 +1218,13 @@ function CheckDiskSpace {
 function RsyncPatternsAdd {
 	local pattern="${1}"
 	local pattern_type="${2}"	# exclude or include
-
 	__CheckArguments 2 $# $FUNCNAME "$@"	#__WITH_PARANOIA_DEBUG
+
+	local rest=
 
 	# Disable globbing so wildcards from exclusions do not get expanded
 	set -f
-	local rest="$pattern"
+	rest="$pattern"
 	while [ -n "$rest" ]
 	do
 		# Take the string until first occurence until $PATH_SEPARATOR_CHAR
@@ -1241,8 +1248,9 @@ function RsyncPatternsAdd {
 function RsyncPatternsFromAdd {
 	local pattern_from="${1}"
 	local pattern_type="${2}"
-
 	__CheckArguments 2 $# $FUNCNAME "$@"    #__WITH_PARANOIA_DEBUG
+
+	local pattern_from=
 
 	## Check if the exclude list has a full path, and if not, add the config file path if there is one
 	if [ "$(basename $pattern_from)" == "$pattern_from" ]; then
@@ -1297,10 +1305,12 @@ function _WriteLockFilesRemote {
 	local lockfile="${1}"
 	__CheckArguments 1 $# $FUNCNAME "$@"	#__WITH_PARANOIA_DEBUG
 
+	local cmd=
+
 	CheckConnectivity3rdPartyHosts
 	CheckConnectivityRemoteHost
 
-	local cmd=$SSH_CMD' "echo '$SCRIPT_PID@$INSTANCE_ID' | '$COMMAND_SUDO' tee \"'$lockfile'\"" > /dev/null 2>&1'
+	cmd=$SSH_CMD' "echo '$SCRIPT_PID@$INSTANCE_ID' | '$COMMAND_SUDO' tee \"'$lockfile'\"" > /dev/null 2>&1'
 	Logger "cmd: $cmd" "DEBUG"
 	eval "$cmd" &
 	WaitForTaskCompletion $! 720 1800 $FUNCNAME
@@ -1327,11 +1337,15 @@ function _CheckLocksLocal {
 	local lockfile="${1}"
 	__CheckArguments 1 $# $FUNCNAME "$@"	#__WITH_PARANOIA_DEBUG
 
+	local lockfile_content=
+	local lock_pid=
+	local lock_instance_id=
+
 	if [ -f "$lockfile" ]; then
-		local lockfile_content=$(cat $lockfile)
+		lockfile_content=$(cat $lockfile)
 		Logger "Master lock pid present: $lockfile_content" "DEBUG"
-		local lock_pid=${lockfile_content%@*}
-		local lock_instance_id=${lockfile_content#*@}
+		lock_pid=${lockfile_content%@*}
+		lock_instance_id=${lockfile_content#*@}
 		ps -p$lock_pid > /dev/null 2>&1
 		if [ $? != 0 ]; then
 			Logger "There is a dead osync lock in [$lockfile]. Instance [$lock_pid] no longer running. Resuming." "NOTICE"
@@ -1346,10 +1360,14 @@ function _CheckLocksRemote { #TODO: Rewrite this a bit more beautiful
 	local lockfile="${1}"
 	__CheckArguments 1 $# $FUNCNAME "$@"	#__WITH_PARANOIA_DEBUG
 
+	local cmd=
+	local lock_pid=
+	local lock_instance_id=
+
 	CheckConnectivity3rdPartyHosts
 	CheckConnectivityRemoteHost
 
-	local cmd=$SSH_CMD' "if [ -f \"'$lockfile'\" ]; then cat \"'$lockfile'\"; fi" > "'$RUN_DIR/$PROGRAM.$FUNCNAME.$SCRIPT_PID'"'
+	cmd=$SSH_CMD' "if [ -f \"'$lockfile'\" ]; then cat \"'$lockfile'\"; fi" > "'$RUN_DIR/$PROGRAM.$FUNCNAME.$SCRIPT_PID'"'
 	Logger "cmd: $cmd" "DEBUG"
 	eval "$cmd" &
 	WaitForTaskCompletion $! 720 1800 $FUNCNAME
@@ -1362,8 +1380,8 @@ function _CheckLocksRemote { #TODO: Rewrite this a bit more beautiful
 		fi
 	fi
 
-	local lock_pid=${lockfile_content%@*}
-	local lock_instance_id=${lockfile_content#*@}
+	lock_pid=${lockfile_content%@*}
+	lock_instance_id=${lockfile_content#*@}
 
 	if [ "$lock_pid" != "" ] && [ "$lock_instance_id" != "" ]; then
 		Logger "Remote lock is: $lock_pid@$lock_instance_id" "DEBUG"
@@ -1429,10 +1447,12 @@ function _UnlockReplicasRemote {
 	local lockfile="${1}"
 	__CheckArguments 1 $# $FUNCNAME "$@"	#__WITH_PARANOIA_DEBUG
 
+	local cmd=
+
 	CheckConnectivity3rdPartyHosts
 	CheckConnectivityRemoteHost
 
-	local cmd=$SSH_CMD' "if [ -f \"'$lockfile'\" ]; then '$COMMAND_SUDO' rm -f \"'$lockfile'\"; fi" > "'$RUN_DIR/$PROGRAM.$FUNCNAME.$SCRIPT_PID'" 2>&1'
+	cmd=$SSH_CMD' "if [ -f \"'$lockfile'\" ]; then '$COMMAND_SUDO' rm -f \"'$lockfile'\"; fi" > "'$RUN_DIR/$PROGRAM.$FUNCNAME.$SCRIPT_PID'" 2>&1'
 	Logger "cmd: $cmd" "DEBUG"
 	eval "$cmd" &
 	WaitForTaskCompletion $! 720 1800 $FUNCNAME
@@ -1470,17 +1490,21 @@ function tree_list {
 	local replica_path="${1}" # path to the replica for which a tree needs to be constructed
 	local replica_type="${2}" # replica type: initiator, target
 	local tree_filename="${3}" # filename to output tree (will be prefixed with $replica_type)
+
+	local escaped_replica_path=
+	local rsync_cmd=
+
 	__CheckArguments 3 $# $FUNCNAME "$@"	#__WITH_PARANOIA_DEBUG
 
-	local escaped_replica_path=$(EscapeSpaces "$replica_path")
+	escaped_replica_path=$(EscapeSpaces "$replica_path")
 
 	Logger "Creating $replica_type replica file list [$replica_path]." "NOTICE"
 	if [ "$REMOTE_OPERATION" == "yes" ] && [ "$replica_type" == "target" ]; then
 		CheckConnectivity3rdPartyHosts
 		CheckConnectivityRemoteHost
-		local rsync_cmd="$(type -p $RSYNC_EXECUTABLE) --rsync-path=\"$RSYNC_PATH\" $RSYNC_ARGS $RSYNC_ATTR_ARGS $RSNYC_TYPE_ARGS -8 --exclude \"$OSYNC_DIR\" $RSYNC_PATTERNS $RSYNC_PARTIAL_EXCLUDE -e \"$RSYNC_SSH_CMD\" --list-only $REMOTE_USER@$REMOTE_HOST:\"$escaped_replica_path/\" | grep \"^-\|^d\" | awk '{\$1=\$2=\$3=\$4=\"\" ;print}' | awk '{\$1=\$1 ;print}' | (grep -v \"^\.$\" || :) | sort > \"$RUN_DIR/$PROGRAM.$replica_type.$SCRIPT_PID\" &"
+		rsync_cmd="$(type -p $RSYNC_EXECUTABLE) --rsync-path=\"$RSYNC_PATH\" $RSYNC_ARGS $RSYNC_ATTR_ARGS $RSNYC_TYPE_ARGS -8 --exclude \"$OSYNC_DIR\" $RSYNC_PATTERNS $RSYNC_PARTIAL_EXCLUDE -e \"$RSYNC_SSH_CMD\" --list-only $REMOTE_USER@$REMOTE_HOST:\"$escaped_replica_path/\" | grep \"^-\|^d\" | awk '{\$1=\$2=\$3=\$4=\"\" ;print}' | awk '{\$1=\$1 ;print}' | (grep -v \"^\.$\" || :) | sort > \"$RUN_DIR/$PROGRAM.$replica_type.$SCRIPT_PID\" &"
 	else
-		local rsync_cmd="$(type -p $RSYNC_EXECUTABLE) --rsync-path=\"$RSYNC_PATH\" $RSYNC_ARGS $RSYNC_ATTR_ARGS $RSNYC_TYPE_ARGS -8 --exclude \"$OSYNC_DIR\" $RSYNC_PATTERNS $RSYNC_PARTIAL_EXCLUDE --list-only \"$replica_path/\" | grep \"^-\|^d\" | awk '{\$1=\$2=\$3=\$4=\"\" ;print}' | awk '{\$1=\$1 ;print}' | (grep -v \"^\.$\" || :) | sort > \"$RUN_DIR/$PROGRAM.$replica_type.$SCRIPT_PID\" &"
+		rsync_cmd="$(type -p $RSYNC_EXECUTABLE) --rsync-path=\"$RSYNC_PATH\" $RSYNC_ARGS $RSYNC_ATTR_ARGS $RSNYC_TYPE_ARGS -8 --exclude \"$OSYNC_DIR\" $RSYNC_PATTERNS $RSYNC_PARTIAL_EXCLUDE --list-only \"$replica_path/\" | grep \"^-\|^d\" | awk '{\$1=\$2=\$3=\$4=\"\" ;print}' | awk '{\$1=\$1 ;print}' | (grep -v \"^\.$\" || :) | sort > \"$RUN_DIR/$PROGRAM.$replica_type.$SCRIPT_PID\" &"
 	fi
 	Logger "RSYNC_CMD: $rsync_cmd" "DEBUG"
 	## Redirect commands stderr here to get rsync stderr output in logfile
@@ -1505,6 +1529,8 @@ function delete_list {
 	local deleted_list_file="${4}" # file containing deleted file list, will be prefixed with replica type
 	local deleted_failed_list_file="${5}" # file containing files that could not be deleted on last run, will be prefixed with replica type
 	__CheckArguments 5 $# $FUNCNAME "$@"	#__WITH_PARANOIA_DEBUG
+
+	local cmd=
 
 	# TODO: Check why external filenames are used (see _DRYRUN option because of NOSUFFIX)
 
@@ -1541,7 +1567,6 @@ function _get_file_ctime_mtime_local {
 	local file_list="${3}" # Contains list of files to get time attrs
 	__CheckArguments 3 $# $FUNCNAME "$@"	#__WITH_PARANOIA_DEBUG
 
-	# TODO: make this more beautiful (include path in stat command ?)
 	cat "$file_list" | xargs -I {} stat -c '%n|%Z|%Y' "$replica_path{}" | sort > "$RUN_DIR/$PROGRAM.$FUNCNAME.$replica_type.$SCRIPT_PID"
 }
 
@@ -1551,17 +1576,30 @@ function _get_file_ctime_mtime_remote {
 	local file_list="${3}"
 	__CheckArguments 3 $# $FUNCNAME "$@"	#__WITH_PARANOIA_DEBUG
 
-	#cmd='cat "'$file_list'" | '$SSH_CMD' cd "'$replica_path'"; xargs -I {} stat -c \'%n|%Z|%Y\' "{}" | sort > "'$RUN_DIR/$PROGRAM.$FUNCNAME.$replica_type.$SCRIPT_PID'"'
+	local cmd=
+
+	cmd='cat "'$file_list'" | '$SSH_CMD' xargs -I "'$replica_path'"{} stat -c "%n|%Z|%Y" "{}" | sort > "'$RUN_DIR/$PROGRAM.$FUNCNAME.$replica_type.$SCRIPT_PID'"'
 	Logger "CMD: $cmd" "DEBUG"
 	eval "$cmd"
+	WaitForCompletion $! $SOFT_MAX_EXEC_TIME $HARD_MAX_EXEC_TIME $FUNCNAME
+	if [ $? != 0 ]; then
+		Logger "Getting file attributes failed [$retval] on $replica_type. Stopping execution." "CRITICAL"
+		if [ $_VERBOSE -eq 0 ] && [ -f "$RUN_DIR/$PROGRAM.$FUNCNAME.$replica_type.$SCRIPT_PID" ]; then
+			Logger "Command output:\n$(cat $RUN_DIR/$PROGRAM.$FUNCNAME.$replica_type.$SCRIPT_PID)" "NOTICE"
+		fi
+		exit 1
+	fi
 }
 
+# rsync does sync with mtime, but file attribute modifications only change ctime.
+# Hence, detect newer ctime on the replica that gets updated first with CONFLICT_PREVALANCE and update all newer file attributes on this replica before real update
 function sync_attrs {
-	local initiator_replica="${1}" # Contains #TODO: Write ACL update function, check other ctime related attributes (xattr ?)
+	local initiator_replica="${1}"
 	local target_replica="${2}"
 	__CheckArguments 2 $# $FUNCNAME "$@"	#__WITH_PARANOIA_DEBUG
 
 	local rsync_cmd=
+	local retval=
 
 	Logger "Getting file attributes." "NOTICE"
 
@@ -1581,15 +1619,15 @@ function sync_attrs {
 	fi
 
 	if [ $retval != 0 ] && [ $retval != 24 ]; then
-		Logger "Getting file attributes failed [$retval]. Stopping execution." "CRITICAL"
+		Logger "Getting file list for attribute sync failed [$retval]. Stopping execution." "CRITICAL"
 		if [ $_VERBOSE -eq 0 ] && [ -f "$RUN_DIR/$PROGRAM.$FUNCNAME.$SCRIPT_PID" ]; then
 			Logger "Rsync output:\n$(cat $RUN_DIR/$PROGRAM.$FUNCNAME.$SCRIPT_PID)" "NOTICE"
 		fi
 		exit $retval
 	else
-		cat "$RUN_DIR/$PROGRAM.$FUNCNAME.$SCRIPT_PID" | ( grep -Ev "^[^ ]*(c|s|t)[^ ]* " || :) | ( grep -E "^[^ ]*(p|o|g|a)[^ ]* " || :) | ( sed -e 's/^[^ ]* //' || :) > "$RUN_DIR/$PROGRAM.$FUNCNAME-cleaned.$SCRIPT_PID"
+		cat "$RUN_DIR/$PROGRAM.$FUNCNAME.$SCRIPT_PID" | ( grep -Ev "^[^ ]*(c|s|t)[^ ]* " || :) | ( grep -E "^[^ ]*(p|o|g|a)[^ ]* " || :) | sed -e 's/^[^ ]* //' > "$RUN_DIR/$PROGRAM.$FUNCNAME-cleaned.$SCRIPT_PID"
 		if [ $? != 0 ]; then
-			Logger "Cannot prepare file attribute list." "CRITICAL"
+			Logger "Cannot prepare file list for attribute sync." "CRITICAL"
 			exit 1
 		fi
 	fi
@@ -1601,8 +1639,22 @@ function sync_attrs {
 		_get_file_ctime_mtime_remote "${TARGET[1]}" "${TARGET[0]}" "$RUN_DIR/$PROGRAM.$FUNCNAME-cleaned.$SCRIPT_PID"
 	fi
 
-	#WIP
-	join -j 1 -t ';' -o 1.1,1.2,2.2 init targ | awk -F';' '{if ($2 < $3) print $1}' > "$RUN_DIR/$PROGRAM.$FUNCNAME-attrfiles.$SCRIPT_PID"
+	# If target gets updated first, then sync_attr must update initiator's attrs first
+	# Also, change replica paths of the two file lists so rsync will know what to sync
+	if [ "$CONFLICT_PREVALANCE" == "${INITIATOR[0]}" ]; then
+		source=targ
+		dest=ini
+		sed -i "s;^${INITIATOR[1]};${TARGET[1]};g" "$RUN_DIR/$PROGRAM.syncattr.$SCRIPT_PID"
+		join -j 1 -t ';' -o 1.1,1.2,2.2 targ init | awk -F';' '{if ($2 < $3) print $1}' > "$RUN_DIR/$PROGRAM.$FUNCNAME-attrfiles.$SCRIPT_PID"
+
+	else
+
+		source=ini
+		dest=tar
+		sed -i "s;^${TARGET[1]};${INITIATOR[1]};g" "$RUN_DIR/$PROGRAM.syncattr.$SCRIPT_PID"
+		join -j 1 -t ';' -o 1.1,1.2,2.2 init targ | awk -F';' '{if ($2 < $3) print $1}' > "$RUN_DIR/$PROGRAM.$FUNCNAME-attrfiles.$SCRIPT_PID"
+	fi
+
 	if [ "$REMOTE_OPERATION" != "yes" ]; then
 		rsync_cmd=""
 	else
@@ -1617,13 +1669,13 @@ function sync_attrs {
 	fi
 
 	if [ $retval != 0 ] && [ $retval != 24 ]; then
-		Logger "Getting file attributes failed [$retval]. Stopping execution." "CRITICAL"
+		Logger "Updating file attributes on $source [$retval]. Stopping execution." "CRITICAL"
 		if [ $_VERBOSE -eq 0 ] && [ -f "$RUN_DIR/$PROGRAM.$FUNCNAME-attrfiles.$SCRIPT_PID" ]; then
 			Logger "Rsync output:\n$(cat $RUN_DIR/$PROGRAM.$FUNCNAME-attrfiles.$SCRIPT_PID)" "NOTICE"
 		fi
 		exit $retval
 	else
-		Logger "Successfully updated file attributes on target replica." "NOTICE"
+		Logger "Successfully updated file attributes on $dest replica." "NOTICE"
 	fi
 }
 
@@ -1633,6 +1685,9 @@ function sync_update {
 	local destination_replica="${2}" # Contains replica type of destination: initiator, target
 	local delete_list_filename="${3}" # Contains deleted list filename, will be prefixed with replica type
 	__CheckArguments 3 $# $FUNCNAME "$@"	#__WITH_PARANOIA_DEBUG
+
+	local rsync_cmd=
+	local retval=
 
 	Logger "Updating $destination_replica replica." "NOTICE"
 	if [ "$source_replica" == "${INITIATOR[0]}" ]; then
@@ -1688,8 +1743,10 @@ function _delete_local {
 	local deleted_failed_list_file="${4}" # file containing files that could not be deleted on last run, will be prefixed with replica type
 	__CheckArguments 4 $# $FUNCNAME "$@"	#__WITH_PARANOIA_DEBUG
 
+	local parentdir=
+
 	## On every run, check wheter the next item is already deleted because it is included in a directory already deleted
-	previous_file=""
+	local previous_file=""
 	OLD_IFS=$IFS
 	IFS=$'\r\n'
 	for files in $(cat "${INITIATOR[1]}${INITIATOR[3]}/$deleted_list_file")
@@ -1782,7 +1839,7 @@ $SSH_CMD ERROR_ALERT=0 sync_on_changes=$sync_on_changes _SILENT=$_SILENT _DEBUG=
 		local value="${1}" # What to log
 		local level="${2}" # Log level: DEBUG, NOTICE, WARN, ERROR, CRITIAL
 
-		prefix="RTIME: $SECONDS - "
+		local prefix="RTIME: $SECONDS - "
 
 		if [ "$level" == "CRITICAL" ]; then
 			_logger "$prefix\e[41m$value\e[0m"
@@ -1807,8 +1864,10 @@ $SSH_CMD ERROR_ALERT=0 sync_on_changes=$sync_on_changes _SILENT=$_SILENT _DEBUG=
 	## Empty earlier failed delete list
 	> "$FAILED_DELETE_LIST"
 
+	local parentdir=
+
 	## On every run, check wheter the next item is already deleted because it is included in a directory already deleted
-	previous_file=""
+	local previous_file=""
 	OLD_IFS=$IFS
 	IFS=$'\r\n'
 	for files in $(cat "$FILE_LIST")
@@ -1891,11 +1950,14 @@ function deletion_propagation {
 	local deleted_failed_list_file="${3}" # file containing files that could not be deleted on last run, will be prefixed with replica type
 	__CheckArguments 3 $# $FUNCNAME "$@"	#__WITH_PARANOIA_DEBUG
 
+	local replica_dir=
+	local delete_dir=
+
 	Logger "Propagating deletions to $replica_type replica." "NOTICE"
 
 	if [ "$replica_type" == "{$INITIATOR[0]}" ]; then
-		local replica_dir="${INITIATOR[1]}${INITIATOR[3]}/"
-		local delete_dir="${INITIATOR[5]}"
+		replica_dir="${INITIATOR[1]}${INITIATOR[3]}/"
+		delete_dir="${INITIATOR[5]}"
 
 		_delete_local "$replica_dir" "${TARGET[0]}$deleted_list_file" "$delete_dir" "${TARGET[0]}$deleted_failed_list_file" &
 		WaitForCompletion $! $SOFT_MAX_EXEC_TIME $HARD_MAX_EXEC_TIME $FUNCNAME
@@ -1905,8 +1967,8 @@ function deletion_propagation {
 			exit 1
 		fi
 	else
-		local replica_dir="${TARGET[1]}${TARGET[3]}/"
-		local delete_dir="${TARGET[5]}"
+		replica_dir="${TARGET[1]}${TARGET[3]}/"
+		delete_dir="${TARGET[5]}"
 
 		if [ "$REMOTE_OPERATION" == "yes" ]; then
 			_delete_remote "$replica_dir" "${INITIATOR[0]}$deleted_list_file" "$delete_dir" "${INITIATOR[0]}$deleted_failed_list_file" &
@@ -2025,7 +2087,7 @@ function Sync {
 		resume_sync="resumed"
 	fi
 	if [ "$resume_sync" == "resumed" ] || [ "$resume_sync" == "${SYNC_ACTION[4]}.success" ] || [ "$resume_sync" == "${SYNC_ACTION[5]}.fail" ] || [ "$resume_sync" == "${SYNC_ACTION[6]}.fail" ] || [ "$resume_sync" == "${SYNC_ACTION[5]}.success" ] || [ "$resume_sync" == "${SYNC_ACTION[6]}.success" ]; then
-		if [ "$CONFLICT_PREVALANCE" != "initiator" ]; then
+		if [ "$CONFLICT_PREVALANCE" != "${INITIATOR[0]}" ]; then
 			if [ "$resume_sync" == "resumed" ] || [ "$resume_sync" == "${SYNC_ACTION[4]}.success" ] || [ "$resume_sync" == "${SYNC_ACTION[5]}.fail" ]; then
 				sync_update ${TARGET[0]} ${INITIATOR[0]} "$DELETED_LIST_FILENAME"
 				if [ $? == 0 ]; then
@@ -2116,6 +2178,8 @@ function _SoftDeleteLocal {
 	local change_time="${3}"
 	__CheckArguments 3 $# $FUNCNAME "$@"	#__WITH_PARANOIA_DEBUG
 
+	local retval=
+
 	if [ -d "$replica_deletion_path" ]; then
 		if [ $_DRYRUN -eq 1 ]; then
 			Logger "Listing files older than $change_time days on $replica_type replica. Does not remove anything." "NOTICE"
@@ -2152,6 +2216,8 @@ function _SoftDeleteRemote {
 	local replica_deletion_path="${2}" # Contains the full path to softdelete / backup directory without ending slash
 	local change_time="${3}"
 	__CheckArguments 3 $# $FUNCNAME "$@"	#__WITH_PARANOIA_DEBUG
+
+	local retval=
 
 	CheckConnectivity3rdPartyHosts
 	CheckConnectivityRemoteHost
@@ -2230,6 +2296,11 @@ function Init {
 		trap TrapQuit SIGTERM EXIT SIGKILL SIGHUP SIGQUIT
 	fi
 
+	local uri
+	local hosturiandpath
+	local hosturi
+
+
 	## Test if target dir is a ssh uri, and if yes, break it down it its values
 	if [ "${TARGET_SYNC_DIR:0:6}" == "ssh://" ]; then
 		REMOTE_OPERATION="yes"
@@ -2248,23 +2319,27 @@ function Init {
 		fi
 
 		# remove everything before '@'
-		_hosturiandpath=${uri#*@}
+		hosturiandpath=${uri#*@}
 		# remove everything after first '/'
-		_hosturi=${_hosturiandpath%%/*}
-		if [[ "$_hosturi" == *":"* ]]; then
-			REMOTE_PORT=${_hosturi##*:}
+		hosturi=${hosturiandpath%%/*}
+		if [[ "$hosturi" == *":"* ]]; then
+			REMOTE_PORT=${hosturi##*:}
 		else
 			REMOTE_PORT=22
 		fi
-		REMOTE_HOST=${_hosturi%%:*}
+		REMOTE_HOST=${hosturi%%:*}
 
 		# remove everything before first '/'
-		TARGET_SYNC_DIR=${_hosturiandpath#*/}
+		TARGET_SYNC_DIR=${hosturiandpath#*/}
 	fi
 
 	## Make sure there is only one trailing slash on path
 	INITIATOR_SYNC_DIR="${INITIATOR_SYNC_DIR%/}/"
 	TARGET_SYNC_DIR="${TARGET_SYNC_DIR%/}/"
+
+	if [ $_DRYRUN -eq 1 ]; then
+		dry_suffix="-dry"
+	fi
 
 	## Replica format
 	## Why the f*** does bash not have simple objects ?
@@ -2323,18 +2398,13 @@ function Init {
 		SYNC_OPTS=$SYNC_OPTS"i"
 	fi
 
-	if [ $stats -eq 1 ]; then
+	if [ $STATS -eq 1 ]; then
 		SYNC_OPTS=$SYNC_OPTS" --stats"
 	fi
 
 	## Add Rsync include / exclude patterns
 	if [ $_QUICK_SYNC -lt 2 ]; then
 		RsyncPatterns
-	fi
-
-	## Filenames for state files
-	if [ $_DRYRUN -eq 1 ]; then
-		dry_suffix="-dry"
 	fi
 
 	## Conflict options
@@ -2422,6 +2492,9 @@ function Usage {
 function SyncOnChanges {
 	__CheckArguments 0 $# $FUNCNAME "$@"	#__WITH_PARANOIA_DEBUG
 
+	local cmd=
+	local retval=
+
 	if ! type inotifywait > /dev/null 2>&1 ; then
 		Logger "No inotifywait command found. Cannot monitor changes." "CRITICAL"
 		exit 1
@@ -2446,8 +2519,8 @@ function SyncOnChanges {
 
 		Logger "#### Monitoring now." "NOTICE"
 		inotifywait --exclude $OSYNC_DIR $RSYNC_PATTERNS $RSYNC_PARTIAL_EXCLUDE -qq -r -e create -e modify -e delete -e move -e attrib --timeout "$MAX_WAIT" "$INITIATOR_SYNC_DIR" &
-		OSYNC_SUB_PID=$!
-		wait $OSYNC_SUB_PID
+		#OSYNC_SUB_PID=$! Not used anymore with killchilds func
+		wait $!
 		retval=$?
 		if [ $retval == 0 ]; then
 			Logger "#### Changes detected, waiting $MIN_WAIT seconds before running next sync." "NOTICE"
@@ -2462,7 +2535,7 @@ function SyncOnChanges {
 
 }
 
-stats=0
+STATS=0
 PARTIAL=0
 FORCE_UNLOCK=0
 no_maxtime=0
@@ -2612,6 +2685,7 @@ opts="${opts# *}"
 
 	GetLocalOS
 	InitLocalOSSettings
+	CheckEnvironment
 	PreInit
 	Init
 	PostInit
