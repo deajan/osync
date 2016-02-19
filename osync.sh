@@ -1491,7 +1491,7 @@ function sync_attrs {
 	local retval=
 
 
-	if [ "$SYNC_ATTR" -ne 1 ]; then
+	if [ "$SYNC_ATTR" != "yes" ]; then
 		return 0
 	fi
 
