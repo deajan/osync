@@ -802,6 +802,12 @@ function PreInit {
 	 ## Set rsync default arguments
         RSYNC_ARGS="-rltD"
 	RSYNC_ATTR_ARGS="-pgo"
+	if [ "$_DRYRUN" -eq 1 ]; then
+		RSYNC_DRY_ARG="-n"
+                DRY_WARNING="/!\ DRY RUN"
+	else
+		RSYNC_DRY_ARG=""
+	fi
 
         if [ "$PRESERVE_ACL" == "yes" ]; then
                 RSYNC_ATTR_ARGS=$RSYNC_ATTR_ARGS" -A"
@@ -823,10 +829,6 @@ function PreInit {
         fi
         if [ "$CHECKSUM" == "yes" ]; then
                 RSYNC_TYPE_ARGS=$RSYNC_TYPE_ARGS" --checksum"
-        fi
-	if [ $_DRYRUN -eq 1 ]; then
-                RSYNC_ARGS=$RSYNC_ARGS" -n"
-                DRY_WARNING="/!\ DRY RUN"
         fi
         if [ "$BANDWIDTH" != "" ] && [ "$BANDWIDTH" != "0" ]; then
                 RSYNC_ARGS=$RSYNC_ARGS" --bwlimit=$BANDWIDTH"
