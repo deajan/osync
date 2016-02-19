@@ -6,7 +6,7 @@ PROGRAM="osync" # Rsync based two way sync engine with fault tolerance
 AUTHOR="(L) 2013-2016 by Orsiris de Jong"
 CONTACT="http://www.netpower.fr/osync - ozy@netpower.fr"
 PROGRAM_VERSION=1.1-dev
-PROGRAM_BUILD=2016021902
+PROGRAM_BUILD=2016021903
 IS_STABLE=no
 
 ## FUNC_BUILD=2016021802
@@ -1619,6 +1619,11 @@ function sync_attrs {
 	local rsync_cmd=
 	local retval=
 
+
+	if [ "$SYNC_ATTR" -ne 1 ]; then
+		return 0
+	fi
+
 	Logger "Getting file attributes." "NOTICE"
 
 	if [ "$REMOTE_OPERATION" == "yes" ]; then
@@ -1661,22 +1666,19 @@ function sync_attrs {
 
 
 	# If target gets updated first, then sync_attr must update initiator's attrs first
-	# Also, change replica paths of the two file lists so join can work
-	# After join, remove leading replica paths
+	# For join, remove leading replica paths
 	if [ "$CONFLICT_PREVALANCE" == "${TARGET[0]}" ]; then
 		local source_dir="${INITIATOR[1]}"
 		local dest_dir="${TARGET[1]}"
 		local dest_replica="${TARGET[0]}"
-		sed -i "s;^${TARGET[1]};${INITIATOR[1]};g" "$RUN_DIR/$PROGRAM.ctime_mtime.${TARGET[0]}.$SCRIPT_PID"
+		sed -i "s;^${TARGET[1]};;g" "$RUN_DIR/$PROGRAM.ctime_mtime.${TARGET[0]}.$SCRIPT_PID"
 		join -j 1 -t ';' -o 1.1,1.2,2.2 "$RUN_DIR/$PROGRAM.ctime_mtime.${INITIATOR[0]}.$SCRIPT_PID" "$RUN_DIR/$PROGRAM.ctime_mtime.${TARGET[0]}.$SCRIPT_PID" | awk -F';' '{if ($2 > $3) print $1}' > "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}-ctime_files.$SCRIPT_PID"
-		sed -i "s;^${INITIATOR[1]};;g" "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}-ctime_files.$SCRIPT_PID"
 	else
 		local source_dir="${TARGET[1]}"
 		local dest_dir="${INITIATOR[1]}"
 		local dest_replica="${INITIATOR[0]}"
-		sed -i "s;^${INITIATOR[1]};${TARGET[1]};g" "$RUN_DIR/$PROGRAM.ctime_mtime.${INITIATOR[0]}.$SCRIPT_PID"
+		sed -i "s;^${INITIATOR[1]};;g" "$RUN_DIR/$PROGRAM.ctime_mtime.${INITIATOR[0]}.$SCRIPT_PID"
 		join -j 1 -t ';' -o 1.1,1.2,2.2 "$RUN_DIR/$PROGRAM.ctime_mtime.${TARGET[0]}.$SCRIPT_PID" "$RUN_DIR/$PROGRAM.ctime_mtime.${INITIATOR[0]}.$SCRIPT_PID" | awk -F';' '{if ($2 > $3) print $1}' > "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}-ctime_files.$SCRIPT_PID"
-		sed -i "s;^${TARGET[1]};;g" "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}-ctime_files.$SCRIPT_PID"
 	fi
 
 	Logger "Updating file attributes on $dest_replica." "NOTICE"
