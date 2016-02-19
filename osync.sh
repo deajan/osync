@@ -6,7 +6,7 @@ PROGRAM="osync" # Rsync based two way sync engine with fault tolerance
 AUTHOR="(L) 2013-2016 by Orsiris de Jong"
 CONTACT="http://www.netpower.fr/osync - ozy@netpower.fr"
 PROGRAM_VERSION=1.1-dev
-PROGRAM_BUILD=2016021901
+PROGRAM_BUILD=2016021902
 IS_STABLE=no
 
 ## FUNC_BUILD=2016021802
@@ -1457,7 +1457,7 @@ function _get_file_ctime_mtime_local {
 	local replica_type="${2}" # Initiator / Target
 	local file_list="${3}" # Contains list of files to get time attrs
 
-	cat "$file_list" | xargs -I {} stat -c '%n|%Z|%Y' "$replica_path{}" | sort > "$RUN_DIR/$PROGRAM.ctime_mtime.$replica_type.$SCRIPT_PID"
+	cat "$file_list" | xargs -I {} stat -c '%n;%Z;%Y' "$replica_path{}" | sort > "$RUN_DIR/$PROGRAM.ctime_mtime.$replica_type.$SCRIPT_PID"
 }
 
 function _get_file_ctime_mtime_remote {
@@ -1466,8 +1466,8 @@ function _get_file_ctime_mtime_remote {
 	local file_list="${3}"
 
 	local cmd=
-
-	cmd='cat "'$file_list'" | '$SSH_CMD' xargs -I "'$replica_path'"{} stat -c "%n|%Z|%Y" "{}" | sort > "'$RUN_DIR/$PROGRAM.ctime_mtime.$replica_type.$SCRIPT_PID'"'
+	# TODO: test
+	cmd='cat "'$file_list'" | '$SSH_CMD' xargs -I "'$replica_path'"{} stat -c "%n;%Z;%Y" "{}" | sort > "'$RUN_DIR/$PROGRAM.ctime_mtime.$replica_type.$SCRIPT_PID'"'
 	Logger "CMD: $cmd" "DEBUG"
 	eval "$cmd"
 	WaitForCompletion $! $SOFT_MAX_EXEC_TIME $HARD_MAX_EXEC_TIME ${FUNCNAME[0]}
@@ -1532,21 +1532,22 @@ function sync_attrs {
 
 
 	# If target gets updated first, then sync_attr must update initiator's attrs first
-	# Also, change replica paths of the two file lists so rsync will know what to sync
-	if [ "$CONFLICT_PREVALANCE" == "${INITIATOR[0]}" ]; then
-		local source_dir="${TARGET[1]}"
-		local dest_dir="${INITIATOR[1]}"
-		local dest_replica="${INITIATOR[0]}"
-		sed -i "s;^${INITIATOR[1]};${TARGET[1]};g" "$RUN_DIR/$PROGRAM.ctime_mtime.${INITIATOR[0]}.$SCRIPT_PID"
-		join -j 1 -t ';' -o 1.1,1.2,2.2 "$RUN_DIR/$PROGRAM.ctime_mtime.${TARGET[0]}.$SCRIPT_PID" "$RUN_DIR/$PROGRAM.ctime_mtime.${INITIATOR[0]}.$SCRIPT_PID" | awk -F';' '{if ($2 < $3) print $1}' > "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}-ctime_files.$SCRIPT_PID"
-
-	else
-
+	# Also, change replica paths of the two file lists so join can work
+	# After join, remove leading replica paths
+	if [ "$CONFLICT_PREVALANCE" == "${TARGET[0]}" ]; then
 		local source_dir="${INITIATOR[1]}"
 		local dest_dir="${TARGET[1]}"
 		local dest_replica="${TARGET[0]}"
 		sed -i "s;^${TARGET[1]};${INITIATOR[1]};g" "$RUN_DIR/$PROGRAM.ctime_mtime.${TARGET[0]}.$SCRIPT_PID"
-		join -j 1 -t ';' -o 1.1,1.2,2.2 "$RUN_DIR/$PROGRAM.ctime_mtime.${INITIATOR[0]}.$SCRIPT_PID" "$RUN_DIR/$PROGRAM.ctime_mtime.${TARGET[0]}.$SCRIPT_PID" | awk -F';' '{if ($2 < $3) print $1}' > "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}-ctime_files.$SCRIPT_PID"
+		join -j 1 -t ';' -o 1.1,1.2,2.2 "$RUN_DIR/$PROGRAM.ctime_mtime.${INITIATOR[0]}.$SCRIPT_PID" "$RUN_DIR/$PROGRAM.ctime_mtime.${TARGET[0]}.$SCRIPT_PID" | awk -F';' '{if ($2 > $3) print $1}' > "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}-ctime_files.$SCRIPT_PID"
+		sed -i "s;^${INITIATOR[1]};;g" "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}-ctime_files.$SCRIPT_PID"
+	else
+		local source_dir="${TARGET[1]}"
+		local dest_dir="${INITIATOR[1]}"
+		local dest_replica="${INITIATOR[0]}"
+		sed -i "s;^${INITIATOR[1]};${TARGET[1]};g" "$RUN_DIR/$PROGRAM.ctime_mtime.${INITIATOR[0]}.$SCRIPT_PID"
+		join -j 1 -t ';' -o 1.1,1.2,2.2 "$RUN_DIR/$PROGRAM.ctime_mtime.${TARGET[0]}.$SCRIPT_PID" "$RUN_DIR/$PROGRAM.ctime_mtime.${INITIATOR[0]}.$SCRIPT_PID" | awk -F';' '{if ($2 > $3) print $1}' > "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}-ctime_files.$SCRIPT_PID"
+		sed -i "s;^${TARGET[1]};;g" "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}-ctime_files.$SCRIPT_PID"
 	fi
 
 	Logger "Updating file attributes on $dest_replica." "NOTICE"
@@ -1997,7 +1998,7 @@ function Sync {
 		resume_sync="resumed"
 	fi
 	if [ "$resume_sync" == "resumed" ] || [ "$resume_sync" == "${SYNC_ACTION[4]}.success" ] || [ "$resume_sync" == "${SYNC_ACTION[5]}.fail" ] || [ "$resume_sync" == "${SYNC_ACTION[6]}.fail" ] || [ "$resume_sync" == "${SYNC_ACTION[5]}.success" ] || [ "$resume_sync" == "${SYNC_ACTION[6]}.success" ]; then
-		if [ "$CONFLICT_PREVALANCE" != "${INITIATOR[0]}" ]; then
+		if [ "$CONFLICT_PREVALANCE" == "${TARGET[0]}" ]; then
 			if [ "$resume_sync" == "resumed" ] || [ "$resume_sync" == "${SYNC_ACTION[4]}.success" ] || [ "$resume_sync" == "${SYNC_ACTION[5]}.fail" ]; then
 				sync_update ${TARGET[0]} ${INITIATOR[0]} "$DELETED_LIST_FILENAME"
 				if [ $? == 0 ]; then
@@ -2438,11 +2439,12 @@ function SyncOnChanges {
 
 }
 
+# quicksync mode settings, overriden by config file
 STATS=0
 PARTIAL=0
+CONFLICT_PREVALANCE=initiator
 FORCE_UNLOCK=0
 no_maxtime=0
-# Alert flags
 opts=""
 ERROR_ALERT=0
 soft_stop=0
