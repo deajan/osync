@@ -1,4 +1,4 @@
-## FUNC_BUILD=2016021802
+## FUNC_BUILD=2016021803
 ## BEGIN Generic functions for osync & obackup written in 2013-2016 by Orsiris de Jong - http://www.netpower.fr - ozy@netpower.fr
 
 ## type -p does not work on platforms other than linux (bash). If if does not work, always assume output is not a zero exitcode
@@ -733,39 +733,80 @@ function __CheckArguments {
 	fi
 }
 
-
-function old__CheckArguments {
-	# Checks the number of arguments and raises an error if some are missing
-	if [ "$_DEBUG" == "yes" ]; then
-
-		local number_of_arguments="${1}" # Number of arguments a function should have
-		local number_of_given_arguments="${2}" # Number of arguments that have been passed
-		local function_name="${3}" # Function name that called __CheckArguments
-		local arguments="${4}" # All other arguments
-
-		if [ "$_PARANOIA_DEBUG" == "yes" ]; then
-			Logger "Entering function [$function_name]." "DEBUG"
-
-			# Paranoia check... Can help finding empty arguments. __CheckArguments should be grepped out in production builds.
-			local count=-3 # Number of arguments minus the function calls for __CheckArguments
-			for i in $@; do
-				count=$((count + 1))
-			done
-			if [ $count -ne $1 ]; then
-				Logger "Function $function_name may have inconsistent number of arguments. Expected: $number_of_arguments, count: $count, see log file." "WARN"
-				echo "Argument list (including checks): $*" >> "$LOG_FILE"
-			fi
-		fi
-
-		if [ $number_of_arguments -ne $number_of_given_arguments ]; then
-			Logger "Inconsistnent number of arguments in $function_name. Should have $number_of_arguments arguments, has $number_of_given_arguments arguments, see log file." "CRITICAL"
-			# Cannot user Logger here because $@ is a list of arguments
-			echo "Argumnt list: $4" >> "$LOG_FILE"
-		fi
-
-	fi
-}
 #__END_WITH_PARANOIA_DEBUG
+
+function RsyncPatternsAdd {
+	local pattern="${1}"
+	local pattern_type="${2}"	# exclude or include
+	__CheckArguments 2 $# ${FUNCNAME[0]} "$@"	#__WITH_PARANOIA_DEBUG
+
+	local rest=
+
+	# Disable globbing so wildcards from exclusions do not get expanded
+	set -f
+	rest="$pattern"
+	while [ -n "$rest" ]
+	do
+		# Take the string until first occurence until $PATH_SEPARATOR_CHAR
+		str=${rest%%;*}
+		# Handle the last case
+		if [ "$rest" = "${rest/$PATH_SEPARATOR_CHAR/}" ]; then
+			rest=
+		else
+			# Cut everything before the first occurence of $PATH_SEPARATOR_CHAR
+			rest=${rest#*$PATH_SEPARATOR_CHAR}
+		fi
+			if [ "$RSYNC_PATTERNS" == "" ]; then
+			RSYNC_PATTERNS="--"$pattern_type"=\"$str\""
+		else
+			RSYNC_PATTERNS="$RSYNC_PATTERNS --"$pattern_type"=\"$str\""
+		fi
+	done
+	set +f
+}
+
+function RsyncPatternsFromAdd {
+        local pattern_from="${1}"
+        local pattern_type="${2}"
+	__CheckArguments 2 $# ${FUNCNAME[0]} "$@"    #__WITH_PARANOIA_DEBUG
+
+	local pattern_from=
+
+        ## Check if the exclude list has a full path, and if not, add the config file path if there is one
+        if [ "$(basename $pattern_from)" == "$pattern_from" ]; then
+                pattern_from="$(dirname $CONFIG_FILE)/$pattern_from"
+        fi
+
+        if [ -e "$pattern_from" ]; then
+                RSYNC_PATTERNS="$RSYNC_PATTERNS --"$pattern_type"-from=\"$pattern_from\""
+        fi
+}
+
+function RsyncPatterns {
+        __CheckArguments 0 $# ${FUNCNAME[0]} "$@"    #__WITH_PARANOIA_DEBUG
+
+        if [ "$RSYNC_PATTERN_FIRST" == "exclude" ]; then
+                RsyncPatternsAdd "$RSYNC_EXCLUDE_PATTERN" "exclude"
+                if [ "$RSYNC_EXCLUDE_FROM" != "" ]; then
+                        RsyncPatternsFromAdd "$RSYNC_EXCLUDE_FROM" "exclude"
+                fi
+                RsyncPatternsAdd "$RSYNC_INCLUDE_PATTERN" "include"
+                if [ "$RSYNC_INCLUDE_FROM" != "" ]; then
+                        RsyncPatternsFromAdd "$RSYNC_INCLUDE_FROM" "include"
+                fi
+        elif [ "$RSYNC_PATTERN_FIRST" == "include" ]; then
+                RsyncPatternsAdd "$RSYNC_INCLUDE_PATTERN" "include"
+                if [ "$RSYNC_INCLUDE_FROM" != "" ]; then
+                        RsyncPatternsFromAdd "$RSYNC_INCLUDE_FROM" "include"
+                fi
+                RsyncPatternsAdd "$RSYNC_EXCLUDE_PATTERN" "exclude"
+                if [ "$RSYNC_EXCLUDE_FROM" != "" ]; then
+                        RsyncPatternsFromAdd "$RSYNC_EXCLUDE_FROM" "exclude"
+                fi
+        else
+                Logger "Bogus RSYNC_PATTERN_FIRST value in config file. Will not use rsync patterns." "WARN"
+        fi
+}
 
 function PreInit {
 	 __CheckArguments 0 $# ${FUNCNAME[0]} "$@"    #__WITH_PARANOIA_DEBUG
