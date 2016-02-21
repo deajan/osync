@@ -1,15 +1,17 @@
 #!/usr/bin/env bash
 
-#TODO: test if trapquit works on kill (sigterm)
+#TODO: clock compare in doc
+#TODO: explain why osync is lowband friendly in doc
+#TODO: explain why osync daemon process can still exist after quit for 30s
 
 PROGRAM="osync" # Rsync based two way sync engine with fault tolerance
 AUTHOR="(L) 2013-2016 by Orsiris de Jong"
 CONTACT="http://www.netpower.fr/osync - ozy@netpower.fr"
 PROGRAM_VERSION=1.1-dev
-PROGRAM_BUILD=2016021904
+PROGRAM_BUILD=2016022101
 IS_STABLE=no
 
-## FUNC_BUILD=2016021802
+## FUNC_BUILD=2016021803
 ## BEGIN Generic functions for osync & obackup written in 2013-2016 by Orsiris de Jong - http://www.netpower.fr - ozy@netpower.fr
 
 ## type -p does not work on platforms other than linux (bash). If if does not work, always assume output is not a zero exitcode
@@ -681,6 +683,76 @@ function CheckConnectivity3rdPartyHosts {
 #__BEGIN_WITH_PARANOIA_DEBUG
 #__END_WITH_PARANOIA_DEBUG
 
+function RsyncPatternsAdd {
+	local pattern="${1}"
+	local pattern_type="${2}"	# exclude or include
+
+	local rest=
+
+	# Disable globbing so wildcards from exclusions do not get expanded
+	set -f
+	rest="$pattern"
+	while [ -n "$rest" ]
+	do
+		# Take the string until first occurence until $PATH_SEPARATOR_CHAR
+		str=${rest%%;*}
+		# Handle the last case
+		if [ "$rest" = "${rest/$PATH_SEPARATOR_CHAR/}" ]; then
+			rest=
+		else
+			# Cut everything before the first occurence of $PATH_SEPARATOR_CHAR
+			rest=${rest#*$PATH_SEPARATOR_CHAR}
+		fi
+			if [ "$RSYNC_PATTERNS" == "" ]; then
+			RSYNC_PATTERNS="--"$pattern_type"=\"$str\""
+		else
+			RSYNC_PATTERNS="$RSYNC_PATTERNS --"$pattern_type"=\"$str\""
+		fi
+	done
+	set +f
+}
+
+function RsyncPatternsFromAdd {
+        local pattern_from="${1}"
+        local pattern_type="${2}"
+
+	local pattern_from=
+
+        ## Check if the exclude list has a full path, and if not, add the config file path if there is one
+        if [ "$(basename $pattern_from)" == "$pattern_from" ]; then
+                pattern_from="$(dirname $CONFIG_FILE)/$pattern_from"
+        fi
+
+        if [ -e "$pattern_from" ]; then
+                RSYNC_PATTERNS="$RSYNC_PATTERNS --"$pattern_type"-from=\"$pattern_from\""
+        fi
+}
+
+function RsyncPatterns {
+
+        if [ "$RSYNC_PATTERN_FIRST" == "exclude" ]; then
+                RsyncPatternsAdd "$RSYNC_EXCLUDE_PATTERN" "exclude"
+                if [ "$RSYNC_EXCLUDE_FROM" != "" ]; then
+                        RsyncPatternsFromAdd "$RSYNC_EXCLUDE_FROM" "exclude"
+                fi
+                RsyncPatternsAdd "$RSYNC_INCLUDE_PATTERN" "include"
+                if [ "$RSYNC_INCLUDE_FROM" != "" ]; then
+                        RsyncPatternsFromAdd "$RSYNC_INCLUDE_FROM" "include"
+                fi
+        elif [ "$RSYNC_PATTERN_FIRST" == "include" ]; then
+                RsyncPatternsAdd "$RSYNC_INCLUDE_PATTERN" "include"
+                if [ "$RSYNC_INCLUDE_FROM" != "" ]; then
+                        RsyncPatternsFromAdd "$RSYNC_INCLUDE_FROM" "include"
+                fi
+                RsyncPatternsAdd "$RSYNC_EXCLUDE_PATTERN" "exclude"
+                if [ "$RSYNC_EXCLUDE_FROM" != "" ]; then
+                        RsyncPatternsFromAdd "$RSYNC_EXCLUDE_FROM" "exclude"
+                fi
+        else
+                Logger "Bogus RSYNC_PATTERN_FIRST value in config file. Will not use rsync patterns." "WARN"
+        fi
+}
+
 function PreInit {
 
 	## SSH compression
@@ -842,21 +914,23 @@ function InitRemoteOSSettings {
 OSYNC_DIR=".osync_workdir"
 
 function TrapStop {
-	if [ $soft_stop -eq 0 ]; then
+	if [ $SOFT_STOP -eq 0 ]; then
 		Logger " /!\ WARNING: Manual exit of osync is really not recommended. Sync will be in inconsistent state." "WARN"
 		Logger " /!\ WARNING: If you are sure, please hit CTRL+C another time to quit." "WARN"
-		soft_stop=1
+		SOFT_STOP=1
 		return 1
 	fi
 
-	if [ $soft_stop -eq 1 ]; then
+	if [ $SOFT_STOP -eq 1 ]; then
 		Logger " /!\ WARNING: CTRL+C hit twice. Exiting osync. Please wait while replicas get unlocked..." "WARN"
-		soft_stop=2
+		SOFT_STOP=2
 		exit 1
 	fi
 }
 
 function TrapQuit {
+	local exitcode=
+
 	if [ $ERROR_ALERT -ne 0 ]; then
 		UnlockReplicas
 		if [ "$_DEBUG" != "yes" ]
@@ -878,29 +952,13 @@ function TrapQuit {
 		fi
 		CleanUp
 		Logger "$PROGRAM finished with warnings." "WARN"
-		exitcode=2
+		exitcode=240	# Special exit code for daemon mode not stopping on warnings
 	else
 		UnlockReplicas
 		CleanUp
 		Logger "$PROGRAM finished." "NOTICE"
 		exitcode=0
 	fi
-
-#TODO: Check new KillChilds function for service mode
-
-#	if ps -p $OSYNC_SUB_PID > /dev/null 2>&1
-#	then
-#		kill -s SIGTERM $OSYNC_SUB_PID
-#		if [ $? == 0 ]; then
-#			Logger "Stopped sub process [$OSYNC_SUB_PID]." "DEBUG"
-#		else
-#			Logger "Could not terminate sub process [$OSYNC_SUB_PID]. Trying the hard way." "DEBUG"
-#			kill -9 $OSYNC_SUB_PID
-#			if [ $? != 0 ]; then
-#				Logger "Could not kill sub process [$OSYNC_SUB_PID]." "ERROR"
-#			fi
-#		fi
-#	fi
 
 	KillChilds $$ > /dev/null 2>&1
 
@@ -1054,12 +1112,12 @@ function _CheckReplicaPathsRemote {
 
 function CheckReplicaPaths {
 
-	#INITIATOR_SYNC_DIR_CANN=$(realpath "$INITIATOR_SYNC_DIR")	#TODO: investigate realpath & readlink issues on MSYS and busybox here
-	#TARGET_SYNC_DIR_CANN=$(realpath "$TARGET_SYNC_DIR")		#TODO2: replace all variables with INITIATOR object
+	#INITIATOR_SYNC_DIR_CANN=$(realpath "${INITIATOR[1]}")	#TODO: investigate realpath & readlink issues on MSYS and busybox here
+	#TARGET_SYNC_DIR_CANN=$(realpath "${TARGET[1]})
 
 	#if [ "$REMOTE_OPERATION" != "yes" ]; then
 	#	if [ "$INITIATOR_SYNC_DIR_CANN" == "$TARGET_SYNC_DIR_CANN" ]; then
-	#		Logger "Master directory [$INITIATOR_SYNC_DIR] cannot be the same as target directory." "CRITICAL"
+	#		Logger "Master directory [${INITIATOR[1]}] cannot be the same as target directory." "CRITICAL"
 	#		exit 1
 	#	fi
 	#fi
@@ -1121,80 +1179,10 @@ function CheckDiskSpace {
 	fi
 }
 
-function RsyncPatternsAdd {
-	local pattern="${1}"
-	local pattern_type="${2}"	# exclude or include
-
-	local rest=
-
-	# Disable globbing so wildcards from exclusions do not get expanded
-	set -f
-	rest="$pattern"
-	while [ -n "$rest" ]
-	do
-		# Take the string until first occurence until $PATH_SEPARATOR_CHAR
-		str=${rest%%;*}
-		# Handle the last case
-		if [ "$rest" = "${rest/$PATH_SEPARATOR_CHAR/}" ]; then
-			rest=
-		else
-			# Cut everything before the first occurence of $PATH_SEPARATOR_CHAR
-			rest=${rest#*$PATH_SEPARATOR_CHAR}
-		fi
-			if [ "$RSYNC_PATTERNS" == "" ]; then
-			RSYNC_PATTERNS="--"$pattern_type"=\"$str\""
-		else
-			RSYNC_PATTERNS="$RSYNC_PATTERNS --"$pattern_type"=\"$str\""
-		fi
-	done
-	set +f
-}
-
-function RsyncPatternsFromAdd {
-	local pattern_from="${1}"
-	local pattern_type="${2}"
-
-	local pattern_from=
-
-	## Check if the exclude list has a full path, and if not, add the config file path if there is one
-	if [ "$(basename $pattern_from)" == "$pattern_from" ]; then
-		pattern_from="$(dirname $CONFIG_FILE)/$pattern_from"
-	fi
-
-	if [ -e "$pattern_from" ]; then
-		RSYNC_PATTERNS="$RSYNC_PATTERNS --"$pattern_type"-from=\"$pattern_from\""
-	fi
-}
-
-function RsyncPatterns {
-
-	if [ "$RSYNC_PATTERN_FIRST" == "exclude" ]; then
-		RsyncPatternsAdd "$RSYNC_EXCLUDE_PATTERN" "exclude"
-		if [ "$RSYNC_EXCLUDE_FROM" != "" ]; then
-			RsyncPatternsFromAdd "$RSYNC_EXCLUDE_FROM" "exclude"
-		fi
-		RsyncPatternsAdd "$RSYNC_INCLUDE_PATTERN" "include"
-		if [ "$RSYNC_INCLUDE_FROM" != "" ]; then
-			RsyncPatternsFromAdd "$RSYNC_INCLUDE_FROM" "include"
-		fi
-	elif [ "$RSYNC_PATTERN_FIRST" == "include" ]; then
-		RsyncPatternsAdd "$RSYNC_INCLUDE_PATTERN" "include"
-		if [ "$RSYNC_INCLUDE_FROM" != "" ]; then
-			RsyncPatternsFromAdd "$RSYNC_INCLUDE_FROM" "include"
-		fi
-		RsyncPatternsAdd "$RSYNC_EXCLUDE_PATTERN" "exclude"
-		if [ "$RSYNC_EXCLUDE_FROM" != "" ]; then
-			RsyncPatternsFromAdd "$RSYNC_EXCLUDE_FROM" "exclude"
-		fi
-	else
-		Logger "Bogus RSYNC_PATTERN_FIRST value in config file. Will not use rsync patterns." "WARN"
-	fi
-}
-
 function _WriteLockFilesLocal {
 	local lockfile="${1}"
 
-	$COMMAND_SUDO echo "$SCRIPT_PID@$INSTANCE_ID" > "$lockfile" #TODO: Determine best format for lockfile for v2
+	$COMMAND_SUDO echo "$SCRIPT_PID@$INSTANCE_ID" > "$lockfile"
 	if [ $?	!= 0 ]; then
 		Logger "Could not create lock file [$lockfile]." "CRITICAL"
 		exit 1
@@ -1255,7 +1243,7 @@ function _CheckLocksLocal {
 	fi
 }
 
-function _CheckLocksRemote { #TODO: Rewrite this a bit more beautiful
+function _CheckLocksRemote {
 	local lockfile="${1}"
 
 	local cmd=
@@ -1418,14 +1406,12 @@ function tree_list {
 # delete_list(replica, tree-file-after, tree-file-current, deleted-list-file, deleted-failed-list-file): Creates a list of files vanished from last run on replica $1 (initiator/target)
 function delete_list {
 	local replica_type="${1}" # replica type: initiator, target
-	local tree_file_after="${2}" # tree-file-after, will be prefixed with replica type #TODO: use this
+	local tree_file_after="${2}" # tree-file-after, will be prefixed with replica type
 	local tree_file_current="${3}" # tree-file-current, will be prefixed with replica type
 	local deleted_list_file="${4}" # file containing deleted file list, will be prefixed with replica type
 	local deleted_failed_list_file="${5}" # file containing files that could not be deleted on last run, will be prefixed with replica type
 
 	local cmd=
-
-	# TODO: Check why external filenames are used (see _DRYRUN option because of NOSUFFIX)
 
 	Logger "Creating $replica_type replica deleted file list." "NOTICE"
 	if [ -f "${INITIATOR[1]}${INITIATOR[3]}/$replica_type$TREE_AFTER_FILENAME_NO_SUFFIX" ]; then
@@ -1487,7 +1473,7 @@ function _get_file_ctime_mtime_remote {
 function sync_attrs {
 	local initiator_replica="${1}"
 	local target_replica="${2}"
-	local delete_list_filename="$DELETED_LIST_FILENAME" # Contains deleted list filename, will be prefixed with replica type #TODO: replace all those with ${INITIATOR[x]}
+	local delete_list_filename="$DELETED_LIST_FILENAME" # Contains deleted list filename, will be prefixed with replica type
 
 	local rsync_cmd=
 	local retval=
@@ -1675,7 +1661,7 @@ function _delete_local {
 
 				if [ $_DRYRUN -ne 1 ]; then
 					if [ -e "$replica_dir$deletion_dir/$files" ]; then
-						rm -rf "${replica_dir:?}$deletion_dir/$files" #TODO: WTF :?
+						rm -rf "${replica_dir:?}$deletion_dir/$files"
 					fi
 
 					if [ -e "$replica_dir$files" ]; then
@@ -1847,7 +1833,6 @@ ENDSSH
 
 	## Copy back the deleted failed file list
 	esc_source_file="$(EscapeSpaces "${TARGET[1]}${TARGET[3]}/$deleted_failed_list_file")"
-	#TODO: Need to check if file exists prior to copy (or add a filemask and copy all state files)
 	rsync_cmd="$(type -p $RSYNC_EXECUTABLE) --rsync-path=\"$RSYNC_PATH\" $SYNC_OPTS -e \"$RSYNC_SSH_CMD\" $REMOTE_USER@$REMOTE_HOST:\"$esc_source_file\" \"${INITIATOR[1]}${INITIATOR[3]}\" > \"$RUN_DIR/$PROGRAM.remote_failed_deletion_list_copy.$SCRIPT_PID\""
 	Logger "RSYNC_CMD: $rsync_cmd" "DEBUG"
 	eval "$rsync_cmd" 2>> "$LOG_FILE"
@@ -2279,6 +2264,7 @@ function Init {
 		local dry_suffix=
 	fi
 
+	#TODO: integrate this into ${REPLICA[x]}
 	TREE_CURRENT_FILENAME="-tree-current-$INSTANCE_ID$dry_suffix"
 	TREE_AFTER_FILENAME="-tree-after-$INSTANCE_ID$dry_suffix"
 	TREE_AFTER_FILENAME_NO_SUFFIX="-tree-after-$INSTANCE_ID"
@@ -2424,7 +2410,7 @@ function SyncOnChanges {
 		Logger "daemon cmd: $cmd" "DEBUG"
 		eval "$cmd"
 		retval=$?
-		if [ $retval != 0 ]; then
+		if [ $retval != 0 ] && [ $retval != 240 ]; then
 			Logger "osync child exited with error." "CRITICAL"
 			exit $retval
 		fi
@@ -2450,12 +2436,14 @@ function SyncOnChanges {
 # quicksync mode settings, overriden by config file
 STATS=0
 PARTIAL=0
-CONFLICT_PREVALANCE=initiator
+if [ "$CONFLICT_PREVALANCE" == "" ]; then
+	CONFLICT_PREVALANCE=initiator
+fi
 FORCE_UNLOCK=0
 no_maxtime=0
 opts=""
 ERROR_ALERT=0
-soft_stop=0
+SOFT_STOP=0
 _QUICK_SYNC=0
 sync_on_changes=0
 _NOLOCKS=0
