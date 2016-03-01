@@ -8,7 +8,7 @@ PROGRAM="osync" # Rsync based two way sync engine with fault tolerance
 AUTHOR="(L) 2013-2016 by Orsiris de Jong"
 CONTACT="http://www.netpower.fr/osync - ozy@netpower.fr"
 PROGRAM_VERSION=1.1-dev
-PROGRAM_BUILD=2016022101
+PROGRAM_BUILD=2016030101
 IS_STABLE=no
 
 source "./ofunctions.sh"
@@ -1439,7 +1439,7 @@ function Init {
 	SYNC_OPTS="-u"
 
 	if [ $_VERBOSE -eq 1 ]; then
-		SYNC_OPTS=$SYNC_OPTS"i"
+		SYNC_OPTS=$SYNC_OPTS" -i"
 	fi
 
 	if [ $STATS -eq 1 ]; then
