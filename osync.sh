@@ -8,10 +8,10 @@ PROGRAM="osync" # Rsync based two way sync engine with fault tolerance
 AUTHOR="(L) 2013-2016 by Orsiris de Jong"
 CONTACT="http://www.netpower.fr/osync - ozy@netpower.fr"
 PROGRAM_VERSION=1.1-dev
-PROGRAM_BUILD=2016030101
+PROGRAM_BUILD=2016030801
 IS_STABLE=no
 
-## FUNC_BUILD=2016021803
+## FUNC_BUILD=2016030801
 ## BEGIN Generic functions for osync & obackup written in 2013-2016 by Orsiris de Jong - http://www.netpower.fr - ozy@netpower.fr
 
 ## type -p does not work on platforms other than linux (bash). If if does not work, always assume output is not a zero exitcode
@@ -39,6 +39,8 @@ else
 	trap 'TrapError ${LINENO} $?' ERR
 	_VERBOSE=1
 fi
+
+#### MINIMAL-FUNCTION-SET BEGIN ####
 
 SCRIPT_PID=$$
 
@@ -105,15 +107,15 @@ function Logger {
 	# </OSYNC SPECIFIC>
 
 	if [ "$level" == "CRITICAL" ]; then
-		_Logger "$prefix\e[41m$value\e[0m" "$prefix$value"
+		_Logger "$prefix\e[41m$value\e[0m" "$prefix$level:$value"
 		ERROR_ALERT=1
 		return
 	elif [ "$level" == "ERROR" ]; then
-		_Logger "$prefix\e[91m$value\e[0m" "$prefix$value"
+		_Logger "$prefix\e[91m$value\e[0m" "$prefix$level:$value"
 		ERROR_ALERT=1
 		return
 	elif [ "$level" == "WARN" ]; then
-		_Logger "$prefix\e[93m$value\e[0m" "$prefix$value"
+		_Logger "$prefix\e[93m$value\e[0m" "$prefix$level:$value"
 		WARN_ALERT=1
 		return
 	elif [ "$level" == "NOTICE" ]; then
@@ -145,7 +147,122 @@ function KillChilds {
 	if [ "$self" == true ]; then
 		kill -s SIGTERM "$pid" || (sleep 30 && kill -9 "$pid" &)
 	fi
+	# sleep 30 needs to wait before killing itself
 }
+
+function SendAlert {
+
+	local mail_no_attachment=
+	local attachment_command=
+
+	if [ "$DESTINATION_MAILS" == "" ]; then
+		return 0
+	fi
+
+	if [ "$_DEBUG" == "yes" ]; then
+		Logger "Debug mode, no warning email will be sent." "NOTICE"
+		return 0
+	fi
+
+	# <OSYNC SPECIFIC>
+	if [ "$_QUICK_SYNC" == "2" ]; then
+		Logger "Current task is a quicksync task. Will not send any alert." "NOTICE"
+		return 0
+	fi
+	# </OSYNC SPECIFIC>
+
+	eval "cat \"$LOG_FILE\" $COMPRESSION_PROGRAM > $ALERT_LOG_FILE"
+	if [ $? != 0 ]; then
+		Logger "Cannot create [$ALERT_LOG_FILE]" "WARN"
+		mail_no_attachment=1
+	else
+		mail_no_attachment=0
+	fi
+	MAIL_ALERT_MSG="$MAIL_ALERT_MSG"$'\n\n'$(tail -n 50 "$LOG_FILE")
+	if [ $ERROR_ALERT -eq 1 ]; then
+		subject="Error alert for $INSTANCE_ID"
+	elif [ $WARN_ALERT -eq 1 ]; then
+		subject="Warning alert for $INSTANCE_ID"
+	else
+		subject="Alert for $INSTANCE_ID"
+	fi
+
+	if [ "$mail_no_attachment" -eq 0 ]; then
+		attachment_command="-a $ALERT_LOG_FILE"
+	fi
+	if type mutt > /dev/null 2>&1 ; then
+		cmd="echo \"$MAIL_ALERT_MSG\" | $(type -p mutt) -x -s \"$subject\" $DESTINATION_MAILS $attachment_command"
+		eval $cmd
+		if [ $? != 0 ]; then
+			Logger "Cannot send alert email via $(type -p mutt) !!!" "WARN"
+		else
+			Logger "Sent alert mail using mutt." "NOTICE"
+			return 0
+		fi
+	fi
+
+	if type mail > /dev/null 2>&1 ; then
+		if [ "$mail_no_attachment" -eq 0 ] && $(type -p mail) -V | grep "GNU" > /dev/null; then
+			attachment_command="-A $ALERT_LOG_FILE"
+		elif [ "$mail_no_attachment" -eq 0 ] && $(type -p mail) -V > /dev/null; then
+			attachment_command="-a $ALERT_LOG_FILE"
+		else
+			attachment_command=""
+		fi
+		cmd="echo \"$MAIL_ALERT_MSG\" | $(type -p mail) $attachment_command -s \"$subject\" $DESTINATION_MAILS"
+		eval $cmd
+		if [ $? != 0 ]; then
+			Logger "Cannot send alert email via $(type -p mail) with attachments !!!" "WARN"
+			cmd="echo \"$MAIL_ALERT_MSG\" | $(type -p mail) -s \"$subject\" $DESTINATION_MAILS"
+			eval $cmd
+			if [ $? != 0 ]; then
+				Logger "Cannot send alert email via $(type -p mail) without attachments !!!" "WARN"
+			else
+				Logger "Sent alert mail using mail command without attachment." "NOTICE"
+				return 0
+			fi
+		else
+			Logger "Sent alert mail using mail command." "NOTICE"
+			return 0
+		fi
+	fi
+
+	if type sendmail > /dev/null 2>&1 ; then
+		cmd="echo -e \"Subject:$subject\r\n$MAIL_ALERT_MSG\" | $(type -p sendmail) $DESTINATION_MAILS"
+		eval $cmd
+		if [ $? != 0 ]; then
+			Logger "Cannot send alert email via $(type -p sendmail) !!!" "WARN"
+		else
+			Logger "Sent alert mail using sendmail command without attachment." "NOTICE"
+			return 0
+		fi
+	fi
+
+	if type sendemail > /dev/null 2>&1 ; then
+		if [ "$SMTP_USER" != "" ] && [ "$SMTP_PASSWORD" != "" ]; then
+			SMTP_OPTIONS="-xu $SMTP_USER -xp $SMTP_PASSWORD"
+		else
+			SMTP_OPTIONS=""
+		fi
+		$(type -p sendemail) -f $SENDER_MAIL -t $DESTINATION_MAILS -u "$subject" -m "$MAIL_ALERT_MSG" -s $SMTP_SERVER $SMTP_OPTIONS > /dev/null 2>&1
+		if [ $? != 0 ]; then
+			Logger "Cannot send alert email via $(type -p sendemail) !!!" "WARN"
+		else
+			Logger "Sent alert mail using sendemail command without attachment." "NOTICE"
+			return 0
+		fi
+	fi
+
+	# If function has not returned 0 yet, assume it's critical that no alert can be sent
+	Logger "Cannot send alert (neither mutt, mail, sendmail nor sendemail found)." "ERROR" # Is not marked critical because execution must continue
+
+	# Delete tmp log file
+	if [ -f "$ALERT_LOG_FILE" ]; then
+		rm "$ALERT_LOG_FILE"
+	fi
+}
+
+#### MINIMAL-FUNCTION-SET END ####
 
 function TrapError {
 	local job="$0"
@@ -232,110 +349,6 @@ function CleanUp {
 
 	if [ "$_DEBUG" != "yes" ]; then
 		rm -f "$RUN_DIR/$PROGRAM."*".$SCRIPT_PID"
-	fi
-}
-
-function SendAlert {
-
-	local mail_no_attachment=
-	local attachment_command=
-
-	if [ "$_DEBUG" == "yes" ]; then
-		Logger "Debug mode, no warning email will be sent." "NOTICE"
-		return 0
-	fi
-
-	# <OSYNC SPECIFIC>
-	if [ "$_QUICK_SYNC" == "2" ]; then
-		Logger "Current task is a quicksync task. Will not send any alert." "NOTICE"
-		return 0
-	fi
-	# </OSYNC SPECIFIC>
-
-	eval "cat \"$LOG_FILE\" $COMPRESSION_PROGRAM > $ALERT_LOG_FILE"
-	if [ $? != 0 ]; then
-		Logger "Cannot create [$ALERT_LOG_FILE]" "WARN"
-		mail_no_attachment=1
-	else
-		mail_no_attachment=0
-	fi
-	MAIL_ALERT_MSG="$MAIL_ALERT_MSG"$'\n\n'$(tail -n 50 "$LOG_FILE")
-	if [ $ERROR_ALERT -eq 1 ]; then
-		subject="Error alert for $INSTANCE_ID"
-	elif [ $WARN_ALERT -eq 1 ]; then
-		subject="Warning alert for $INSTANCE_ID"
-	else
-		subject="Alert for $INSTANCE_ID"
-	fi
-
-	if [ "$mail_no_attachment" -eq 0 ]; then
-		attachment_command="-a $ALERT_LOG_FILE"
-	fi
-	if type mutt > /dev/null 2>&1 ; then
-		echo "$MAIL_ALERT_MSG" | $(type -p mutt) -x -s "$subject" $DESTINATION_MAILS $attachment_command
-		if [ $? != 0 ]; then
-			Logger "WARNING: Cannot send alert email via $(type -p mutt) !!!" "WARN"
-		else
-			Logger "Sent alert mail using mutt." "NOTICE"
-			return 0
-		fi
-	fi
-
-	if type mail > /dev/null 2>&1 ; then
-		if [ "$mail_no_attachment" -eq 0 ] && $(type -p mail) -V | grep "GNU" > /dev/null; then
-			attachment_command="-A $ALERT_LOG_FILE"
-		elif [ "$mail_no_attachment" -eq 0 ] && $(type -p mail) -V > /dev/null; then
-			attachment_command="-a $ALERT_LOG_FILE"
-		else
-			attachment_command=""
-		fi
-		echo "$MAIL_ALERT_MSG" | $(type -p mail) $attachment_command -s "$subject" $DESTINATION_MAILS
-		if [ $? != 0 ]; then
-			Logger "WARNING: Cannot send alert email via $(type -p mail) with attachments !!!" "WARN"
-			echo "$MAIL_ALERT_MSG" | $(type -p mail) -s "$subject" $DESTINATION_MAILS
-			if [ $? != 0 ]; then
-				Logger "WARNING: Cannot send alert email via $(type -p mail) without attachments !!!" "WARN"
-			else
-				Logger "Sent alert mail using mail command without attachment." "NOTICE"
-				return 0
-			fi
-		else
-			Logger "Sent alert mail using mail command." "NOTICE"
-			return 0
-		fi
-	fi
-
-	if type sendmail > /dev/null 2>&1 ; then
-		echo -e "Subject:$subject\r\n$MAIL_ALERT_MSG" | $(type -p sendmail) $DESTINATION_MAILS
-		if [ $? != 0 ]; then
-			Logger "WARNING: Cannot send alert email via $(type -p sendmail) !!!" "WARN"
-		else
-			Logger "Sent alert mail using sendmail command without attachment." "NOTICE"
-			return 0
-		fi
-	fi
-
-	if type sendemail > /dev/null 2>&1 ; then
-		if [ "$SMTP_USER" != "" ] && [ "$SMTP_PASSWORD" != "" ]; then
-			SMTP_OPTIONS="-xu $SMTP_USER -xp $SMTP_PASSWORD"
-		else
-			SMTP_OPTIONS=""
-		fi
-		$(type -p sendemail) -f $SENDER_MAIL -t $DESTINATION_MAILS -u "$subject" -m "$MAIL_ALERT_MSG" -s $SMTP_SERVER $SMTP_OPTIONS > /dev/null 2>&1
-		if [ $? != 0 ]; then
-			Logger "WARNING: Cannot send alert email via $(type -p sendemail) !!!" "WARN"
-		else
-			Logger "Sent alert mail using sendemail command without attachment." "NOTICE"
-			return 0
-		fi
-	fi
-
-	# If function has not returned 0 yet, assume it's critical that no alert can be sent
-	Logger "/!\ CRITICAL: Cannot send alert (neither mutt, mail, sendmail nor sendemail found)." "ERROR" # Is not marked critical because execution must continue
-
-	# Delete tmp log file
-	if [ -f "$ALERT_LOG_FILE" ]; then
-		rm "$ALERT_LOG_FILE"
 	fi
 }
 
@@ -476,13 +489,13 @@ function WaitForTaskCompletion {
 		fi
 		if [ $exec_time -gt $soft_max_time ]; then
 			if [ $soft_alert -eq 0 ] && [ $soft_max_time -ne 0 ]; then
-				Logger "Max soft execution time exceeded for task." "WARN"
+				Logger "Max soft execution time exceeded for task [$caller_name]." "WARN"
 				soft_alert=1
 				SendAlert
 
 			fi
 			if [ $exec_time -gt $hard_max_time ] && [ $hard_max_time -ne 0 ]; then
-				Logger "Max hard execution time exceeded for task. Stopping task execution." "ERROR"
+				Logger "Max hard execution time exceeded for task [$caller_name]. Stopping task execution." "ERROR"
 				kill -s SIGTERM $pid
 				if [ $? == 0 ]; then
 					Logger "Task stopped succesfully" "NOTICE"
@@ -1389,8 +1402,9 @@ function tree_list {
 		rsync_cmd="$(type -p $RSYNC_EXECUTABLE) --rsync-path=\"$RSYNC_PATH\" $RSYNC_ARGS $RSYNC_ATTR_ARGS $RSYNC_TYPE_ARGS -8 --exclude \"$OSYNC_DIR\" $RSYNC_PATTERNS $RSYNC_PARTIAL_EXCLUDE --list-only \"$replica_path/\" | grep \"^-\|^d\" | awk '{\$1=\$2=\$3=\$4=\"\" ;print}' | awk '{\$1=\$1 ;print}' | (grep -v \"^\.$\" || :) | sort > \"$RUN_DIR/$PROGRAM.$replica_type.$SCRIPT_PID\" &"
 	fi
 	Logger "RSYNC_CMD: $rsync_cmd" "DEBUG"
-	## Redirect commands stderr here to get rsync stderr output in logfile
-	eval "$rsync_cmd" 2>> "$LOG_FILE"
+	## Redirect commands stderr here to get rsync stderr output in logfile with eval "$rsync_cmd" 2>> "$LOG_FILE"
+	## When log writing fails, $! is empty and WaitForCompletion fails.  Removing the 2>> log
+	eval "$rsync_cmd"
 	WaitForCompletion $! $SOFT_MAX_EXEC_TIME $HARD_MAX_EXEC_TIME ${FUNCNAME[0]}
 	retval=$?
 	## Retval 24 = some files vanished while creating list

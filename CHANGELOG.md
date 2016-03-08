@@ -9,12 +9,17 @@ KNOWN ISSUES
 
 - Cannot finish sync if one replica contains a directory and the other replica contains a file named the same way (Unix doesn't allow this)
 - Soft deletion does not honor exclusion lists
-
+- Permissions aren't set right when setfacl / chmod only is used and the file is not modified (WIP for v1.1)
 
 RECENT CHANGES
 --------------
 
-! XX Dec 2015: osync v1.1 released
+! XX Mar 2016: osync v1.1 released
+- Fixed a nasty bug with log writing and tree_list function
+- Improved mail fallback
+- Improved more logging
+- Fixed conflict prevalance is target in quicksync mode
+- Fixed file attributes aren't updated in a right manner when file mtime is not altered (Big thanks to vstefanoxx)
 - Better upgrade script (adding missing new config values)
 - More fixes for GNU / non-GNU versions of mail command
 - Added bogus config file checks & environment checks
@@ -36,7 +41,7 @@ RECENT CHANGES
 - Improved Logging
 - Updated osync to be fully compliant with coding style
 - Uploaded coding style manifest
-- Integrated new realpath emulation from https://github.com/mkropat/sh-realpath
+!- Integrated new realpath emulation from https://github.com/mkropat/sh-realpath
 
 v0-v1.0x - Jun 2013 - Sep 2015
 - Added LSB info to init script for Debian based distros
