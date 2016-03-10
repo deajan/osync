@@ -8,7 +8,7 @@ PROGRAM="osync" # Rsync based two way sync engine with fault tolerance
 AUTHOR="(L) 2013-2016 by Orsiris de Jong"
 CONTACT="http://www.netpower.fr/osync - ozy@netpower.fr"
 PROGRAM_VERSION=1.1-dev
-PROGRAM_BUILD=2016031001
+PROGRAM_BUILD=2016031002
 IS_STABLE=no
 
 ## FUNC_BUILD=2016031001
@@ -1605,7 +1605,7 @@ function sync_update {
 		local esc_source_dir=$(EscapeSpaces "${INITIATOR[1]}")
 		local dest_dir="${TARGET[1]}"
 		local esc_dest_dir=$(EscapeSpaces "${TARGET[1]}")
-		local backup_args="$TARGET_BACKUP_ARGS"
+		local backup_args="$TARGET_BACKUP"
 	else
 		local source_dir="${TARGET[1]}"
 		local esc_source_dir=$(EscapeSpaces "${TARGET[1]}")
@@ -1728,7 +1728,7 @@ function _delete_remote {
 
 	# Additionnaly, we need to copy the deletetion list to the remote state folder
 	esc_dest_dir="$(EscapeSpaces "${TARGET[1]}${TARGET[3]}")"
-	rsync_cmd="$(type -p $RSYNC_EXECUTABLE) --rsync-path=\"$RSYNC_PATH\" $SYNC_OPTS -e \"$RSYNC_SSH_CMD\" \"${INITIATOR[1]}$INITIATOR[3]}/$2\" $REMOTE_USER@$REMOTE_HOST:\"$esc_dest_dir/\" > $RUN_DIR/$PROGRAM.${FUNCNAME[0]}.precopy.$SCRIPT_PID 2>&1"
+	rsync_cmd="$(type -p $RSYNC_EXECUTABLE) --rsync-path=\"$RSYNC_PATH\" $SYNC_OPTS -e \"$RSYNC_SSH_CMD\" \"${INITIATOR[1]}${INITIATOR[3]}/$2\" $REMOTE_USER@$REMOTE_HOST:\"$esc_dest_dir/\" > $RUN_DIR/$PROGRAM.${FUNCNAME[0]}.precopy.$SCRIPT_PID 2>&1"
 	Logger "RSYNC_CMD: $rsync_cmd" "DEBUG"
 	eval "$rsync_cmd" 2>> "$LOG_FILE"
 	if [ $? != 0 ]; then
@@ -1996,7 +1996,7 @@ function Sync {
 		resume_sync="resumed"
 	fi
 	if [ "$resume_sync" == "resumed" ] || [ "$resume_sync" == "${SYNC_ACTION[3]}.success" ] || [ "$resume_sync" == "${SYNC_ACTION[4]}.fail" ]; then
-		sync_attrs "$INITIATOR_SYNC_DIR" "$TARGET_SYNC_DIR"
+		sync_attrs "${INITIATOR[1]}" "$TARGET_SYNC_DIR"
 		if [ $? == 0 ]; then
 			echo "${SYNC_ACTION[4]}.success" > "${INITIATOR[7]}"
 		else
