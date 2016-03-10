@@ -8,7 +8,7 @@ PROGRAM="osync" # Rsync based two way sync engine with fault tolerance
 AUTHOR="(L) 2013-2016 by Orsiris de Jong"
 CONTACT="http://www.netpower.fr/osync - ozy@netpower.fr"
 PROGRAM_VERSION=1.1-dev
-PROGRAM_BUILD=2016030801
+PROGRAM_BUILD=2016031001
 IS_STABLE=no
 
 ## FUNC_BUILD=2016031001
@@ -1322,7 +1322,7 @@ function CheckLocks {
 	if [ "$REMOTE_OPERATION" != "yes" ]; then
 		_CheckLocksLocal "${TARGET[2]}"
 	else
-		_CheckLocksRemote "${TARGET{2]}"
+		_CheckLocksRemote "${TARGET[2]}"
 	fi
 
 	WriteLockFiles
