@@ -11,7 +11,7 @@ PROGRAM_VERSION=1.1-dev
 PROGRAM_BUILD=2016030801
 IS_STABLE=no
 
-## FUNC_BUILD=2016030801
+## FUNC_BUILD=2016031001
 ## BEGIN Generic functions for osync & obackup written in 2013-2016 by Orsiris de Jong - http://www.netpower.fr - ozy@netpower.fr
 
 ## type -p does not work on platforms other than linux (bash). If if does not work, always assume output is not a zero exitcode
@@ -544,7 +544,7 @@ function WaitForCompletion {
 				SendAlert
 			fi
 			if [ $SECONDS -gt $hard_max_time ] && [ $hard_max_time != 0 ]; then
-				Logger "Max hard execution time exceeded for script. Stopping current task execution." "ERROR"
+				Logger "Max hard execution time exceeded for script in [$caller_name]. Stopping current task execution." "ERROR"
 				kill -s SIGTERM $pid
 				if [ $? == 0 ]; then
 					Logger "Task stopped succesfully" "NOTICE"
@@ -679,14 +679,14 @@ function CheckConnectivity3rdPartyHosts {
 				eval "$PING_CMD $i > /dev/null 2>&1" &
 				WaitForTaskCompletion $! 360 360 ${FUNCNAME[0]}
 				if [ $? != 0 ]; then
-					Logger "Cannot ping 3rd party host $i" "WARN"
+					Logger "Cannot ping 3rd party host $i" "NOTICE"
 				else
 					remote_3rd_party_success=1
 				fi
 			done
 			IFS=$OLD_IFS
 			if [ $remote_3rd_party_success -ne 1 ]; then
-				Logger "No remote 3rd party host responded to ping. No internet ?" "CRITICAL"
+				Logger "No remote 3rd party host responded to ping. No internet ?" "ERROR"
 				return 1
 			fi
 		fi
