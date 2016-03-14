@@ -1,4 +1,4 @@
-## FUNC_BUILD=2016031001
+## FUNC_BUILD=2016031101
 ## BEGIN Generic functions for osync & obackup written in 2013-2016 by Orsiris de Jong - http://www.netpower.fr - ozy@netpower.fr
 
 ## type -p does not work on platforms other than linux (bash). If if does not work, always assume output is not a zero exitcode
@@ -190,6 +190,7 @@ function SendAlert {
 	fi
 	if type mutt > /dev/null 2>&1 ; then
 		cmd="echo \"$MAIL_ALERT_MSG\" | $(type -p mutt) -x -s \"$subject\" $DESTINATION_MAILS $attachment_command"
+		Logger "Mail cmd: $cmd" "DEBUG"
 		eval $cmd
 		if [ $? != 0 ]; then
 			Logger "Cannot send alert email via $(type -p mutt) !!!" "WARN"
@@ -208,10 +209,12 @@ function SendAlert {
 			attachment_command=""
 		fi
 		cmd="echo \"$MAIL_ALERT_MSG\" | $(type -p mail) $attachment_command -s \"$subject\" $DESTINATION_MAILS"
+		Logger "Mail cmd: $cmd" "DEBUG"
 		eval $cmd
 		if [ $? != 0 ]; then
 			Logger "Cannot send alert email via $(type -p mail) with attachments !!!" "WARN"
 			cmd="echo \"$MAIL_ALERT_MSG\" | $(type -p mail) -s \"$subject\" $DESTINATION_MAILS"
+			Logger "Mail cmd: $cmd" "DEBUG"
 			eval $cmd
 			if [ $? != 0 ]; then
 				Logger "Cannot send alert email via $(type -p mail) without attachments !!!" "WARN"
@@ -227,6 +230,7 @@ function SendAlert {
 
 	if type sendmail > /dev/null 2>&1 ; then
 		cmd="echo -e \"Subject:$subject\r\n$MAIL_ALERT_MSG\" | $(type -p sendmail) $DESTINATION_MAILS"
+		Logger "Mail cmd: $cmd" "DEBUG"
 		eval $cmd
 		if [ $? != 0 ]; then
 			Logger "Cannot send alert email via $(type -p sendmail) !!!" "WARN"

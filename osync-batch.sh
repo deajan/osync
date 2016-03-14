@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
 SUBPROGRAM=osync
 PROGRAM="$SUBPROGRAM-batch" # Batch program to run osync / obackup instances sequentially and rerun failed ones
-AUTHOR="(L) 2013-2015 by Orsiris \"Ozy\" de Jong"
+AUTHOR="(L) 2013-2016 by Orsiris de Jong"
 CONTACT="http://www.netpower.fr - ozy@netpower.fr"
-PROGRAM_BUILD=2015103001
+PROGRAM_BUILD=2016031301
 
 ## Runs an osync /obackup instance for every conf file found
 ## If an instance fails, run it again if time permits
@@ -43,10 +43,8 @@ function Logger {
 
 	if [ "$level" == "CRITICAL" ]; then
 		_logger "$prefix\e[41m$value\e[0m"
-		ERROR_ALERT=1
 	elif [ "$level" == "ERROR" ]; then
 		_logger "$prefix\e[91m$value\e[0m"
-		ERROR_ALERT=1
 	elif [ "$level" == "WARN" ]; then
 		_logger "$prefix\e[93m$value\e[0m"
 	elif [ "$level" == "NOTICE" ]; then
@@ -63,7 +61,7 @@ function Logger {
 
 function CheckEnvironment {
 	## osync / obackup executable full path can be set here if it cannot be found on the system
-	if ! type -p $SUBPROGRAM.sh > /dev/null 2>&1
+	if ! type $SUBPROGRAM.sh > /dev/null 2>&1
 	then
 		if [ -f /usr/local/bin/$SUBPROGRAM.sh ]
 		then
@@ -85,7 +83,7 @@ function CheckEnvironment {
 
 function Batch {
 	## Get list of .conf files
-	for i in $(ls $CONF_FILE_PATH/*.conf)
+	for i in $CONF_FILE_PATH/*.conf
 	do
 		if [ "$RUN" == "" ]; then
 			RUN="$i"
@@ -104,7 +102,7 @@ function Batch {
 			wait $!
 			if [ $? != 0 ]; then
 				Logger "Run instance $(basename $i) failed" "ERROR"
-				if [ "RUN_AGAIN" == "" ]; then
+				if [ "$RUN_AGAIN" == "" ]; then
 					RUN_AGAIN="$i"
 				else
 					RUN_AGAIN=$RUN_AGAIN" $i"
@@ -138,23 +136,17 @@ function Usage {
 	exit 128
 }
 
-_SILENT=0
-_DRY=0
-_VERBOSE=0
 opts=""
 for i in "$@"
 do
 	case $i in
 		--silent)
-		_SILENT=1
 		opts=$opts" --silent"
 		;;
 		--dry)
-		_DRY=1
 		opts=$opts" --dry"
 		;;
 		--verbose)
-		_VERBOSE=1
 		opts=$opts" --verbose"
 		;;
 		--no-maxtime)
