@@ -1,4 +1,4 @@
-## FUNC_BUILD=2016032001
+## FUNC_BUILD=2016032002
 ## BEGIN Generic functions for osync & obackup written in 2013-2016 by Orsiris de Jong - http://www.netpower.fr - ozy@netpower.fr
 
 ## type -p does not work on platforms other than linux (bash). If if does not work, always assume output is not a zero exitcode
@@ -408,7 +408,7 @@ function GetLocalOS {
 		;;
 		*)
 		if [ "$IGNORE_OS_TYPE" == "yes" ]; then		#DOC: Undocumented option
-			Logger "Running on unknown local OS." "WARN"
+			Logger "Running on unknown local OS [$local_os_var]." "WARN"
 			return
 		fi
 		Logger "Running on >> $local_os_var << not supported. Please report to the author." "ERROR"
@@ -472,7 +472,7 @@ function GetRemoteOS {
 			;;
 			*)
 			if [ "$IGNORE_OS_VER" == "yes" ]; then		#DOC: Undocumented option
-				Logger "Running on unknown remote OS." "WARN"
+				Logger "Running on unknown remote OS [$remote_os_var]." "WARN"
 				return
 			fi
 			Logger "Running on remote OS failed. Please report to the author if the OS is not supported." "CRITICAL"
