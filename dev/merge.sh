@@ -3,6 +3,8 @@
 ## Merges ofunctions.sh and $PROGRAM
 
 PROGRAM=osync
+VERSION=$(grep "PROGRAM_VERSION=" n_$PROGRAM.sh)
+VERSION=${VERSION#*=}
 FUNC_PATH=/home/git/common
 
 PARANOIA_DEBUG_LINE="#__WITH_PARANOIA_DEBUG"
@@ -36,7 +38,8 @@ function CleanDebug {
 }
 
 function CopyCommons {
-        sed "s/\[prgname\]/$PROGRAM/g" /home/git/common/common_install.sh > ../install.sh
+        sed "s/\[prgname\]/$PROGRAM/g" /home/git/common/common_install.sh > ../tmp_install.sh
+        sed "s/\[version\]/$VERSION/g" ../tmp_install.sh > ../install.sh
         sed "s/\[prgname\]/$PROGRAM/g" /home/git/common/common_batch.sh > ../$PROGRAM-batch.sh
         chmod +x ../install.sh
         chmod +x ../$PROGRAM-batch.sh
@@ -46,4 +49,5 @@ Unexpand
 Merge
 CleanDebug
 rm -f tmp_$PROGRAM.sh
+rm -f tmp_install.sh
 CopyCommons
