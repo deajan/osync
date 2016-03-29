@@ -1,15 +1,11 @@
 #!/usr/bin/env bash
 
-#TODO: clock compare in doc
-#TODO: explain why osync is lowband friendly in doc
-#TODO: explain why osync daemon process can still exist after quit for 30s
-
 PROGRAM="osync" # Rsync based two way sync engine with fault tolerance
 AUTHOR="(C) 2013-2016 by Orsiris de Jong"
 CONTACT="http://www.netpower.fr/osync - ozy@netpower.fr"
 PROGRAM_VERSION=1.1-dev
-PROGRAM_BUILD=2016031002
-IS_STABLE=no
+PROGRAM_BUILD=2016032901
+IS_STABLE=yes
 
 source "./ofunctions.sh"
 
@@ -606,11 +602,6 @@ function sync_attrs {
 
 	local rsync_cmd=
 	local retval=
-
-
-	if [ "$SYNC_ATTR" != "yes" ]; then
-		return 0
-	fi
 
 	Logger "Getting file attributes." "NOTICE"
 
