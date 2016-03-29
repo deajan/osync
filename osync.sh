@@ -5,13 +5,13 @@
 #TODO: explain why osync daemon process can still exist after quit for 30s
 
 PROGRAM="osync" # Rsync based two way sync engine with fault tolerance
-AUTHOR="(L) 2013-2016 by Orsiris de Jong"
+AUTHOR="(C) 2013-2016 by Orsiris de Jong"
 CONTACT="http://www.netpower.fr/osync - ozy@netpower.fr"
 PROGRAM_VERSION=1.1-dev
 PROGRAM_BUILD=2016031002
 IS_STABLE=no
 
-## FUNC_BUILD=2016032201
+## FUNC_BUILD=2016032901
 ## BEGIN Generic functions for osync & obackup written in 2013-2016 by Orsiris de Jong - http://www.netpower.fr - ozy@netpower.fr
 
 ## type -p does not work on platforms other than linux (bash). If if does not work, always assume output is not a zero exitcode
@@ -90,11 +90,15 @@ function Dummy {
 }
 
 function _Logger {
-	local svalue="${1}" # What to log to screen
+	local svalue="${1}" # What to log to stdout
 	local lvalue="${2:-$svalue}" # What to log to logfile, defaults to screen value
+	local evalue="${3}" # What to log to stderr
 	echo -e "$lvalue" >> "$LOG_FILE"
 
-	if [ $_SILENT -eq 0 ]; then
+	# <OSYNC SPECIFIC> Special case in daemon mode where systemctl doesn't need double timestamps
+	if [ "$sync_on_changes" == "1" ]; then
+		cat <<< "$evalue" 1>&2	# Log to stderr in daemon mode
+	elif [ $_SILENT -eq 0 ]; then
 		echo -e "$svalue"
 	fi
 }
@@ -112,15 +116,15 @@ function Logger {
 	# </OSYNC SPECIFIC>
 
 	if [ "$level" == "CRITICAL" ]; then
-		_Logger "$prefix\e[41m$value\e[0m" "$prefix$level:$value"
+		_Logger "$prefix\e[41m$value\e[0m" "$prefix$level:$value" "$level:$value"
 		ERROR_ALERT=1
 		return
 	elif [ "$level" == "ERROR" ]; then
-		_Logger "$prefix\e[91m$value\e[0m" "$prefix$level:$value"
+		_Logger "$prefix\e[91m$value\e[0m" "$prefix$level:$value" "$level:$value"
 		ERROR_ALERT=1
 		return
 	elif [ "$level" == "WARN" ]; then
-		_Logger "$prefix\e[93m$value\e[0m" "$prefix$level:$value"
+		_Logger "$prefix\e[93m$value\e[0m" "$prefix$level:$value" "$level:$value"
 		WARN_ALERT=1
 		return
 	elif [ "$level" == "NOTICE" ]; then
@@ -265,7 +269,7 @@ function SendAlert {
 
 	# pfSense specific
 	if [ -f /usr/local/bin/mail.php ]; then
-		cmd="echo \"$MAIL_ALERT_MSG\" | /usr/local/bin/mail.php subject=\"$subject\""
+		cmd="echo \"$MAIL_ALERT_MSG\" | /usr/local/bin/mail.php -s=\"$subject\""
 		Logger "Mail cmd: $cmd" "DEBUG"
 		eval $cmd
 		if [ $? != 0 ]; then
@@ -806,6 +810,11 @@ function PreInit {
                 SSH_COMP=
         fi
 
+	## Ignore SSH known host verification
+	if [ "$SSH_IGNORE_KNOWN_HOSTS" == "yes" ]; then
+		SSH_OPTS="-o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no"
+	fi
+
         ## Support for older config files without RSYNC_EXECUTABLE option
         if [ "$RSYNC_EXECUTABLE" == "" ]; then
                 RSYNC_EXECUTABLE=rsync
@@ -906,7 +915,7 @@ function PreInit {
 function PostInit {
 
 	# Define remote commands
-        SSH_CMD="$(type -p ssh) $SSH_COMP -i $SSH_RSA_PRIVATE_KEY $REMOTE_USER@$REMOTE_HOST -p $REMOTE_PORT"
+        SSH_CMD="$(type -p ssh) $SSH_COMP -i $SSH_RSA_PRIVATE_KEY $SSH_IGNORE_KNOWN_HOSTS $REMOTE_USER@$REMOTE_HOST -p $REMOTE_PORT"
         SCP_CMD="$(type -p scp) $SSH_COMP -i $SSH_RSA_PRIVATE_KEY -P $REMOTE_PORT"
         RSYNC_SSH_CMD="$(type -p ssh) $SSH_COMP -i $SSH_RSA_PRIVATE_KEY -p $REMOTE_PORT"
 }

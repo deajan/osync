@@ -14,7 +14,12 @@ KNOWN ISSUES
 RECENT CHANGES
 --------------
 
-! XX Mar 2016: osync v1.1 released
+! XX Apr 2016: osync v1.1 released
+! Updated documentation (+README.md file)
+- Redirected ERROR and WARN messages to stderr to systemd catches them into it's journal
+!- Added a systemd unit file (needs testing in file monitor mode yet)
+- Added an option to ignore ssh known hosts (use with caution, can lead to security risks), also updated upgrade script accordingly
+- Added optional installation statistics
 - Fixed a nasty bug with log writing and tree_list function
 - Improved mail fallback
 - Improved more logging

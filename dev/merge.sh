@@ -49,5 +49,5 @@ Unexpand
 Merge
 CleanDebug
 rm -f tmp_$PROGRAM.sh
-rm -f tmp_install.sh
+rm -f ../tmp_install.sh
 CopyCommons

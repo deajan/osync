@@ -4,7 +4,7 @@ PROGRAM=osync
 PROGRAM_VERSION=1.1-dev
 PROGRAM_BINARY=$PROGRAM".sh"
 PROGRAM_BATCH=$PROGRAM"-batch.sh"
-SCRIPT_BUILD=2016032502
+SCRIPT_BUILD=2016032903
 
 ## osync / obackup daemon install script
 ## Tested on RHEL / CentOS 6 & 7, Fedora 23, Debian 7 & 8, Mint 17 and FreeBSD 8 & 10
@@ -12,7 +12,10 @@ SCRIPT_BUILD=2016032502
 
 CONF_DIR=/etc/$PROGRAM
 BIN_DIR=/usr/local/bin
-SERVICE_DIR=/etc/init.d
+SERVICE_DIR_INIT=/etc/init.d
+SERVICE_FILE_INIT="osync-srv"
+SERVICE_DIR_SYSTEMD=/usr/lib/systemd/system
+SERVICE_FILE_SYSTEMD="osync-srv@.service"
 
 USER=root
 
@@ -36,6 +39,17 @@ esac
 if [ "$(whoami)" != "$USER" ]; then
   echo "Must be run as $USER."
   exit 1
+fi
+
+if [ -f /sbin/init ]; then
+	if file /sbin/init | grep systemd > /dev/null; then
+		init=systemd
+	else
+		init=init
+	fi
+else
+	echo "Can't detect init system."
+	exit 1
 fi
 
 if [ ! -d "$CONF_DIR" ]; then
@@ -95,13 +109,26 @@ if [  -f "./ssh_filter.sh" ]; then
 	fi
 fi
 
-if [ -f "./osync-srv" ]; then
-	cp "./osync-srv" "$SERVICE_DIR"
-	if [ $? != 0 ]; then
-		echo "Cannot copy osync-srv to [$SERVICE_DIR]."
-	else
-		chmod 755 "$SERVICE_DIR/osync-srv"
-		echo "Created osync-srv service in [$SERVICE_DIR]."
+if ([ -f "./$SERVICE_FILE_INIT" ] || [ -f "./$SERVICE_FILE_SYSTEMD" ] ); then
+	if [ "$init" == "systemd" ]; then
+		cp "./$SERVICE_FILE_SYSTEMD" "$SERVICE_DIR_SYSTEMD"
+		if [ $? != 0 ]; then
+			echo "Cannot copy the systemd file to [$SERVICE_DIR_SYSTEMD]."
+		else
+			echo "Created osync-srv service in [$SERVICE_DIR_SYSTEMD]."
+			echo "Activate with [systemctl start osync-srv@instance.conf] where instance.conf is the name of the config file in /etc/osync."
+			echo "Enable on boot with [systemctl enable osync-srv@instance.conf]."
+		fi
+	elif [ "$init" == "init" ]; then
+		cp "./$SERVICE_FILE_INIT" "$SERVICE_DIR_INIT"
+		if [ $? != 0 ]; then
+			echo "Cannot copy osync-srv to [$SERVICE_DIR_INIT]."
+		else
+			chmod 755 "$SERVICE_DIR_INIT/$SERVICE_FILE_INIT"
+			echo "Created osync-srv service in [$SERVICE_DIR_INIT]."
+			echo "Activate with [service $SERVICE_FILE_INIT start]."
+			echo "Enable on boot with [chkconfig $SERVICE_FILE_INIT on]."
+		fi
 	fi
 fi
 

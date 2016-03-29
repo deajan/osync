@@ -1,8 +1,8 @@
 osync
 =====
 
-A two way filesync script with fault tolerance, resuming, deletion backup and conflict backups running on linux and virtually any system supporting bash.
-File synchronization is bidirectional, based on rsync, and can be run manually, by cron, or triggered whenever a file changes on master.
+A two way filesync script with fault tolerance, resume, soft deletion, conflictual file backups running on bash (linux, BSD and virtually any system supporting bash).
+File synchronization is bidirectional, based on rsync, can be run manually, as scheduled task, or triggered on file changes.
 
 ## About
 
@@ -22,12 +22,14 @@ Osync uses a master / slave sync schema. It can sync local to local or local to 
 Osync uses pidlocks to prevent multiple concurrent sync processes on/to the same master / slave replica. Be sure a sync process is finished before launching next one, or use osync-batch.
 You may launch concurrent sync processes on the same system but only for different master replicas.
 
-Currently, it has been tested on CentOS 5.x, 6.x, 7.x, Debian 6.0.7, Linux Mint 14, 15 and 16, Ubuntu 12.04 and 12.10, FreeBSD 8.3 and 10.1.
-Some users report osync to work on MacOS X too. Microsoft Windows is supported via MSYS environment.
+Currently, it has been tested on CentOS 5.x, 6.x, 7.x, Debian 6.0.7, Linux Mint 14-17, Ubuntu 12.04 and 12.10, FreeBSD 8.3 and 10.1.
+Microsoft Windows is supported via MSYS or Cygwin.
+Some users report osync to work on MacOS X too.
+
 
 ## Installation
 
-Please note that development of version 1.1 has begun. Stable release is v1.01.
+Stable release is v1.1 and will be the last of v1 series.
 
 Osync has been designed to not delete any data, but rather make backups of conflictual files or soft deletes.
 Nevertheless, you should always have a neat backup of your data before trying a new sync tool.
@@ -36,7 +38,7 @@ You can download the latest stable release of Osync at www.netpower.fr/osync or 
 
 You may also get the last development version at https://github.com/deajan/osync with the following command
 
-	$ git clone -b "v1.01" https://github.com/deajan/osync
+	$ git clone -b "v1.1" https://github.com/deajan/osync
 	$ sh install.sh
 
 Osync will install itself to /usr/local/bin and an example configuration file will be installed to /etc/osync
@@ -48,6 +50,17 @@ If bash is not your default shell, you may invoke it using
 
 On *BSD, be sure to have bash installed.
 On MSYS, On top of your basic install, you need msys-rsync and msys-coreutils-ext packages.
+
+## Upgrade from v1.0x
+
+Since osync v1.1 the config file format has changed in semantics and adds new config options.
+Also, master is now called initiator and slave is now called target.
+
+You can upgrade all v1.0x config files by running the upgrade script
+
+	$ ./upgrade-v1.0x-v1.1x.sh /etc/osync/your-config-file.conf
+
+The script will backup your config file, update it's content and try to connect to master and remote replicas to update the state dir.
 
 ## Usage
 
@@ -113,6 +126,11 @@ You may run the install.sh script which should work in most cases or copy the fi
 
 	$ service osync-srv start
 	$ chkconfig osync-srv on
+
+Systemd specific
+
+	$ systemctl start osync-srv@configfile
+	$ systemctl enable osync-srv@configfile
 
 Troubleshooting
 ---------------
