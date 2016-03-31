@@ -1,4 +1,4 @@
-## FUNC_BUILD=2016033103
+## FUNC_BUILD=2016033104
 ## BEGIN Generic functions for osync & obackup written in 2013-2016 by Orsiris de Jong - http://www.netpower.fr - ozy@netpower.fr
 
 ## type -p does not work on platforms other than linux (bash). If if does not work, always assume output is not a zero exitcode
@@ -149,11 +149,19 @@ function KillChilds {
 		done
 	fi
 
-	# Try to kill nicely, if not, wait 30 seconds to let Trap actions happen before killing
+	# Try to kill nicely, if not, wait 15 seconds to let Trap actions happen before killing
 	if [ "$self" == true ]; then
-		kill -s SIGTERM "$pid" || (sleep 30 && kill -9 "$pid" &)
+		if [ "$_DEBUG" == "yes" ]; then
+			Logger "Killing process $pid" "NOTICE"
+			kill -s SIGTERM "$pid"
+			if [ $? != 0 ]; then
+				sleep 15 && kill -9 "$pid" &
+				return 1
+			else
+				return 0
+		fi
 	fi
-	# sleep 30 needs to wait before killing itself
+	# sleep 15 needs to wait before killing itself
 }
 
 function SendAlert {
@@ -513,29 +521,36 @@ function WaitForTaskCompletion {
 		if [ $((($exec_time + 1) % $KEEP_LOGGING)) -eq 0 ]; then
 			if [ $log_ttime -ne $exec_time ]; then
 				log_ttime=$exec_time
-				Logger "Current task still running." "NOTICE"
+				Logger "Current task still running with pid [$pid]." "NOTICE"
 			fi
 		fi
 		if [ $exec_time -gt $soft_max_time ]; then
 			if [ $soft_alert -eq 0 ] && [ $soft_max_time -ne 0 ]; then
-				Logger "Max soft execution time exceeded for task [$caller_name]." "WARN"
+				Logger "Max soft execution time exceeded for task [$caller_name] with pid [$pid]." "WARN"
 				soft_alert=1
 				SendAlert
 
 			fi
 			if [ $exec_time -gt $hard_max_time ] && [ $hard_max_time -ne 0 ]; then
-				Logger "Max hard execution time exceeded for task [$caller_name]. Stopping task execution." "ERROR"
-				kill -s SIGTERM $pid
+				Logger "Max hard execution time exceeded for task [$caller_name] with pid [$pid]. Stopping task execution." "ERROR"
+				KillChilds $pid
+				if [ $? == 0 ]; then
+					Logger "Task stopped successfully" "NOTICE"
+					return 0
+				else
+					return 1
+				fi
+				#kill -s SIGTERM $pid
 				if [ $? == 0 ]; then
 					Logger "Task stopped succesfully" "NOTICE"
-				else
-					Logger "Sending SIGTERM to proces failed. Trying the hard way." "ERROR"
-					sleep 5 && kill -9 $pid
-					if [ $? != 0 ]; then
-						Logger "Could not stop task." "ERROR"
-					fi
-				fi
-				return 1
+				#else
+				#	Logger "Sending SIGTERM to proces failed. Trying the hard way." "ERROR"
+				#	sleep 5 && kill -9 $pid
+				#	if [ $? != 0 ]; then
+				#		Logger "Could not stop task." "ERROR"
+				#	fi
+				#fi
+				#return 1
 			fi
 		fi
 		sleep $SLEEP_TIME
@@ -577,17 +592,24 @@ function WaitForCompletion {
 			fi
 			if [ $SECONDS -gt $hard_max_time ] && [ $hard_max_time != 0 ]; then
 				Logger "Max hard execution time exceeded for script in [$caller_name]. Stopping current task execution." "ERROR"
-				kill -s SIGTERM $pid
+				KillChilds $pid
 				if [ $? == 0 ]; then
-					Logger "Task stopped succesfully" "NOTICE"
+					Logger "Task stopped successfully" "NOTICE"
+					return 0
 				else
-					Logger "Sending SIGTERM to proces failed. Trying the hard way." "ERROR"
-					kill -9 $pid
-					if [ $? != 0 ]; then
-						Logger "Could not stop task." "ERROR"
-					fi
+					return 1
 				fi
-				return 1
+				#kill -s SIGTERM $pid
+				#if [ $? == 0 ]; then
+				#	Logger "Task stopped succesfully" "NOTICE"
+				#else
+				#	Logger "Sending SIGTERM to proces failed. Trying the hard way." "ERROR"
+				#	kill -9 $pid
+				#	if [ $? != 0 ]; then
+				#		Logger "Could not stop task." "ERROR"
+				#	fi
+				#fi
+				#return 1
 			fi
 		fi
 		sleep $SLEEP_TIME
