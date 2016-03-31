@@ -4,10 +4,10 @@ PROGRAM="osync" # Rsync based two way sync engine with fault tolerance
 AUTHOR="(C) 2013-2016 by Orsiris de Jong"
 CONTACT="http://www.netpower.fr/osync - ozy@netpower.fr"
 PROGRAM_VERSION=1.1-dev
-PROGRAM_BUILD=2016032901
+PROGRAM_BUILD=2016033101
 IS_STABLE=yes
 
-## FUNC_BUILD=2016033103
+## FUNC_BUILD=2016033105
 ## BEGIN Generic functions for osync & obackup written in 2013-2016 by Orsiris de Jong - http://www.netpower.fr - ozy@netpower.fr
 
 ## type -p does not work on platforms other than linux (bash). If if does not work, always assume output is not a zero exitcode
@@ -158,11 +158,20 @@ function KillChilds {
 		done
 	fi
 
-	# Try to kill nicely, if not, wait 30 seconds to let Trap actions happen before killing
+	# Try to kill nicely, if not, wait 15 seconds to let Trap actions happen before killing
 	if [ "$self" == true ]; then
-		kill -s SIGTERM "$pid" || (sleep 30 && kill -9 "$pid" &)
+		if [ "$_DEBUG" == "yes" ]; then
+			Logger "Killing process $pid" "NOTICE"
+			kill -s SIGTERM "$pid"
+			if [ $? != 0 ]; then
+				sleep 15 && kill -9 "$pid" &
+				return 1
+			else
+				return 0
+			fi
+		fi
 	fi
-	# sleep 30 needs to wait before killing itself
+	# sleep 15 needs to wait before killing itself
 }
 
 function SendAlert {
@@ -522,29 +531,36 @@ function WaitForTaskCompletion {
 		if [ $((($exec_time + 1) % $KEEP_LOGGING)) -eq 0 ]; then
 			if [ $log_ttime -ne $exec_time ]; then
 				log_ttime=$exec_time
-				Logger "Current task still running." "NOTICE"
+				Logger "Current task still running with pid [$pid]." "NOTICE"
 			fi
 		fi
 		if [ $exec_time -gt $soft_max_time ]; then
 			if [ $soft_alert -eq 0 ] && [ $soft_max_time -ne 0 ]; then
-				Logger "Max soft execution time exceeded for task [$caller_name]." "WARN"
+				Logger "Max soft execution time exceeded for task [$caller_name] with pid [$pid]." "WARN"
 				soft_alert=1
 				SendAlert
 
 			fi
 			if [ $exec_time -gt $hard_max_time ] && [ $hard_max_time -ne 0 ]; then
-				Logger "Max hard execution time exceeded for task [$caller_name]. Stopping task execution." "ERROR"
-				kill -s SIGTERM $pid
+				Logger "Max hard execution time exceeded for task [$caller_name] with pid [$pid]. Stopping task execution." "ERROR"
+				KillChilds $pid
 				if [ $? == 0 ]; then
-					Logger "Task stopped succesfully" "NOTICE"
+					Logger "Task stopped successfully" "NOTICE"
+					return 0
 				else
-					Logger "Sending SIGTERM to proces failed. Trying the hard way." "ERROR"
-					sleep 5 && kill -9 $pid
-					if [ $? != 0 ]; then
-						Logger "Could not stop task." "ERROR"
-					fi
+					return 1
 				fi
-				return 1
+				#kill -s SIGTERM $pid
+				#if [ $? == 0 ]; then
+				#	Logger "Task stopped succesfully" "NOTICE"
+				#else
+				#	Logger "Sending SIGTERM to proces failed. Trying the hard way." "ERROR"
+				#	sleep 5 && kill -9 $pid
+				#	if [ $? != 0 ]; then
+				#		Logger "Could not stop task." "ERROR"
+				#	fi
+				#fi
+				#return 1
 			fi
 		fi
 		sleep $SLEEP_TIME
@@ -586,17 +602,24 @@ function WaitForCompletion {
 			fi
 			if [ $SECONDS -gt $hard_max_time ] && [ $hard_max_time != 0 ]; then
 				Logger "Max hard execution time exceeded for script in [$caller_name]. Stopping current task execution." "ERROR"
-				kill -s SIGTERM $pid
+				KillChilds $pid
 				if [ $? == 0 ]; then
-					Logger "Task stopped succesfully" "NOTICE"
+					Logger "Task stopped successfully" "NOTICE"
+					return 0
 				else
-					Logger "Sending SIGTERM to proces failed. Trying the hard way." "ERROR"
-					kill -9 $pid
-					if [ $? != 0 ]; then
-						Logger "Could not stop task." "ERROR"
-					fi
+					return 1
 				fi
-				return 1
+				#kill -s SIGTERM $pid
+				#if [ $? == 0 ]; then
+				#	Logger "Task stopped succesfully" "NOTICE"
+				#else
+				#	Logger "Sending SIGTERM to proces failed. Trying the hard way." "ERROR"
+				#	kill -9 $pid
+				#	if [ $? != 0 ]; then
+				#		Logger "Could not stop task." "ERROR"
+				#	fi
+				#fi
+				#return 1
 			fi
 		fi
 		sleep $SLEEP_TIME
@@ -1111,14 +1134,14 @@ function CheckCurrentConfig {
 	fi
 
 	# Check all variables that should contain "yes" or "no"
-	declare -a yes_no_vars=(CREATE_DIRS SUDO_EXEC SSH_COMPRESSION REMOTE_HOST_PING PRESERVE_ACL PRESERVE_XATTR COPY_SYMLINKS KEEP_DIRLINKS PRESERVE_HARDLINKS CHECKSUM RSYNC_COMPRESS CONFLICT_BACKUP CONFLICT_BACKUP_MULTIPLE SOFT_DELETE RESUME_SYNC FORCE_STRANGER_LOCK_RESUME PARTIAL DELTA_COPIES STOP_ON_CMD_ERROR)
+	declare -a yes_no_vars=(CREATE_DIRS SUDO_EXEC SSH_COMPRESSION SSH_IGNORE_KNOWN_HOSTS REMOTE_HOST_PING PRESERVE_ACL PRESERVE_XATTR COPY_SYMLINKS KEEP_DIRLINKS PRESERVE_HARDLINKS CHECKSUM RSYNC_COMPRESS CONFLICT_BACKUP CONFLICT_BACKUP_MULTIPLE SOFT_DELETE RESUME_SYNC FORCE_STRANGER_LOCK_RESUME PARTIAL DELTA_COPIES STOP_ON_CMD_ERROR)
 	for i in "${yes_no_vars[@]}"; do
 		test="if [ \"\$$i\" != \"yes\" ] && [ \"\$$i\" != \"no\" ]; then Logger \"Bogus $i value defined in config file.\" \"CRITICAL\"; exit 1; fi"
 		eval "$test"
 	done
 
 	# Check all variables that should contain a numerical value >= 0
-	declare -a num_vars=(MINIMUM_SPACE BANDWIDTH SOFT_MAX_EXEC_TIME HARD_MAX_EXEC_TIME MIN_WAIT MAX_WAIT CONFLICT_BACKUP_DAYS SOFT_DELETE_DAYS RESUME_TRY)
+	declare -a num_vars=(MINIMUM_SPACE BANDWIDTH SOFT_MAX_EXEC_TIME HARD_MAX_EXEC_TIME MIN_WAIT MAX_WAIT CONFLICT_BACKUP_DAYS SOFT_DELETE_DAYS RESUME_TRY MAX_EXEC_TIME_PER_CMD_BEFORE MAX_EXEC_TIME_PER_CMD_AFTER)
 	for i in "${num_vars[@]}"; do
 		test="if [ $(IsNumeric \"\$$i\") -eq 0 ]; then Logger \"Bogus $i value defined in config file.\" \"CRITICAL\"; exit 1; fi"
 		eval "$test"
