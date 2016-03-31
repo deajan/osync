@@ -6,7 +6,7 @@ AUTHOR="(C) 2015 by Orsiris \"Ozy\" de Jong"
 CONTACT="http://www.netpower.fr/osync - ozy@netpower.fr"
 OLD_PROGRAM_VERSION="1.0x"
 NEW_PROGRAM_VERSION="v1.1x"
-PROGRAM_BUILD=2016032901
+PROGRAM_BUILD=2016033101
 
 function Init {
 	OSYNC_DIR=".osync_workdir"
@@ -306,8 +306,8 @@ function RenameStateFiles {
 function RewriteConfigFiles {
 	local config_file="${1}"
 
-	if ! grep "MASTER_SYNC_DIR=" "$config_file" > /dev/null; then
-		echo "Config file [$config_file] does not seem to be an osync v1.0x file."
+	if ((! grep "MASTER_SYNC_DIR=" "$config_file" > /dev/null) && (! grep "INITIATOR_SYNC_DIR=" "$config_file" > /dev/null)); then
+		echo "Config file [$config_file] does not seem to be an osync v1.0x or v1.1-dev file."
 		exit 1
 	fi
 
@@ -335,6 +335,7 @@ function RewriteConfigFiles {
 
        	if ! grep "^SSH_IGNORE_KNOWN_HOSTS=" "$config_file" > /dev/null; then
                 sed -i '/^SSH_COMPRESSION=*/a SSH_IGNORE_KNOWN_HOSTS=no' "$config_file"
+	fi
 
 	if ! grep "^RSYNC_INCLUDE_PATTERN=" "$config_file" > /dev/null; then
 		sed -i '/^RSYNC_EXCLUDE_PATTERN=*/a RSYNC_INCLUDE_PATTERN=""' "$config_file"
