@@ -1924,10 +1924,10 @@ $SSH_CMD ERROR_ALERT=0 sync_on_changes=$sync_on_changes _SILENT=$_SILENT _DEBUG=
 	## Empty earlier failed delete list
 	> "$FAILED_DELETE_LIST"
 
-	local parentdir=
+	parentdir=
 
 	## On every run, check wheter the next item is already deleted because it is included in a directory already deleted
-	local previous_file=""
+	previous_file=""
 	OLD_IFS=$IFS
 	IFS=$'\r\n'
 	for files in $(cat "$FILE_LIST")
