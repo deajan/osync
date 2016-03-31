@@ -7,7 +7,7 @@ PROGRAM_VERSION=1.1-dev
 PROGRAM_BUILD=2016032901
 IS_STABLE=yes
 
-## FUNC_BUILD=2016033104
+## FUNC_BUILD=2016033105
 ## BEGIN Generic functions for osync & obackup written in 2013-2016 by Orsiris de Jong - http://www.netpower.fr - ozy@netpower.fr
 
 ## type -p does not work on platforms other than linux (bash). If if does not work, always assume output is not a zero exitcode
@@ -168,6 +168,7 @@ function KillChilds {
 				return 1
 			else
 				return 0
+			fi
 		fi
 	fi
 	# sleep 15 needs to wait before killing itself
@@ -550,8 +551,8 @@ function WaitForTaskCompletion {
 					return 1
 				fi
 				#kill -s SIGTERM $pid
-				if [ $? == 0 ]; then
-					Logger "Task stopped succesfully" "NOTICE"
+				#if [ $? == 0 ]; then
+				#	Logger "Task stopped succesfully" "NOTICE"
 				#else
 				#	Logger "Sending SIGTERM to proces failed. Trying the hard way." "ERROR"
 				#	sleep 5 && kill -9 $pid
