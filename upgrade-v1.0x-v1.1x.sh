@@ -6,7 +6,7 @@ AUTHOR="(C) 2015 by Orsiris \"Ozy\" de Jong"
 CONTACT="http://www.netpower.fr/osync - ozy@netpower.fr"
 OLD_PROGRAM_VERSION="1.0x"
 NEW_PROGRAM_VERSION="v1.1x"
-PROGRAM_BUILD=2016033101
+PROGRAM_BUILD=2016033102
 
 function Init {
 	OSYNC_DIR=".osync_workdir"
@@ -311,8 +311,8 @@ function RewriteConfigFiles {
 		exit 1
 	fi
 
-        echo "Backing up [$config_file] as [$config_file.v1.0x.save]"
-        cp --preserve "$config_file" "$config_file.v1.0x.save"
+        echo "Backing up [$config_file] as [$config_file.save]"
+        cp --preserve "$config_file" "$config_file.save"
         if [ $? != 0 ]; then
                 echo "Cannot backup config file."
                 exit 1

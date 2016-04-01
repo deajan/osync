@@ -127,10 +127,10 @@ You may run the install.sh script which should work in most cases or copy the fi
 	$ service osync-srv start
 	$ chkconfig osync-srv on
 
-Systemd specific
+Systemd specific (one service per config file)
 
-	$ systemctl start osync-srv@configfile
-	$ systemctl enable osync-srv@configfile
+	$ systemctl start osync-srv@configfile.conf
+	$ systemctl enable osync-srv@configfile.conf
 
 Troubleshooting
 ---------------

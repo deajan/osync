@@ -3,7 +3,7 @@
 #TODO: test if trapquit works on kill (sigterm)
 
 PROGRAM="osync" # Rsync based two way sync engine with fault tolerance
-AUTHOR="(L) 2013-2016 by Orsiris de Jong"
+AUTHOR="(C) 2013-2016 by Orsiris de Jong"
 CONTACT="http://www.netpower.fr/osync - ozy@netpower.fr"
 PROGRAM_VERSION=1.1-dev
 PROGRAM_BUILD=2016021804
