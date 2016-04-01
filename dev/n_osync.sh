@@ -4,11 +4,7 @@ PROGRAM="osync" # Rsync based two way sync engine with fault tolerance
 AUTHOR="(C) 2013-2016 by Orsiris de Jong"
 CONTACT="http://www.netpower.fr/osync - ozy@netpower.fr"
 PROGRAM_VERSION=1.1-dev
-<<<<<<< HEAD
 PROGRAM_BUILD=2016040101
-=======
-PROGRAM_BUILD=2016033101
->>>>>>> master
 IS_STABLE=yes
 
 source "./ofunctions.sh"
