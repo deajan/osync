@@ -7,7 +7,7 @@ PROGRAM_VERSION=1.1-dev
 PROGRAM_BUILD=2016040101
 IS_STABLE=yes
 
-## FUNC_BUILD=2016033105
+## FUNC_BUILD=2016040102
 ## BEGIN Generic functions for osync & obackup written in 2013-2016 by Orsiris de Jong - http://www.netpower.fr - ozy@netpower.fr
 
 ## type -p does not work on platforms other than linux (bash). If if does not work, always assume output is not a zero exitcode
@@ -797,7 +797,7 @@ function __CheckArguments {
                 local counted_arguments=$((iterate-4))
 
                 if [ $counted_arguments -ne $number_of_arguments ]; then
-                        Logger "Function $function_name may have inconsistent number of arguments. Expected: $number_of_arguments, count: $counted_arguments, see log file." "ERROR"
+                        Logger "Function $function_name may have inconsistent number of arguments. Expected: $number_of_arguments, count: $counted_arguments, bash seen: $number_of_given_arguments. see log file." "ERROR"
                         Logger "Arguments passed: $arg_list" "ERROR"
                 fi
 	fi
@@ -806,8 +806,8 @@ function __CheckArguments {
 #__END_WITH_PARANOIA_DEBUG
 
 function RsyncPatternsAdd {
-	local pattern="${1}"
-	local pattern_type="${2}"	# exclude or include
+	local pattern_type="${1}"	# exclude or include
+	local pattern="${2}"
 	__CheckArguments 2 $# ${FUNCNAME[0]} "$@"	#__WITH_PARANOIA_DEBUG
 
 	local rest=
@@ -836,8 +836,8 @@ function RsyncPatternsAdd {
 }
 
 function RsyncPatternsFromAdd {
-        local pattern_from="${1}"
-        local pattern_type="${2}"
+        local pattern_type="${1}"
+        local pattern_from="${2}"
 	__CheckArguments 2 $# ${FUNCNAME[0]} "$@"    #__WITH_PARANOIA_DEBUG
 
 	local pattern_from=
@@ -856,22 +856,22 @@ function RsyncPatterns {
         __CheckArguments 0 $# ${FUNCNAME[0]} "$@"    #__WITH_PARANOIA_DEBUG
 
         if [ "$RSYNC_PATTERN_FIRST" == "exclude" ]; then
-                RsyncPatternsAdd "$RSYNC_EXCLUDE_PATTERN" "exclude"
+                RsyncPatternsAdd "exclude" "$RSYNC_EXCLUDE_PATTERN"
                 if [ "$RSYNC_EXCLUDE_FROM" != "" ]; then
-                        RsyncPatternsFromAdd "$RSYNC_EXCLUDE_FROM" "exclude"
+                        RsyncPatternsFromAdd "exclude" "$RSYNC_EXCLUDE_FROM"
                 fi
                 RsyncPatternsAdd "$RSYNC_INCLUDE_PATTERN" "include"
                 if [ "$RSYNC_INCLUDE_FROM" != "" ]; then
-                        RsyncPatternsFromAdd "$RSYNC_INCLUDE_FROM" "include"
+                        RsyncPatternsFromAdd "include" "$RSYNC_INCLUDE_FROM"
                 fi
         elif [ "$RSYNC_PATTERN_FIRST" == "include" ]; then
-                RsyncPatternsAdd "$RSYNC_INCLUDE_PATTERN" "include"
+                RsyncPatternsAdd "include" "$RSYNC_INCLUDE_PATTERN"
                 if [ "$RSYNC_INCLUDE_FROM" != "" ]; then
-                        RsyncPatternsFromAdd "$RSYNC_INCLUDE_FROM" "include"
+                        RsyncPatternsFromAdd "include" "$RSYNC_INCLUDE_FROM"
                 fi
-                RsyncPatternsAdd "$RSYNC_EXCLUDE_PATTERN" "exclude"
+                RsyncPatternsAdd "exclude" "$RSYNC_EXCLUDE_PATTERN"
                 if [ "$RSYNC_EXCLUDE_FROM" != "" ]; then
-                        RsyncPatternsFromAdd "$RSYNC_EXCLUDE_FROM" "exclude"
+                        RsyncPatternsFromAdd "exclude" "$RSYNC_EXCLUDE_FROM"
                 fi
         else
                 Logger "Bogus RSYNC_PATTERN_FIRST value in config file. Will not use rsync patterns." "WARN"
@@ -1134,14 +1134,14 @@ function CheckCurrentConfig {
 	fi
 
 	# Check all variables that should contain "yes" or "no"
-	declare -a yes_no_vars=(CREATE_DIRS SUDO_EXEC SSH_COMPRESSION REMOTE_HOST_PING PRESERVE_ACL PRESERVE_XATTR COPY_SYMLINKS KEEP_DIRLINKS PRESERVE_HARDLINKS CHECKSUM RSYNC_COMPRESS CONFLICT_BACKUP CONFLICT_BACKUP_MULTIPLE SOFT_DELETE RESUME_SYNC FORCE_STRANGER_LOCK_RESUME PARTIAL DELTA_COPIES STOP_ON_CMD_ERROR)
+	declare -a yes_no_vars=(CREATE_DIRS SUDO_EXEC SSH_COMPRESSION SSH_IGNORE_KNOWN_HOSTS REMOTE_HOST_PING PRESERVE_ACL PRESERVE_XATTR COPY_SYMLINKS KEEP_DIRLINKS PRESERVE_HARDLINKS CHECKSUM RSYNC_COMPRESS CONFLICT_BACKUP CONFLICT_BACKUP_MULTIPLE SOFT_DELETE RESUME_SYNC FORCE_STRANGER_LOCK_RESUME PARTIAL DELTA_COPIES STOP_ON_CMD_ERROR)
 	for i in "${yes_no_vars[@]}"; do
 		test="if [ \"\$$i\" != \"yes\" ] && [ \"\$$i\" != \"no\" ]; then Logger \"Bogus $i value defined in config file.\" \"CRITICAL\"; exit 1; fi"
 		eval "$test"
 	done
 
 	# Check all variables that should contain a numerical value >= 0
-	declare -a num_vars=(MINIMUM_SPACE BANDWIDTH SOFT_MAX_EXEC_TIME HARD_MAX_EXEC_TIME MIN_WAIT MAX_WAIT CONFLICT_BACKUP_DAYS SOFT_DELETE_DAYS RESUME_TRY)
+	declare -a num_vars=(MINIMUM_SPACE BANDWIDTH SOFT_MAX_EXEC_TIME HARD_MAX_EXEC_TIME MIN_WAIT MAX_WAIT CONFLICT_BACKUP_DAYS SOFT_DELETE_DAYS RESUME_TRY MAX_EXEC_TIME_PER_CMD_BEFORE MAX_EXEC_TIME_PER_CMD_AFTER)
 	for i in "${num_vars[@]}"; do
 		test="if [ $(IsNumeric \"\$$i\") -eq 0 ]; then Logger \"Bogus $i value defined in config file.\" \"CRITICAL\"; exit 1; fi"
 		eval "$test"

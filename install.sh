@@ -135,7 +135,7 @@ fi
 function Statistics {
 
         local link="http://instcount.netpower.fr?program=$PROGRAM&version=$PROGRAM_VERSION"
-        if type wget > /dev/null; then
+        if type wget -qO- > /dev/null; then
                 wget $link > /dev/null 2>&1
                 if [ $? == 0 ]; then
                         exit 0

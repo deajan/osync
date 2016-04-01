@@ -13,8 +13,12 @@ KNOWN ISSUES
 
 RECENT CHANGES
 --------------
-
+#TODO: clock compare in doc
+#TODO: explain why osync is lowband friendly in doc
+#TODO: explain why osync daemon process can still exist after quit for 30s
 ! XX Apr 2016: osync v1.1 released
+! Paranoia debug gives incorrect number of arguments in rsyncpatternsadd
+! cat vv | ssh -p 49999 -i /root/.ssh/id_rsa_netpower root@netpower.fr cat | xargs -I {} stat -c "%n;%Z;%Y" "{}" | sort > tes
 ! Updated documentation (+README.md file)
 - Redirected ERROR and WARN messages to stderr to systemd catches them into it's journal
 !- Added a systemd unit file (needs testing in file monitor mode yet)

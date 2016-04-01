@@ -8,7 +8,7 @@ Always use the following header
 #!/usr/bin/env bash
 
 PROGRAM="program-name" # Long description
-AUTHOR="(L) 20XX-20YY by Orsiris \"Ozy\" de Jong"
+AUTHOR="(C) 20XX-20YY by Orsiris \"Ozy\" de Jong"
 CONTACT="http://www.example.com me@example.com"
 PROGRAM_BUILD=YYYYMMDDVV
 
@@ -145,3 +145,12 @@ As obackup and osync share alot of common functions, ofunctions.sh will host all
 Dev programs n_osync.sh and n_obackup.sh will source ofunctions.sh
 Release programs will still include ofunctions.sh in order to enhance ease of use.
 
+Ofunctions are defined like:
+
+#__FUNC:FunctionName
+function FunctionName {
+
+}
+#__ENDFUNC
+
+These functions are inserted into code that has placeholders like #__FUNC:FuncName
