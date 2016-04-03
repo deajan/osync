@@ -1,4 +1,4 @@
-## FUNC_BUILD=2016040102
+## FUNC_BUILD=2016040302
 ## BEGIN Generic functions for osync & obackup written in 2013-2016 by Orsiris de Jong - http://www.netpower.fr - ozy@netpower.fr
 
 ## type -p does not work on platforms other than linux (bash). If if does not work, always assume output is not a zero exitcode
@@ -1013,8 +1013,10 @@ function InitLocalOSSettings {
         ## Stat command has different syntax on Linux and FreeBSD/MacOSX
         if [ "$LOCAL_OS" == "MacOSX" ] || [ "$LOCAL_OS" == "BSD" ]; then
                 STAT_CMD="stat -f \"%Sm\""
+		STAT_CTIME_MTIME_CMD="stat -f %N;%c;%m"
         else
                 STAT_CMD="stat --format %y"
+		STAT_CTIME_MTIME_CMD="stat -c %n;%Z;%Y"
         fi
 }
 
@@ -1031,6 +1033,16 @@ function InitRemoteOSSettings {
         else
                 REMOTE_FIND_CMD=find
         fi
+
+        ## Stat command has different syntax on Linux and FreeBSD/MacOSX
+        if [ "$LOCAL_OS" == "MacOSX" ] || [ "$LOCAL_OS" == "BSD" ]; then
+                REMOTE_STAT_CMD="stat -f \"%Sm\""
+		REMOTE_STAT_CTIME_MTIME_CMD="stat -f \\\"%N;%c;%m\\\""
+        else
+                REMOTE_STAT_CMD="stat --format %y"
+		REMOTE_STAT_CTIME_MTIME_CMD="stat -c \\\"%n;%Z;%Y\\\""
+        fi
+
 }
 
 ## END Generic functions

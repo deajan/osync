@@ -4,7 +4,7 @@ PROGRAM="osync" # Rsync based two way sync engine with fault tolerance
 AUTHOR="(C) 2013-2016 by Orsiris de Jong"
 CONTACT="http://www.netpower.fr/osync - ozy@netpower.fr"
 PROGRAM_VERSION=1.1-dev
-PROGRAM_BUILD=2016040303
+PROGRAM_BUILD=2016040305
 IS_STABLE=yes
 
 source "./ofunctions.sh"
@@ -571,7 +571,7 @@ function _get_file_ctime_mtime_local {
 
 	#cat "$file_list" | xargs -I {} stat -c '%n;%Z;%Y' "$replica_path{}" | sort > "$RUN_DIR/$PROGRAM.ctime_mtime.$replica_type.$SCRIPT_PID"
 	echo -n "" > "$RUN_DIR/$PROGRAM.ctime_mtime.$replica_type.$SCRIPT_PID"
-	while read file; do stat -c '%n;%Z;%Y' "$replica_path$file" | sort > "$RUN_DIR/$PROGRAM.ctime_mtime.$replica_type.$SCRIPT_PID"; done < "$file_list"
+	while read file; do $STAT_CTIME_MTIME_CMD "$replica_path$file" | sort > "$RUN_DIR/$PROGRAM.ctime_mtime.$replica_type.$SCRIPT_PID"; done < "$file_list"
 }
 
 function _get_file_ctime_mtime_remote {
@@ -581,7 +581,7 @@ function _get_file_ctime_mtime_remote {
 	__CheckArguments 3 $# ${FUNCNAME[0]} "$@"	#__WITH_PARANOIA_DEBUG
 
 	local cmd=
-	cmd='cat "'$file_list'" | '$SSH_CMD' "while read file; do stat -c \"%n;%Z;%Y\" \"'$replica_path'\$file\"; done | sort" > "'$RUN_DIR/$PROGRAM.ctime_mtime.$replica_type.$SCRIPT_PID'"'
+	cmd='cat "'$file_list'" | '$SSH_CMD' "while read file; do '$REMOTE_STAT_CTIME_MTIME_CMD' \"'$replica_path'\$file\"; done | sort" > "'$RUN_DIR/$PROGRAM.ctime_mtime.$replica_type.$SCRIPT_PID'"'
 	Logger "CMD: $cmd" "DEBUG"
 	eval $cmd
 	WaitForCompletion $! $SOFT_MAX_EXEC_TIME $HARD_MAX_EXEC_TIME ${FUNCNAME[0]}
