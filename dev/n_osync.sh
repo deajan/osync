@@ -4,7 +4,7 @@ PROGRAM="osync" # Rsync based two way sync engine with fault tolerance
 AUTHOR="(C) 2013-2016 by Orsiris de Jong"
 CONTACT="http://www.netpower.fr/osync - ozy@netpower.fr"
 PROGRAM_VERSION=1.1-dev
-PROGRAM_BUILD=2016040305
+PROGRAM_BUILD=2016040602
 IS_STABLE=yes
 
 source "./ofunctions.sh"
@@ -1717,9 +1717,11 @@ opts="${opts# *}"
 
 	if [ "$LOGFILE" == "" ]; then
 		if [ -w /var/log ]; then
-			LOG_FILE=/var/log/$PROGRAM.$INSTANCE_ID.log
+			LOG_FILE="/var/log/$PROGRAM.$INSTANCE_ID.log"
+		elif ([ "$HOME" != "" ] && [ -w "$HOME" ]); then
+			LOG_FILE="$HOME/$PROGRAM.$INSTANCE_ID.log"
 		else
-			LOG_FILE=./$PROGRAM.$INSTANCE_ID.log
+			LOG_FILE="./$PROGRAM.$INSTANCE_ID.log"
 		fi
 	else
 		LOG_FILE="$LOGFILE"

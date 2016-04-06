@@ -4,10 +4,10 @@ PROGRAM="osync" # Rsync based two way sync engine with fault tolerance
 AUTHOR="(C) 2013-2016 by Orsiris de Jong"
 CONTACT="http://www.netpower.fr/osync - ozy@netpower.fr"
 PROGRAM_VERSION=1.1-dev
-PROGRAM_BUILD=2016040305
+PROGRAM_BUILD=2016040602
 IS_STABLE=yes
 
-## FUNC_BUILD=2016040301
+## FUNC_BUILD=2016040601
 ## BEGIN Generic functions for osync & obackup written in 2013-2016 by Orsiris de Jong - http://www.netpower.fr - ozy@netpower.fr
 
 ## type -p does not work on platforms other than linux (bash). If if does not work, always assume output is not a zero exitcode
@@ -63,6 +63,8 @@ LOCAL_HOST=$(hostname)
 ## Default log file until config file is loaded
 if [ -w /var/log ]; then
 	LOG_FILE="/var/log/$PROGRAM.log"
+elif ([ "$HOME" != "" ] && [ -w "$HOME" ]); then
+	LOG_FILE="$HOME/$PROGRAM.log"
 else
 	LOG_FILE="./$PROGRAM.log"
 fi
@@ -2764,9 +2766,11 @@ opts="${opts# *}"
 
 	if [ "$LOGFILE" == "" ]; then
 		if [ -w /var/log ]; then
-			LOG_FILE=/var/log/$PROGRAM.$INSTANCE_ID.log
+			LOG_FILE="/var/log/$PROGRAM.$INSTANCE_ID.log"
+		elif ([ "$HOME" != "" ] && [ -w "$HOME" ]); then
+			LOG_FILE="$HOME/$PROGRAM.$INSTANCE_ID.log"
 		else
-			LOG_FILE=./$PROGRAM.$INSTANCE_ID.log
+			LOG_FILE="./$PROGRAM.$INSTANCE_ID.log"
 		fi
 	else
 		LOG_FILE="$LOGFILE"
