@@ -7,7 +7,7 @@ PROGRAM_VERSION=1.1-pre
 PROGRAM_BUILD=2016040603
 IS_STABLE=yes
 
-## FUNC_BUILD=2016040601
+## FUNC_BUILD=2016040602
 ## BEGIN Generic functions for osync & obackup written in 2013-2016 by Orsiris de Jong - http://www.netpower.fr - ozy@netpower.fr
 
 ## type -p does not work on platforms other than linux (bash). If if does not work, always assume output is not a zero exitcode
@@ -705,7 +705,7 @@ function CheckConnectivityRemoteHost {
 			eval "$PING_CMD $REMOTE_HOST > /dev/null 2>&1" &
 			WaitForTaskCompletion $! 180 180 ${FUNCNAME[0]}
 			if [ $? != 0 ]; then
-				Logger "Cannot ping $REMOTE_HOST" "CRITICAL"
+				Logger "Cannot ping $REMOTE_HOST" "ERROR"
 				return 1
 			fi
 		fi
@@ -2680,17 +2680,19 @@ opts="${opts# *}"
 	if [ $_QUICK_SYNC -lt 2 ]; then
 		CheckCurrentConfig
 	fi
+
+	DATE=$(date)
+	Logger "-------------------------------------------------------------" "NOTICE"
+	Logger "$DRY_WARNING $DATE - $PROGRAM $PROGRAM_VERSION script begin." "NOTICE"
+	Logger "-------------------------------------------------------------" "NOTICE"
+	Logger "Sync task [$INSTANCE_ID] launched as $LOCAL_USER@$LOCAL_HOST (PID $SCRIPT_PID)" "NOTICE"
+
 	GetRemoteOS
 	InitRemoteOSSettings
 
 	if [ $sync_on_changes -eq 1 ]; then
 		SyncOnChanges
 	else
-		DATE=$(date)
-		Logger "-------------------------------------------------------------" "NOTICE"
-		Logger "$DRY_WARNING $DATE - $PROGRAM $PROGRAM_VERSION script begin." "NOTICE"
-		Logger "-------------------------------------------------------------" "NOTICE"
-		Logger "Sync task [$INSTANCE_ID] launched as $LOCAL_USER@$LOCAL_HOST (PID $SCRIPT_PID)" "NOTICE"
 		if [ $no_maxtime -eq 1 ]; then
 			SOFT_MAX_EXEC_TIME=0
 			HARD_MAX_EXEC_TIME=0

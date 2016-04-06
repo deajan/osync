@@ -1740,17 +1740,19 @@ opts="${opts# *}"
 	if [ $_QUICK_SYNC -lt 2 ]; then
 		CheckCurrentConfig
 	fi
+
+	DATE=$(date)
+	Logger "-------------------------------------------------------------" "NOTICE"
+	Logger "$DRY_WARNING $DATE - $PROGRAM $PROGRAM_VERSION script begin." "NOTICE"
+	Logger "-------------------------------------------------------------" "NOTICE"
+	Logger "Sync task [$INSTANCE_ID] launched as $LOCAL_USER@$LOCAL_HOST (PID $SCRIPT_PID)" "NOTICE"
+
 	GetRemoteOS
 	InitRemoteOSSettings
 
 	if [ $sync_on_changes -eq 1 ]; then
 		SyncOnChanges
 	else
-		DATE=$(date)
-		Logger "-------------------------------------------------------------" "NOTICE"
-		Logger "$DRY_WARNING $DATE - $PROGRAM $PROGRAM_VERSION script begin." "NOTICE"
-		Logger "-------------------------------------------------------------" "NOTICE"
-		Logger "Sync task [$INSTANCE_ID] launched as $LOCAL_USER@$LOCAL_HOST (PID $SCRIPT_PID)" "NOTICE"
 		if [ $no_maxtime -eq 1 ]; then
 			SOFT_MAX_EXEC_TIME=0
 			HARD_MAX_EXEC_TIME=0
