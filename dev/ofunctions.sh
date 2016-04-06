@@ -1,4 +1,4 @@
-## FUNC_BUILD=2016040302
+## FUNC_BUILD=2016040601
 ## BEGIN Generic functions for osync & obackup written in 2013-2016 by Orsiris de Jong - http://www.netpower.fr - ozy@netpower.fr
 
 ## type -p does not work on platforms other than linux (bash). If if does not work, always assume output is not a zero exitcode
@@ -54,6 +54,8 @@ LOCAL_HOST=$(hostname)
 ## Default log file until config file is loaded
 if [ -w /var/log ]; then
 	LOG_FILE="/var/log/$PROGRAM.log"
+elif ([ "$HOME" != "" ] && [ -w "$HOME" ]); then
+	LOG_FILE="$HOME/$PROGRAM.log"
 else
 	LOG_FILE="./$PROGRAM.log"
 fi
