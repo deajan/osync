@@ -63,8 +63,8 @@ function Usage {
 	echo "Usage: $0 --master=/path/to/master/replica --slave=/path/to/local/slave/replica --sync-id=existing_id"
 	echo "Usage: $0 --master=/path/to/master/replica --slave=ssh://[backupuser]@remotehost.com[:portnumber]//path/to/slave/replica --sync-id=existing_id --rsakey=/path/to/rsa/key"
 	echo ""
-	echo "If config file is provided, the config file itself and both replicas from config file will be updated."
-	echo "If no config file provided, assume you run  the update script just like any other quicksync task."
+	echo "If config file is provided, the config file itself and both replicas from config file will be updated. Please make sure the config file is writable."
+	echo "If no config file provided, assume you run the update script just like any other quicksync task."
 	echo "If sync-id is not specified, it will assume handling a quicksync task."
 	exit 128
 }
