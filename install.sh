@@ -1,21 +1,27 @@
 #!/usr/bin/env bash
 
 PROGRAM=osync
-PROGRAM_VERSION=1.1-dev
+PROGRAM_VERSION=1.1-pre
 PROGRAM_BINARY=$PROGRAM".sh"
 PROGRAM_BATCH=$PROGRAM"-batch.sh"
-SCRIPT_BUILD=2016032903
+SCRIPT_BUILD=2016040601
 
-## osync / obackup daemon install script
+## osync / obackup / pmocr / zsnap install script
 ## Tested on RHEL / CentOS 6 & 7, Fedora 23, Debian 7 & 8, Mint 17 and FreeBSD 8 & 10
 ## Please adapt this to fit your distro needs
 
 CONF_DIR=/etc/$PROGRAM
 BIN_DIR=/usr/local/bin
 SERVICE_DIR_INIT=/etc/init.d
-SERVICE_FILE_INIT="osync-srv"
-SERVICE_DIR_SYSTEMD=/usr/lib/systemd/system
-SERVICE_FILE_SYSTEMD="osync-srv@.service"
+SERVICE_DIR_SYSTEMD_SYSTEM=/usr/lib/systemd/system
+SERVICE_DIR_SYSTEMD_USER=/etc/systemd/user
+
+## osync specific code
+OSYNC_SERVICE_FILE_INIT="osync-srv"
+OSYNC_SERVICE_FILE_SYSTEMD_SYSTEM="osync-srv@.service"
+OSYNC_SERVICE_FILE_SYSTEMD_USER="osync-srv@.service.user"
+
+## Generic code
 
 USER=root
 
@@ -109,15 +115,16 @@ if [  -f "./ssh_filter.sh" ]; then
 	fi
 fi
 
-if ([ -f "./$SERVICE_FILE_INIT" ] || [ -f "./$SERVICE_FILE_SYSTEMD" ] ); then
+if ([ -f "./$OSYNC_SERVICE_FILE_INIT" ] || [ -f "./$OSYNC_SERVICE_FILE_SYSTEMD_SYSTEM" ] ); then
 	if [ "$init" == "systemd" ]; then
-		cp "./$SERVICE_FILE_SYSTEMD" "$SERVICE_DIR_SYSTEMD"
+		cp "./$OSYNC_SERVICE_FILE_SYSTEMD_SYSTEM" "$SERVICE_DIR_SYSTEMD_SYSTEM" && cp "./$OSYNC_SERVICE_FILE_SYSTEMD_USER" "$SERVICE_DIR_SYSTEMD_USER/$SERVICE_FILE_SYSTEMD_SYSTEM"
 		if [ $? != 0 ]; then
-			echo "Cannot copy the systemd file to [$SERVICE_DIR_SYSTEMD]."
+			echo "Cannot copy the systemd file to [$SERVICE_DIR_SYSTEMD_SYSTEM] or [$SERVICE_DIR_SYSTEMD_USER]."
 		else
-			echo "Created osync-srv service in [$SERVICE_DIR_SYSTEMD]."
+			echo "Created osync-srv service in [$SERVICE_DIR_SYSTEMD_SYSTEM] and [$SERVICE_DIR_SYSTEMD_USER]."
 			echo "Activate with [systemctl start osync-srv@instance.conf] where instance.conf is the name of the config file in /etc/osync."
 			echo "Enable on boot with [systemctl enable osync-srv@instance.conf]."
+			echo "In userland, active with [systemctl --user start osync-srv@instance.conf]."
 		fi
 	elif [ "$init" == "init" ]; then
 		cp "./$SERVICE_FILE_INIT" "$SERVICE_DIR_INIT"
@@ -135,8 +142,8 @@ fi
 function Statistics {
 
         local link="http://instcount.netpower.fr?program=$PROGRAM&version=$PROGRAM_VERSION"
-        if type wget -qO- > /dev/null; then
-                wget $link > /dev/null 2>&1
+        if type wget > /dev/null; then
+                wget -qO- $link > /dev/null 2>&1
                 if [ $? == 0 ]; then
                         exit 0
                 fi
