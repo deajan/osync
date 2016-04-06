@@ -3,8 +3,8 @@
 PROGRAM="osync" # Rsync based two way sync engine with fault tolerance
 AUTHOR="(C) 2013-2016 by Orsiris de Jong"
 CONTACT="http://www.netpower.fr/osync - ozy@netpower.fr"
-PROGRAM_VERSION=1.1-dev
-PROGRAM_BUILD=2016040602
+PROGRAM_VERSION=1.1-pre
+PROGRAM_BUILD=2016040603
 IS_STABLE=yes
 
 ## FUNC_BUILD=2016040601
@@ -1946,7 +1946,7 @@ function deletion_propagation {
 
 	Logger "Propagating deletions to $replica_type replica." "NOTICE"
 
-	if [ "$replica_type" == "{$INITIATOR[0]}" ]; then
+	if [ "$replica_type" == "${INITIATOR[0]}" ]; then
 		replica_dir="${INITIATOR[1]}"
 		delete_dir="${INITIATOR[5]}"
 
