@@ -6,7 +6,7 @@ AUTHOR="(C) 2015 by Orsiris \"Ozy\" de Jong"
 CONTACT="http://www.netpower.fr/osync - ozy@netpower.fr"
 OLD_PROGRAM_VERSION="1.0x"
 NEW_PROGRAM_VERSION="v1.1x"
-PROGRAM_BUILD=2016033102
+PROGRAM_BUILD=2016040601
 
 function Init {
 	OSYNC_DIR=".osync_workdir"
@@ -360,6 +360,11 @@ function RewriteConfigFiles {
 	if ! grep "^DELTA_COPIES=" "$config_file" > /dev/null; then
 		sed -i '/^PARTIAL=*/a DELTA_COPIES=yes' "$config_file"
 	fi
+
+	if ! grep "^RUN_AFTER_CMD_ON_ERROR=" "$config_file" > /dev/null; then
+		sed -i '/^STOP_ON_CMD_ERROR=*/a RUN_AFTER_CMD_ON_ERROR=no' "$config_file"
+	fi
+
 }
 
 _QUICKSYNC=0
