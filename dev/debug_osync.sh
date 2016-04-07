@@ -4,7 +4,7 @@ PROGRAM="osync" # Rsync based two way sync engine with fault tolerance
 AUTHOR="(C) 2013-2016 by Orsiris de Jong"
 CONTACT="http://www.netpower.fr/osync - ozy@netpower.fr"
 PROGRAM_VERSION=1.1-pre
-PROGRAM_BUILD=2016040604
+PROGRAM_BUILD=2016040701
 IS_STABLE=yes
 
 ## FUNC_BUILD=2016040602
@@ -2782,12 +2782,12 @@ opts="${opts# *}"
 	Logger "-------------------------------------------------------------" "NOTICE"
 	Logger "Sync task [$INSTANCE_ID] launched as $LOCAL_USER@$LOCAL_HOST (PID $SCRIPT_PID)" "NOTICE"
 
-	GetRemoteOS
-	InitRemoteOSSettings
-
 	if [ $sync_on_changes -eq 1 ]; then
 		SyncOnChanges
 	else
+		GetRemoteOS
+		InitRemoteOSSettings
+
 		if [ $no_maxtime -eq 1 ]; then
 			SOFT_MAX_EXEC_TIME=0
 			HARD_MAX_EXEC_TIME=0
