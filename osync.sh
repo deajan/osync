@@ -2484,8 +2484,7 @@ function SyncOnChanges {
 		eval "$cmd"
 		retval=$?
 		if [ $retval != 0 ] && [ $retval != 240 ]; then
-			Logger "osync child exited with error." "CRITICAL"
-			exit $retval
+			Logger "osync child exited with error." "ERROR"
 		fi
 
 		Logger "#### Monitoring now." "NOTICE"
