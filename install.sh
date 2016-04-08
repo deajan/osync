@@ -181,7 +181,7 @@ function Statistics {
 	fi
 
         if type curl > /dev/null; then
-                curl $link > /dev/null 2>&1
+                curl -o /dev/null $link > /dev/null 2>&1
                 if [ $? == 0 ]; then
                         return 0
                 fi
