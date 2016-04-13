@@ -6,7 +6,13 @@ AUTHOR="(C) 2015 by Orsiris \"Ozy\" de Jong"
 CONTACT="http://www.netpower.fr/osync - ozy@netpower.fr"
 OLD_PROGRAM_VERSION="1.0x"
 NEW_PROGRAM_VERSION="v1.1x"
-PROGRAM_BUILD=2016040601
+PROGRAM_BUILD=2016041301
+
+## type -p does not work on platforms other than linux (bash). If if does not work, always assume output is not a zero exitcode
+if ! type "$BASH" > /dev/null; then
+        echo "Please run this script only with bash shell. Tested on bash >= 3.2"
+        exit 127
+fi
 
 function Init {
 	OSYNC_DIR=".osync_workdir"
@@ -312,7 +318,7 @@ function RewriteConfigFiles {
 	fi
 
         echo "Backing up [$config_file] as [$config_file.save]"
-        cp --preserve "$config_file" "$config_file.save"
+        cp -p "$config_file" "$config_file.save"
         if [ $? != 0 ]; then
                 echo "Cannot backup config file."
                 exit 1
@@ -322,49 +328,50 @@ function RewriteConfigFiles {
 
 	#TODO: exclude occurences between doublequotes
 
-	sed -i 's/^MASTER_SYNC_DIR/INITIATOR_SYNC_DIR/g' "$config_file"
-	sed -i 's/^SLAVE_SYNC_DIR/TARGET_SYNC_DIR/g' "$config_file"
-	sed -i 's/^CONFLICT_PREVALANCE=master/CONFLICT_PREVALANCE=initiator/g' "$config_file"
-	sed -i 's/^CONFLICT_PREVALANCE=slave/CONFLICT_PREVALANCE=target/g' "$config_file"
-	sed -i 's/^SYNC_ID=/INSTANCE_ID=/g' "$config_file"
+	sed -i'.tmp' 's/^MASTER_SYNC_DIR/INITIATOR_SYNC_DIR/g' "$config_file"
+	sed -i'.tmp' 's/^SLAVE_SYNC_DIR/TARGET_SYNC_DIR/g' "$config_file"
+	sed -i'.tmp' 's/^CONFLICT_PREVALANCE=master/CONFLICT_PREVALANCE=initiator/g' "$config_file"
+	sed -i'.tmp' 's/^CONFLICT_PREVALANCE=slave/CONFLICT_PREVALANCE=target/g' "$config_file"
+	sed -i'.tmp' 's/^SYNC_ID=/INSTANCE_ID=/g' "$config_file"
 
 	# Add new config file values from v1.1x
 	if ! grep "^RSYNC_PATTERN_FIRST=" "$config_file" > /dev/null; then
-		sed -i '/^LOGFILE=*/a RSYNC_PATTERN_FIRST=include' "$config_file"
+		sed -i'.tmp' '/^LOGFILE=*/a\'$'\n''RSYNC_PATTERN_FIRST=include\'$'\n''' "$config_file"
 	fi
 
        	if ! grep "^SSH_IGNORE_KNOWN_HOSTS=" "$config_file" > /dev/null; then
-                sed -i '/^SSH_COMPRESSION=*/a SSH_IGNORE_KNOWN_HOSTS=no' "$config_file"
+                sed -i'.tmp' '/^SSH_COMPRESSION=*/a\'$'\n''SSH_IGNORE_KNOWN_HOSTS=no\'$'\n''' "$config_file"
 	fi
 
 	if ! grep "^RSYNC_INCLUDE_PATTERN=" "$config_file" > /dev/null; then
-		sed -i '/^RSYNC_EXCLUDE_PATTERN=*/a RSYNC_INCLUDE_PATTERN=""' "$config_file"
+		sed -i'.tmp' '/^RSYNC_EXCLUDE_PATTERN=*/a\'$'\n''RSYNC_INCLUDE_PATTERN=""\'$'\n''' "$config_file"
 	fi
 
 	if ! grep "^RSYNC_INCLUDE_FROM=" "$config_file" > /dev/null; then
-		sed -i '/^RSYNC_EXCLUDE_FROM=*/a RSYNC_INCLUDE_FROM=""' "$config_file"
+		sed -i'.tmp' '/^RSYNC_EXCLUDE_FROM=*/a\'$'\n''RSYNC_INCLUDE_FROM=""\'$'\n''' "$config_file"
 	fi
 
 	if ! grep "^CHECKSUM=" "$config_file" > /dev/null; then
-		sed -i '/^PRESERVE_HARDLINKS=*/a CHECKSUM=no' "$config_file"
+		sed -i'.tmp' '/^PRESERVE_HARDLINKS=*/a\'$'\n''CHECKSUM=no\'$'\n''' "$config_file"
 	fi
 
 	if ! grep "^MAX_WAIT=" "$config_file" > /dev/null; then
-		sed -i '/^MIN_WAIT=*/a MAX_WAIT=300' "$config_file"
+		sed -i'.tmp' '/^MIN_WAIT=*/a\'$'\n''MAX_WAIT=300\'$'\n''' "$config_file"
 	fi
 
 	if ! grep "^PARTIAL=" "$config_file" > /dev/null; then
-		sed -i '/^FORCE_STRANGER_LOCK_RESUME=*/a PARTIAL=no' "$config_file"
+		sed -i'.tmp' '/^FORCE_STRANGER_LOCK_RESUME=*/a\'$'\n''PARTIAL=no\'$'\n''' "$config_file"
 	fi
 
 	if ! grep "^DELTA_COPIES=" "$config_file" > /dev/null; then
-		sed -i '/^PARTIAL=*/a DELTA_COPIES=yes' "$config_file"
+		sed -i'.tmp' '/^PARTIAL=*/a\'$'\n''DELTA_COPIES=yes\'$'\n''' "$config_file"
 	fi
 
 	if ! grep "^RUN_AFTER_CMD_ON_ERROR=" "$config_file" > /dev/null; then
-		sed -i '/^STOP_ON_CMD_ERROR=*/a RUN_AFTER_CMD_ON_ERROR=no' "$config_file"
+		sed -i'.tmp' '/^STOP_ON_CMD_ERROR=*/a\'$'\n''RUN_AFTER_CMD_ON_ERROR=no\'$'\n''' "$config_file"
 	fi
 
+	rm -f "$config_file.tmp"
 }
 
 _QUICKSYNC=0
