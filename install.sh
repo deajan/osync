@@ -4,7 +4,7 @@ PROGRAM=osync
 PROGRAM_VERSION=1.1-pre
 PROGRAM_BINARY=$PROGRAM".sh"
 PROGRAM_BATCH=$PROGRAM"-batch.sh"
-SCRIPT_BUILD=2016040801
+SCRIPT_BUILD=2016041401
 
 ## osync / obackup / pmocr / zsnap install script
 ## Tested on RHEL / CentOS 6 & 7, Fedora 23, Debian 7 & 8, Mint 17 and FreeBSD 8 & 10
@@ -78,20 +78,20 @@ else
 	echo "Config directory [$CONF_DIR] exists."
 fi
 
-if [ -f "./sync.conf" ]; then
-	cp "./sync.conf" "/etc/$PROGRAM/sync.conf.example"
+if [ -f "./sync.conf.example" ]; then
+	cp "./sync.conf.example" "/etc/$PROGRAM/sync.conf.example"
 fi
 
-if [ -f "./host_backup.conf" ]; then
-	cp "./host_backup.conf" "/etc/$PROGRAM/host_backup.conf.example"
+if [ -f "./host_backup.conf.example" ]; then
+	cp "./host_backup.conf.example" "/etc/$PROGRAM/host_backup.conf.example"
 fi
 
 if [ -f "./exlude.list.example" ]; then
 	cp "./exclude.list.example" "/etc/$PROGRAM"
 fi
 
-if [ -f "./snapshot.conf" ]; then
-	cp "./snapshot.conf" "/etc/$PROGRAM/snapshot.conf.example"
+if [ -f "./snapshot.conf.example" ]; then
+	cp "./snapshot.conf.example" "/etc/$PROGRAM/snapshot.conf.example"
 fi
 
 cp "./$PROGRAM_BINARY" "$BIN_DIR"

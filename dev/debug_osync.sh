@@ -7,7 +7,7 @@ PROGRAM_VERSION=1.1-pre
 PROGRAM_BUILD=2016040701
 IS_STABLE=yes
 
-## FUNC_BUILD=2016041202
+## FUNC_BUILD=2016041402
 ## BEGIN Generic functions for osync & obackup written in 2013-2016 by Orsiris de Jong - http://www.netpower.fr - ozy@netpower.fr
 
 ## type -p does not work on platforms other than linux (bash). If if does not work, always assume output is not a zero exitcode
@@ -101,7 +101,7 @@ function _Logger {
 	# <OSYNC SPECIFIC> Special case in daemon mode where systemctl doesn't need double timestamps
 	if [ "$sync_on_changes" == "1" ]; then
 		cat <<< "$evalue" 1>&2	# Log to stderr in daemon mode
-	elif [ $_SILENT -eq 0 ]; then
+	elif [ "$_SILENT" -eq 0 ]; then
 		echo -e "$svalue"
 	fi
 }
@@ -180,6 +180,7 @@ function KillChilds {
 	fi
 }
 
+# Script specific email alert function, please use SendEmail function for generic sends
 function SendAlert {
 	__CheckArguments 0 $# ${FUNCNAME[0]} "$@"	#__WITH_PARANOIA_DEBUG
 
@@ -301,6 +302,85 @@ function SendAlert {
 	fi
 }
 
+# Generic email sending function. Usage:
+# SendEmail "subject" "Body text" "receiver@email.fr receiver2@otheremail.fr" "/path/to/attachment.file"
+function SendEmail {
+	local subject="${1}"
+	local message="${2}"
+	local destination_mails="${3}"
+	local attachment="{$4}"
+
+	__CheckArguments 4 $# ${FUNCNAME[0]} "$@"	#__WITH_PARANOIA_DEBUG
+
+	local mail_no_attachment=
+	local attachment_command=
+
+	if [ ! -f "$attachment" ]; then
+		attachment_command="-a $ALERT_LOG_FILE"
+		mail_no_attachment=1
+	else
+		mail_no_attachment=0
+	fi
+
+	if type mutt > /dev/null 2>&1 ; then
+		echo "$message" | $(type -p mutt) -x -s "$subject" "$destination_mails" $attachment_command
+		if [ $? != 0 ]; then
+			Logger "Cannot send alert email via $(type -p mutt) !!!" "WARN"
+		else
+			Logger "Sent alert mail using mutt." "NOTICE"
+			return 0
+		fi
+	fi
+
+	if type mail > /dev/null 2>&1 ; then
+		if [ "$mail_no_attachment" -eq 0 ] && $(type -p mail) -V | grep "GNU" > /dev/null; then
+			attachment_command="-A $attachment"
+		elif [ "$mail_no_attachment" -eq 0 ] && $(type -p mail) -V > /dev/null; then
+			attachment_command="-a$attachment"
+		else
+			attachment_command=""
+		fi
+		echo "$message" | $(type -p mail) $attachment_command -s "$subject" "$destination_mails"
+		if [ $? != 0 ]; then
+			Logger "Cannot send alert email via $(type -p mail) with attachments !!!" "WARN"
+			echo "$message" | $(type -p mail) -s "$subject" "$destination_mails"
+			if [ $? != 0 ]; then
+				Logger "Cannot send alert email via $(type -p mail) without attachments !!!" "WARN"
+			else
+				Logger "Sent alert mail using mail command without attachment." "NOTICE"
+				return 0
+			fi
+		else
+			Logger "Sent alert mail using mail command." "NOTICE"
+			return 0
+		fi
+	fi
+
+	if type sendmail > /dev/null 2>&1 ; then
+		echo -e "Subject:$subject\r\n$message" | $(type -p sendmail) "$destination_mails"
+		if [ $? != 0 ]; then
+			Logger "Cannot send alert email via $(type -p sendmail) !!!" "WARN"
+		else
+			Logger "Sent alert mail using sendmail command without attachment." "NOTICE"
+			return 0
+		fi
+	fi
+
+	# pfSense specific
+	if [ -f /usr/local/bin/mail.php ]; then
+		echo "$message" | /usr/local/bin/mail.php -s="$subject"
+		if [ $? != 0 ]; then
+			Logger "Cannot send alert email via /usr/local/bin/mail.php (pfsense) !!!" "WARN"
+		else
+			Logger "Sent alert mail using pfSense mail.php." "NOTICE"
+			return 0
+		fi
+	fi
+
+	# If function has not returned 0 yet, assume it's critical that no alert can be sent
+	Logger "Cannot send alert (neither mutt, mail, sendmail, sendemail or pfSense mail.php could be used)." "ERROR" # Is not marked critical because execution must continue
+}
+
 function TrapError {
 	local job="$0"
 	local line="$1"
@@ -365,10 +445,12 @@ function Spinner {
 	esac
 }
 
+# obsolete, use StripQuotes
 function SedStripQuotes {
         echo $(echo $1 | sed "s/^\([\"']\)\(.*\)\1\$/\2/g")
 }
 
+# Usage: var=$(StripSingleQuotes "$var")
 function StripSingleQuotes {
 	local string="${1}"
 	string="${string/#\'/}" # Remove singlequote if it begins string
@@ -376,6 +458,7 @@ function StripSingleQuotes {
 	echo "$string"
 }
 
+# Usage: var=$(StripDoubleQuotes "$var")
 function StripDoubleQuotes {
 	local string="${1}"
 	string="${string/#\"/}"
