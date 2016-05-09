@@ -4,7 +4,7 @@ PROGRAM=osync
 PROGRAM_VERSION=1.1-pre
 PROGRAM_BINARY=$PROGRAM".sh"
 PROGRAM_BATCH=$PROGRAM"-batch.sh"
-SCRIPT_BUILD=2016041401
+SCRIPT_BUILD=2016050901
 
 ## osync / obackup / pmocr / zsnap install script
 ## Tested on RHEL / CentOS 6 & 7, Fedora 23, Debian 7 & 8, Mint 17 and FreeBSD 8 & 10
@@ -40,6 +40,9 @@ fi
 case $local_os_var in
 	*"BSD"*)
 	GROUP=wheel
+	;;
+	*"Darwin"*)
+	GROUP=admin
 	;;
 	*)
 	GROUP=root
@@ -172,7 +175,7 @@ fi
 
 function Statistics {
 
-        local link="http://instcount.netpower.fr?program=$PROGRAM&version=$PROGRAM_VERSION"
+        local link="http://instcount.netpower.fr?program=$PROGRAM&version=$PROGRAM_VERSION&os=$local_os_var"
         if type wget > /dev/null; then
                 wget -qO- $link > /dev/null 2>&1
                 if [ $? == 0 ]; then
