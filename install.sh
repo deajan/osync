@@ -4,7 +4,7 @@ PROGRAM=osync
 PROGRAM_VERSION=1.1-pre
 PROGRAM_BINARY=$PROGRAM".sh"
 PROGRAM_BATCH=$PROGRAM"-batch.sh"
-SCRIPT_BUILD=2016050901
+SCRIPT_BUILD=2016052501
 
 ## osync / obackup / pmocr / zsnap install script
 ## Tested on RHEL / CentOS 6 & 7, Fedora 23, Debian 7 & 8, Mint 17 and FreeBSD 8 & 10
@@ -13,7 +13,8 @@ SCRIPT_BUILD=2016050901
 CONF_DIR=/etc/$PROGRAM
 BIN_DIR=/usr/local/bin
 SERVICE_DIR_INIT=/etc/init.d
-SERVICE_DIR_SYSTEMD_SYSTEM=/usr/lib/systemd/system
+# Should be /usr/lib/systemd/system, but /lib/systemd/system exists on debian & rhel / fedora
+SERVICE_DIR_SYSTEMD_SYSTEM=/lib/systemd/system
 SERVICE_DIR_SYSTEMD_USER=/etc/systemd/user
 
 ## osync specific code
