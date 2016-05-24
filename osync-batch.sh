@@ -3,7 +3,7 @@ SUBPROGRAM=osync
 PROGRAM="$SUBPROGRAM-batch" # Batch program to run osync / obackup instances sequentially and rerun failed ones
 AUTHOR="(L) 2013-2016 by Orsiris de Jong"
 CONTACT="http://www.netpower.fr - ozy@netpower.fr"
-PROGRAM_BUILD=2016031301
+PROGRAM_BUILD=2016052501
 
 ## Runs an osync /obackup instance for every conf file found
 ## If an instance fails, run it again if time permits
@@ -29,10 +29,6 @@ fi
 function _logger {
 	local value="${1}" # What to log
 	echo -e "$value" >> "$LOG_FILE"
-
-	if [ $_SILENT -eq 0 ]; then
-		echo -e "$value"
-	fi
 }
 
 function Logger {
