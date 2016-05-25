@@ -3,7 +3,7 @@
 PROGRAM="osync" # Rsync based two way sync engine with fault tolerance
 AUTHOR="(C) 2013-2016 by Orsiris de Jong"
 CONTACT="http://www.netpower.fr/osync - ozy@netpower.fr"
-PROGRAM_VERSION=1.1-pre
+PROGRAM_VERSION=1.1-RC1
 PROGRAM_BUILD=2016040701
 IS_STABLE=yes
 
@@ -185,7 +185,7 @@ function SendAlert {
 	fi
 
 	if [ "$_DEBUG" == "yes" ]; then
-		Logger "Debug mode, no warning email will be sent." "NOTICE"
+		Logger "Debug mode, no warning mail will be sent." "NOTICE"
 		return 0
 	fi
 
@@ -218,7 +218,7 @@ function SendAlert {
 	if type mutt > /dev/null 2>&1 ; then
 		echo "$MAIL_ALERT_MSG" | $(type -p mutt) -x -s "$subject" $DESTINATION_MAILS $attachment_command
 		if [ $? != 0 ]; then
-			Logger "Cannot send alert email via $(type -p mutt) !!!" "WARN"
+			Logger "Cannot send alert mail via $(type -p mutt) !!!" "WARN"
 		else
 			Logger "Sent alert mail using mutt." "NOTICE"
 			return 0
@@ -235,10 +235,10 @@ function SendAlert {
 		fi
 		echo "$MAIL_ALERT_MSG" | $(type -p mail) $attachment_command -s "$subject" $DESTINATION_MAILS
 		if [ $? != 0 ]; then
-			Logger "Cannot send alert email via $(type -p mail) with attachments !!!" "WARN"
+			Logger "Cannot send alert mail via $(type -p mail) with attachments !!!" "WARN"
 			echo "$MAIL_ALERT_MSG" | $(type -p mail) -s "$subject" $DESTINATION_MAILS
 			if [ $? != 0 ]; then
-				Logger "Cannot send alert email via $(type -p mail) without attachments !!!" "WARN"
+				Logger "Cannot send alert mail via $(type -p mail) without attachments !!!" "WARN"
 			else
 				Logger "Sent alert mail using mail command without attachment." "NOTICE"
 				return 0
@@ -252,7 +252,7 @@ function SendAlert {
 	if type sendmail > /dev/null 2>&1 ; then
 		echo -e "Subject:$subject\r\n$MAIL_ALERT_MSG" | $(type -p sendmail) $DESTINATION_MAILS
 		if [ $? != 0 ]; then
-			Logger "Cannot send alert email via $(type -p sendmail) !!!" "WARN"
+			Logger "Cannot send alert mail via $(type -p sendmail) !!!" "WARN"
 		else
 			Logger "Sent alert mail using sendmail command without attachment." "NOTICE"
 			return 0
@@ -291,7 +291,7 @@ function SendAlert {
 		fi
 		$(type -p sendemail) -f $SENDER_MAIL -t "$DESTINATION_MAILS" -u "$subject" -m "$MAIL_ALERT_MSG" -s $SMTP_SERVER $SMTP_OPTIONS > /dev/null 2>&1
 		if [ $? != 0 ]; then
-			Logger "Cannot send alert email via $(type -p sendemail) !!!" "WARN"
+			Logger "Cannot send alert mail via $(type -p sendemail) !!!" "WARN"
 		else
 			Logger "Sent alert mail using sendemail command without attachment." "NOTICE"
 			return 0
@@ -302,7 +302,7 @@ function SendAlert {
 	if [ -f /usr/local/bin/mail.php ]; then
 		echo "$MAIL_ALERT_MSG" | /usr/local/bin/mail.php -s="$subject"
 		if [ $? != 0 ]; then
-			Logger "Cannot send alert email via /usr/local/bin/mail.php (pfsense) !!!" "WARN"
+			Logger "Cannot send alert mail via /usr/local/bin/mail.php (pfsense) !!!" "WARN"
 		else
 			Logger "Sent alert mail using pfSense mail.php." "NOTICE"
 			return 0
@@ -310,7 +310,7 @@ function SendAlert {
 	fi
 
 	# If function has not returned 0 yet, assume it's critical that no alert can be sent
-	Logger "Cannot send alert (neither mutt, mail, sendmail, sendemail or pfSense mail.php could be used)." "ERROR" # Is not marked critical because execution must continue
+	Logger "Cannot send alert (neither mutt, mail, sendmail, mailsend, sendemail or pfSense mail.php could be used)." "ERROR" # Is not marked critical because execution must continue
 
 	# Delete tmp log file
 	if [ -f "$ALERT_LOG_FILE" ]; then
