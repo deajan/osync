@@ -4,7 +4,7 @@ PROGRAM="osync" # Rsync based two way sync engine with fault tolerance
 AUTHOR="(C) 2013-2016 by Orsiris de Jong"
 CONTACT="http://www.netpower.fr/osync - ozy@netpower.fr"
 PROGRAM_VERSION=1.1-RC1
-PROGRAM_BUILD=2016052601
+PROGRAM_BUILD=2016052602
 IS_STABLE=yes
 
 source "./ofunctions.sh"
@@ -659,8 +659,8 @@ function sync_attrs {
 	# If target gets updated first, then sync_attr must update initiator's attrs first
 	# For join, remove leading replica paths
 
-	sed -i "s;^${INITIATOR[1]};;g" "$RUN_DIR/$PROGRAM.ctime_mtime.${INITIATOR[0]}.$SCRIPT_PID"
-	sed -i "s;^${TARGET[1]};;g" "$RUN_DIR/$PROGRAM.ctime_mtime.${TARGET[0]}.$SCRIPT_PID"
+	sed -i'.tmp' "s;^${INITIATOR[1]};;g" "$RUN_DIR/$PROGRAM.ctime_mtime.${INITIATOR[0]}.$SCRIPT_PID"
+	sed -i'.tmp' "s;^${TARGET[1]};;g" "$RUN_DIR/$PROGRAM.ctime_mtime.${TARGET[0]}.$SCRIPT_PID"
 
 	if [ "$CONFLICT_PREVALANCE" == "${TARGET[0]}" ]; then
 		local source_dir="${INITIATOR[1]}"

@@ -4,10 +4,10 @@ PROGRAM="osync" # Rsync based two way sync engine with fault tolerance
 AUTHOR="(C) 2013-2016 by Orsiris de Jong"
 CONTACT="http://www.netpower.fr/osync - ozy@netpower.fr"
 PROGRAM_VERSION=1.1-RC1
-PROGRAM_BUILD=2016052601
+PROGRAM_BUILD=2016052602
 IS_STABLE=yes
 
-## FUNC_BUILD=2016052502
+## FUNC_BUILD=2016052602
 ## BEGIN Generic functions for osync & obackup written in 2013-2016 by Orsiris de Jong - http://www.netpower.fr - ozy@netpower.fr
 
 ## type -p does not work on platforms other than linux (bash). If if does not work, always assume output is not a zero exitcode
@@ -577,10 +577,36 @@ function IsNumeric {
 	fi
 }
 
+## from https://gist.github.com/cdown/1163649
+function urlEncode {
+	local length="${#1}"
+
+	local LANG=C
+	for (( i = 0; i < length; i++ )); do
+		local c="${1:i:1}"
+		case $c in
+			[a-zA-Z0-9.~_-])
+			printf "$c"
+			;;
+			*)
+			printf '%%%02X' "'$c"
+			;;
+		esac
+	done
+}
+
+function urlDecode {
+    local url_encoded="${1//+/ }"
+
+    printf '%b' "${url_encoded//%/\\x}"
+}
+
 function CleanUp {
 
 	if [ "$_DEBUG" != "yes" ]; then
 		rm -f "$RUN_DIR/$PROGRAM."*".$SCRIPT_PID"
+		# Fix for sed -i requiring backup extension for BSD & Mac (see all sed -i statements)
+		rm -f "$RUN_DIR/$PROGRAM."*".$SCRIPT_PID.tmp"
 	fi
 }
 
@@ -1778,8 +1804,8 @@ function sync_attrs {
 	# If target gets updated first, then sync_attr must update initiator's attrs first
 	# For join, remove leading replica paths
 
-	sed -i "s;^${INITIATOR[1]};;g" "$RUN_DIR/$PROGRAM.ctime_mtime.${INITIATOR[0]}.$SCRIPT_PID"
-	sed -i "s;^${TARGET[1]};;g" "$RUN_DIR/$PROGRAM.ctime_mtime.${TARGET[0]}.$SCRIPT_PID"
+	sed -i'.tmp' "s;^${INITIATOR[1]};;g" "$RUN_DIR/$PROGRAM.ctime_mtime.${INITIATOR[0]}.$SCRIPT_PID"
+	sed -i'.tmp' "s;^${TARGET[1]};;g" "$RUN_DIR/$PROGRAM.ctime_mtime.${TARGET[0]}.$SCRIPT_PID"
 
 	if [ "$CONFLICT_PREVALANCE" == "${TARGET[0]}" ]; then
 		local source_dir="${INITIATOR[1]}"

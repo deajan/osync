@@ -1,4 +1,4 @@
-## FUNC_BUILD=2016052502
+## FUNC_BUILD=2016052602
 ## BEGIN Generic functions for osync & obackup written in 2013-2016 by Orsiris de Jong - http://www.netpower.fr - ozy@netpower.fr
 
 ## type -p does not work on platforms other than linux (bash). If if does not work, always assume output is not a zero exitcode
@@ -83,6 +83,7 @@ function Dummy {
 	sleep .1
 }
 
+# Sub function of Logger
 function _Logger {
 	local svalue="${1}" # What to log to stdout
 	local lvalue="${2:-$svalue}" # What to log to logfile, defaults to screen value
@@ -97,6 +98,7 @@ function _Logger {
 	fi
 }
 
+# General log function with log levels
 function Logger {
 	local value="${1}" # Sentence to log (in double quotes)
 	local level="${2}" # Log level: PARANOIA_DEBUG, DEBUG, NOTICE, WARN, ERROR, CRITIAL
@@ -137,6 +139,29 @@ function Logger {
 	else
 		_Logger "\e[41mLogger function called without proper loglevel.\e[0m"
 		_Logger "$prefix$value"
+	fi
+}
+
+# QuickLogger subfunction, can be called directly
+function _QuickLogger {
+	local value="${1}"
+	local destination="${2}" # Destination: stdout, log, both
+
+	if ([ "$destination" == "log" ] || [ "$destination" == "both" ]); then
+		echo -e "$(date) - $value" >> "$LOG_FILE"
+	elif ([ "$destination" == "stdout" ] || [ "$destination" == "both" ]); then
+		echo -e "$value"
+	fi
+}
+
+# Generic quick logging function
+function QuickLogger {
+	local value="${1}"
+
+	if [ "$_SILENT" -eq 1 ]; then
+		_QuickLogger "$value" "log"
+	else
+		_QuickLogger "$value" "stdout"
 	fi
 }
 
@@ -557,11 +582,37 @@ function IsNumeric {
 	fi
 }
 
+## from https://gist.github.com/cdown/1163649
+function urlEncode {
+	local length="${#1}"
+
+	local LANG=C
+	for (( i = 0; i < length; i++ )); do
+		local c="${1:i:1}"
+		case $c in
+			[a-zA-Z0-9.~_-])
+			printf "$c"
+			;;
+			*)
+			printf '%%%02X' "'$c"
+			;;
+		esac
+	done
+}
+
+function urlDecode {
+    local url_encoded="${1//+/ }"
+
+    printf '%b' "${url_encoded//%/\\x}"
+}
+
 function CleanUp {
 	__CheckArguments 0 $# ${FUNCNAME[0]} "$@"	#__WITH_PARANOIA_DEBUG
 
 	if [ "$_DEBUG" != "yes" ]; then
 		rm -f "$RUN_DIR/$PROGRAM."*".$SCRIPT_PID"
+		# Fix for sed -i requiring backup extension for BSD & Mac (see all sed -i statements)
+		rm -f "$RUN_DIR/$PROGRAM."*".$SCRIPT_PID.tmp"
 	fi
 }
 
