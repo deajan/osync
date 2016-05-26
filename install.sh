@@ -4,7 +4,7 @@ PROGRAM=osync
 PROGRAM_VERSION=1.1-RC1
 PROGRAM_BINARY=$PROGRAM".sh"
 PROGRAM_BATCH=$PROGRAM"-batch.sh"
-SCRIPT_BUILD=2016052501
+SCRIPT_BUILD=2016052601
 
 ## osync / obackup / pmocr / zsnap install script
 ## Tested on RHEL / CentOS 6 & 7, Fedora 23, Debian 7 & 8, Mint 17 and FreeBSD 8 & 10
@@ -258,6 +258,14 @@ function Statistics {
         return 1
 }
 
+function Usage {
+	echo "Installs $PROGRAM into $BIN_DIR"
+	echo "options:"
+	echo "--silent		Will log and bypass user interaction."
+	echo "--no-stats	Used with --silent in order to refuse sending anonymous install stats."
+	exit 127
+}
+
 _SILENT=0
 _STATS=1
 for i in "$@"
@@ -269,6 +277,8 @@ do
 		--no-stats)
 		_STATS=0
 		;;
+		--help|-h|-?)
+		Usage
 	esac
 done
 
