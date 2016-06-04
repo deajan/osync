@@ -1475,8 +1475,8 @@ function Init {
 			TARGET_BACKUP="$TARGET_BACKUP --suffix .$(date +%Y.%m.%d-%H.%M.%S)"
 		fi
 	else
-		INITIATOR_BACKUP="
-		TARGET_BACKUP="
+		INITIATOR_BACKUP=""
+		TARGET_BACKUP=""
 	fi
 
 	## Sync function actions (0-10)
