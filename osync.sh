@@ -4,7 +4,7 @@ PROGRAM="osync" # Rsync based two way sync engine with fault tolerance
 AUTHOR="(C) 2013-2016 by Orsiris de Jong"
 CONTACT="http://www.netpower.fr/osync - ozy@netpower.fr"
 PROGRAM_VERSION=1.1-RC1
-PROGRAM_BUILD=2016052602
+PROGRAM_BUILD=2016070601
 IS_STABLE=yes
 
 ## FUNC_BUILD=2016052602
@@ -2611,8 +2611,8 @@ function Init {
 			TARGET_BACKUP="$TARGET_BACKUP --suffix .$(date +%Y.%m.%d-%H.%M.%S)"
 		fi
 	else
-		INITIATOR_BACKUP="
-		TARGET_BACKUP="
+		INITIATOR_BACKUP=""
+		TARGET_BACKUP=""
 	fi
 
 	## Sync function actions (0-10)
