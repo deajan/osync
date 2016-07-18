@@ -3,8 +3,8 @@
 PROGRAM="osync" # Rsync based two way sync engine with fault tolerance
 AUTHOR="(C) 2013-2016 by Orsiris de Jong"
 CONTACT="http://www.netpower.fr/osync - ozy@netpower.fr"
-PROGRAM_VERSION=1.1-RC1
-PROGRAM_BUILD=2016070601
+PROGRAM_VERSION=1.1-RC2
+PROGRAM_BUILD=2016071801
 IS_STABLE=yes
 
 source "./ofunctions.sh"
@@ -709,7 +709,7 @@ function sync_attrs {
 	fi
 
 	if [ $retval != 0 ] && [ $retval != 24 ]; then
-		Logger "Updating file attributes on $source [$retval]. Stopping execution." "CRITICAL"
+		Logger "Updating file attributes on $dest_replica [$retval]. Stopping execution." "CRITICAL"
 		if [ $_VERBOSE -eq 0 ] && [ -f "$RUN_DIR/$PROGRAM.attr-update.$dest_replica.$SCRIPT_PID" ]; then
 			Logger "Rsync output:\n$(cat $RUN_DIR/$PROGRAM.attr-update.$dest_replica.$SCRIPT_PID)" "NOTICE"
 		fi
