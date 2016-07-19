@@ -7,7 +7,7 @@ PROGRAM_VERSION=1.1-RC2
 PROGRAM_BUILD=2016071801
 IS_STABLE=yes
 
-## FUNC_BUILD=2016070601
+## FUNC_BUILD=2016071901
 ## BEGIN Generic functions for osync & obackup written in 2013-2016 by Orsiris de Jong - http://www.netpower.fr - ozy@netpower.fr
 
 ## type -p does not work on platforms other than linux (bash). If if does not work, always assume output is not a zero exitcode
@@ -766,7 +766,7 @@ function WaitForCompletion {
 	local caller_name="${4}" # Who called this function
 
 	local soft_alert=0 # Does a soft alert need to be triggered, if yes, send an alert once
-	local log_ttime=0 # local time instance for comparaison
+	local log_time=0 # local time instance for comparaison
 
 	local seconds_begin=$SECONDS # Seconds since the beginning of the script
 	local exec_time=0 # Seconds since the beginning of this function
