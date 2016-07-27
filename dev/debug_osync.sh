@@ -3,9 +3,9 @@
 PROGRAM="osync" # Rsync based two way sync engine with fault tolerance
 AUTHOR="(C) 2013-2016 by Orsiris de Jong"
 CONTACT="http://www.netpower.fr/osync - ozy@netpower.fr"
-PROGRAM_VERSION=1.2-dev-parallel
-PROGRAM_BUILD=2016072703
-IS_STABLE=yes
+PROGRAM_VERSION=1.2-dev-parallel-unstable
+PROGRAM_BUILD=2016072704
+IS_STABLE=no
 
 ## FUNC_BUILD=2016072702
 ## BEGIN Generic functions for osync & obackup written in 2013-2016 by Orsiris de Jong - http://www.netpower.fr - ozy@netpower.fr
@@ -1620,7 +1620,7 @@ function _WriteLockFilesRemote {
 		exit 1
 	else
 		Logger "Locked remote target replica." "DEBUG"
-		LOCK_REMOTE_1
+		LOCK_REMOTE=1
 	fi
 }
 
@@ -1953,15 +1953,18 @@ function sync_attrs {
 	fi
 
 	Logger "Getting ctimes for pending files on initiator." "NOTICE"
-	_get_file_ctime_mtime_local "${INITIATOR[1]}" "${INITIATOR[0]}" "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}-cleaned.$SCRIPT_PID"
+	_get_file_ctime_mtime_local "${INITIATOR[1]}" "${INITIATOR[0]}" "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}-cleaned.$SCRIPT_PID" &
+	pids="$!"
 
 	Logger "Getting ctimes for pending files on target." "NOTICE"
 	if [ "$REMOTE_OPERATION" != "yes" ]; then
-		_get_file_ctime_mtime_local "${TARGET[1]}" "${TARGET[0]}" "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}-cleaned.$SCRIPT_PID"
+		_get_file_ctime_mtime_local "${TARGET[1]}" "${TARGET[0]}" "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}-cleaned.$SCRIPT_PID" &
+		pids="$pids $!"
 	else
-		_get_file_ctime_mtime_remote "${TARGET[1]}" "${TARGET[0]}" "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}-cleaned.$SCRIPT_PID"
+		_get_file_ctime_mtime_remote "${TARGET[1]}" "${TARGET[0]}" "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}-cleaned.$SCRIPT_PID" &
+		pids="$pids $!"
 	fi
-
+	WaitForPids $pids
 
 	# If target gets updated first, then sync_attr must update initiator's attrs first
 	# For join, remove leading replica paths
