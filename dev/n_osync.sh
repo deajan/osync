@@ -3,7 +3,7 @@
 PROGRAM="osync" # Rsync based two way sync engine with fault tolerance
 AUTHOR="(C) 2013-2016 by Orsiris de Jong"
 CONTACT="http://www.netpower.fr/osync - ozy@netpower.fr"
-PROGRAM_VERSION=1.1.1-dev
+PROGRAM_VERSION=1.2-dev-parallel
 PROGRAM_BUILD=2016072703
 IS_STABLE=yes
 
@@ -126,52 +126,6 @@ function CheckCurrentConfig {
 
 ###### Osync specific functions (non shared)
 
-function _CreateStateDirsLocal {
-	local replica_state_dir="${1}"
-	__CheckArguments 1 $# ${FUNCNAME[0]} "$@"	#__WITH_PARANOIA_DEBUG
-
-	if ! [ -d "$replica_state_dir" ]; then
-		$COMMAND_SUDO mkdir -p "$replica_state_dir" > "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$SCRIPT_PID" 2>&1
-		if [ $? != 0 ]; then
-			Logger "Cannot create state dir [$replica_state_dir]." "CRITICAL"
-			Logger "Command output:\n$(cat $RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$SCRIPT_PID)" "ERROR"
-			exit 1
-		fi
-	fi
-}
-
-function _CreateStateDirsRemote {
-	local replica_state_dir="${1}"
-	__CheckArguments 1 $# ${FUNCNAME[0]} "$@"	#__WITH_PARANOIA_DEBUG
-
-	local cmd=
-
-	CheckConnectivity3rdPartyHosts
-	CheckConnectivityRemoteHost
-
-	cmd=$SSH_CMD' "if ! [ -d \"'$replica_state_dir'\" ]; then '$COMMAND_SUDO' mkdir -p \"'$replica_state_dir'\"; fi" > "'$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$SCRIPT_PID'" 2>&1'
-	Logger "cmd: $cmd" "DEBUG"
-	eval "$cmd" &
-	WaitForTaskCompletion $! 720 1800 ${FUNCNAME[0]}
-	if [ $? != 0 ]; then
-		Logger "Cannot create remote state dir [$replica_state_dir]." "CRITICAL"
-		Logger "Command output:\n$(cat $RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$SCRIPT_PID)" "ERROR"
-		exit 1
-	fi
-}
-
-#TODO: also create deleted and backup dirs
-function CreateStateDirs {
-	__CheckArguments 0 $# ${FUNCNAME[0]} "$@"	#__WITH_PARANOIA_DEBUG
-
-	_CreateStateDirsLocal "${INITIATOR[1]}${INITIATOR[3]}"
-	if [ "$REMOTE_OPERATION" != "yes" ]; then
-		_CreateStateDirsLocal "${TARGET[1]}${TARGET[3]}"
-	else
-		_CreateStateDirsRemote "${TARGET[1]}${TARGET[3]}"
-	fi
-}
-
 function _CheckReplicaPathsLocal {
 	local replica_path="${1}"
 	__CheckArguments 1 $# ${FUNCNAME[0]} "$@"	#__WITH_PARANOIA_DEBUG
@@ -226,6 +180,35 @@ function _CheckReplicaPathsRemote {
 	fi
 }
 
+#TODO: organize this function into WaitforTaskCompletion, and add optional parameter to exit on error
+function WaitForPids {
+
+	local errors=0
+
+	while [ "$#" -gt 0 ]; do
+		for pid in "$@"; do
+			shift
+			if kill -0 "$pid" > /dev/null 2>&1; then
+				Logger "$pid is alive" "DEBUG"
+				set -- "$@" "$pid"
+			else
+				wait "$pid"
+				result=$?
+				if [ $result -eq 0 ]; then
+					Logger "$pid exited okay with $result" "DEBUG"
+				else
+					errors=$((errors+1))
+					Logger "$pid exited with bad status $result" "DEBUG"
+				fi
+			fi
+		done
+		sleep .1
+	done
+	if [ $errors -gt 0 ]; then
+		exit 1
+	fi
+}
+
 function CheckReplicaPaths {
 	__CheckArguments 0 $# ${FUNCNAME[0]} "$@"	#__WITH_PARANOIA_DEBUG
 
@@ -239,12 +222,67 @@ function CheckReplicaPaths {
 	#	fi
 	#fi
 
-	_CheckReplicaPathsLocal "${INITIATOR[1]}"
+	_CheckReplicaPathsLocal "${INITIATOR[1]}" &
+	pids="$!"
 	if [ "$REMOTE_OPERATION" != "yes" ]; then
-		_CheckReplicaPathsLocal "${TARGET[1]}"
+		_CheckReplicaPathsLocal "${TARGET[1]}" &
+		pids="$pids $!"
 	else
-		_CheckReplicaPathsRemote "${TARGET[1]}"
+		_CheckReplicaPathsRemote "${TARGET[1]}" &
+		pids="$pids $!"
 	fi
+
+	WaitForPids $pids
+}
+
+function _CreateStateDirsLocal {
+	local replica_state_dir="${1}"
+	__CheckArguments 1 $# ${FUNCNAME[0]} "$@"	#__WITH_PARANOIA_DEBUG
+
+	if ! [ -d "$replica_state_dir" ]; then
+		$COMMAND_SUDO mkdir -p "$replica_state_dir" > "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$SCRIPT_PID" 2>&1
+		if [ $? != 0 ]; then
+			Logger "Cannot create state dir [$replica_state_dir]." "CRITICAL"
+			Logger "Command output:\n$(cat $RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$SCRIPT_PID)" "ERROR"
+			exit 1
+		fi
+	fi
+}
+
+function _CreateStateDirsRemote {
+	local replica_state_dir="${1}"
+	__CheckArguments 1 $# ${FUNCNAME[0]} "$@"	#__WITH_PARANOIA_DEBUG
+
+	local cmd=
+
+	CheckConnectivity3rdPartyHosts
+	CheckConnectivityRemoteHost
+
+	cmd=$SSH_CMD' "if ! [ -d \"'$replica_state_dir'\" ]; then '$COMMAND_SUDO' mkdir -p \"'$replica_state_dir'\"; fi" > "'$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$SCRIPT_PID'" 2>&1'
+	Logger "cmd: $cmd" "DEBUG"
+	eval "$cmd" &
+	WaitForTaskCompletion $! 720 1800 ${FUNCNAME[0]}
+	if [ $? != 0 ]; then
+		Logger "Cannot create remote state dir [$replica_state_dir]." "CRITICAL"
+		Logger "Command output:\n$(cat $RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$SCRIPT_PID)" "ERROR"
+		exit 1
+	fi
+}
+
+#TODO: also create deleted and backup dirs
+function CreateStateDirs {
+	__CheckArguments 0 $# ${FUNCNAME[0]} "$@"	#__WITH_PARANOIA_DEBUG
+
+	_CreateStateDirsLocal "${INITIATOR[1]}${INITIATOR[3]}" &
+	pids="$!"
+	if [ "$REMOTE_OPERATION" != "yes" ]; then
+		_CreateStateDirsLocal "${TARGET[1]}${TARGET[3]}" &
+		pids="$pids $!"
+	else
+		_CreateStateDirsRemote "${TARGET[1]}${TARGET[3]}" &
+		pids="$pids $!"
+	fi
+	WaitForPids $pids
 }
 
 function _CheckDiskSpaceLocal {
@@ -291,11 +329,14 @@ function _CheckDiskSpaceRemote {
 function CheckDiskSpace {
 	__CheckArguments 0 $# ${FUNCNAME[0]} "$@"	#__WITH_PARANOIA_DEBUG
 
-	_CheckDiskSpaceLocal "${INITIATOR[1]}"
+	_CheckDiskSpaceLocal "${INITIATOR[1]}" &
+	pids="$!"
 	if [ "$REMOTE_OPERATION" != "yes" ]; then
-		_CheckDiskSpaceLocal "${TARGET[1]}"
+		_CheckDiskSpaceLocal "${TARGET[1]}" &
+		pids="$pids $!"
 	else
-		_CheckDiskSpaceRemote "${TARGET[1]}"
+		_CheckDiskSpaceRemote "${TARGET[1]}" &
+		pifs="$pids $!"
 	fi
 }
 
@@ -338,12 +379,16 @@ function _WriteLockFilesRemote {
 function WriteLockFiles {
 	__CheckArguments 0 $# ${FUNCNAME[0]} "$@"	#__WITH_PARANOIA_DEBUG
 
-	_WriteLockFilesLocal "${INITIATOR[2]}"
+	_WriteLockFilesLocal "${INITIATOR[2]}" &
+	pids="$!"
 	if [ "$REMOTE_OPERATION" != "yes" ]; then
-		_WriteLockFilesLocal "${TARGET[2]}"
+		_WriteLockFilesLocal "${TARGET[2]}" &
+		pids="$pids $!"
 	else
-		_WriteLockFilesRemote "${TARGET[2]}"
+		_WriteLockFilesRemote "${TARGET[2]}" &
+		pids="$pids $!"
 	fi
+	WaitForPids $pids
 }
 
 function _CheckLocksLocal {
@@ -363,7 +408,7 @@ function _CheckLocksLocal {
 		if [ $? != 0 ]; then
 			Logger "There is a dead osync lock in [$lockfile]. Instance [$lock_pid] no longer running. Resuming." "NOTICE"
 		else
-			Logger "There is already a local instance of osync running [$lock_pid]. Cannot start." "CRITICAL"
+			Logger "There is already a local instance of osync running [$lock_pid] for this replica. Cannot start." "CRITICAL"
 			exit 1
 		fi
 	fi
@@ -433,6 +478,8 @@ function CheckLocks {
 			exit 1
 		fi
 	fi
+
+	#TODO: do not parallelize the detection of locks because of pids
 	_CheckLocksLocal "${INITIATOR[2]}"
 	if [ "$REMOTE_OPERATION" != "yes" ]; then
 		_CheckLocksLocal "${TARGET[2]}"
@@ -486,16 +533,19 @@ function UnlockReplicas {
 	fi
 
 	if [ $LOCK_LOCAL -eq 1 ]; then
-		_UnlockReplicasLocal "${INITIATOR[2]}"
+		_UnlockReplicasLocal "${INITIATOR[2]}" &
+		pids="$!"
 	fi
 
 	if [ "$REMOTE_OPERATION" != "yes" ]; then
 		if [ $LOCK_LOCAL -eq 1 ]; then
-			_UnlockReplicasLocal "${TARGET[2]}"
+			_UnlockReplicasLocal "${TARGET[2]}" &
+			pids="$pids $!"
 		fi
 	else
 		if [ $LOCK_REMOTE -eq 1 ]; then
-			_UnlockReplicasRemote "${TARGET[2]}"
+			_UnlockReplicasRemote "${TARGET[2]}" &
+			pids="$pids $!"
 		fi
 	fi
 }
@@ -1320,24 +1370,32 @@ function SoftDelete {
 	if [ "$CONFLICT_BACKUP" != "no" ] && [ $CONFLICT_BACKUP_DAYS -ne 0 ]; then
 		Logger "Running conflict backup cleanup." "NOTICE"
 
-		_SoftDeleteLocal "${INITIATOR[0]}" "${INITIATOR[1]}${INITIATOR[4]}" $CONFLICT_BACKUP_DAYS
+		_SoftDeleteLocal "${INITIATOR[0]}" "${INITIATOR[1]}${INITIATOR[4]}" $CONFLICT_BACKUP_DAYS &
+		pids="$!"
 		if [ "$REMOTE_OPERATION" != "yes" ]; then
-			_SoftDeleteLocal "${TARGET[0]}" "${TARGET[1]}${TARGET[4]}" $CONFLICT_BACKUP_DAYS
+			_SoftDeleteLocal "${TARGET[0]}" "${TARGET[1]}${TARGET[4]}" $CONFLICT_BACKUP_DAYS &
+			pids="$pids $!"
 		else
-			_SoftDeleteRemote "${TARGET[0]}" "${TARGET[1]}${TARGET[4]}" $CONFLICT_BACKUP_DAYS
+			_SoftDeleteRemote "${TARGET[0]}" "${TARGET[1]}${TARGET[4]}" $CONFLICT_BACKUP_DAYS &
+			pids="$pids $!"
 		fi
 	fi
+	WaitForPids $pids
 
 	if [ "$SOFT_DELETE" != "no" ] && [ $SOFT_DELETE_DAYS -ne 0 ]; then
 		Logger "Running soft deletion cleanup." "NOTICE"
 
-		_SoftDeleteLocal "${INITIATOR[0]}" "${INITIATOR[1]}${INITIATOR[5]}" $SOFT_DELETE_DAYS
+		_SoftDeleteLocal "${INITIATOR[0]}" "${INITIATOR[1]}${INITIATOR[5]}" $SOFT_DELETE_DAYS &
+		pids="$!"
 		if [ "$REMOTE_OPERATION" != "yes" ]; then
-			_SoftDeleteLocal "${TARGET[0]}" "${TARGET[1]}${TARGET[5]}" $SOFT_DELETE_DAYS
+			_SoftDeleteLocal "${TARGET[0]}" "${TARGET[1]}${TARGET[5]}" $SOFT_DELETE_DAYS &
+			pids="$pids $!"
 		else
-			_SoftDeleteRemote "${TARGET[0]}" "${TARGET[1]}${TARGET[5]}" $SOFT_DELETE_DAYS
+			_SoftDeleteRemote "${TARGET[0]}" "${TARGET[1]}${TARGET[5]}" $SOFT_DELETE_DAYS &
+			pids="$pids $!"
 		fi
 	fi
+	WaitForPids $pids
 }
 
 function Init {
@@ -1601,8 +1659,9 @@ if [ "$CONFLICT_PREVALANCE" == "" ]; then
 	CONFLICT_PREVALANCE=initiator
 fi
 
-LOCK_LOCAL=0
-LOCK_REMOTE=0
+#TODO: lock_local is in a subprocess so it won't update, rethink this
+LOCK_LOCAL=1
+LOCK_REMOTE=1
 
 FORCE_UNLOCK=0
 no_maxtime=0
@@ -1745,6 +1804,7 @@ opts="${opts# *}"
 	else
 		LOG_FILE="$LOGFILE"
 	fi
+	Logger "Script begin ! Logging to [$LOG_FILE]." "DEBUG"
 
 	if [ "$IS_STABLE" != "yes" ]; then
                 Logger "This is an unstable dev build. Please use with caution." "WARN"
