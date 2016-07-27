@@ -1,4 +1,4 @@
-## FUNC_BUILD=2016072701
+## FUNC_BUILD=2016071902
 ## BEGIN Generic functions for osync & obackup written in 2013-2016 by Orsiris de Jong - http://www.netpower.fr - ozy@netpower.fr
 
 ## type -p does not work on platforms other than linux (bash). If if does not work, always assume output is not a zero exitcode
@@ -38,7 +38,7 @@ fi						#__WITH_PARANOIA_DEBUG
 ## allow debugging from command line with _DEBUG=yes
 if [ ! "$_DEBUG" == "yes" ]; then
 	_DEBUG=no
-	SLEEP_TIME=.01 # Tested under linux bash / FreeBSD
+	SLEEP_TIME=.1
 	_VERBOSE=0
 else
 	SLEEP_TIME=1
