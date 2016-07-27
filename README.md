@@ -17,23 +17,24 @@ Osync provides the following capabilities
 - Directory monitoring
 - Running on schedule or as daemon
 - Batch runner for multiple sync tasks with rerun option for failed sync tasks
-- ACL synchronization
 
-osync uses a initiator / target sync schema. It can sync local to local or local to remote directories. By definition, initiator replica is always a local directory on the system osync runs on.
-osync uses pidlocks to prevent multiple concurrent sync processes on/to the same initiator / target replica.
-You may launch concurrent sync processes on the same system but only for different initiator replicas.
-osync tasks may be launched sequentially by osync osync-batch tool.
+Osync uses a master / slave sync schema. It can sync local to local or local to remote directories. By definition, master replica is always a local directory on the system osync runs on.
+Osync uses pidlocks to prevent multiple concurrent sync processes on/to the same master / slave replica. Be sure a sync process is finished before launching next one, or use osync-batch.
+You may launch concurrent sync processes on the same system but only for different master replicas.
 
-Currently, it has been tested on CentOS 5.x, 6.x, 7.x, Debian 6, Debian 7, Linux Mint 14-17, Ubuntu 12.04, 12.10, FreeBSD 8.3, 10.1, 10.3, Mac OS X and pfSense.
+Currently, it has been tested on CentOS 5.x, 6.x, 7.x, Debian 6.0.7, Linux Mint 14-17, Ubuntu 12.04 and 12.10, FreeBSD 8.3 and 10.1.
 Microsoft Windows is supported via MSYS or Cygwin.
+Some users report osync to work on MacOS X too.
 
 
 ## Installation
 
+Stable release is v1.1 and will be the last of v1 series.
+
 Osync has been designed to not delete any data, but rather make backups of conflictual files or soft deletes.
 Nevertheless, you should always have a neat backup of your data before trying a new sync tool.
 
-You can download the latest stable release of Osync at www.netpower.fr/osync or https://github.com/deajan/osync/archive/v1.1.tar.gz
+You can download the latest stable release of Osync at www.netpower.fr/osync or https://github.com/deajan/osync/archive/v1.01.tar.gz
 
 You may also get the last development version at https://github.com/deajan/osync with the following command
 
@@ -55,11 +56,11 @@ On MSYS, On top of your basic install, you need msys-rsync and msys-coreutils-ex
 Since osync v1.1 the config file format has changed in semantics and adds new config options.
 Also, master is now called initiator and slave is now called target.
 
-You can upgrade all v1.0x-v1.1-dev config files by running the upgrade script
+You can upgrade all v1.0x config files by running the upgrade script
 
 	$ ./upgrade-v1.0x-v1.1x.sh /etc/osync/your-config-file.conf
 
-The script will backup your config file, update it's content and try to connect to initiator and target replicas to update the state dir.
+The script will backup your config file, update it's content and try to connect to master and remote replicas to update the state dir.
 
 ## Usage
 
@@ -69,8 +70,8 @@ Please use double quotes as path delimiters. Do not use escaped characters in pa
 
 QuickSync example
 -----------------
-	# osync.sh --initiator="/path/to/dir1" --target="/path/to/remote dir2"
-	# osync.sh --initiator="/path/to/another dir" --target="ssh://user@host.com:22//path/to/dir2" --rsakey=/home/user/.ssh/id_rsa_private_key_example.com
+	# osync.sh --master="/path/to/dir1" --slave="/path/to/remote dir2"
+	# osync.sh --master="/path/to/another dir" --slave="ssh://user@host.com:22//path/to/dir2" --rsakey=/home/user/.ssh/id_rsa_private_key_example.com
 
 Running osync with a Configuration file
 ---------------------------------------
@@ -111,9 +112,9 @@ Having multiple conf files can then be run in a single cron command like
 
 Daemon mode
 -----------
-Additionnaly, you may run osync in monitor mode, which means it will perform a sync upon file operations on initiator replica.
-This can be a drawback on functionnality versus scheduled mode because this mode only launches a sync task if there are file modifications on the initiator replica, without being able to monitor the target replica.
-Target replica changes are only synced when initiator replica changes occur, or when a given amount of time (default 600 seconds) passed without any changes on initiator replica.
+Additionnaly, you may run osync in monitor mode, which means it will perform a sync upon file operations on master replica.
+This can be a drawback on functionnality versus scheduled mode because this mode only launches a sync task if there are file modifications on the master replica, without being able to monitor the slave replica.
+Slave replica changes are only synced when master replica changes occur, or when a given amount of time (default 600 seconds) passed without any changes on master replica.
 File monitor mode can also be launched as a daemon with an init script. Please read the documentation for more info.
 Note that monitoring changes requires inotifywait command (inotify-tools package for most Linux distributions).
 BSD, MacOS X and Windows are not yet supported for this operation mode, unless you find a inotify-tools package on these OSes.
@@ -133,10 +134,10 @@ Systemd specific (one service per config file)
 
 Troubleshooting
 ---------------
-You may find osync's logs in /var/log/osync.*.log (or current directory if /var/log is not writable).
+You may find osync's logs in /var/log/osync-*.log (or current directory if /var/log is not writable).
 Additionnaly, you can use the --verbose flag see to what actions are going on.
 
 ## Author
 
 Feel free to mail me for limited support in my free time :)
-Orsiris de Jong | ozy@netpower.fr
+Orsiris "Ozy" de Jong | ozy@netpower.fr
