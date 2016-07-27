@@ -2079,7 +2079,7 @@ local TARGET_STATE_DIR="${TARGET[1]}${TARGET[3]}"
 local DELETE_CMD=(
 $SSH_CMD ERROR_ALERT=0 sync_on_changes=$sync_on_changes _SILENT=$_SILENT _DEBUG=$_DEBUG _DRYRUN=$_DRYRUN _VERBOSE=$_VERBOSE COMMAND_SUDO=$COMMAND_SUDO FILE_LIST="$(EscapeSpaces "$TARGET_STATE_DIR/$deleted_list_file")" REPLICA_DIR="$(EscapeSpaces "$replica_dir")" DELETE_DIR="$(EscapeSpaces "$deletion_dir")" FAILED_DELETE_LIST="$(EscapeSpaces "${TARGET[1]}${TARGET[3]}/$deleted_failed_list_file")" 'bash -s'
 )
-local DELETE_CMD_INPUT = $(cat << 'ENDSSH'
+local DELETE_CMD_INPUT=$(cat << 'ENDSSH'
 	## The following lines are executed remotely
 	function _logger {
 		local value="${1}" # What to log
