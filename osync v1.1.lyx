@@ -475,7 +475,7 @@ initiator replica
 \end_layout
 
 \begin_layout Standard
-The second directory, called the 
+The other directory, called the 
 \emph on
 target replica
 \emph default
@@ -503,6 +503,14 @@ initiator
  and 
 \emph on
 target replicas
+\emph default
+.
+\end_layout
+
+\begin_layout Standard
+Any osync configuration file that gets executed is called an 
+\emph on
+osync task
 \emph default
 .
 \end_layout
@@ -1727,7 +1735,11 @@ Remark: When exiting osync daemon, the process will continue to run for
 \end_layout
 
 \begin_layout Paragraph
-Init.d service files
+init.d service files
+\end_layout
+
+\begin_layout Standard
+For init.d systems, syntax is:
 \end_layout
 
 \begin_layout Standard
@@ -1761,6 +1773,10 @@ Service control just works like with standard system services.
 
 \begin_layout Paragraph
 systemd service files
+\end_layout
+
+\begin_layout Standard
+For systemd systems, syntax is:
 \end_layout
 
 \begin_layout Standard
