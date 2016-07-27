@@ -101,7 +101,7 @@ osync v1.1 Documentation
 \end_layout
 
 \begin_layout Date
-07 July 2016
+27 July 2016
 \end_layout
 
 \begin_layout Standard
@@ -164,7 +164,7 @@ Synchronization is usually found in two flavors, bloc level sync and file
  While whole bloc level synchronization is generally a good way of doing,
  it's also very greedy in network ressources and is not easy to setup.
  That's where file level sync comes in handy, where only some directories
- need to be synced.
+ & files need to be synced.
 \end_layout
 
 \begin_layout Standard
@@ -195,7 +195,7 @@ What would happen if a power fault occurs while synchronization is going
 \end_layout
 
 \begin_layout Subsection
-What exactly osync can do
+What osync can do
 \end_layout
 
 \begin_layout Subsubsection
@@ -213,12 +213,12 @@ It is time controlled, which means you can decide how much time it should
 \end_layout
 
 \begin_layout Standard
-It's designed to resume failed or stopped sync tasks, and totally restart
+It's designed to resume failed or stopped sync tasks, or totally restart
  the sync task if resume fails.
 \end_layout
 
 \begin_layout Standard
-It can keep an multiple versions of a file in case of a conflict.
+It can keep multiple versions of a file in case of a conflict.
 \end_layout
 
 \begin_layout Standard
@@ -228,7 +228,7 @@ It handles soft deletion.
 \begin_inset Quotes sld
 \end_inset
 
-deleted
+.osync_workdir/deleted
 \begin_inset Quotes srd
 \end_inset
 
@@ -241,7 +241,8 @@ It will automatically clean old files (soft deleted and conflict backups)
 \end_layout
 
 \begin_layout Standard
-It will perform various checks before launching a synchronization.
+It will perform various checks before launching a synchronization like free
+ disk space.
 \end_layout
 
 \begin_layout Subsubsection
@@ -269,7 +270,8 @@ Multiple concurrent instances of osync can be run as long as they don't
 \end_layout
 
 \begin_layout Standard
-A batch processing script is included to launch sequential sync tasks.
+A batch processing script is included (osync-batch.sh) to launch sequential
+ sync tasks.
  Failed sync tasks are rerun if every other task has completed and there's
  still some time left in a given timespan.
 \end_layout
@@ -291,8 +293,8 @@ You may run osync manually, schedule it with cron, or have it monitor a
 
 \begin_layout Standard
 osync has been succesfully tested on RHEL / CentOS 5, CentOS 6, Centos 7,
- Debian Linux 6.0.7, Linux Mint 14, 17, FreeBSD 8.3, 10.3, pfSense 2.x, Mac OS
- X, and Windows using msys & cygwin environment.
+ Debian 6, Debian 7, Linux Mint 14, 17, FreeBSD 8.3, 10.3, pfSense 2.x, Mac
+ OS X, and Windows using msys & cygwin environment.
 \end_layout
 
 \begin_layout Subsubsection
@@ -330,7 +332,85 @@ Disavantages:
 \end_layout
 
 \begin_layout Standard
-- There's no muliinitiator replication in osync V1.
+- There's no multi-master replication in osync V1.
+ Hence, if you want to sync replicas A, B, and C using osync, you'll have
+ to use one of the following schemas:
+\end_layout
+
+\begin_layout Paragraph
+Replicate 3-way with A as master
+\end_layout
+
+\begin_layout Standard
+Run the following tasks sequentially where A is the initiatior:
+\end_layout
+
+\begin_layout Standard
+Replicate A & B
+\end_layout
+
+\begin_layout Standard
+Replicate A & C
+\end_layout
+
+\begin_layout Standard
+Replicate A & B
+\end_layout
+
+\begin_layout Paragraph
+Replicate 3-way with A & B as masters
+\end_layout
+
+\begin_layout Standard
+Run the following tasks from each system.
+ Be sure they won't run concurrently (osync will detect that another replication
+ is still running, and abort the current one):
+\end_layout
+
+\begin_layout Standard
+Replicate A & B where A is the initiator
+\end_layout
+
+\begin_layout Standard
+Replicate B & C where B is the initiator
+\end_layout
+
+\begin_layout Standard
+Replicate C & A where C is the initiator
+\end_layout
+
+\begin_layout Subsection
+Why use osync
+\end_layout
+
+\begin_layout Standard
+There are a lot of file sync tools out there, some probably better than
+ osync depending on the use case.
+\end_layout
+
+\begin_layout Standard
+osync has been basically written to be low bandwidth friendly, with resume
+ options for unstable internet links (but it will also do great on a fiber
+ link :)).
+\end_layout
+
+\begin_layout Standard
+It has also been written to be a setup and forget tool, without any user
+ interaction like manual conflict resolution.
+\end_layout
+
+\begin_layout Standard
+osync also is one of the few tools that support ACL synchronization.
+\end_layout
+
+\begin_layout Standard
+At least, osync consumes very little RAM and CPU ressources and is suitable
+ from lower en hardware up to serveres.
+\end_layout
+
+\begin_layout Standard
+Hence, it has some unique features that make it a good tool depending on
+ the use case.
 \end_layout
 
 \begin_layout Subsection
@@ -433,6 +513,57 @@ In the following examples, a special user called
 syncuser
 \emph default
  is used for osync.
+\end_layout
+
+\begin_layout Subsection
+How osync solves sync conflicts
+\end_layout
+
+\begin_layout Standard
+Conflict resolution is done automatically.
+ When a file is modified on both replicas, osync compares the timestamps
+ on both replicas and keeps the most recent file.
+\end_layout
+
+\begin_layout Standard
+In the highly uncommon case where both files have the exact same timestamp,
+ a configuration value called CONFLICT_PREVALANCE choses the which replica's
+ file will be kept.
+ By default, Initiator is chosen, unless specified otherwise in the config
+ file.
+\end_layout
+
+\begin_layout Standard
+The file that isn't kept is copied to 
+\begin_inset Quotes sld
+\end_inset
+
+.osync_wordir/backups
+\begin_inset Quotes srd
+\end_inset
+
+ directory of the replica by default, with its full path relative to the
+ replica, unless specified otherwise by the CONFLICT_BACKUP configuration
+ value.
+\end_layout
+
+\begin_layout Standard
+After an amount of days set by CONFLICT_BACKUP_DAYS, which is 30 by default,
+ the backed up file is deleted.
+\end_layout
+
+\begin_layout Standard
+If CONFLICT_BACKUP_MULTIPLE is set to YES (disabled by default), multiple
+ versions of the backed up files are kept, with a timestamp suffix like
+ 
+\begin_inset Quotes sld
+\end_inset
+
+2016.12.31-12.00.01
+\begin_inset Quotes srd
+\end_inset
+
+.
 \end_layout
 
 \begin_layout Section
@@ -599,6 +730,20 @@ $ touch /initiator/replica/othertest.file
 
 \begin_layout Standard
 Repeat that step for the target replica.
+\end_layout
+
+\begin_layout Subsection
+Time setup
+\end_layout
+
+\begin_layout Standard
+WARNING: osync's conflict resolution relies on timestamps, so it is very
+ important for all systems osync runs / syncs to, to have a reliable and
+ common timesource.
+\end_layout
+
+\begin_layout Standard
+Please consider setting up NTPD first before you plan to run osync.
 \end_layout
 
 \begin_layout Subsection
@@ -1266,7 +1411,11 @@ Also, edit RSYNC_EXECUTABLE value on any of your sync configuration files
 \end_layout
 
 \begin_layout Section
-Getting osync
+Getting and running osync
+\end_layout
+
+\begin_layout Subsection
+Downloading osync
 \end_layout
 
 \begin_layout Standard
@@ -1355,7 +1504,7 @@ It will also copy daemon required files to /etc/init.d or /usr/lib/systemd/syste
  and /etc/systemd/user depending on your distribution.
 \end_layout
 
-\begin_layout Section
+\begin_layout Subsection
 \begin_inset CommandInset label
 LatexCommand label
 name "sec:Running-Osync-in"
@@ -1420,7 +1569,7 @@ $ ./osync.sh --initiator=/path/to/dir2 --target=ssh://remoteuser@remotehost.com:
 
 \end_layout
 
-\begin_layout Section
+\begin_layout Subsection
 \begin_inset CommandInset label
 LatexCommand label
 name "sec:Running-Osync-with-config-file"
@@ -1520,7 +1669,7 @@ You may find the sync log under /var/log/osync-your_sync.log or under the
  current directory if /var/log is not writable.
 \end_layout
 
-\begin_layout Section
+\begin_layout Subsection
 \begin_inset CommandInset label
 LatexCommand label
 name "sec:Running-Osync-as-daemon"
@@ -1530,7 +1679,7 @@ name "sec:Running-Osync-as-daemon"
 Running osync as deamon
 \end_layout
 
-\begin_layout Subsection
+\begin_layout Subsubsection
 Manually
 \end_layout
 
@@ -1558,7 +1707,7 @@ $ ./osync.sh /etc/osync/my_sync.conf --on-changes
 
 \end_layout
 
-\begin_layout Subsection
+\begin_layout Subsubsection
 As a system service
 \end_layout
 
@@ -1570,6 +1719,15 @@ If you plan to run osync on a regular basis in file monitor mode, you might
 \begin_layout Standard
 From the directory you downloaded osync, run the install.sh script and enable
  the service.
+\end_layout
+
+\begin_layout Standard
+Remark: When exiting osync daemon, the process will continue to run for
+ up to a minute to unlock replicas and termine sub processes.
+\end_layout
+
+\begin_layout Paragraph
+Init.d service files
 \end_layout
 
 \begin_layout Standard
@@ -1599,6 +1757,113 @@ osync then scans for *.conf files in /etc/osync and will run an instance
 
 \begin_layout Standard
 Service control just works like with standard system services.
+\end_layout
+
+\begin_layout Paragraph
+systemd service files
+\end_layout
+
+\begin_layout Standard
+\begin_inset listings
+inline false
+status open
+
+\begin_layout Plain Layout
+
+# systemctl start osync-srv@config_file
+\end_layout
+
+\begin_layout Plain Layout
+
+# systemctl enable osync-srv@config_file
+\end_layout
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Standard
+With systemd, every config file found in /etc/osync can be controlled as
+ a separate service.
+\end_layout
+
+\begin_layout Subsection
+Running osync batch
+\end_layout
+
+\begin_layout Standard
+If you have multiple configuration files in /etc/osync that you would like
+ to run sequentially, and re-run failed sync tasks, osync comes with a tool
+ called osync-batch.
+\end_layout
+
+\begin_layout Standard
+It will execute all osync conf files in alphanumerical order, in a given
+ timespan.
+\end_layout
+
+\begin_layout Standard
+osync-batch takes the following non mandatory parameters:
+\end_layout
+
+\begin_layout Labeling
+\labelwidthstring 00.00.0000
+–silent Will launch osync tasks silently
+\end_layout
+
+\begin_layout Labeling
+\labelwidthstring 00.00.0000
+–dry Will launch osnyc tasks as simulations only
+\end_layout
+
+\begin_layout Labeling
+\labelwidthstring 00.00.0000
+–verbose Will launch osync tasks with detailed output, including changed
+ and deleted files lists on both sides
+\end_layout
+
+\begin_layout Labeling
+\labelwidthstring 00.00.0000
+–no-maxtime Will launch osync taks without any maximum execution time
+\end_layout
+
+\begin_layout Labeling
+\labelwidthstring 00.00.0000
+–path= By default, osync-batch.sh searches for config files in /etc/osync.
+ This parameter overrides the default value.
+\end_layout
+
+\begin_layout Labeling
+\labelwidthstring 00.00.0000
+–max-reruns= By default osync-batch.sh tries to rerun failed tasks 3 times.
+ This parameter overrides the default value.
+\end_layout
+
+\begin_layout Labeling
+\labelwidthstring 00.00.0000
+–max-exec-time= By default, osync-batch.sh won't launch next task if 36000
+ seconds have passed.
+ This parameter overrides the default value.
+\end_layout
+
+\begin_layout Standard
+You may program a cron task for osync-batch.sh like
+\end_layout
+
+\begin_layout Standard
+\begin_inset listings
+inline false
+status open
+
+\begin_layout Plain Layout
+
+00 * * * * syncuser /usr/local/bin/osync-batch.sh --silent
+\end_layout
+
+\end_inset
+
+
 \end_layout
 
 \begin_layout Section
