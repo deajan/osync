@@ -1,27 +1,18 @@
-NOTES FOR MY FUTURE SELF
-------------------------
-
-Have this kind of info written to state dir.
-inotifywait -m -r -e moved_from -e moved_to -e delete /home/git/osync/dir2/
-
 KNOWN ISSUES
 ------------
 
 - Cannot finish sync if one replica contains a directory and the other replica contains a file named the same way (Unix doesn't allow this)
 - Soft deletion does not honor exclusion lists
-- Permissions aren't set right when setfacl / chmod only is used and the file is not modified (WIP for v1.1)
 
 RECENT CHANGES
 --------------
-#TODO: clock compare in doc
-#TODO: explain why osync is lowband friendly in doc
-#TODO: explain why osync daemon process can still exist after quit for 30s
-! XX Apr 2016: osync v1.1 released
-! Paranoia debug gives incorrect number of arguments in rsyncpatternsadd
-! cat vv | ssh -p 49999 -i /root/.ssh/id_rsa_netpower root@netpower.fr cat | xargs -I {} stat -c "%n;%Z;%Y" "{}" | sort > tes
-! Updated documentation (+README.md file)
+
+27 Jul 2016: osync v1.1 released
+- More msys and cygwin compatibility
+- Logging begins now before any remote checks
+- Improved process killing and process time control
 - Redirected ERROR and WARN messages to stderr to systemd catches them into it's journal
-!- Added a systemd unit file (needs testing in file monitor mode yet)
+- Added systemd unit files
 - Added an option to ignore ssh known hosts (use with caution, can lead to security risks), also updated upgrade script accordingly
 - Added optional installation statistics
 - Fixed a nasty bug with log writing and tree_list function
@@ -50,11 +41,10 @@ RECENT CHANGES
 - Improved Logging
 - Updated osync to be fully compliant with coding style
 - Uploaded coding style manifest
-!- Integrated new realpath emulation from https://github.com/mkropat/sh-realpath
 
 v0-v1.0x - Jun 2013 - Sep 2015
 - Added LSB info to init script for Debian based distros
-- 22 Jul. 2015: Osync v1.00a released
+22 Jul. 2015: Osync v1.00a released
 - Small improvements in osync-batch.sh time management
 - Improved various logging on error
 - Work in progress: Unit tests (intial tests written by onovy, Thanks again!)
@@ -69,7 +59,7 @@ v0-v1.0x - Jun 2013 - Sep 2015
 - Fixed typo in soft deletion code preventing logging slave deleted backup files
 - Removed legacy lockfile code from init script
 - Removed hardcoded program name from init script
-- 01 Avr. 2015: Osync v1.00pre
+01 Avr. 2015: Osync v1.00pre
 - Improved and refactored the soft deletion routine by merging conflict backup and soft deletion
 	- Reworked soft deletion code to handle a case where a top level directory gets deleted even if the files contained in it are not old enough (this obviously shouldn't happen on most FS)
 	- Added more logging
@@ -102,7 +92,7 @@ v0-v1.0x - Jun 2013 - Sep 2015
 - Fixed remote OS detection when a banner is used on SSH
 - Added a routine that reinjects failed deletions for next run in order to prevent bringing back when deletion failed with permission issues
 - Added treat dir symlink as dir parameter
-- 27 May 2014: Osync 0.99 RC3
+27 May 2014: Osync 0.99 RC3
 - Additionnal delete fix for *BSD and MSYS (deleted file list not created right)
 - Fixed dry mode to use non dry after run treelists to create delete lists
 - Added follow symlink parameter
@@ -148,7 +138,7 @@ v0-v1.0x - Jun 2013 - Sep 2015
 - Merged tree list functions into one
 - Added possibility to quick sync two local directories without any prior configuration
 - Added time control on OS detection
-- 02 Nov. 2013: Osync 0.99 RC2
+02 Nov. 2013: Osync 0.99 RC2
 - Minor improvement on operating system detection
 - Improved RunLocalCommand execution hook
 - Minor improvements on permission checks
@@ -172,7 +162,7 @@ v0-v1.0x - Jun 2013 - Sep 2015
 - Improved verbose output
 - Fixed various typos
 - Enforced CheckConnectivityRemoteHost and CheckConnectivity3rdPartyHosts checks (if one of these fails, osync is stopped)
-- 18 Aug. 2013: Osync 0.99 RC1
+18 Aug. 2013: Osync 0.99 RC1
 - Added possibility to change default logfile
 - Fixed a possible error upon master replica lock check
 - Fixed exclude directorires with spaces in names generate errros on master replica tree functions
@@ -182,18 +172,18 @@ v0-v1.0x - Jun 2013 - Sep 2015
 - Update and delete functions now run rsync with --stats parameter
 - Fixed LoadConfigFile function will not warn on wrong config file
 - Added --no-maxtime parameter for sync big changes without enforcing execution time checks
-- 03 Aug. 2013: beta 3 milestone
+03 Aug. 2013: beta 3 milestone
 - Softdelete functions do now honor --dry switch
 - Simplified sync delete functions
 - Enhanced compatibility with different charsets in filenames
 - Added CentOS 5 compatibility (comm v5.97 without --nocheck-order function replaced by sort)
 - Tree functions now honor supplementary rsync arguments
 - Tree functions now honor exclusion lists
-- 01 Aug. 2013: beta 2 milestone
+01 Aug. 2013: beta 2 milestone
 - Fixed an issue with spaces in directory trees
 - Fixed an issue with recursive directory trees
 - Revamped a bit code to add bash 3.2 compatibility
-- 24 Jul. 2013: beta milestone
+24 Jul. 2013: beta milestone
 - Fixed some bad error handling in CheckMasterSlaveDirs and LockDirectories
 - Added support for spaces in sync dirs and exclude lists
 - Fixed false exit code if no remote slave lock present
