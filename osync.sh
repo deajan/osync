@@ -4,7 +4,7 @@ PROGRAM="osync" # Rsync based two way sync engine with fault tolerance
 AUTHOR="(C) 2013-2016 by Orsiris de Jong"
 CONTACT="http://www.netpower.fr/osync - ozy@netpower.fr"
 PROGRAM_VERSION=1.2-dev-parallel-unstable
-PROGRAM_BUILD=2016072704
+PROGRAM_BUILD=2016072705
 IS_STABLE=no
 
 ## FUNC_BUILD=2016072702
@@ -1372,7 +1372,7 @@ function WaitForPids {
 				fi
 			fi
 		done
-		sleep .1
+		sleep .01
 	done
 	if [ $errors -gt 0 ]; then
 		exit 1
@@ -1686,20 +1686,18 @@ function UnlockReplicas {
 		return 0
 	fi
 
+	#TODO: Cannot parallelize unlockreplicasremote until waitfortaskcompletion is removed
 	if [ $LOCK_LOCAL -eq 1 ]; then
-		_UnlockReplicasLocal "${INITIATOR[2]}" &
-		pids="$!"
+		_UnlockReplicasLocal "${INITIATOR[2]}"
 	fi
 
 	if [ "$REMOTE_OPERATION" != "yes" ]; then
 		if [ $LOCK_LOCAL -eq 1 ]; then
-			_UnlockReplicasLocal "${TARGET[2]}" &
-			pids="$pids $!"
+			_UnlockReplicasLocal "${TARGET[2]}"
 		fi
 	else
 		if [ $LOCK_REMOTE -eq 1 ]; then
-			_UnlockReplicasRemote "${TARGET[2]}" &
-			pids="$pids $!"
+			_UnlockReplicasRemote "${TARGET[2]}"
 		fi
 	fi
 }
@@ -1853,19 +1851,16 @@ function sync_attrs {
 		fi
 	fi
 
+	#TODO _get_file_ctime_mtime_remote can be sent into background only if waitfortaskcompletion is removed from sub function
 	Logger "Getting ctimes for pending files on initiator." "NOTICE"
-	_get_file_ctime_mtime_local "${INITIATOR[1]}" "${INITIATOR[0]}" "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}-cleaned.$SCRIPT_PID" &
-	pids="$!"
+	_get_file_ctime_mtime_local "${INITIATOR[1]}" "${INITIATOR[0]}" "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}-cleaned.$SCRIPT_PID"
 
 	Logger "Getting ctimes for pending files on target." "NOTICE"
 	if [ "$REMOTE_OPERATION" != "yes" ]; then
-		_get_file_ctime_mtime_local "${TARGET[1]}" "${TARGET[0]}" "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}-cleaned.$SCRIPT_PID" &
-		pids="$pids $!"
+		_get_file_ctime_mtime_local "${TARGET[1]}" "${TARGET[0]}" "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}-cleaned.$SCRIPT_PID"
 	else
-		_get_file_ctime_mtime_remote "${TARGET[1]}" "${TARGET[0]}" "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}-cleaned.$SCRIPT_PID" &
-		pids="$pids $!"
+		_get_file_ctime_mtime_remote "${TARGET[1]}" "${TARGET[0]}" "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}-cleaned.$SCRIPT_PID"
 	fi
-	WaitForPids $pids
 
 	# If target gets updated first, then sync_attr must update initiator's attrs first
 	# For join, remove leading replica paths
