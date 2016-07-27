@@ -4,7 +4,7 @@ PROGRAM="osync" # Rsync based two way sync engine with fault tolerance
 AUTHOR="(C) 2013-2016 by Orsiris de Jong"
 CONTACT="http://www.netpower.fr/osync - ozy@netpower.fr"
 PROGRAM_VERSION=1.1.1-dev
-PROGRAM_BUILD=2016072702
+PROGRAM_BUILD=2016072703
 IS_STABLE=yes
 
 source "./ofunctions.sh"
@@ -309,6 +309,7 @@ function _WriteLockFilesLocal {
 		exit 1
 	else
 		Logger "Locked replica on [$lockfile]." "DEBUG"
+		LOCK_LOCAL=1
 	fi
 }
 
@@ -330,6 +331,7 @@ function _WriteLockFilesRemote {
 		exit 1
 	else
 		Logger "Locked remote target replica." "DEBUG"
+		LOCK_REMOTE_1
 	fi
 }
 
@@ -483,11 +485,18 @@ function UnlockReplicas {
 		return 0
 	fi
 
-	_UnlockReplicasLocal "${INITIATOR[2]}"
+	if [ $LOCK_LOCAL -eq 1 ]; then
+		_UnlockReplicasLocal "${INITIATOR[2]}"
+	fi
+
 	if [ "$REMOTE_OPERATION" != "yes" ]; then
-		_UnlockReplicasLocal "${TARGET[2]}"
+		if [ $LOCK_LOCAL -eq 1 ]; then
+			_UnlockReplicasLocal "${TARGET[2]}"
+		fi
 	else
-		_UnlockReplicasRemote "${TARGET[2]}"
+		if [ $LOCK_REMOTE -eq 1 ]; then
+			_UnlockReplicasRemote "${TARGET[2]}"
+		fi
 	fi
 }
 
@@ -1591,6 +1600,10 @@ PARTIAL=0
 if [ "$CONFLICT_PREVALANCE" == "" ]; then
 	CONFLICT_PREVALANCE=initiator
 fi
+
+LOCK_LOCAL=0
+LOCK_REMOTE=0
+
 FORCE_UNLOCK=0
 no_maxtime=0
 opts=""
