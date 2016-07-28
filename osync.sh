@@ -2128,6 +2128,7 @@ local DELETE_CMD_INPUT=$(cat << 'ENDSSH'
 	IFS=$'\r\n'
 	for files in $(cat "$FILE_LIST")
 	do
+		Logger "Processing file $files" "DEBUG"
 		if [[ "$files" != "$previous_file/"* ]] && [ "$files" != "" ]; then
 			if [ ! -d "$REPLICA_DIR$DELETE_DIR" ]; then
 					$COMMAND_SUDO mkdir -p "$REPLICA_DIR$DELETE_DIR"
@@ -2166,6 +2167,7 @@ local DELETE_CMD_INPUT=$(cat << 'ENDSSH'
 					Logger "Deleting $REPLICA_DIR$files" "NOTICE"
 				fi
 
+				Logger "Full path for deletion: ""$REPLICA_DIR$files" "DEBUG"
 				if [ $_DRYRUN -ne 1 ]; then
 					if [ -e "$REPLICA_DIR$files" ]; then
 						$COMMAND_SUDO rm -rf "$REPLICA_DIR$files"
