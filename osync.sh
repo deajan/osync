@@ -2173,7 +2173,7 @@ local DELETE_CMD_INPUT=$(cat << 'ENDSSH'
 						$COMMAND_SUDO rm -rf "$REPLICA_DIR$files"
 						if [ $? != 0 ]; then
 							Logger "Cannot delete $REPLICA_DIR$files" "ERROR"
-							echo "$files" >> "$TARGET_STATE_DIR/$FAILED_DELETE_LIST"
+							echo "$files" >> "$FAILED_DELETE_LIST"
 						fi
 					fi
 				fi
