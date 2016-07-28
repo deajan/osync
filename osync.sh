@@ -2083,7 +2083,8 @@ local DELETE_CMD_INPUT=$(cat << 'ENDSSH'
 	## The following lines are executed remotely
 	function _logger {
 		local value="${1}" # What to log
-		echo -e "$value" >> "$LOG_FILE"
+		#echo -e "$value" >> "$LOG_FILE"
+		echo -e "$value" >&2 # writing to STDERR because
 
 		if [ $_SILENT -eq 0 ]; then
 		echo -e "$value"
