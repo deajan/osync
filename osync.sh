@@ -2187,7 +2187,7 @@ ENDSSH
 Logger "DELETE_CMD_INPUT: $DELETE_CMD_INPUT" "DEBUG"
 Logger "DELETE_CMD: ${DELETE_CMD[*]}" "DEBUG"
 
-	printf "%s" $DELETE_CMD_INPUT | ${DELETE_CMD[*]} > "$RUN_DIR/$PROGRAM.remote_deletion.$SCRIPT_PID" 2>&1
+	printf "%s" "$DELETE_CMD_INPUT" | ${DELETE_CMD[*]} > "$RUN_DIR/$PROGRAM.remote_deletion.$SCRIPT_PID" 2>&1
 
 	## Copy back the deleted failed file list
 	esc_source_file="$(EscapeSpaces "${TARGET[1]}${TARGET[3]}/$deleted_failed_list_file")"
