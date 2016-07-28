@@ -2147,7 +2147,7 @@ local DELETE_CMD_INPUT=$(cat << 'ENDSSH'
 						$COMMAND_SUDO rm -rf "$REPLICA_DIR$DELETE_DIR/$files"
 					fi
 
-					if [ -e "$$REPLICA_DIR$files" ]; then
+					if [ -e "$REPLICA_DIR$files" ]; then
 						# In order to keep full path on soft deletion, create parent directories before move
 						parentdir="$(dirname "$files")"
 						if [ "$parentdir" != "." ]; then
