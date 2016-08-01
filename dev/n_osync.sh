@@ -4,7 +4,7 @@ PROGRAM="osync" # Rsync based two way sync engine with fault tolerance
 AUTHOR="(C) 2013-2016 by Orsiris de Jong"
 CONTACT="http://www.netpower.fr/osync - ozy@netpower.fr"
 PROGRAM_VERSION=1.1.1
-PROGRAM_BUILD=2016080105
+PROGRAM_BUILD=2016080106
 IS_STABLE=yes
 
 source "./ofunctions.sh"
@@ -793,18 +793,19 @@ function _delete_local {
 	do
 		if [[ "$files" != "$previous_file/"* ]] && [ "$files" != "" ]; then
 			if [ "$SOFT_DELETE" != "no" ]; then
-				if [ ! -d "$replica_dir$deletion_dir" ]; then
-					mkdir -p "$replica_dir$deletion_dir"
-					if [ $? != 0 ]; then
-						Logger "Cannot create replica deletion directory." "ERROR"
-					fi
-				fi
 
 				if [ $_VERBOSE -eq 1 ]; then
 					Logger "Soft deleting $replica_dir$files" "NOTICE"
 				fi
 
 				if [ $_DRYRUN -ne 1 ]; then
+					if [ ! -d "$replica_dir$deletion_dir" ]; then
+						mkdir -p "$replica_dir$deletion_dir"
+						if [ $? != 0 ]; then
+							Logger "Cannot create replica deletion directory." "ERROR"
+						fi
+					fi
+
 					if [ -e "$replica_dir$deletion_dir/$files" ]; then
 						rm -rf "${replica_dir:?}$deletion_dir/$files"
 					fi
@@ -922,12 +923,6 @@ $SSH_CMD ERROR_ALERT=0 sync_on_changes=$sync_on_changes _SILENT=$_SILENT _DEBUG=
 	do
 		Logger "Processing file [$file]." "DEBUG"
 		if [[ "$files" != "$previous_file/"* ]] && [ "$files" != "" ]; then
-			if [ ! -d "$REPLICA_DIR$DELETE_DIR" ]; then
-					$COMMAND_SUDO mkdir -p "$REPLICA_DIR$DELETE_DIR"
-					if [ $? != 0 ]; then
-						Logger "Cannot create replica deletion directory." "ERROR"
-					fi
-				fi
 
 			if [ "$SOFT_DELETE" != "no" ]; then
 				if [ $_VERBOSE -eq 1 ]; then
@@ -935,6 +930,14 @@ $SSH_CMD ERROR_ALERT=0 sync_on_changes=$sync_on_changes _SILENT=$_SILENT _DEBUG=
 				fi
 
 				Logger "Full path for deletion is [$REPLICA_DIR$DELETE_DIR/$files]." "DEBUG"
+
+				if [ ! -d "$REPLICA_DIR$DELETE_DIR" ]; then
+					$COMMAND_SUDO mkdir -p "$REPLICA_DIR$DELETE_DIR"
+					if [ $? != 0 ]; then
+						Logger "Cannot create replica deletion directory." "ERROR"
+					fi
+				fi
+
 				if [ $_DRYRUN -ne 1 ]; then
 					if [ -e "$REPLICA_DIR$DELETE_DIR/$files" ]; then
 						$COMMAND_SUDO rm -rf "$REPLICA_DIR$DELETE_DIR/$files"
@@ -947,7 +950,7 @@ $SSH_CMD ERROR_ALERT=0 sync_on_changes=$sync_on_changes _SILENT=$_SILENT _DEBUG=
 							$COMMAND_SUDO mkdir -p "$REPLICA_DIR$DELETE_DIR/$parentdir"
 							$COMMAND_SUDO mv -f "$REPLICA_DIR$files" "$REPLICA_DIR$DELETE_DIR/$parentdir"
 						else
-							$COMMAND_SUDO mv -f "$REPLICA_DIR$files" "$REPLICA_DIR$DELETE_DIR"1
+							$COMMAND_SUDO mv -f "$REPLICA_DIR$files" "$REPLICA_DIR$DELETE_DIR"
 						fi
 						if [ $? != 0 ]; then
 							Logger "Cannot move $REPLICA_DIR$files to deletion directory." "ERROR"
