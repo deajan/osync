@@ -4,7 +4,7 @@ PROGRAM="osync" # Rsync based two way sync engine with fault tolerance
 AUTHOR="(C) 2013-2016 by Orsiris de Jong"
 CONTACT="http://www.netpower.fr/osync - ozy@netpower.fr"
 PROGRAM_VERSION=1.2-dev-parallel-unstable
-PROGRAM_BUILD=2016072705
+PROGRAM_BUILD=2016080101
 IS_STABLE=no
 
 source "./ofunctions.sh"
@@ -368,10 +368,10 @@ function _WriteLockFilesRemote {
 	eval "$cmd" &
 	WaitForTaskCompletion $! 720 1800 ${FUNCNAME[0]}
 	if [ $? != 0 ]; then
-		Logger "Could not set lock on remote target replica." "CRITICAL"
+		Logger "Could not set lock on remote $replica_type replica." "CRITICAL"
 		exit 1
 	else
-		Logger "Locked remote target replica." "DEBUG"
+		Logger "Locked remote $replica_type replica." "DEBUG"
 		LOCK_REMOTE=1
 	fi
 }
