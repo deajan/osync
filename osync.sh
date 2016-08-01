@@ -3,11 +3,11 @@
 PROGRAM="osync" # Rsync based two way sync engine with fault tolerance
 AUTHOR="(C) 2013-2016 by Orsiris de Jong"
 CONTACT="http://www.netpower.fr/osync - ozy@netpower.fr"
-PROGRAM_VERSION=1.1
-PROGRAM_BUILD=2016072701
+PROGRAM_VERSION=1.1.1
+PROGRAM_BUILD=2016080104
 IS_STABLE=yes
 
-## FUNC_BUILD=2016071902
+## FUNC_BUILD=2016072703
 ## BEGIN Generic functions for osync & obackup written in 2013-2016 by Orsiris de Jong - http://www.netpower.fr - ozy@netpower.fr
 
 ## type -p does not work on platforms other than linux (bash). If if does not work, always assume output is not a zero exitcode
@@ -43,7 +43,7 @@ WARN_ALERT=0
 ## allow debugging from command line with _DEBUG=yes
 if [ ! "$_DEBUG" == "yes" ]; then
 	_DEBUG=no
-	SLEEP_TIME=.1
+	SLEEP_TIME=.001 # Tested under linux and FreeBSD bash, #TODO tests on cygwin / msys
 	_VERBOSE=0
 else
 	SLEEP_TIME=1
@@ -712,11 +712,39 @@ function GetRemoteOS {
 	fi
 }
 
+function WaitForPids {
+	# Takes a list of pids separated by space as argument, and waits until all pids are finished
+       local errors=0
+
+        while [ "$#" -gt 0 ]; do
+                for pid in "$@"; do
+                        shift
+                        if kill -0 "$pid" > /dev/null 2>&1; then
+                                Logger "[$pid] is alive." "DEBUG"
+                                set -- "$@" "$pid"
+                        else
+                                wait "$pid"
+                                result=$?
+                                if [ $result -eq 0 ]; then
+                                        Logger "[$pid] exited okay with [$result]" "DEBUG"
+                                else
+                                        errors=$((errors+1))
+                                        Logger "[$pid] exited with bad status [$result]." "WARN"
+                                fi
+                        fi
+                done
+                sleep $SLEEP_TIME
+        done
+	return $errors
+}
+
+
 function WaitForTaskCompletion {
-	local pid="${1}" # pid to wait for
+	local pids="${1}" # list of pids to wait for, separated by a semicolon
 	local soft_max_time="${2}" # If program with pid $pid takes longer than $soft_max_time seconds, will log a warning, unless $soft_max_time equals 0.
 	local hard_max_time="${3}" # If program with pid $pid takes longer than $hard_max_time seconds, will stop execution, unless $hard_max_time equals 0.
 	local caller_name="${4}" # Who called this function
+	local should_exit="${5}" # If true, the function exits on failure
 
 	local soft_alert=0 # Does a soft alert need to be triggered, if yes, send an alert once
 	local log_ttime=0 # local time instance for comparaison
@@ -726,7 +754,56 @@ function WaitForTaskCompletion {
 
 	local retval=0 # return value of monitored pid process
 
-	while eval "$PROCESS_TEST_CMD" > /dev/null
+	local pid
+	local new_pids
+	local result
+
+	IFS=';' read -r -a pidarray <<< "$pids"
+
+	while [ ${#pidarray[@]} -gt 0 ]; do
+		newarray=""
+		for index in ${!pidarray[@]}; do
+			pid="${pidarray[index]}"
+			echo "run  for $pid"
+			if kill -0 $pid > /dev/null 2>&1; then
+				echo "pid [$pid] is running."
+				newarray+=$pid
+			else
+				wait "$pid"
+				result=$?
+				echo $result
+				if [ $result -eq 0 ]; then
+					echo "pid [$pid] is finished with exit code 0."
+				else
+					echo "pid [$pid] is finished with exit code $result."
+				fi
+			fi
+		done
+		pidarray=$newarray
+		sleep .05
+ 	done
+}
+
+sleep 1 &
+pids=$!
+sleep 5 &
+pids="$pids;$!"
+echo "Waiting for pid $pids"
+#sleep 5 &
+#pids="$pids;$!"
+
+WaitForTaskCompletion $pids 0 0 "caller" 1
+
+echo "done"
+exit
+
+function old {
+
+
+
+
+	#TODO: test on FreeBSD, MacOS X and msys / cygwin
+	while kill -0 "$pid" > /dev/null 2>&1
 	do
 		Spinner
 		exec_time=$(($SECONDS - $seconds_begin))
@@ -775,7 +852,8 @@ function WaitForCompletion {
 
 	local retval=0 # return value of monitored pid process
 
-	while eval "$PROCESS_TEST_CMD" > /dev/null
+	#TODO: test on FreeBSD, MacOS X and msys / cygwin
+	while kill -0 "$pid" > /dev/null 2>&1
 	do
 		Spinner
 		if [ $((($SECONDS + 1) % $KEEP_LOGGING)) -eq 0 ]; then
@@ -1138,6 +1216,7 @@ function InitLocalOSSettings {
                 FIND_CMD=$(dirname $BASH)/find
                 # PROCESS_TEST_CMD assumes there is a variable $pid
 		# Tested on MSYS and cygwin
+		#TODO: remove PROCESS_TEST_CMD if kill -0 works
                 PROCESS_TEST_CMD='ps -a | awk "{\$1=\$1}\$1" | awk "{print \$1}" | grep $pid'
                 PING_CMD='$SYSTEMROOT\system32\ping -n 2'
         else
@@ -2006,7 +2085,7 @@ function _delete_remote {
 
 	# Additionnaly, we need to copy the deletetion list to the remote state folder
 	esc_dest_dir="$(EscapeSpaces "${TARGET[1]}${TARGET[3]}")"
-	rsync_cmd="$(type -p $RSYNC_EXECUTABLE) --rsync-path=\"$RSYNC_PATH\" $SYNC_OPTS -e \"$RSYNC_SSH_CMD\" \"${INITIATOR[1]}${INITIATOR[3]}/$2\" $REMOTE_USER@$REMOTE_HOST:\"$esc_dest_dir/\" > $RUN_DIR/$PROGRAM.${FUNCNAME[0]}.precopy.$SCRIPT_PID 2>&1"
+	rsync_cmd="$(type -p $RSYNC_EXECUTABLE) --rsync-path=\"$RSYNC_PATH\" $SYNC_OPTS -e \"$RSYNC_SSH_CMD\" \"${INITIATOR[1]}${INITIATOR[3]}/$deleted_list_file\" $REMOTE_USER@$REMOTE_HOST:\"$esc_dest_dir/\" > $RUN_DIR/$PROGRAM.${FUNCNAME[0]}.precopy.$SCRIPT_PID 2>&1"
 	Logger "RSYNC_CMD: $rsync_cmd" "DEBUG"
 	eval "$rsync_cmd" 2>> "$LOG_FILE"
 	if [ $? != 0 ]; then
@@ -2017,12 +2096,12 @@ function _delete_remote {
 		exit 1
 	fi
 
-$SSH_CMD ERROR_ALERT=0 sync_on_changes=$sync_on_changes _SILENT=$_SILENT _DEBUG=$_DEBUG _DRYRUN=$_DRYRUN _VERBOSE=$_VERBOSE COMMAND_SUDO=$COMMAND_SUDO FILE_LIST="$(EscapeSpaces "$TARGET_STATE_DIR/$deleted_list_file")" REPLICA_DIR="$(EscapeSpaces "$replica_dir")" DELETE_DIR="$(EscapeSpaces "$deletion_dir")" FAILED_DELETE_LIST="$(EscapeSpaces "${TARGET[1]}${TARGET[3]}/$deleted_failed_list_file")" 'bash -s' << 'ENDSSH' > "$RUN_DIR/$PROGRAM.remote_deletion.$SCRIPT_PID" 2>&1 &
+$SSH_CMD ERROR_ALERT=0 sync_on_changes=$sync_on_changes _SILENT=$_SILENT _DEBUG=$_DEBUG _DRYRUN=$_DRYRUN _VERBOSE=$_VERBOSE COMMAND_SUDO=$COMMAND_SUDO FILE_LIST="$(EscapeSpaces "${TARGET[1]}${TARGET[3]}/$deleted_list_file")" REPLICA_DIR="$(EscapeSpaces "$replica_dir")" DELETE_DIR="$(EscapeSpaces "$deletion_dir")" FAILED_DELETE_LIST="$(EscapeSpaces "${TARGET[1]}${TARGET[3]}/$deleted_failed_list_file")" 'bash -s' << 'ENDSSH' > "$RUN_DIR/$PROGRAM.remote_deletion.$SCRIPT_PID" 2>&1 &
 
 	## The following lines are executed remotely
 	function _logger {
 		local value="${1}" # What to log
-		echo -e "$value" >> "$LOG_FILE"
+		echo -e "$value" >&2 # Log to STDERR
 
 		if [ $_SILENT -eq 0 ]; then
 		echo -e "$value"
@@ -2066,6 +2145,7 @@ $SSH_CMD ERROR_ALERT=0 sync_on_changes=$sync_on_changes _SILENT=$_SILENT _DEBUG=
 	IFS=$'\r\n'
 	for files in $(cat "$FILE_LIST")
 	do
+		Logger "Processing file [$file]." "DEBUG"
 		if [[ "$files" != "$previous_file/"* ]] && [ "$files" != "" ]; then
 			if [ ! -d "$REPLICA_DIR$DELETE_DIR" ]; then
 					$COMMAND_SUDO mkdir -p "$REPLICA_DIR$DELETE_DIR"
@@ -2079,12 +2159,13 @@ $SSH_CMD ERROR_ALERT=0 sync_on_changes=$sync_on_changes _SILENT=$_SILENT _DEBUG=
 					Logger "Soft deleting $REPLICA_DIR$files" "NOTICE"
 				fi
 
+				Logger "Full path for deletion is [$REPLICA_DIR$DELETE_DIR/$files]." "DEBUG"
 				if [ $_DRYRUN -ne 1 ]; then
 					if [ -e "$REPLICA_DIR$DELETE_DIR/$files" ]; then
 						$COMMAND_SUDO rm -rf "$REPLICA_DIR$DELETE_DIR/$files"
 					fi
 
-					if [ -e "$$REPLICA_DIR$files" ]; then
+					if [ -e "$REPLICA_DIR$files" ]; then
 						# In order to keep full path on soft deletion, create parent directories before move
 						parentdir="$(dirname "$files")"
 						if [ "$parentdir" != "." ]; then
@@ -2109,7 +2190,7 @@ $SSH_CMD ERROR_ALERT=0 sync_on_changes=$sync_on_changes _SILENT=$_SILENT _DEBUG=
 						$COMMAND_SUDO rm -rf "$REPLICA_DIR$files"
 						if [ $? != 0 ]; then
 							Logger "Cannot delete $REPLICA_DIR$files" "ERROR"
-							echo "$files" >> "$TARGET_STATE_DIR/$FAILED_DELETE_LIST"
+							echo "$files" >> "$FAILED_DELETE_LIST"
 						fi
 					fi
 				fi
@@ -2417,9 +2498,9 @@ function _SoftDeleteRemote {
 	CheckConnectivityRemoteHost
 
 	if [ $_DRYRUN -eq 1 ]; then
-		Logger "Listing files older than $change_time days on target replica. Does not remove anything." "NOTICE"
+		Logger "Listing files older than $change_time days on $replica_type replica. Does not remove anything." "NOTICE"
 	else
-		Logger "Removing files older than $change_time days on target replica." "NOTICE"
+		Logger "Removing files older than $change_time days on $replica_type replica." "NOTICE"
 	fi
 
 	if [ $_VERBOSE -eq 1 ]; then
@@ -2442,10 +2523,10 @@ function _SoftDeleteRemote {
 	WaitForCompletion $! $SOFT_MAX_EXEC_TIME $HARD_MAX_EXEC_TIME ${FUNCNAME[0]}
 	retval=$?
 	if [ $retval -ne 0 ]; then
-		Logger "Error while executing cleanup on remote target replica." "ERROR"
+		Logger "Error while executing cleanup on remote $replica_type replica." "ERROR"
 		Logger "Command output:\n$(cat $RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$SCRIPT_PID)" "NOTICE"
 	else
-		Logger "Cleanup complete on target replica." "NOTICE"
+		Logger "Cleanup complete on $replica_type replica." "NOTICE"
 	fi
 }
 
