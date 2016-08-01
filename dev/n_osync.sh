@@ -1303,7 +1303,7 @@ function _SoftDeleteRemote {
 		Logger "Error while executing cleanup on remote target replica." "ERROR"
 		Logger "Command output:\n$(cat $RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$SCRIPT_PID)" "NOTICE"
 	else
-		Logger "Cleanup complete on target replica." "NOTICE"
+		Logger "Cleanup complete on $replica_type replica." "NOTICE"
 	fi
 }
 
