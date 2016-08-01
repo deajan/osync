@@ -3,8 +3,8 @@
 PROGRAM="osync" # Rsync based two way sync engine with fault tolerance
 AUTHOR="(C) 2013-2016 by Orsiris de Jong"
 CONTACT="http://www.netpower.fr/osync - ozy@netpower.fr"
-PROGRAM_VERSION=1.1
-PROGRAM_BUILD=2016072701
+PROGRAM_VERSION=1.1.1
+PROGRAM_BUILD=2016080101
 IS_STABLE=yes
 
 source "./ofunctions.sh"
@@ -938,7 +938,7 @@ $SSH_CMD ERROR_ALERT=0 sync_on_changes=$sync_on_changes _SILENT=$_SILENT _DEBUG=
 						$COMMAND_SUDO rm -rf "$REPLICA_DIR$DELETE_DIR/$files"
 					fi
 
-					if [ -e "$$REPLICA_DIR$files" ]; then
+					if [ -e "$REPLICA_DIR$files" ]; then
 						# In order to keep full path on soft deletion, create parent directories before move
 						parentdir="$(dirname "$files")"
 						if [ "$parentdir" != "." ]; then
