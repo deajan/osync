@@ -4,7 +4,7 @@ PROGRAM="osync" # Rsync based two way sync engine with fault tolerance
 AUTHOR="(C) 2013-2016 by Orsiris de Jong"
 CONTACT="http://www.netpower.fr/osync - ozy@netpower.fr"
 PROGRAM_VERSION=1.1.1
-PROGRAM_BUILD=2016080101
+PROGRAM_BUILD=2016080102
 IS_STABLE=yes
 
 source "./ofunctions.sh"
@@ -963,7 +963,7 @@ $SSH_CMD ERROR_ALERT=0 sync_on_changes=$sync_on_changes _SILENT=$_SILENT _DEBUG=
 						$COMMAND_SUDO rm -rf "$REPLICA_DIR$files"
 						if [ $? != 0 ]; then
 							Logger "Cannot delete $REPLICA_DIR$files" "ERROR"
-							echo "$files" >> "$TARGET_STATE_DIR/$FAILED_DELETE_LIST"
+							echo "$files" >> "$FAILED_DELETE_LIST"
 						fi
 					fi
 				fi
