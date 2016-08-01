@@ -4,7 +4,7 @@ PROGRAM="osync" # Rsync based two way sync engine with fault tolerance
 AUTHOR="(C) 2013-2016 by Orsiris de Jong"
 CONTACT="http://www.netpower.fr/osync - ozy@netpower.fr"
 PROGRAM_VERSION=1.1.1
-PROGRAM_BUILD=2016080102
+PROGRAM_BUILD=2016080103
 IS_STABLE=yes
 
 source "./ofunctions.sh"
@@ -1275,9 +1275,9 @@ function _SoftDeleteRemote {
 	CheckConnectivityRemoteHost
 
 	if [ $_DRYRUN -eq 1 ]; then
-		Logger "Listing files older than $change_time days on target replica. Does not remove anything." "NOTICE"
+		Logger "Listing files older than $change_time days on $replica_type replica. Does not remove anything." "NOTICE"
 	else
-		Logger "Removing files older than $change_time days on target replica." "NOTICE"
+		Logger "Removing files older than $change_time days on $replica_type replica." "NOTICE"
 	fi
 
 	if [ $_VERBOSE -eq 1 ]; then
@@ -1300,7 +1300,7 @@ function _SoftDeleteRemote {
 	WaitForCompletion $! $SOFT_MAX_EXEC_TIME $HARD_MAX_EXEC_TIME ${FUNCNAME[0]}
 	retval=$?
 	if [ $retval -ne 0 ]; then
-		Logger "Error while executing cleanup on remote target replica." "ERROR"
+		Logger "Error while executing cleanup on remote $replica_type replica." "ERROR"
 		Logger "Command output:\n$(cat $RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$SCRIPT_PID)" "NOTICE"
 	else
 		Logger "Cleanup complete on $replica_type replica." "NOTICE"
