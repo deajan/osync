@@ -4,7 +4,7 @@ PROGRAM="osync" # Rsync based two way sync engine with fault tolerance
 AUTHOR="(C) 2013-2016 by Orsiris de Jong"
 CONTACT="http://www.netpower.fr/osync - ozy@netpower.fr"
 PROGRAM_VERSION=1.1.1
-PROGRAM_BUILD=2016080103
+PROGRAM_BUILD=2016080104
 IS_STABLE=yes
 
 source "./ofunctions.sh"
@@ -920,6 +920,7 @@ $SSH_CMD ERROR_ALERT=0 sync_on_changes=$sync_on_changes _SILENT=$_SILENT _DEBUG=
 	IFS=$'\r\n'
 	for files in $(cat "$FILE_LIST")
 	do
+		Logger "Processing file [$file]." "DEBUG"
 		if [[ "$files" != "$previous_file/"* ]] && [ "$files" != "" ]; then
 			if [ ! -d "$REPLICA_DIR$DELETE_DIR" ]; then
 					$COMMAND_SUDO mkdir -p "$REPLICA_DIR$DELETE_DIR"
@@ -933,6 +934,7 @@ $SSH_CMD ERROR_ALERT=0 sync_on_changes=$sync_on_changes _SILENT=$_SILENT _DEBUG=
 					Logger "Soft deleting $REPLICA_DIR$files" "NOTICE"
 				fi
 
+				Logger "Full path for deletion is [$REPLICA_DIR$DELETE_DIR/$files]." "DEBUG"
 				if [ $_DRYRUN -ne 1 ]; then
 					if [ -e "$REPLICA_DIR$DELETE_DIR/$files" ]; then
 						$COMMAND_SUDO rm -rf "$REPLICA_DIR$DELETE_DIR/$files"
