@@ -131,6 +131,11 @@ Systemd specific (one service per config file)
 	$ systemctl start osync-srv@configfile.conf
 	$ systemctl enable osync-srv@configfile.conf
 
+Contributions
+-------------
+Bug fixes and ideas are welcome. When submitting a PR, please be sure to modify dev/n_osync.sh & dev/ofunctions.sh instead of osync.sh which is overwritten on every commit.
+Consider reading CODING_STYLE.TXT before submitting a patch.
+
 Troubleshooting
 ---------------
 You may find osync's logs in /var/log/osync.*.log (or current directory if /var/log is not writable).

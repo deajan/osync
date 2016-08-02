@@ -7,6 +7,18 @@ KNOWN ISSUES
 RECENT CHANGES
 --------------
 
+- Improved execution speed
+	- Added parallel execution for most secondary fuctions
+	- Lowered sleep time in wait functions
+	- Removed trivial sleep and forking in remote deletion code, send the whole function to background instead
+- Improved WaitFor... functions to accept multiple pids
+- Improved logging
+
+XX Xxx 2016: osync v1.1.1 released
+
+- Fixed deletion propagation code
+- Fixed missing deletion / backup diretories message in verbose mode
+
 27 Jul 2016: osync v1.1 released
 - More msys and cygwin compatibility
 - Logging begins now before any remote checks
