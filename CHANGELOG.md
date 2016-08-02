@@ -16,6 +16,7 @@ RECENT CHANGES
 
 XX Xxx 2016: osync v1.1.1 released
 
+- Fixed problem with attributes file list function
 - Fixed deletion propagation code
 - Fixed missing deletion / backup diretories message in verbose mode
 
