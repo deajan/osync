@@ -4,7 +4,7 @@ PROGRAM="osync" # Rsync based two way sync engine with fault tolerance
 AUTHOR="(C) 2013-2016 by Orsiris de Jong"
 CONTACT="http://www.netpower.fr/osync - ozy@netpower.fr"
 PROGRAM_VERSION=1.1.1
-PROGRAM_BUILD=2016080108
+PROGRAM_BUILD=2016080106
 IS_STABLE=yes
 
 source "./ofunctions.sh"
@@ -127,23 +127,13 @@ function CheckCurrentConfig {
 ###### Osync specific functions (non shared)
 
 function _CreateStateDirsLocal {
-	local backup_dir="${1}"
-	local delete_dir="${2}"
-	__CheckArguments 2 $# ${FUNCNAME[0]} "$@"	#__WITH_PARANOIA_DEBUG
+	local replica_state_dir="${1}"
+	__CheckArguments 1 $# ${FUNCNAME[0]} "$@"	#__WITH_PARANOIA_DEBUG
 
-	if ! [ -d "$backup_dir" ]; then
-		$COMMAND_SUDO mkdir -p "$backup_dir" > "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$SCRIPT_PID" 2>&1
+	if ! [ -d "$replica_state_dir" ]; then
+		$COMMAND_SUDO mkdir -p "$replica_state_dir" > "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$SCRIPT_PID" 2>&1
 		if [ $? != 0 ]; then
-			Logger "Cannot create state dir [$backup_dir]." "CRITICAL"
-			Logger "Command output:\n$(cat $RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$SCRIPT_PID)" "ERROR"
-			exit 1
-		fi
-	fi
-
-	if ! [ -d "$delete_dir" ]; then
-		$COMMAND_SUDO mkdir -p "$delete_dir" > "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$SCRIPT_PID" 2>&1
-		if [ $? != 0 ]; then
-			Logger "Cannot create state dir [$delete_dir]." "CRITICAL"
+			Logger "Cannot create state dir [$replica_state_dir]." "CRITICAL"
 			Logger "Command output:\n$(cat $RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$SCRIPT_PID)" "ERROR"
 			exit 1
 		fi
@@ -151,45 +141,34 @@ function _CreateStateDirsLocal {
 }
 
 function _CreateStateDirsRemote {
-	local backup_dir="${1}"
-	local delete_dir="${2}"
-	__CheckArguments 2 $# ${FUNCNAME[0]} "$@"	#__WITH_PARANOIA_DEBUG
+	local replica_state_dir="${1}"
+	__CheckArguments 1 $# ${FUNCNAME[0]} "$@"	#__WITH_PARANOIA_DEBUG
 
 	local cmd=
 
 	CheckConnectivity3rdPartyHosts
 	CheckConnectivityRemoteHost
 
-	cmd=$SSH_CMD' "if ! [ -d \"'$backup_dir'\" ]; then '$COMMAND_SUDO' mkdir -p \"'$backup_dir'\"; fi" > "'$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$SCRIPT_PID'" 2>&1'
+	cmd=$SSH_CMD' "if ! [ -d \"'$replica_state_dir'\" ]; then '$COMMAND_SUDO' mkdir -p \"'$replica_state_dir'\"; fi" > "'$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$SCRIPT_PID'" 2>&1'
 	Logger "cmd: $cmd" "DEBUG"
 	eval "$cmd" &
 	WaitForTaskCompletion $! 720 1800 ${FUNCNAME[0]}
 	if [ $? != 0 ]; then
-		Logger "Cannot create remote state dir [$backup_dir]." "CRITICAL"
-		Logger "Command output:\n$(cat $RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$SCRIPT_PID)" "ERROR"
-		exit 1
-	fi
-
-	cmd=$SSH_CMD' "if ! [ -d \"'$delete_dir'\" ]; then '$COMMAND_SUDO' mkdir -p \"'$delete_dir'\"; fi" > "'$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$SCRIPT_PID'" 2>&1'
-	Logger "cmd: $cmd" "DEBUG"
-	eval "$cmd" &
-	WaitForTaskCompletion $! 720 1800 ${FUNCNAME[0]}
-	if [ $? != 0 ]; then
-		Logger "Cannot create remote state dir [$delete_dir]." "CRITICAL"
+		Logger "Cannot create remote state dir [$replica_state_dir]." "CRITICAL"
 		Logger "Command output:\n$(cat $RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$SCRIPT_PID)" "ERROR"
 		exit 1
 	fi
 }
 
-# Merge with CheckReplicaPaths ?
+#TODO: also create deleted and backup dirs
 function CreateStateDirs {
 	__CheckArguments 0 $# ${FUNCNAME[0]} "$@"	#__WITH_PARANOIA_DEBUG
 
-	_CreateStateDirsLocal "${INITIATOR[1]}${INITIATOR[4]}" "${INITIATOR[1]}${INITIATOR[5]}"
+	_CreateStateDirsLocal "${INITIATOR[1]}${INITIATOR[3]}"
 	if [ "$REMOTE_OPERATION" != "yes" ]; then
-		_CreateStateDirsLocal "${TARGET[1]}${TARGET[4]}" "${TARGET[1]}${TARGET[5]}"
+		_CreateStateDirsLocal "${TARGET[1]}${TARGET[3]}"
 	else
-		_CreateStateDirsRemote "${TARGET[1]}${TARGET[4]}" "${TARGET[1]}${TARGET[5]}"
+		_CreateStateDirsRemote "${TARGET[1]}${TARGET[3]}"
 	fi
 }
 
@@ -1429,7 +1408,6 @@ function Init {
 	#${REPLICA[8]}  contains full resume count file path
 
 	# Local variables used for state filenames
-
 	local lock_filename="lock"
 	local state_dir="state"
 	local backup_dir="backup"
@@ -1526,7 +1504,6 @@ function Init {
 function Main {
 	__CheckArguments 0 $# ${FUNCNAME[0]} "$@"	#__WITH_PARANOIA_DEBUG
 
-	#TODO: Check replicas and Create StateDirs should be the same functions
 	CreateStateDirs
 	CheckLocks
 	Sync
