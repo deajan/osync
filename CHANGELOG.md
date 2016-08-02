@@ -12,10 +12,12 @@ RECENT CHANGES
 	- Lowered sleep time in wait functions
 	- Removed trivial sleep and forking in remote deletion code, send the whole function to background instead
 - Improved WaitFor... functions to accept multiple pids
+! Improved KillChilds function to accept multiple pids
 - Improved logging
 
 XX Xxx 2016: osync v1.1.1 released
 
+- Fixed soft deletion always enabled on target
 - Fixed problem with attributes file list function
 - Fixed deletion propagation code
 - Fixed missing deletion / backup diretories message in verbose mode
