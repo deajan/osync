@@ -1,4 +1,4 @@
-## FUNC_BUILD=2016072702
+## FUNC_BUILD=2016080202
 ## BEGIN Generic functions for osync & obackup written in 2013-2016 by Orsiris de Jong - http://www.netpower.fr - ozy@netpower.fr
 
 ## type -p does not work on platforms other than linux (bash). If if does not work, always assume output is not a zero exitcode
@@ -90,7 +90,7 @@ function _Logger {
 	local evalue="${3}" # What to log to stderr
 	echo -e "$lvalue" >> "$LOG_FILE"
 
-	# <OSYNC SPECIFIC> Special case in daemon mode where systemctl doesn't need double timestamps
+	# <OSYNC SPECIFIC> Special case in daemon mode where systemctl does not need double timestamps
 	if [ "$sync_on_changes" == "1" ]; then
 		cat <<< "$evalue" 1>&2	# Log to stderr in daemon mode
 	elif [ "$_SILENT" -eq 0 ]; then
@@ -337,7 +337,7 @@ function SendAlert {
 		fi
 	fi
 
-	# If function has not returned 0 yet, assume it's critical that no alert can be sent
+	# If function has not returned 0 yet, assume it is critical that no alert can be sent
 	Logger "Cannot send alert (neither mutt, mail, sendmail, mailsend, sendemail or pfSense mail.php could be used)." "ERROR" # Is not marked critical because execution must continue
 
 	# Delete tmp log file
@@ -472,7 +472,7 @@ function SendEmail {
 		fi
 	fi
 
-	# If function has not returned 0 yet, assume it's critical that no alert can be sent
+	# If function has not returned 0 yet, assume it is critical that no alert can be sent
 	Logger "Cannot send mail (neither mutt, mail, sendmail, sendemail, mailsend (windows) or pfSense mail.php could be used)." "ERROR" # Is not marked critical because execution must continue
 }
 
@@ -721,10 +721,96 @@ function GetRemoteOS {
 }
 
 function WaitForTaskCompletion {
+	local pids="${1}" # pids to wait for, separated by semi-colon
+	local soft_max_time="${2}" # If program with pid $pid takes longer than $soft_max_time seconds, will log a warning, unless $soft_max_time equals 0.
+	local hard_max_time="${3}" # If program with pid $pid takes longer than $hard_max_time seconds, will stop execution, unless $hard_max_time equals 0.
+	local caller_name="${4}" # Who called this function
+	local exit_on_error="${5}" # Should the function exit on subprocess errors
+
+	Logger "${FUNCNAME[0]} called by [$caller_name]." "PARANOIA_DEBUG"	#__WITH_PARANOIA_DEBUG
+	__CheckArguments 4 $# ${FUNCNAME[0]} "$@"				#__WITH_PARANOIA_DEBUG
+
+	local soft_alert=0 # Does a soft alert need to be triggered, if yes, send an alert once
+	local log_ttime=0 # local time instance for comparaison
+
+	local seconds_begin=$SECONDS # Seconds since the beginning of the script
+	local exec_time=0 # Seconds since the beginning of this function
+
+	local retval=0 # return value of monitored pid process
+	local errorcount=0 # Number of pids that finished with errors
+
+	IFS=';' read -a pidsArray <<< "$pids"
+
+	while [ ${#pidsArray[@]} -gt 0 ]; do
+		newPidsArray=()
+		for pid in "${pidsArray[@]}"; do
+			if kill -0 $pid > /dev/null 2>&1; then
+				newPidsArray+=($pid)
+			else
+				wait $pid
+				result=$?
+				if [ $result -ne 0 ]; then
+					errorcount=$((errorcount+1))
+					Logger "${FUNCNAME[0]} called by [$caller_name] finished monitoring [$pid] with exitcode [$result]." "DEBUG"
+				fi
+			fi
+		done
+
+		Spinner
+		exec_time=$(($SECONDS - $seconds_begin))
+		if [ $((($exec_time + 1) % $KEEP_LOGGING)) -eq 0 ]; then
+			if [ $log_ttime -ne $exec_time ]; then
+				log_ttime=$exec_time
+				Logger "Current tasks still running with pids [${pidsArray[@]}]." "NOTICE"
+			fi
+		fi
+
+		if [ $exec_time -gt $soft_max_time ]; then
+			if [ $soft_alert -eq 0 ] && [ $soft_max_time -ne 0 ]; then
+				Logger "Max soft execution time exceeded for task [$caller_name] with pids [${pidsArray[@]}]." "WARN"
+				soft_alert=1
+				SendAlert
+
+			fi
+			if [ $exec_time -gt $hard_max_time ] && [ $hard_max_time -ne 0 ]; then
+				Logger "Max hard execution time exceeded for task [$caller_name] with pids [${pidsArray[@]}]. Stopping task execution." "ERROR"
+				#KillChilds $pid
+				#if [ $? == 0 ]; then
+				#	Logger "Task stopped successfully" "NOTICE"
+				#	return 0
+				#else
+				#	return 1
+				#fi
+			fi
+		fi
+
+		pidsArray=("${newPidsArray[@]}")
+		sleep $SLEEP_TIME
+	done
+
+	Logger "${FUNCNAME[0]} ended for [$caller_name] with [$errorcount] errors." "PARANOIA_DEBUG"	#__WITH_PARANOIA_DEBUG
+	return $errorcount
+}
+
+#sleep 2 &
+#pids=$!
+#sleep 4 &
+#pids="$pids;$!"
+#sleep 3 &
+#pids="$pids;$!"
+
+#WaitForAllTaskCompletion $pids
+
+#sleep 5 &
+#WaitForAllTaskCompletion $! 0 0 "me" 1
+#exit
+
+function WaitForOldTaskCompletion {
 	local pid="${1}" # pid to wait for
 	local soft_max_time="${2}" # If program with pid $pid takes longer than $soft_max_time seconds, will log a warning, unless $soft_max_time equals 0.
 	local hard_max_time="${3}" # If program with pid $pid takes longer than $hard_max_time seconds, will stop execution, unless $hard_max_time equals 0.
 	local caller_name="${4}" # Who called this function
+
 	Logger "${FUNCNAME[0]} called by [$caller_name]." "PARANOIA_DEBUG"	#__WITH_PARANOIA_DEBUG
 	__CheckArguments 4 $# ${FUNCNAME[0]} "$@"				#__WITH_PARANOIA_DEBUG
 
@@ -736,7 +822,61 @@ function WaitForTaskCompletion {
 
 	local retval=0 # return value of monitored pid process
 
-	while eval "$PROCESS_TEST_CMD" > /dev/null
+	while kill -0 $pid > /dev/null 2>&1
+	do
+		Spinner
+		exec_time=$(($SECONDS - $seconds_begin))
+		if [ $((($exec_time + 1) % $KEEP_LOGGING)) -eq 0 ]; then
+			if [ $log_ttime -ne $exec_time ]; then
+				log_ttime=$exec_time
+				Logger "Current task still running with pid [$pid]." "NOTICE"
+			fi
+		fi
+		if [ $exec_time -gt $soft_max_time ]; then
+			if [ $soft_alert -eq 0 ] && [ $soft_max_time -ne 0 ]; then
+				Logger "Max soft execution time exceeded for task [$caller_name] with pid [$pid]." "WARN"
+				soft_alert=1
+				SendAlert
+
+			fi
+			if [ $exec_time -gt $hard_max_time ] && [ $hard_max_time -ne 0 ]; then
+				Logger "Max hard execution time exceeded for task [$caller_name] with pid [$pid]. Stopping task execution." "ERROR"
+				KillChilds $pid
+				if [ $? == 0 ]; then
+					Logger "Task stopped successfully" "NOTICE"
+					return 0
+				else
+					return 1
+				fi
+			fi
+		fi
+		sleep $SLEEP_TIME
+	done
+	wait $pid
+	retval=$?
+	Logger "${FUNCNAME[0]} ended for [$caller_name] with status $retval." "PARANOIA_DEBUG"	#__WITH_PARANOIA_DEBUG
+	return $retval
+}
+
+function WaitForTaskCompletion {
+	local pids="${1}" # pids to wait for, separated by semi-colon
+	local soft_max_time="${2}" # If program with pid $pid takes longer than $soft_max_time seconds, will log a warning, unless $soft_max_time equals 0.
+	local hard_max_time="${3}" # If program with pid $pid takes longer than $hard_max_time seconds, will stop execution, unless $hard_max_time equals 0.
+	local caller_name="${4}" # Who called this function
+	local exit_on_error="${5}" # Should the function exit on subprocess errors
+
+	Logger "${FUNCNAME[0]} called by [$caller_name]." "PARANOIA_DEBUG"	#__WITH_PARANOIA_DEBUG
+	__CheckArguments 4 $# ${FUNCNAME[0]} "$@"				#__WITH_PARANOIA_DEBUG
+
+	local soft_alert=0 # Does a soft alert need to be triggered, if yes, send an alert once
+	local log_ttime=0 # local time instance for comparaison
+
+	local seconds_begin=$SECONDS # Seconds since the beginning of the script
+	local exec_time=0 # Seconds since the beginning of this function
+
+	local retval=0 # return value of monitored pid process
+
+	while kill -0 $pids > /dev/null 2>&1
 	do
 		Spinner
 		exec_time=$(($SECONDS - $seconds_begin))
