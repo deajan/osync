@@ -4,7 +4,7 @@ PROGRAM="osync" # Rsync based two way sync engine with fault tolerance
 AUTHOR="(C) 2013-2016 by Orsiris de Jong"
 CONTACT="http://www.netpower.fr/osync - ozy@netpower.fr"
 PROGRAM_VERSION=1.2-dev-parallel-unstable
-PROGRAM_BUILD=2016080203
+PROGRAM_BUILD=2016080204
 IS_STABLE=no
 
 source "./ofunctions.sh"
@@ -673,8 +673,6 @@ function _get_file_ctime_mtime_local {
 	local file_list="${3}" # Contains list of files to get time attrs
 	__CheckArguments 3 $# ${FUNCNAME[0]} "$@"	#__WITH_PARANOIA_DEBUG
 
-	#cat "$file_list" | xargs -I {} stat -c '%n;%Z;%Y' "$replica_path{}" | sort >> "$RUN_DIR/$PROGRAM.ctime_mtime.$replica_type.$SCRIPT_PID"
-	echo -n "" >> "$RUN_DIR/$PROGRAM.ctime_mtime.$replica_type.$SCRIPT_PID"
 	while read file; do $STAT_CTIME_MTIME_CMD "$replica_path$file" | sort >> "$RUN_DIR/$PROGRAM.ctime_mtime.$replica_type.$SCRIPT_PID"; done < "$file_list"
 }
 
@@ -685,7 +683,7 @@ function _get_file_ctime_mtime_remote {
 	__CheckArguments 3 $# ${FUNCNAME[0]} "$@"	#__WITH_PARANOIA_DEBUG
 
 	local cmd=
-	cmd='cat "'$file_list'" | '$SSH_CMD' "while read file; do '$REMOTE_STAT_CTIME_MTIME_CMD' \"'$replica_path'\$file\"; done | sort" > "'$RUN_DIR/$PROGRAM.ctime_mtime.$replica_type.$SCRIPT_PID'"'
+	cmd='cat "'$file_list'" | '$SSH_CMD' "while read file; do '$REMOTE_STAT_CTIME_MTIME_CMD' \"'$replica_path'\$file\"; done | sort" >> "'$RUN_DIR/$PROGRAM.ctime_mtime.$replica_type.$SCRIPT_PID'"'
 	Logger "CMD: $cmd" "DEBUG"
 	eval $cmd
 	WaitForCompletion $! $SOFT_MAX_EXEC_TIME $HARD_MAX_EXEC_TIME ${FUNCNAME[0]}
@@ -763,14 +761,14 @@ function sync_attrs {
 		local dest_dir="${TARGET[1]}"
 		local esc_dest_dir=$(EscapeSpaces "${TARGET[1]}")
 		local dest_replica="${TARGET[0]}"
-		join -j 1 -t ';' -o 1.1,1.2,2.2 "$RUN_DIR/$PROGRAM.ctime_mtime.${INITIATOR[0]}.$SCRIPT_PID" "$RUN_DIR/$PROGRAM.ctime_mtime.${TARGET[0]}.$SCRIPT_PID" | awk -F';' '{if ($2 > $3) print $1}' >> "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}-ctime_files.$SCRIPT_PID"
+		join -j 1 -t ';' -o 1.1,1.2,2.2 "$RUN_DIR/$PROGRAM.ctime_mtime.${INITIATOR[0]}.$SCRIPT_PID" "$RUN_DIR/$PROGRAM.ctime_mtime.${TARGET[0]}.$SCRIPT_PID" | awk -F';' '{if ($2 > $3) print $1}' > "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}-ctime_files.$SCRIPT_PID"
 	else
 		local source_dir="${TARGET[1]}"
 		local esc_source_dir=$(EscapeSpaces "${TARGET[1]}")
 		local dest_dir="${INITIATOR[1]}"
 		local esc_dest_dir=$(EscapeSpaces "${INITIATOR[1]}")
 		local dest_replica="${INITIATOR[0]}"
-		join -j 1 -t ';' -o 1.1,1.2,2.2 "$RUN_DIR/$PROGRAM.ctime_mtime.${TARGET[0]}.$SCRIPT_PID" "$RUN_DIR/$PROGRAM.ctime_mtime.${INITIATOR[0]}.$SCRIPT_PID" | awk -F';' '{if ($2 > $3) print $1}' >> "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}-ctime_files.$SCRIPT_PID"
+		join -j 1 -t ';' -o 1.1,1.2,2.2 "$RUN_DIR/$PROGRAM.ctime_mtime.${TARGET[0]}.$SCRIPT_PID" "$RUN_DIR/$PROGRAM.ctime_mtime.${INITIATOR[0]}.$SCRIPT_PID" | awk -F';' '{if ($2 > $3) print $1}' > "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}-ctime_files.$SCRIPT_PID"
 	fi
 
 	if [ $(wc -l < "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}-ctime_files.$SCRIPT_PID") -eq 0 ]; then
@@ -1348,9 +1346,9 @@ function _SoftDeleteRemote {
 	CheckConnectivityRemoteHost
 
 	if [ $_DRYRUN -eq 1 ]; then
-		Logger "Listing files older than $change_time days on target replica. Does not remove anything." "NOTICE"
+		Logger "Listing files older than $change_time days on $replica_type replica. Does not remove anything." "NOTICE"
 	else
-		Logger "Removing files older than $change_time days on target replica." "NOTICE"
+		Logger "Removing files older than $change_time days on $replica_type replica." "NOTICE"
 	fi
 
 	if [ $_VERBOSE -eq 1 ]; then
@@ -1373,10 +1371,10 @@ function _SoftDeleteRemote {
 	WaitForCompletion $! $SOFT_MAX_EXEC_TIME $HARD_MAX_EXEC_TIME ${FUNCNAME[0]}
 	retval=$?
 	if [ $retval -ne 0 ]; then
-		Logger "Error while executing cleanup on remote target replica." "ERROR"
+		Logger "Error while executing cleanup on remote $replica_type replica." "ERROR"
 		Logger "Command output:\n$(cat $RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$SCRIPT_PID)" "NOTICE"
 	else
-		Logger "Cleanup complete on target replica." "NOTICE"
+		Logger "Cleanup complete on $replica_type replica." "NOTICE"
 	fi
 }
 
