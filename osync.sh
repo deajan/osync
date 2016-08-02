@@ -4,7 +4,7 @@ PROGRAM="osync" # Rsync based two way sync engine with fault tolerance
 AUTHOR="(C) 2013-2016 by Orsiris de Jong"
 CONTACT="http://www.netpower.fr/osync - ozy@netpower.fr"
 PROGRAM_VERSION=1.1.1
-PROGRAM_BUILD=2016080201
+PROGRAM_BUILD=2016080202
 IS_STABLE=yes
 
 ## FUNC_BUILD=2016071902
@@ -1729,9 +1729,8 @@ function _get_file_ctime_mtime_local {
 	local replica_type="${2}" # Initiator / Target
 	local file_list="${3}" # Contains list of files to get time attrs
 
-	#cat "$file_list" | xargs -I {} stat -c '%n;%Z;%Y' "$replica_path{}" | sort > "$RUN_DIR/$PROGRAM.ctime_mtime.$replica_type.$SCRIPT_PID"
 	echo -n "" > "$RUN_DIR/$PROGRAM.ctime_mtime.$replica_type.$SCRIPT_PID"
-	while read file; do $STAT_CTIME_MTIME_CMD "$replica_path$file" | sort > "$RUN_DIR/$PROGRAM.ctime_mtime.$replica_type.$SCRIPT_PID"; done < "$file_list"
+	while read file; do $STAT_CTIME_MTIME_CMD "$replica_path$file" | sort >> "$RUN_DIR/$PROGRAM.ctime_mtime.$replica_type.$SCRIPT_PID"; done < "$file_list"
 }
 
 function _get_file_ctime_mtime_remote {
@@ -1739,7 +1738,8 @@ function _get_file_ctime_mtime_remote {
 	local replica_type="${2}"
 	local file_list="${3}"
 
-	local cmd=
+	local cmd
+
 	cmd='cat "'$file_list'" | '$SSH_CMD' "while read file; do '$REMOTE_STAT_CTIME_MTIME_CMD' \"'$replica_path'\$file\"; done | sort" > "'$RUN_DIR/$PROGRAM.ctime_mtime.$replica_type.$SCRIPT_PID'"'
 	Logger "CMD: $cmd" "DEBUG"
 	eval $cmd
