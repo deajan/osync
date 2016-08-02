@@ -4,7 +4,7 @@ PROGRAM="osync" # Rsync based two way sync engine with fault tolerance
 AUTHOR="(C) 2013-2016 by Orsiris de Jong"
 CONTACT="http://www.netpower.fr/osync - ozy@netpower.fr"
 PROGRAM_VERSION=1.2-dev-parallel-unstable
-PROGRAM_BUILD=2016080204
+PROGRAM_BUILD=2016080205
 IS_STABLE=no
 
 source "./ofunctions.sh"
@@ -264,12 +264,12 @@ function CheckReplicaPaths {
 	pids="$!"
 	if [ "$REMOTE_OPERATION" != "yes" ]; then
 		_CheckReplicaPathsLocal "${TARGET[1]}" &
-		pids="$pids $!"
+		pids="$pids;$!"
 	else
 		_CheckReplicaPathsRemote "${TARGET[1]}" &
-		pids="$pids $!"
+		pids="$pids;$!"
 	fi
-	WaitForPids $pids
+	WaitForTaskCompletion $pids 720 1800 ${FUNCNAME[0]} true
 }
 
 function _CheckDiskSpaceLocal {
@@ -959,7 +959,7 @@ function _delete_remote {
 	fi
 
 #TODO: check output file without & and sleep 5
-$SSH_CMD ERROR_ALERT=0 sync_on_changes=$sync_on_changes _SILENT=$_SILENT _DEBUG=$_DEBUG _DRYRUN=$_DRYRUN _VERBOSE=$_VERBOSE COMMAND_SUDO=$COMMAND_SUDO FILE_LIST="$(EscapeSpaces "${TARGET[1]}${TARGET[3]}/$deleted_list_file")" REPLICA_DIR="$(EscapeSpaces "$replica_dir")" DELETE_DIR="$(EscapeSpaces "$deletion_dir")" FAILED_DELETE_LIST="$(EscapeSpaces "${TARGET[1]}${TARGET[3]}/$deleted_failed_list_file")" 'bash -s' << 'ENDSSH' >> "$RUN_DIR/$PROGRAM.remote_deletion.$SCRIPT_PID" 2>&1
+$SSH_CMD ERROR_ALERT=0 sync_on_changes=$sync_on_changes _SILENT=$_SILENT _DEBUG=$_DEBUG _DRYRUN=$_DRYRUN _VERBOSE=$_VERBOSE COMMAND_SUDO=$COMMAND_SUDO FILE_LIST="$(EscapeSpaces "${TARGET[1]}${TARGET[3]}/$deleted_list_file")" REPLICA_DIR="$(EscapeSpaces "$replica_dir")" SOFT_DELETE=$SOFT_DELETE DELETE_DIR="$(EscapeSpaces "$deletion_dir")" FAILED_DELETE_LIST="$(EscapeSpaces "${TARGET[1]}${TARGET[3]}/$deleted_failed_list_file")" 'bash -s' << 'ENDSSH' >> "$RUN_DIR/$PROGRAM.remote_deletion.$SCRIPT_PID" 2>&1
 
 	## The following lines are executed remotely
 	function _logger {
