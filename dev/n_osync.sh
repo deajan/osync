@@ -4,10 +4,47 @@ PROGRAM="osync" # Rsync based two way sync engine with fault tolerance
 AUTHOR="(C) 2013-2016 by Orsiris de Jong"
 CONTACT="http://www.netpower.fr/osync - ozy@netpower.fr"
 PROGRAM_VERSION=1.2-dev-parallel-unstable
-PROGRAM_BUILD=2016080101
+PROGRAM_BUILD=2016080201
 IS_STABLE=no
 
 source "./ofunctions.sh"
+
+#	Function Name		Is parallel	#__WITH_PARANOIA_DEBUG
+
+#	GetLocalOS		no		#__WITH_PARANOIA_DEBUG
+#	InitLocalOSSettings	no		#__WITH_PARANOIA_DEBUG
+#	CheckEnvironment	no		#__WITH_PARANOIA_DEBUG
+#	PreInit			no		#__WITH_PARANOIA_DEBUG
+#	Init			no		#__WITH_PARANOIA_DEBUG
+#	PostInit		no		#__WITH_PARANOIA_DEBUG
+#	GetRemoteOS		no		#__WITH_PARANOIA_DEBUG
+#	InitRemoteOSSettings	no		#__WITH_PARANOIA_DEBUG
+#	CheckReplicaPaths	yes		#__WITH_PARANOIA_DEBUG
+#	CheckDiskSpace		yes		#__WITH_PARANOIA_DEBUG
+#	RunBeforeHook		should		#__WITH_PARANOIA_DEBUG
+#	Main			no		#__WITH_PARANOIA_DEBUG
+#	CreateStateDirs		outcoded	#__WITH_PARANOIA_DEBUG
+#	CheckLocks		should		#__WITH_PARANOIA_DEBUG
+#	WriteLockFiles		yes		#__WITH_PARANOIA_DEBUG
+#	Sync			no		#__WITH_PARANOIA_DEBUG
+#	tree_list		no		#__WITH_PARANOIA_DEBUG
+#	tree_list		no		#__WITH_PARANOIA_DEBUG
+#	delete_list		no		#__WITH_PARANOIA_DEBUG
+#	delete_list		no		#__WITH_PARANOIA_DEBUG
+#	sync_attrs		no		#__WITH_PARANOIA_DEBUG
+#	_get_file_ctime_mtime	yes		#__WITH_PARANOIA_DEBUG
+#	sync_update		no		#__WITH_PARANOIA_DEBUG
+#	sync_update		no		#__WITH_PARANOIA_DEBUG
+#	deletion_propagation	no		#__WITH_PARANOIA_DEBUG
+#	deletion_propagation	no		#__WITH_PARANOIA_DEBUG
+#	tree_list		no		#__WITH_PARANOIA_DEBUG
+#	tree_list		no		#__WITH_PARANOIA_DEBUG
+#	SoftDelete		should		#__WITH_PARANOIA_DEBUG
+#	RunAfterHook		should		#__WITH_PARANOIA_DEBUG
+#	UnlockReplicas		should		#__WITH_PARANOIA_DEBUG
+#	CleanUp			no		#__WITH_PARANOIA_DEBUG
+
+
 
 ## Working directory. This directory exists in any replica and contains state files, backups, soft deleted files etc
 OSYNC_DIR=".osync_workdir"
@@ -128,7 +165,12 @@ function CheckCurrentConfig {
 
 function _CheckReplicaPathsLocal {
 	local replica_path="${1}"
-	__CheckArguments 1 $# ${FUNCNAME[0]} "$@"	#__WITH_PARANOIA_DEBUG
+	__CheckArguments 3 $# ${FUNCNAME[0]} "$@"	#__WITH_PARANOIA_DEBUG
+
+	if [ ! -w "$replica_path" ]; then
+		Logger "Local replica path [$replica_path] is not writable." "CRITICAL"
+		exit 1
+	fi
 
 	if [ ! -d "$replica_path" ]; then
 		if [ "$CREATE_DIRS" == "yes" ]; then
@@ -145,30 +187,16 @@ function _CheckReplicaPathsLocal {
 			exit 1
 		fi
 	fi
-
-	if [ ! -w "$replica_path" ]; then
-		Logger "Local replica path [$replica_path] is not writable." "CRITICAL"
-		exit 1
-	fi
 }
 
 function _CheckReplicaPathsRemote {
 	local replica_path="${1}"
 	__CheckArguments 1 $# ${FUNCNAME[0]} "$@"	#__WITH_PARANOIA_DEBUG
 
-	local cmd=
+	local cmd
 
 	CheckConnectivity3rdPartyHosts
 	CheckConnectivityRemoteHost
-	cmd=$SSH_CMD' "if ! [ -d \"'$replica_path'\" ]; then if [ \"'$CREATE_DIRS'\" == \"yes\" ]; then '$COMMAND_SUDO' mkdir -p \"'$replica_path'\"; fi; fi" > "'$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$SCRIPT_PID'" 2>&1'
-	Logger "cmd: $cmd" "DEBUG"
-	eval "$cmd" &
-	WaitForTaskCompletion $! 720 1800 ${FUNCNAME[0]}
-	if [ $? != 0 ]; then
-		Logger "Cannot create remote replica path [$replica_path]." "CRITICAL"
-		Logger "Command output:\n$(cat $RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$SCRIPT_PID)" "ERROR"
-		exit 1
-	fi
 
 	cmd=$SSH_CMD' "if [ ! -w \"'$replica_path'\" ];then exit 1; fi" 2>&1'
 	Logger "cmd: $cmd" "DEBUG"
@@ -176,6 +204,16 @@ function _CheckReplicaPathsRemote {
 	WaitForTaskCompletion $! 720 1800 ${FUNCNAME[0]}
 	if [ $? != 0 ]; then
 		Logger "Remote replica path [$replica_path] is not writable." "CRITICAL"
+		exit 1
+	fi
+
+	cmd=$SSH_CMD' "if ! [ -d \"'$replica_path'\" ]; then if [ \"'$CREATE_DIRS'\" == \"yes\" ]; then '$COMMAND_SUDO' mkdir -p \"'$replica_path'\"; fi; fi" > "'$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$SCRIPT_PID'" 2>&1'
+	Logger "cmd: $cmd" "DEBUG"
+	eval "$cmd" &
+	WaitForTaskCompletion $! 720 1800 ${FUNCNAME[0]}
+	if [ $? != 0 ]; then
+		Logger "Cannot create remote replica path [$replica_path]." "CRITICAL"
+		Logger "Command output:\n$(cat $RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$SCRIPT_PID)" "ERROR"
 		exit 1
 	fi
 }
@@ -229,57 +267,6 @@ function CheckReplicaPaths {
 		pids="$pids $!"
 	else
 		_CheckReplicaPathsRemote "${TARGET[1]}" &
-		pids="$pids $!"
-	fi
-
-	WaitForPids $pids
-}
-
-function _CreateStateDirsLocal {
-	local replica_state_dir="${1}"
-	__CheckArguments 1 $# ${FUNCNAME[0]} "$@"	#__WITH_PARANOIA_DEBUG
-
-	if ! [ -d "$replica_state_dir" ]; then
-		$COMMAND_SUDO mkdir -p "$replica_state_dir" > "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$SCRIPT_PID" 2>&1
-		if [ $? != 0 ]; then
-			Logger "Cannot create state dir [$replica_state_dir]." "CRITICAL"
-			Logger "Command output:\n$(cat $RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$SCRIPT_PID)" "ERROR"
-			exit 1
-		fi
-	fi
-}
-
-function _CreateStateDirsRemote {
-	local replica_state_dir="${1}"
-	__CheckArguments 1 $# ${FUNCNAME[0]} "$@"	#__WITH_PARANOIA_DEBUG
-
-	local cmd=
-
-	CheckConnectivity3rdPartyHosts
-	CheckConnectivityRemoteHost
-
-	cmd=$SSH_CMD' "if ! [ -d \"'$replica_state_dir'\" ]; then '$COMMAND_SUDO' mkdir -p \"'$replica_state_dir'\"; fi" > "'$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$SCRIPT_PID'" 2>&1'
-	Logger "cmd: $cmd" "DEBUG"
-	eval "$cmd" &
-	WaitForTaskCompletion $! 720 1800 ${FUNCNAME[0]}
-	if [ $? != 0 ]; then
-		Logger "Cannot create remote state dir [$replica_state_dir]." "CRITICAL"
-		Logger "Command output:\n$(cat $RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$SCRIPT_PID)" "ERROR"
-		exit 1
-	fi
-}
-
-#TODO: also create deleted and backup dirs
-function CreateStateDirs {
-	__CheckArguments 0 $# ${FUNCNAME[0]} "$@"	#__WITH_PARANOIA_DEBUG
-
-	_CreateStateDirsLocal "${INITIATOR[1]}${INITIATOR[3]}" &
-	pids="$!"
-	if [ "$REMOTE_OPERATION" != "yes" ]; then
-		_CreateStateDirsLocal "${TARGET[1]}${TARGET[3]}" &
-		pids="$pids $!"
-	else
-		_CreateStateDirsRemote "${TARGET[1]}${TARGET[3]}" &
 		pids="$pids $!"
 	fi
 	WaitForPids $pids
@@ -340,22 +327,23 @@ function CheckDiskSpace {
 	fi
 }
 
-function _WriteLockFilesLocal {
-	local lockfile="${1}"
+
+function _CreateStateDirsLocal {
+	local replica_state_dir="${1}"
 	__CheckArguments 1 $# ${FUNCNAME[0]} "$@"	#__WITH_PARANOIA_DEBUG
 
-	$COMMAND_SUDO echo "$SCRIPT_PID@$INSTANCE_ID" > "$lockfile"
-	if [ $?	!= 0 ]; then
-		Logger "Could not create lock file [$lockfile]." "CRITICAL"
-		exit 1
-	else
-		Logger "Locked replica on [$lockfile]." "DEBUG"
-		LOCK_LOCAL=1
+	if ! [ -d "$replica_state_dir" ]; then
+		$COMMAND_SUDO mkdir -p "$replica_state_dir" > "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$SCRIPT_PID" 2>&1
+		if [ $? != 0 ]; then
+			Logger "Cannot create state dir [$replica_state_dir]." "CRITICAL"
+			Logger "Command output:\n$(cat $RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$SCRIPT_PID)" "ERROR"
+			exit 1
+		fi
 	fi
 }
 
-function _WriteLockFilesRemote {
-	local lockfile="${1}"
+function _CreateStateDirsRemote {
+	local replica_state_dir="${1}"
 	__CheckArguments 1 $# ${FUNCNAME[0]} "$@"	#__WITH_PARANOIA_DEBUG
 
 	local cmd=
@@ -363,29 +351,28 @@ function _WriteLockFilesRemote {
 	CheckConnectivity3rdPartyHosts
 	CheckConnectivityRemoteHost
 
-	cmd=$SSH_CMD' "echo '$SCRIPT_PID@$INSTANCE_ID' | '$COMMAND_SUDO' tee \"'$lockfile'\"" > /dev/null 2>&1'
+	cmd=$SSH_CMD' "if ! [ -d \"'$replica_state_dir'\" ]; then '$COMMAND_SUDO' mkdir -p \"'$replica_state_dir'\"; fi" > "'$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$SCRIPT_PID'" 2>&1'
 	Logger "cmd: $cmd" "DEBUG"
 	eval "$cmd" &
 	WaitForTaskCompletion $! 720 1800 ${FUNCNAME[0]}
 	if [ $? != 0 ]; then
-		Logger "Could not set lock on remote $replica_type replica." "CRITICAL"
+		Logger "Cannot create remote state dir [$replica_state_dir]." "CRITICAL"
+		Logger "Command output:\n$(cat $RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$SCRIPT_PID)" "ERROR"
 		exit 1
-	else
-		Logger "Locked remote $replica_type replica." "DEBUG"
-		LOCK_REMOTE=1
 	fi
 }
 
-function WriteLockFiles {
+#TODO: also create deleted and backup dirs
+function CreateStateDirs {
 	__CheckArguments 0 $# ${FUNCNAME[0]} "$@"	#__WITH_PARANOIA_DEBUG
 
-	_WriteLockFilesLocal "${INITIATOR[2]}" &
+	_CreateStateDirsLocal "${INITIATOR[1]}${INITIATOR[3]}" &
 	pids="$!"
 	if [ "$REMOTE_OPERATION" != "yes" ]; then
-		_WriteLockFilesLocal "${TARGET[2]}" &
+		_CreateStateDirsLocal "${TARGET[1]}${TARGET[3]}" &
 		pids="$pids $!"
 	else
-		_WriteLockFilesRemote "${TARGET[2]}" &
+		_CreateStateDirsRemote "${TARGET[1]}${TARGET[3]}" &
 		pids="$pids $!"
 	fi
 	WaitForPids $pids
@@ -488,6 +475,57 @@ function CheckLocks {
 	fi
 
 	WriteLockFiles
+}
+
+function _WriteLockFilesLocal {
+	local lockfile="${1}"
+	__CheckArguments 1 $# ${FUNCNAME[0]} "$@"	#__WITH_PARANOIA_DEBUG
+
+	$COMMAND_SUDO echo "$SCRIPT_PID@$INSTANCE_ID" > "$lockfile"
+	if [ $?	!= 0 ]; then
+		Logger "Could not create lock file [$lockfile]." "CRITICAL"
+		exit 1
+	else
+		Logger "Locked replica on [$lockfile]." "DEBUG"
+		LOCK_LOCAL=1
+	fi
+}
+
+function _WriteLockFilesRemote {
+	local lockfile="${1}"
+	__CheckArguments 1 $# ${FUNCNAME[0]} "$@"	#__WITH_PARANOIA_DEBUG
+
+	local cmd=
+
+	CheckConnectivity3rdPartyHosts
+	CheckConnectivityRemoteHost
+
+	cmd=$SSH_CMD' "echo '$SCRIPT_PID@$INSTANCE_ID' | '$COMMAND_SUDO' tee \"'$lockfile'\"" > /dev/null 2>&1'
+	Logger "cmd: $cmd" "DEBUG"
+	eval "$cmd" &
+	WaitForTaskCompletion $! 720 1800 ${FUNCNAME[0]}
+	if [ $? != 0 ]; then
+		Logger "Could not set lock on remote $replica_type replica." "CRITICAL"
+		exit 1
+	else
+		Logger "Locked remote $replica_type replica." "DEBUG"
+		LOCK_REMOTE=1
+	fi
+}
+
+function WriteLockFiles {
+	__CheckArguments 0 $# ${FUNCNAME[0]} "$@"	#__WITH_PARANOIA_DEBUG
+
+	_WriteLockFilesLocal "${INITIATOR[2]}" &
+	pids="$!"
+	if [ "$REMOTE_OPERATION" != "yes" ]; then
+		_WriteLockFilesLocal "${TARGET[2]}" &
+		pids="$pids $!"
+	else
+		_WriteLockFilesRemote "${TARGET[2]}" &
+		pids="$pids $!"
+	fi
+	WaitForPids $pids
 }
 
 function _UnlockReplicasLocal {
@@ -844,23 +882,20 @@ function _delete_local {
 
 	## On every run, check wheter the next item is already deleted because it is included in a directory already deleted
 	local previous_file=""
+
+	#if [ -d "$replica_dir$deletion_dir" ];then #TODO
+
+
 	OLD_IFS=$IFS
 	IFS=$'\r\n'
 	for files in $(cat "${INITIATOR[1]}${INITIATOR[3]}/$deleted_list_file")
 	do
 		if [[ "$files" != "$previous_file/"* ]] && [ "$files" != "" ]; then
+			if [ $_VERBOSE -eq 1 ]; then
+				Logger "Soft deleting $replica_dir$files" "NOTICE"
+			fi
+
 			if [ "$SOFT_DELETE" != "no" ]; then
-				if [ ! -d "$replica_dir$deletion_dir" ]; then
-					mkdir -p "$replica_dir$deletion_dir"
-					if [ $? != 0 ]; then
-						Logger "Cannot create replica deletion directory." "ERROR"
-					fi
-				fi
-
-				if [ $_VERBOSE -eq 1 ]; then
-					Logger "Soft deleting $replica_dir$files" "NOTICE"
-				fi
-
 				if [ $_DRYRUN -ne 1 ]; then
 					if [ -e "$replica_dir$deletion_dir/$files" ]; then
 						rm -rf "${replica_dir:?}$deletion_dir/$files"
@@ -882,10 +917,6 @@ function _delete_local {
 					fi
 				fi
 			else
-				if [ $_VERBOSE -eq 1 ]; then
-					Logger "Deleting $replica_dir$files" "NOTICE"
-				fi
-
 				if [ $_DRYRUN -ne 1 ]; then
 					if [ -e "$replica_dir$files" ]; then
 						rm -rf "$replica_dir$files"
@@ -917,7 +948,7 @@ function _delete_remote {
 
 	# Additionnaly, we need to copy the deletetion list to the remote state folder
 	esc_dest_dir="$(EscapeSpaces "${TARGET[1]}${TARGET[3]}")"
-	rsync_cmd="$(type -p $RSYNC_EXECUTABLE) --rsync-path=\"$RSYNC_PATH\" $SYNC_OPTS -e \"$RSYNC_SSH_CMD\" \"${INITIATOR[1]}${INITIATOR[3]}/$2\" $REMOTE_USER@$REMOTE_HOST:\"$esc_dest_dir/\" > $RUN_DIR/$PROGRAM.${FUNCNAME[0]}.precopy.$SCRIPT_PID 2>&1"
+	rsync_cmd="$(type -p $RSYNC_EXECUTABLE) --rsync-path=\"$RSYNC_PATH\" -e \"$RSYNC_SSH_CMD\" \"${INITIATOR[1]}${INITIATOR[3]}/$deletion_dir\" $REMOTE_USER@$REMOTE_HOST:\"$esc_dest_dir/\" > $RUN_DIR/$PROGRAM.${FUNCNAME[0]}.precopy.$SCRIPT_PID 2>&1"
 	Logger "RSYNC_CMD: $rsync_cmd" "DEBUG"
 	eval "$rsync_cmd" 2>> "$LOG_FILE"
 	if [ $? != 0 ]; then
@@ -929,12 +960,12 @@ function _delete_remote {
 	fi
 
 #TODO: check output file without & and sleep 5
-$SSH_CMD ERROR_ALERT=0 sync_on_changes=$sync_on_changes _SILENT=$_SILENT _DEBUG=$_DEBUG _DRYRUN=$_DRYRUN _VERBOSE=$_VERBOSE COMMAND_SUDO=$COMMAND_SUDO FILE_LIST="$(EscapeSpaces "$TARGET_STATE_DIR/$deleted_list_file")" REPLICA_DIR="$(EscapeSpaces "$replica_dir")" DELETE_DIR="$(EscapeSpaces "$deletion_dir")" FAILED_DELETE_LIST="$(EscapeSpaces "${TARGET[1]}${TARGET[3]}/$deleted_failed_list_file")" 'bash -s' << 'ENDSSH' > "$RUN_DIR/$PROGRAM.remote_deletion.$SCRIPT_PID" 2>&1
+$SSH_CMD ERROR_ALERT=0 sync_on_changes=$sync_on_changes _SILENT=$_SILENT _DEBUG=$_DEBUG _DRYRUN=$_DRYRUN _VERBOSE=$_VERBOSE COMMAND_SUDO=$COMMAND_SUDO FILE_LIST="$(EscapeSpaces "${TARGET[1]}${TARGET[3]}/$deleted_list_file")" REPLICA_DIR="$(EscapeSpaces "$replica_dir")" DELETE_DIR="$(EscapeSpaces "$deletion_dir")" FAILED_DELETE_LIST="$(EscapeSpaces "${TARGET[1]}${TARGET[3]}/$deleted_failed_list_file")" 'bash -s' << 'ENDSSH' > "$RUN_DIR/$PROGRAM.remote_deletion.$SCRIPT_PID" 2>&1
 
 	## The following lines are executed remotely
 	function _logger {
 		local value="${1}" # What to log
-		echo -e "$value" >> "$LOG_FILE"
+		echo -e "$value" >&2
 
 		if [ $_SILENT -eq 0 ]; then
 		echo -e "$value"
@@ -979,31 +1010,24 @@ $SSH_CMD ERROR_ALERT=0 sync_on_changes=$sync_on_changes _SILENT=$_SILENT _DEBUG=
 	for files in $(cat "$FILE_LIST")
 	do
 		if [[ "$files" != "$previous_file/"* ]] && [ "$files" != "" ]; then
-			if [ ! -d "$REPLICA_DIR$DELETE_DIR" ]; then
-					$COMMAND_SUDO mkdir -p "$REPLICA_DIR$DELETE_DIR"
-					if [ $? != 0 ]; then
-						Logger "Cannot create replica deletion directory." "ERROR"
-					fi
-				fi
+			if [ $_VERBOSE -eq 1 ]; then
+				Logger "Soft deleting $REPLICA_DIR$files" "NOTICE"
+			fi
 
 			if [ "$SOFT_DELETE" != "no" ]; then
-				if [ $_VERBOSE -eq 1 ]; then
-					Logger "Soft deleting $REPLICA_DIR$files" "NOTICE"
-				fi
-
 				if [ $_DRYRUN -ne 1 ]; then
 					if [ -e "$REPLICA_DIR$DELETE_DIR/$files" ]; then
 						$COMMAND_SUDO rm -rf "$REPLICA_DIR$DELETE_DIR/$files"
 					fi
 
-					if [ -e "$$REPLICA_DIR$files" ]; then
+					if [ -e "$REPLICA_DIR$files" ]; then
 						# In order to keep full path on soft deletion, create parent directories before move
 						parentdir="$(dirname "$files")"
 						if [ "$parentdir" != "." ]; then
 							$COMMAND_SUDO mkdir -p "$REPLICA_DIR$DELETE_DIR/$parentdir"
 							$COMMAND_SUDO mv -f "$REPLICA_DIR$files" "$REPLICA_DIR$DELETE_DIR/$parentdir"
 						else
-							$COMMAND_SUDO mv -f "$REPLICA_DIR$files" "$REPLICA_DIR$DELETE_DIR"1
+							$COMMAND_SUDO mv -f "$REPLICA_DIR$files" "$REPLICA_DIR$DELETE_DIR"
 						fi
 						if [ $? != 0 ]; then
 							Logger "Cannot move $REPLICA_DIR$files to deletion directory." "ERROR"
@@ -1012,16 +1036,12 @@ $SSH_CMD ERROR_ALERT=0 sync_on_changes=$sync_on_changes _SILENT=$_SILENT _DEBUG=
 					fi
 				fi
 			else
-				if [ $_VERBOSE -eq 1 ]; then
-					Logger "Deleting $REPLICA_DIR$files" "NOTICE"
-				fi
-
 				if [ $_DRYRUN -ne 1 ]; then
 					if [ -e "$REPLICA_DIR$files" ]; then
 						$COMMAND_SUDO rm -rf "$REPLICA_DIR$files"
 						if [ $? != 0 ]; then
 							Logger "Cannot delete $REPLICA_DIR$files" "ERROR"
-							echo "$files" >> "$TARGET_STATE_DIR/$FAILED_DELETE_LIST"
+							echo "$files" >> "$FAILED_DELETE_LIST"
 						fi
 					fi
 				fi
@@ -1034,20 +1054,18 @@ ENDSSH
 
 	## Copy back the deleted failed file list
 	esc_source_file="$(EscapeSpaces "${TARGET[1]}${TARGET[3]}/$deleted_failed_list_file")"
-	rsync_cmd="$(type -p $RSYNC_EXECUTABLE) --rsync-path=\"$RSYNC_PATH\" $SYNC_OPTS -e \"$RSYNC_SSH_CMD\" $REMOTE_USER@$REMOTE_HOST:\"$esc_source_file\" \"${INITIATOR[1]}${INITIATOR[3]}\" > \"$RUN_DIR/$PROGRAM.remote_failed_deletion_list_copy.$SCRIPT_PID\""
+	rsync_cmd="$(type -p $RSYNC_EXECUTABLE) --rsync-path=\"$RSYNC_PATH\" -e \"$RSYNC_SSH_CMD\" $REMOTE_USER@$REMOTE_HOST:\"$esc_source_file\" \"${INITIATOR[1]}${INITIATOR[3]}\" > \"$RUN_DIR/$PROGRAM.remote_failed_deletion_list_copy.$SCRIPT_PID\""
 	Logger "RSYNC_CMD: $rsync_cmd" "DEBUG"
 	eval "$rsync_cmd" 2>> "$LOG_FILE"
-	if [ $? != 0 ]; then
+	result=$?
+	if [ $result != 0 ]; then
 		Logger "Cannot copy back the failed deletion list to initiator replica." "CRITICAL"
 		if [ -f "$RUN_DIR/$PROGRAM.remote_failed_deletion_list_copy.$SCRIPT_PID" ]; then
 			Logger "Comand output: $(cat $RUN_DIR/$PROGRAM.remote_failed_deletion_list_copy.$SCRIPT_PID)" "NOTICE"
 		fi
-		exit 1
+		exit $result
 	fi
-
-
-
-	exit $?
+	return 0
 }
 
 # delete_propagation(replica name, deleted_list_filename, deleted_failed_file_list)
@@ -1337,7 +1355,7 @@ function _SoftDeleteRemote {
 
 	if [ $_VERBOSE -eq 1 ]; then
 		# Cannot launch log function from xargs, ugly hack
-		cmd=$SSH_CMD' "if [ -d \"'$replica_deletion_path'\" ]; then '$COMMAND_SUDO' '$REMOTE_FIND_CMD' \"'$replica_deletion_path'/\" -type f -ctime +'$change_time' -print0 | xargs -0 -I {} echo Will delete file {} && '$REMOTE_FIND_CMD' \"'$replica_deletion_path'/\" -type d -empty -ctime '$change_time' -print0 | xargs -0 -I {} echo Will delete directory {}; else echo \"No remote backup/deletion directory.\"; exit 1; fi" > "'$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$SCRIPT_PID'" 2>&1'
+		cmd=$SSH_CMD' "if [ -d \"'$replica_deletion_path'\" ]; then '$COMMAND_SUDO' '$REMOTE_FIND_CMD' \"'$replica_deletion_path'/\" -type f -ctime +'$change_time' -print0 | xargs -0 -I {} echo Will delete file {} && '$REMOTE_FIND_CMD' \"'$replica_deletion_path'/\" -type d -empty -ctime '$change_time' -print0 | xargs -0 -I {} echo Will delete directory {}; else echo \"No remote backup/deletion directory.\"; fi" > "'$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$SCRIPT_PID'" 2>&1'
 		Logger "cmd: $cmd" "DEBUG"
 		eval "$cmd" &
 		WaitForCompletion $! $SOFT_MAX_EXEC_TIME $HARD_MAX_EXEC_TIME ${FUNCNAME[0]}
