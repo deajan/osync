@@ -7,6 +7,12 @@ KNOWN ISSUES
 RECENT CHANGES
 --------------
 
+XX Xxx 2016: osync v1.1.1 released
+
+- Fixed problem with attributes file list function
+- Fixed deletion propagation code
+- Fixed missing deletion / backup diretories message in verbose mode
+
 27 Jul 2016: osync v1.1 released
 - More msys and cygwin compatibility
 - Logging begins now before any remote checks
