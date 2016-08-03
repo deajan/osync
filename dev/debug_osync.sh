@@ -7,8 +7,11 @@ PROGRAM_VERSION=1.2-dev-parallel-unstable
 PROGRAM_BUILD=2016080205
 IS_STABLE=no
 
-## FUNC_BUILD=2016080203
+## FUNC_BUILD=2016080305
 ## BEGIN Generic functions for osync & obackup written in 2013-2016 by Orsiris de Jong - http://www.netpower.fr - ozy@netpower.fr
+
+#TODO: set _LOGGER_PREFIX in other apps, specially for osync daemon mode
+#TODO: set _LOGGER_STDERR in other apps
 
 ## type -p does not work on platforms other than linux (bash). If if does not work, always assume output is not a zero exitcode
 if ! type "$BASH" > /dev/null; then
@@ -47,7 +50,7 @@ fi						#__WITH_PARANOIA_DEBUG
 ## allow debugging from command line with _DEBUG=yes
 if [ ! "$_DEBUG" == "yes" ]; then
 	_DEBUG=no
-	SLEEP_TIME=.001 # Tested under linux and FreeBSD bash, #TODO tests on cygwin / msys
+	SLEEP_TIME=.05 # Tested under linux and FreeBSD bash, #TODO tests on cygwin / msys
 	_VERBOSE=0
 else
 	SLEEP_TIME=1
@@ -99,9 +102,8 @@ function _Logger {
 	local evalue="${3}" # What to log to stderr
 	echo -e "$lvalue" >> "$LOG_FILE"
 
-	# <OSYNC SPECIFIC> Special case in daemon mode where systemctl does not need double timestamps
-	if [ "$sync_on_changes" == "1" ]; then
-		cat <<< "$evalue" 1>&2	# Log to stderr in daemon mode
+	if [ "$_LOGGER_STDERR" -eq 1 ]; then
+		cat <<< "$evalue" 1>&2
 	elif [ "$_SILENT" -eq 0 ]; then
 		echo -e "$svalue"
 	fi
@@ -112,13 +114,13 @@ function Logger {
 	local value="${1}" # Sentence to log (in double quotes)
 	local level="${2}" # Log level: PARANOIA_DEBUG, DEBUG, NOTICE, WARN, ERROR, CRITIAL
 
-	# <OSYNC SPECIFIC> Special case in daemon mode we should timestamp instead of counting seconds
-	if [ "$sync_on_changes" == "1" ]; then
+	if [ "$_LOGGER_PREFIX" == "time" ]; then
+		prefix="TIME: $SECONDS - "
+	elif [ "$_LOGGER_PREFIX" == "date" ]; then
 		prefix="$(date) - "
 	else
-		prefix="TIME: $SECONDS - "
+		prefix=""
 	fi
-	# </OSYNC SPECIFIC>
 
 	if [ "$level" == "CRITICAL" ]; then
 		_Logger "$prefix\e[41m$value\e[0m" "$prefix$level:$value" "$level:$value"
@@ -176,8 +178,9 @@ function QuickLogger {
 
 # Portable child (and grandchild) kill function tester under Linux, BSD and MacOS X
 function KillChilds {
-	local pid="${1}"
+	local pid="${1}" # Parent pid to kill
 	local self="${2:-false}"
+
 
 	if children="$(pgrep -P "$pid")"; then
 		for child in $children; do
@@ -185,9 +188,8 @@ function KillChilds {
 			KillChilds "$child" true
 		done
 	fi
-
-	# Try to kill nicely, if not, wait 15 seconds to let Trap actions happen before killing
-	if ( [ "$self" == true ] && eval $PROCESS_TEST_CMD > /dev/null 2>&1); then
+		# Try to kill nicely, if not, wait 15 seconds to let Trap actions happen before killing
+	if ( [ "$self" == true ] && kill -0 $pid > /dev/null 2>&1); then
 		Logger "Sending SIGTERM to process [$pid]." "DEBUG"
 		kill -s SIGTERM "$pid"
 		if [ $? != 0 ]; then
@@ -198,11 +200,27 @@ function KillChilds {
 				Logger "Sending SIGKILL to process [$pid] failed." "DEBUG"
 				return 1
 			fi
+		else
+			return 0
 		fi
-		return 0
 	else
 		return 0
 	fi
+}
+
+function KillAllChilds {
+	local pids="${1}" # List of parent pids to kill separated by semi-colon
+
+	local errorcount=0
+
+	IFS=';' read -a pidsArray <<< "$pids"
+	for pid in "${pidsArray[@]}"; do
+		KillChilds $pid
+		if [ $? != 0 ]; then
+			errorcount=$((errorcount+1))
+			fi
+	done
+	return $errorcount
 }
 
 # osync/obackup/pmocr script specific mail alert function, use SendEmail function for generic mail sending
@@ -748,7 +766,10 @@ function WaitForTaskCompletion {
 	local retval=0 # return value of monitored pid process
 	local errorcount=0 # Number of pids that finished with errors
 
+	local pidCount # number of given pids
+
 	IFS=';' read -a pidsArray <<< "$pids"
+	pidCount=${#pidsArray[@]}
 
 	while [ ${#pidsArray[@]} -gt 0 ]; do
 		newPidsArray=()
@@ -783,13 +804,14 @@ function WaitForTaskCompletion {
 			fi
 			if [ $exec_time -gt $hard_max_time ] && [ $hard_max_time -ne 0 ]; then
 				Logger "Max hard execution time exceeded for task [$caller_name] with pids [${pidsArray[@]}]. Stopping task execution." "ERROR"
-				#KillChilds $pid
-				#if [ $? == 0 ]; then
-				#	Logger "Task stopped successfully" "NOTICE"
-				#	return 0
-				#else
-				#	return 1
-				#fi
+				KillChilds $pid
+				if [ $? == 0 ]; then
+					Logger "Task stopped successfully" "NOTICE"
+					#return 0
+				else
+					errrorcount=$((errorcount+1))
+					#return 1
+				fi
 			fi
 		fi
 
@@ -797,26 +819,13 @@ function WaitForTaskCompletion {
 		sleep $SLEEP_TIME
 	done
 
-	Logger "${FUNCNAME[0]} ended for [$caller_name] with [$errorcount] errors." "PARANOIA_DEBUG"	#__WITH_PARANOIA_DEBUG
-	if [ $exit_on_error == true ]; then
+	Logger "${FUNCNAME[0]} ended for [$caller_name] using [$pidCount] subprocesses with [$errorcount] errors." "PARANOIA_DEBUG"	#__WITH_PARANOIA_DEBUG
+	if [ $exit_on_error == true ] && [ $errorcount -gt 0 ]; then
 		exit 1337
 	else
 		return $errorcount
 	fi
 }
-
-#sleep 2 &
-#pids=$!
-#sleep 4 &
-#pids="$pids;$!"
-#sleep 3 &
-#pids="$pids;$!"
-
-#WaitForAllTaskCompletion $pids
-
-#sleep 5 &
-#WaitForAllTaskCompletion $! 0 0 "me" 1
-#exit
 
 function WaitForOldTaskCompletion {
 	local pid="${1}" # pid to wait for
@@ -871,7 +880,7 @@ function WaitForOldTaskCompletion {
 	return $retval
 }
 
-function WaitForTaskCompletion {
+function WaitForXTaskCompletion {
 	local pids="${1}" # pids to wait for, separated by semi-colon
 	local soft_max_time="${2}" # If program with pid $pid takes longer than $soft_max_time seconds, will log a warning, unless $soft_max_time equals 0.
 	local hard_max_time="${3}" # If program with pid $pid takes longer than $hard_max_time seconds, will stop execution, unless $hard_max_time equals 0.
@@ -1441,6 +1450,9 @@ function InitRemoteOSSettings {
 ## Working directory. This directory exists in any replica and contains state files, backups, soft deleted files etc
 OSYNC_DIR=".osync_workdir"
 
+_LOGGER_PREFIX="time"
+_LOGGER_STDERR=0
+
 function TrapStop {
 	if [ $SOFT_STOP -eq 0 ]; then
 		Logger " /!\ WARNING: Manual exit of osync is really not recommended. Sync will be in inconsistent state." "WARN"
@@ -1610,37 +1622,10 @@ function _CheckReplicaPathsRemote {
 	fi
 }
 
-#TODO: organize this function into WaitforTaskCompletion, and add optional parameter to exit on error
-function WaitForPids {
-
-	local errors=0
-
-	while [ "$#" -gt 0 ]; do
-		for pid in "$@"; do
-			shift
-			if kill -0 "$pid" > /dev/null 2>&1; then
-				Logger "$pid is alive" "DEBUG"
-				set -- "$@" "$pid"
-			else
-				wait "$pid"
-				result=$?
-				if [ $result -eq 0 ]; then
-					Logger "$pid exited okay with $result" "DEBUG"
-				else
-					errors=$((errors+1))
-					Logger "$pid exited with bad status $result" "DEBUG"
-				fi
-			fi
-		done
-		sleep .01
-	done
-	if [ $errors -gt 0 ]; then
-		exit 1
-	fi
-}
-
 function CheckReplicaPaths {
 	__CheckArguments 0 $# ${FUNCNAME[0]} "$@"	#__WITH_PARANOIA_DEBUG
+
+	local pids
 
 	#INITIATOR_SYNC_DIR_CANN=$(realpath "${INITIATOR[1]}")	#TODO: investigate realpath & readlink issues on MSYS and busybox here
 	#TARGET_SYNC_DIR_CANN=$(realpath "${TARGET[1]})
@@ -1668,7 +1653,7 @@ function _CheckDiskSpaceLocal {
 	local replica_path="${1}"
 	__CheckArguments 1 $# ${FUNCNAME[0]} "$@"	#__WITH_PARANOIA_DEBUG
 
-	local disk_space=
+	local disk_space
 
 	Logger "Checking minimum disk space in [$replica_path]." "NOTICE"
 
@@ -1684,8 +1669,8 @@ function _CheckDiskSpaceRemote {
 
 	Logger "Checking minimum disk space on target [$replica_path]." "NOTICE"
 
-	local cmd=
-	local disk_space=
+	local cmd
+	local disk_space
 
 	CheckConnectivity3rdPartyHosts
 	CheckConnectivityRemoteHost
@@ -1708,15 +1693,18 @@ function _CheckDiskSpaceRemote {
 function CheckDiskSpace {
 	__CheckArguments 0 $# ${FUNCNAME[0]} "$@"	#__WITH_PARANOIA_DEBUG
 
+	local pids
+
 	_CheckDiskSpaceLocal "${INITIATOR[1]}" &
 	pids="$!"
 	if [ "$REMOTE_OPERATION" != "yes" ]; then
 		_CheckDiskSpaceLocal "${TARGET[1]}" &
-		pids="$pids $!"
+		pids="$pids;$!"
 	else
 		_CheckDiskSpaceRemote "${TARGET[1]}" &
-		pifs="$pids $!"
+		pids="$pids;$!"
 	fi
+	WaitForTaskCompletion $pids 720 1800 ${FUNCNAME[0]} false
 }
 
 
@@ -1762,12 +1750,12 @@ function CreateStateDirs {
 	pids="$!"
 	if [ "$REMOTE_OPERATION" != "yes" ]; then
 		_CreateStateDirsLocal "${TARGET[1]}${TARGET[3]}" &
-		pids="$pids $!"
+		pids="$pids;$!"
 	else
 		_CreateStateDirsRemote "${TARGET[1]}${TARGET[3]}" &
-		pids="$pids $!"
+		pids="$pids;$!"
 	fi
-	WaitForPids $pids
+	WaitForTaskCompletion $pids 720 1800 ${FUNCNAME[0]} true
 }
 
 function _CheckLocksLocal {
@@ -1908,16 +1896,18 @@ function _WriteLockFilesRemote {
 function WriteLockFiles {
 	__CheckArguments 0 $# ${FUNCNAME[0]} "$@"	#__WITH_PARANOIA_DEBUG
 
+	local pids
+
 	_WriteLockFilesLocal "${INITIATOR[2]}" &
 	pids="$!"
 	if [ "$REMOTE_OPERATION" != "yes" ]; then
 		_WriteLockFilesLocal "${TARGET[2]}" &
-		pids="$pids $!"
+		pids="$pids;$!"
 	else
 		_WriteLockFilesRemote "${TARGET[2]}" &
-		pids="$pids $!"
+		pids="$pids;$!"
 	fi
-	WaitForPids $pids
+	WaitForTaskCompletion $pids 720 1800 ${FUNCNAME[0]} true
 }
 
 function _UnlockReplicasLocal {
@@ -2781,13 +2771,13 @@ function SoftDelete {
 		pids="$!"
 		if [ "$REMOTE_OPERATION" != "yes" ]; then
 			_SoftDeleteLocal "${TARGET[0]}" "${TARGET[1]}${TARGET[4]}" $CONFLICT_BACKUP_DAYS &
-			pids="$pids $!"
+			pids="$pids;$!"
 		else
 			_SoftDeleteRemote "${TARGET[0]}" "${TARGET[1]}${TARGET[4]}" $CONFLICT_BACKUP_DAYS &
-			pids="$pids $!"
+			pids="$pids;$!"
 		fi
 	fi
-	WaitForPids $pids
+	WaitForTaskCompletion $pids 720 1800 ${FUNCNAME[0]} false
 
 	if [ "$SOFT_DELETE" != "no" ] && [ $SOFT_DELETE_DAYS -ne 0 ]; then
 		Logger "Running soft deletion cleanup." "NOTICE"
@@ -2796,13 +2786,13 @@ function SoftDelete {
 		pids="$!"
 		if [ "$REMOTE_OPERATION" != "yes" ]; then
 			_SoftDeleteLocal "${TARGET[0]}" "${TARGET[1]}${TARGET[5]}" $SOFT_DELETE_DAYS &
-			pids="$pids $!"
+			pids="$pids;$!"
 		else
 			_SoftDeleteRemote "${TARGET[0]}" "${TARGET[1]}${TARGET[5]}" $SOFT_DELETE_DAYS &
-			pids="$pids $!"
+			pids="$pids;$!"
 		fi
 	fi
-	WaitForPids $pids
+	WaitForTaskCompletion $pids 720 1800 ${FUNCNAME[0]} false
 }
 
 function Init {
@@ -3143,6 +3133,8 @@ do
 		--on-changes)
 		sync_on_changes=1
 		_NOLOCKS=1
+		_LOGGER_PREFIX="date"
+		_LOGGER_STDERR=1
 		;;
 		--no-locks)
 		_NOLOCKS=1
