@@ -4,10 +4,10 @@ PROGRAM="osync" # Rsync based two way sync engine with fault tolerance
 AUTHOR="(C) 2013-2016 by Orsiris de Jong"
 CONTACT="http://www.netpower.fr/osync - ozy@netpower.fr"
 PROGRAM_VERSION=1.2-dev-parallel-unstable
-PROGRAM_BUILD=2016080205
+PROGRAM_BUILD=2016080206
 IS_STABLE=no
 
-## FUNC_BUILD=2016080305
+## FUNC_BUILD=2016080306
 ## BEGIN Generic functions for osync & obackup written in 2013-2016 by Orsiris de Jong - http://www.netpower.fr - ozy@netpower.fr
 
 #TODO: set _LOGGER_PREFIX in other apps, specially for osync daemon mode
@@ -821,6 +821,7 @@ function WaitForTaskCompletion {
 
 	Logger "${FUNCNAME[0]} ended for [$caller_name] using [$pidCount] subprocesses with [$errorcount] errors." "PARANOIA_DEBUG"	#__WITH_PARANOIA_DEBUG
 	if [ $exit_on_error == true ] && [ $errorcount -gt 0 ]; then
+		Logger "Stopping execution." "CRITICAL"
 		exit 1337
 	else
 		return $errorcount
@@ -1053,24 +1054,38 @@ function RunRemoteCommand {
 function RunBeforeHook {
 	__CheckArguments 0 $# ${FUNCNAME[0]} "$@"	#__WITH_PARANOIA_DEBUG
 
+	local pids=
+
 	if [ "$LOCAL_RUN_BEFORE_CMD" != "" ]; then
-		RunLocalCommand "$LOCAL_RUN_BEFORE_CMD" $MAX_EXEC_TIME_PER_CMD_BEFORE
+		RunLocalCommand "$LOCAL_RUN_BEFORE_CMD" $MAX_EXEC_TIME_PER_CMD_BEFORE &
+		pids="$!"
 	fi
 
 	if [ "$REMOTE_RUN_BEFORE_CMD" != "" ]; then
-		RunRemoteCommand "$REMOTE_RUN_BEFORE_CMD" $MAX_EXEC_TIME_PER_CMD_BEFORE
+		RunRemoteCommand "$REMOTE_RUN_BEFORE_CMD" $MAX_EXEC_TIME_PER_CMD_BEFORE &
+		pids="$pids;$!"
+	fi
+	if [ "$pids" != "" ]; then
+		WaitForTaskCompletion $pids 0 0 ${FUNCNAME[0]} false
 	fi
 }
 
 function RunAfterHook {
 	__CheckArguments 0 $# ${FUNCNAME[0]} "$@"	#__WITH_PARANOIA_DEBUG
 
+	local pids
+
 	if [ "$LOCAL_RUN_AFTER_CMD" != "" ]; then
-		RunLocalCommand "$LOCAL_RUN_AFTER_CMD" $MAX_EXEC_TIME_PER_CMD_AFTER
+		RunLocalCommand "$LOCAL_RUN_AFTER_CMD" $MAX_EXEC_TIME_PER_CMD_AFTER &
+		pids="$!"
 	fi
 
 	if [ "$REMOTE_RUN_AFTER_CMD" != "" ]; then
-		RunRemoteCommand "$REMOTE_RUN_AFTER_CMD" $MAX_EXEC_TIME_PER_CMD_AFTER
+		RunRemoteCommand "$REMOTE_RUN_AFTER_CMD" $MAX_EXEC_TIME_PER_CMD_AFTER &
+		pids="$pids;$!"
+	fi
+	if [ "$pids" != "" ]; then
+		WaitForTaskCompletion $pids 0 0 ${FUNCNAME[0]} false
 	fi
 }
 
@@ -1422,10 +1437,10 @@ function InitRemoteOSSettings {
 #	InitRemoteOSSettings	no		#__WITH_PARANOIA_DEBUG
 #	CheckReplicaPaths	yes		#__WITH_PARANOIA_DEBUG
 #	CheckDiskSpace		yes		#__WITH_PARANOIA_DEBUG
-#	RunBeforeHook		should		#__WITH_PARANOIA_DEBUG
+#	RunBeforeHook		yes		#__WITH_PARANOIA_DEBUG
 #	Main			no		#__WITH_PARANOIA_DEBUG
-#	CreateStateDirs		outcoded	#__WITH_PARANOIA_DEBUG
-#	CheckLocks		should		#__WITH_PARANOIA_DEBUG
+#	CreateStateDirs		yes		#__WITH_PARANOIA_DEBUG
+#	CheckLocks		yes		#__WITH_PARANOIA_DEBUG
 #	WriteLockFiles		yes		#__WITH_PARANOIA_DEBUG
 #	Sync			no		#__WITH_PARANOIA_DEBUG
 #	tree_list		no		#__WITH_PARANOIA_DEBUG
@@ -1440,9 +1455,9 @@ function InitRemoteOSSettings {
 #	deletion_propagation	no		#__WITH_PARANOIA_DEBUG
 #	tree_list		no		#__WITH_PARANOIA_DEBUG
 #	tree_list		no		#__WITH_PARANOIA_DEBUG
-#	SoftDelete		should		#__WITH_PARANOIA_DEBUG
-#	RunAfterHook		should		#__WITH_PARANOIA_DEBUG
-#	UnlockReplicas		should		#__WITH_PARANOIA_DEBUG
+#	SoftDelete		yes		#__WITH_PARANOIA_DEBUG
+#	RunAfterHook		yes		#__WITH_PARANOIA_DEBUG
+#	UnlockReplicas		yes		#__WITH_PARANOIA_DEBUG
 #	CleanUp			no		#__WITH_PARANOIA_DEBUG
 
 
@@ -1695,6 +1710,11 @@ function CheckDiskSpace {
 
 	local pids
 
+	if [ $MINIMUM_SPACE -eq 0 ]; then
+		Logger "Skipped minimum space check." "NOTICE"
+		return 0
+	fi
+
 	_CheckDiskSpaceLocal "${INITIATOR[1]}" &
 	pids="$!"
 	if [ "$REMOTE_OPERATION" != "yes" ]; then
@@ -1746,6 +1766,8 @@ function _CreateStateDirsRemote {
 function CreateStateDirs {
 	__CheckArguments 0 $# ${FUNCNAME[0]} "$@"	#__WITH_PARANOIA_DEBUG
 
+	local pids
+
 	_CreateStateDirsLocal "${INITIATOR[1]}${INITIATOR[3]}" &
 	pids="$!"
 	if [ "$REMOTE_OPERATION" != "yes" ]; then
@@ -1762,16 +1784,16 @@ function _CheckLocksLocal {
 	local lockfile="${1}"
 	__CheckArguments 1 $# ${FUNCNAME[0]} "$@"	#__WITH_PARANOIA_DEBUG
 
-	local lockfile_content=
-	local lock_pid=
-	local lock_instance_id=
+	local lockfile_content
+	local lock_pid
+	local lock_instance_id
 
 	if [ -f "$lockfile" ]; then
 		lockfile_content=$(cat $lockfile)
 		Logger "Master lock pid present: $lockfile_content" "DEBUG"
 		lock_pid=${lockfile_content%@*}
 		lock_instance_id=${lockfile_content#*@}
-		ps -p$lock_pid > /dev/null 2>&1
+		kill -9 $lock_pid > /dev/null 2>&1
 		if [ $? != 0 ]; then
 			Logger "There is a dead osync lock in [$lockfile]. Instance [$lock_pid] no longer running. Resuming." "NOTICE"
 		else
@@ -1785,10 +1807,10 @@ function _CheckLocksRemote {
 	local lockfile="${1}"
 	__CheckArguments 1 $# ${FUNCNAME[0]} "$@"	#__WITH_PARANOIA_DEBUG
 
-	local cmd=
-	local lock_pid=
-	local lock_instance_id=
-	local lockfile_content=
+	local cmd
+	local lock_pid
+	local lock_instance_id
+	local lockfile_content
 
 	CheckConnectivity3rdPartyHosts
 	CheckConnectivityRemoteHost
@@ -1812,7 +1834,7 @@ function _CheckLocksRemote {
 	if [ "$lock_pid" != "" ] && [ "$lock_instance_id" != "" ]; then
 		Logger "Remote lock is: $lock_pid@$lock_instance_id" "DEBUG"
 
-		ps -p$lock_pid > /dev/null 2>&1
+		kill -0 $lock_pid > /dev/null 2>&1
 		if [ $? != 0 ]; then
 			if [ "$lock_instance_id" == "$INSTANCE_ID" ]; then
 				Logger "There is a dead osync lock on target replica that corresponds to this initiator sync id [$lock_instance_id]. Instance [$lock_pid] no longer running. Resuming." "NOTICE"
@@ -1834,6 +1856,8 @@ function _CheckLocksRemote {
 function CheckLocks {
 	__CheckArguments 0 $# ${FUNCNAME[0]} "$@"	#__WITH_PARANOIA_DEBUG
 
+	local pids
+
 	if [ $_NOLOCKS -eq 1 ]; then
 		return 0
 	fi
@@ -1847,13 +1871,16 @@ function CheckLocks {
 	fi
 
 	#TODO: do not parallelize the detection of locks because of pids
-	_CheckLocksLocal "${INITIATOR[2]}"
+	_CheckLocksLocal "${INITIATOR[2]}" &
+	pids="$!"
 	if [ "$REMOTE_OPERATION" != "yes" ]; then
-		_CheckLocksLocal "${TARGET[2]}"
+		_CheckLocksLocal "${TARGET[2]}" &
+		pids="$pids;$!"
 	else
-		_CheckLocksRemote "${TARGET[2]}"
+		_CheckLocksRemote "${TARGET[2]}" &
+		pids="$pids;$!"
 	fi
-
+	WaitForTaskCompletion $pids 720 1800 ${FUNCNAME[0]} true
 	WriteLockFiles
 }
 
@@ -1867,7 +1894,6 @@ function _WriteLockFilesLocal {
 		exit 1
 	else
 		Logger "Locked replica on [$lockfile]." "DEBUG"
-		LOCK_LOCAL=1
 	fi
 }
 
@@ -1889,7 +1915,6 @@ function _WriteLockFilesRemote {
 		exit 1
 	else
 		Logger "Locked remote $replica_type replica." "DEBUG"
-		LOCK_REMOTE=1
 	fi
 }
 
@@ -1908,6 +1933,7 @@ function WriteLockFiles {
 		pids="$pids;$!"
 	fi
 	WaitForTaskCompletion $pids 720 1800 ${FUNCNAME[0]} true
+	LOCK_FILES_EXIST=1
 }
 
 function _UnlockReplicasLocal {
@@ -1948,24 +1974,23 @@ function _UnlockReplicasRemote {
 function UnlockReplicas {
 	__CheckArguments 0 $# ${FUNCNAME[0]} "$@"	#__WITH_PARANOIA_DEBUG
 
-	if [ $_NOLOCKS -eq 1 ]; then
+	local pids
+
+	if [ $_NOLOCKS -eq 1 ] || [ $LOCK_FILES_EXIST -eq 0 ]; then
 		return 0
 	fi
 
-	#TODO: Cannot parallelize unlockreplicasremote until waitfortaskcompletion is removed
-	if [ $LOCK_LOCAL -eq 1 ]; then
-		_UnlockReplicasLocal "${INITIATOR[2]}"
-	fi
+	_UnlockReplicasLocal "${INITIATOR[2]}" &
+	pids="$!"
 
 	if [ "$REMOTE_OPERATION" != "yes" ]; then
-		if [ $LOCK_LOCAL -eq 1 ]; then
-			_UnlockReplicasLocal "${TARGET[2]}"
-		fi
+		_UnlockReplicasLocal "${TARGET[2]}" &
+		pids="$pids;$!"
 	else
-		if [ $LOCK_REMOTE -eq 1 ]; then
-			_UnlockReplicasRemote "${TARGET[2]}"
-		fi
+		_UnlockReplicasRemote "${TARGET[2]}" &
+		pids="$pids;$!"
 	fi
+	WaitForTaskCompletion $pids 720 1800 ${FUNCNAME[0]} false
 }
 
 ###### Sync core functions
@@ -2508,8 +2533,8 @@ function deletion_propagation {
 ###### Step 5: Create after run tree list for initiator and target replicas (Steps 5M and 5S)
 
 function Sync {
-	local resume_count=
-	local resume_sync=
+	local resume_count
+	local resume_sync
 	__CheckArguments 0 $# ${FUNCNAME[0]} "$@"	#__WITH_PARANOIA_DEBUG
 
 	Logger "Starting synchronization task." "NOTICE"
@@ -2763,6 +2788,8 @@ function _SoftDeleteRemote {
 
 function SoftDelete {
 	__CheckArguments 0 $# ${FUNCNAME[0]} "$@"	#__WITH_PARANOIA_DEBUG
+
+	local pids
 
 	if [ "$CONFLICT_BACKUP" != "no" ] && [ $CONFLICT_BACKUP_DAYS -ne 0 ]; then
 		Logger "Running conflict backup cleanup." "NOTICE"
@@ -3056,10 +3083,7 @@ if [ "$CONFLICT_PREVALANCE" == "" ]; then
 	CONFLICT_PREVALANCE=initiator
 fi
 
-#TODO: lock_local is in a subprocess so it won't update, rethink this
-LOCK_LOCAL=1
-LOCK_REMOTE=1
-
+LOCK_FILES_EXIST=0
 FORCE_UNLOCK=0
 no_maxtime=0
 opts=""
@@ -3203,7 +3227,7 @@ opts="${opts# *}"
 	else
 		LOG_FILE="$LOGFILE"
 	fi
-	Logger "Script begin ! Logging to [$LOG_FILE]." "DEBUG"
+	Logger "Script begin, logging to [$LOG_FILE]." "DEBUG"
 
 	if [ "$IS_STABLE" != "yes" ]; then
 		Logger "This is an unstable dev build. Please use with caution." "WARN"
