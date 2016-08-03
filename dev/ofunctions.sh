@@ -1,4 +1,4 @@
-## FUNC_BUILD=2016080305
+## FUNC_BUILD=2016080306
 ## BEGIN Generic functions for osync & obackup written in 2013-2016 by Orsiris de Jong - http://www.netpower.fr - ozy@netpower.fr
 
 #TODO: set _LOGGER_PREFIX in other apps, specially for osync daemon mode
@@ -1045,24 +1045,30 @@ function RunBeforeHook {
 	__CheckArguments 0 $# ${FUNCNAME[0]} "$@"	#__WITH_PARANOIA_DEBUG
 
 	if [ "$LOCAL_RUN_BEFORE_CMD" != "" ]; then
-		RunLocalCommand "$LOCAL_RUN_BEFORE_CMD" $MAX_EXEC_TIME_PER_CMD_BEFORE
+		RunLocalCommand "$LOCAL_RUN_BEFORE_CMD" $MAX_EXEC_TIME_PER_CMD_BEFORE &
+		pids="$!"
 	fi
 
 	if [ "$REMOTE_RUN_BEFORE_CMD" != "" ]; then
-		RunRemoteCommand "$REMOTE_RUN_BEFORE_CMD" $MAX_EXEC_TIME_PER_CMD_BEFORE
+		RunRemoteCommand "$REMOTE_RUN_BEFORE_CMD" $MAX_EXEC_TIME_PER_CMD_BEFORE &
+		pids="$pids;$!"
 	fi
+	WaitForTaskCompletion $pids 0 0 ${FUNCNAME[0]} false
 }
 
 function RunAfterHook {
 	__CheckArguments 0 $# ${FUNCNAME[0]} "$@"	#__WITH_PARANOIA_DEBUG
 
 	if [ "$LOCAL_RUN_AFTER_CMD" != "" ]; then
-		RunLocalCommand "$LOCAL_RUN_AFTER_CMD" $MAX_EXEC_TIME_PER_CMD_AFTER
+		RunLocalCommand "$LOCAL_RUN_AFTER_CMD" $MAX_EXEC_TIME_PER_CMD_AFTER &
+		pids="$!"
 	fi
 
 	if [ "$REMOTE_RUN_AFTER_CMD" != "" ]; then
-		RunRemoteCommand "$REMOTE_RUN_AFTER_CMD" $MAX_EXEC_TIME_PER_CMD_AFTER
+		RunRemoteCommand "$REMOTE_RUN_AFTER_CMD" $MAX_EXEC_TIME_PER_CMD_AFTER &
+		pids="$pids;$!"
 	fi
+	WaitForTaskCompletion $pids 0 0 ${FUNCNAME[0]} false
 }
 
 function CheckConnectivityRemoteHost {
