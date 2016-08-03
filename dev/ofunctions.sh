@@ -1,5 +1,8 @@
-## FUNC_BUILD=2016080204
+## FUNC_BUILD=2016080305
 ## BEGIN Generic functions for osync & obackup written in 2013-2016 by Orsiris de Jong - http://www.netpower.fr - ozy@netpower.fr
+
+#TODO: set _LOGGER_PREFIX in other apps, specially for osync daemon mode
+#TODO: set _LOGGER_STDERR in other apps
 
 ## type -p does not work on platforms other than linux (bash). If if does not work, always assume output is not a zero exitcode
 if ! type "$BASH" > /dev/null; then
@@ -90,9 +93,8 @@ function _Logger {
 	local evalue="${3}" # What to log to stderr
 	echo -e "$lvalue" >> "$LOG_FILE"
 
-	# <OSYNC SPECIFIC> Special case in daemon mode where systemctl does not need double timestamps
-	if [ "$sync_on_changes" == "1" ]; then
-		cat <<< "$evalue" 1>&2	# Log to stderr in daemon mode
+	if [ "$_LOGGER_STDERR" -eq 1 ]; then
+		cat <<< "$evalue" 1>&2
 	elif [ "$_SILENT" -eq 0 ]; then
 		echo -e "$svalue"
 	fi
@@ -103,13 +105,13 @@ function Logger {
 	local value="${1}" # Sentence to log (in double quotes)
 	local level="${2}" # Log level: PARANOIA_DEBUG, DEBUG, NOTICE, WARN, ERROR, CRITIAL
 
-	# <OSYNC SPECIFIC> Special case in daemon mode we should timestamp instead of counting seconds
-	if [ "$sync_on_changes" == "1" ]; then
+	if [ "$_LOGGER_PREFIX" == "time" ]; then
+		prefix="TIME: $SECONDS - "
+	elif [ "$_LOGGER_PREFIX" == "date" ]; then
 		prefix="$(date) - "
 	else
-		prefix="TIME: $SECONDS - "
+		prefix=""
 	fi
-	# </OSYNC SPECIFIC>
 
 	if [ "$level" == "CRITICAL" ]; then
 		_Logger "$prefix\e[41m$value\e[0m" "$prefix$level:$value" "$level:$value"
@@ -167,39 +169,47 @@ function QuickLogger {
 
 # Portable child (and grandchild) kill function tester under Linux, BSD and MacOS X
 function KillChilds {
-	local pids="${1}"
+	local pid="${1}" # Parent pid to kill
 	local self="${2:-false}"
+
+
+	if children="$(pgrep -P "$pid")"; then
+		for child in $children; do
+			Logger "Launching KillChilds \"$child\" true" "DEBUG"	#__WITH_PARANOIA_DEBUG
+			KillChilds "$child" true
+		done
+	fi
+		# Try to kill nicely, if not, wait 15 seconds to let Trap actions happen before killing
+	if ( [ "$self" == true ] && kill -0 $pid > /dev/null 2>&1); then
+		Logger "Sending SIGTERM to process [$pid]." "DEBUG"
+		kill -s SIGTERM "$pid"
+		if [ $? != 0 ]; then
+			sleep 15
+			Logger "Sending SIGTERM to process [$pid] failed." "DEBUG"
+			kill -9 "$pid"
+			if [ $? != 0 ]; then
+				Logger "Sending SIGKILL to process [$pid] failed." "DEBUG"
+				return 1
+			fi
+		else
+			return 0
+		fi
+	else
+		return 0
+	fi
+}
+
+function KillAllChilds {
+	local pids="${1}" # List of parent pids to kill separated by semi-colon
 
 	local errorcount=0
 
 	IFS=';' read -a pidsArray <<< "$pids"
 	for pid in "${pidsArray[@]}"; do
-
-		if children="$(pgrep -P "$pid")"; then
-			for child in $children; do
-				Logger "Launching KillChilds \"$child\" true" "DEBUG"	#__WITH_PARANOIA_DEBUG
-				KillChilds "$child" true
-			done
-		fi
-
-		# Try to kill nicely, if not, wait 15 seconds to let Trap actions happen before killing
-		if ( [ "$self" == true ] && eval $PROCESS_TEST_CMD > /dev/null 2>&1); then
-			Logger "Sending SIGTERM to process [$pid]." "DEBUG"
-			kill -s SIGTERM "$pid"
-			if [ $? != 0 ]; then
-				sleep 15
-				Logger "Sending SIGTERM to process [$pid] failed." "DEBUG"
-				kill -9 "$pid"
-				if [ $? != 0 ]; then
-					Logger "Sending SIGKILL to process [$pid] failed." "DEBUG"
-					errorcount=$((errorcount+1))
-				fi
+		KillChilds $pid
+		if [ $? != 0 ]; then
+			errorcount=$((errorcount+1))
 			fi
-			#return 0
-		else
-			echo ""
-			#return 0
-		fi
 	done
 	return $errorcount
 }
