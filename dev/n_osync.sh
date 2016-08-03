@@ -49,6 +49,9 @@ source "./ofunctions.sh"
 ## Working directory. This directory exists in any replica and contains state files, backups, soft deleted files etc
 OSYNC_DIR=".osync_workdir"
 
+_LOGGER_PREFIX="time"
+_LOGGER_STDERR=0
+
 function TrapStop {
 	if [ $SOFT_STOP -eq 0 ]; then
 		Logger " /!\ WARNING: Manual exit of osync is really not recommended. Sync will be in inconsistent state." "WARN"
@@ -1729,6 +1732,8 @@ do
 		--on-changes)
 		sync_on_changes=1
 		_NOLOCKS=1
+		_LOGGER_PREFIX="date"
+		_LOGGER_STDERR=1
 		;;
 		--no-locks)
 		_NOLOCKS=1
