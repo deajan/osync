@@ -1,4 +1,4 @@
-## FUNC_BUILD=2016080203
+## FUNC_BUILD=2016080204
 ## BEGIN Generic functions for osync & obackup written in 2013-2016 by Orsiris de Jong - http://www.netpower.fr - ozy@netpower.fr
 
 ## type -p does not work on platforms other than linux (bash). If if does not work, always assume output is not a zero exitcode
@@ -38,7 +38,7 @@ fi						#__WITH_PARANOIA_DEBUG
 ## allow debugging from command line with _DEBUG=yes
 if [ ! "$_DEBUG" == "yes" ]; then
 	_DEBUG=no
-	SLEEP_TIME=.001 # Tested under linux and FreeBSD bash, #TODO tests on cygwin / msys
+	SLEEP_TIME=.05 # Tested under linux and FreeBSD bash, #TODO tests on cygwin / msys
 	_VERBOSE=0
 else
 	SLEEP_TIME=1
@@ -167,33 +167,41 @@ function QuickLogger {
 
 # Portable child (and grandchild) kill function tester under Linux, BSD and MacOS X
 function KillChilds {
-	local pid="${1}"
+	local pids="${1}"
 	local self="${2:-false}"
 
-	if children="$(pgrep -P "$pid")"; then
-		for child in $children; do
-			Logger "Launching KillChilds \"$child\" true" "DEBUG"	#__WITH_PARANOIA_DEBUG
-			KillChilds "$child" true
-		done
-	fi
+	local errorcount=0
 
-	# Try to kill nicely, if not, wait 15 seconds to let Trap actions happen before killing
-	if ( [ "$self" == true ] && eval $PROCESS_TEST_CMD > /dev/null 2>&1); then
-		Logger "Sending SIGTERM to process [$pid]." "DEBUG"
-		kill -s SIGTERM "$pid"
-		if [ $? != 0 ]; then
-			sleep 15
-			Logger "Sending SIGTERM to process [$pid] failed." "DEBUG"
-			kill -9 "$pid"
-			if [ $? != 0 ]; then
-				Logger "Sending SIGKILL to process [$pid] failed." "DEBUG"
-				return 1
-			fi
+	IFS=';' read -a pidsArray <<< "$pids"
+	for pid in "${pidsArray[@]}"; do
+
+		if children="$(pgrep -P "$pid")"; then
+			for child in $children; do
+				Logger "Launching KillChilds \"$child\" true" "DEBUG"	#__WITH_PARANOIA_DEBUG
+				KillChilds "$child" true
+			done
 		fi
-		return 0
-	else
-		return 0
-	fi
+
+		# Try to kill nicely, if not, wait 15 seconds to let Trap actions happen before killing
+		if ( [ "$self" == true ] && eval $PROCESS_TEST_CMD > /dev/null 2>&1); then
+			Logger "Sending SIGTERM to process [$pid]." "DEBUG"
+			kill -s SIGTERM "$pid"
+			if [ $? != 0 ]; then
+				sleep 15
+				Logger "Sending SIGTERM to process [$pid] failed." "DEBUG"
+				kill -9 "$pid"
+				if [ $? != 0 ]; then
+					Logger "Sending SIGKILL to process [$pid] failed." "DEBUG"
+					errorcount=$((errorcount+1))
+				fi
+			fi
+			#return 0
+		else
+			echo ""
+			#return 0
+		fi
+	done
+	return $errorcount
 }
 
 # osync/obackup/pmocr script specific mail alert function, use SendEmail function for generic mail sending
@@ -739,7 +747,10 @@ function WaitForTaskCompletion {
 	local retval=0 # return value of monitored pid process
 	local errorcount=0 # Number of pids that finished with errors
 
+	local pidCount # number of given pids
+
 	IFS=';' read -a pidsArray <<< "$pids"
+	pidCount=${#pidsArray[@]}
 
 	while [ ${#pidsArray[@]} -gt 0 ]; do
 		newPidsArray=()
@@ -774,13 +785,14 @@ function WaitForTaskCompletion {
 			fi
 			if [ $exec_time -gt $hard_max_time ] && [ $hard_max_time -ne 0 ]; then
 				Logger "Max hard execution time exceeded for task [$caller_name] with pids [${pidsArray[@]}]. Stopping task execution." "ERROR"
-				#KillChilds $pid
-				#if [ $? == 0 ]; then
-				#	Logger "Task stopped successfully" "NOTICE"
-				#	return 0
-				#else
-				#	return 1
-				#fi
+				KillChilds $pid
+				if [ $? == 0 ]; then
+					Logger "Task stopped successfully" "NOTICE"
+					#return 0
+				else
+					errrorcount=$((errorcount+1))
+					#return 1
+				fi
 			fi
 		fi
 
@@ -788,26 +800,13 @@ function WaitForTaskCompletion {
 		sleep $SLEEP_TIME
 	done
 
-	Logger "${FUNCNAME[0]} ended for [$caller_name] with [$errorcount] errors." "PARANOIA_DEBUG"	#__WITH_PARANOIA_DEBUG
-	if [ $exit_on_error == true ]; then
+	Logger "${FUNCNAME[0]} ended for [$caller_name] using [$pidCount] subprocesses with [$errorcount] errors." "PARANOIA_DEBUG"	#__WITH_PARANOIA_DEBUG
+	if [ $exit_on_error == true ] && [ $errorcount -gt 0 ]; then
 		exit 1337
 	else
 		return $errorcount
 	fi
 }
-
-#sleep 2 &
-#pids=$!
-#sleep 4 &
-#pids="$pids;$!"
-#sleep 3 &
-#pids="$pids;$!"
-
-#WaitForAllTaskCompletion $pids
-
-#sleep 5 &
-#WaitForAllTaskCompletion $! 0 0 "me" 1
-#exit
 
 function WaitForOldTaskCompletion {
 	local pid="${1}" # pid to wait for
@@ -862,7 +861,7 @@ function WaitForOldTaskCompletion {
 	return $retval
 }
 
-function WaitForTaskCompletion {
+function WaitForXTaskCompletion {
 	local pids="${1}" # pids to wait for, separated by semi-colon
 	local soft_max_time="${2}" # If program with pid $pid takes longer than $soft_max_time seconds, will log a warning, unless $soft_max_time equals 0.
 	local hard_max_time="${3}" # If program with pid $pid takes longer than $hard_max_time seconds, will stop execution, unless $hard_max_time equals 0.
