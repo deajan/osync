@@ -218,37 +218,10 @@ function _CheckReplicaPathsRemote {
 	fi
 }
 
-#TODO: organize this function into WaitforTaskCompletion, and add optional parameter to exit on error
-function WaitForPids {
-
-	local errors=0
-
-	while [ "$#" -gt 0 ]; do
-		for pid in "$@"; do
-			shift
-			if kill -0 "$pid" > /dev/null 2>&1; then
-				Logger "$pid is alive" "DEBUG"
-				set -- "$@" "$pid"
-			else
-				wait "$pid"
-				result=$?
-				if [ $result -eq 0 ]; then
-					Logger "$pid exited okay with $result" "DEBUG"
-				else
-					errors=$((errors+1))
-					Logger "$pid exited with bad status $result" "DEBUG"
-				fi
-			fi
-		done
-		sleep .01
-	done
-	if [ $errors -gt 0 ]; then
-		exit 1
-	fi
-}
-
 function CheckReplicaPaths {
 	__CheckArguments 0 $# ${FUNCNAME[0]} "$@"	#__WITH_PARANOIA_DEBUG
+
+	local pids
 
 	#INITIATOR_SYNC_DIR_CANN=$(realpath "${INITIATOR[1]}")	#TODO: investigate realpath & readlink issues on MSYS and busybox here
 	#TARGET_SYNC_DIR_CANN=$(realpath "${TARGET[1]})
@@ -276,7 +249,7 @@ function _CheckDiskSpaceLocal {
 	local replica_path="${1}"
 	__CheckArguments 1 $# ${FUNCNAME[0]} "$@"	#__WITH_PARANOIA_DEBUG
 
-	local disk_space=
+	local disk_space
 
 	Logger "Checking minimum disk space in [$replica_path]." "NOTICE"
 
@@ -292,8 +265,8 @@ function _CheckDiskSpaceRemote {
 
 	Logger "Checking minimum disk space on target [$replica_path]." "NOTICE"
 
-	local cmd=
-	local disk_space=
+	local cmd
+	local disk_space
 
 	CheckConnectivity3rdPartyHosts
 	CheckConnectivityRemoteHost
@@ -316,15 +289,18 @@ function _CheckDiskSpaceRemote {
 function CheckDiskSpace {
 	__CheckArguments 0 $# ${FUNCNAME[0]} "$@"	#__WITH_PARANOIA_DEBUG
 
+	local pids
+
 	_CheckDiskSpaceLocal "${INITIATOR[1]}" &
 	pids="$!"
 	if [ "$REMOTE_OPERATION" != "yes" ]; then
 		_CheckDiskSpaceLocal "${TARGET[1]}" &
-		pids="$pids $!"
+		pids="$pids;$!"
 	else
 		_CheckDiskSpaceRemote "${TARGET[1]}" &
-		pifs="$pids $!"
+		pids="$pids;$!"
 	fi
+	WaitForTaskCompletion $pids 720 1800 ${FUNCNAME[0]} false
 }
 
 
@@ -370,12 +346,12 @@ function CreateStateDirs {
 	pids="$!"
 	if [ "$REMOTE_OPERATION" != "yes" ]; then
 		_CreateStateDirsLocal "${TARGET[1]}${TARGET[3]}" &
-		pids="$pids $!"
+		pids="$pids;$!"
 	else
 		_CreateStateDirsRemote "${TARGET[1]}${TARGET[3]}" &
-		pids="$pids $!"
+		pids="$pids;$!"
 	fi
-	WaitForPids $pids
+	WaitForTaskCompletion $pids 720 1800 ${FUNCNAME[0]} true
 }
 
 function _CheckLocksLocal {
@@ -516,16 +492,18 @@ function _WriteLockFilesRemote {
 function WriteLockFiles {
 	__CheckArguments 0 $# ${FUNCNAME[0]} "$@"	#__WITH_PARANOIA_DEBUG
 
+	local pids
+
 	_WriteLockFilesLocal "${INITIATOR[2]}" &
 	pids="$!"
 	if [ "$REMOTE_OPERATION" != "yes" ]; then
 		_WriteLockFilesLocal "${TARGET[2]}" &
-		pids="$pids $!"
+		pids="$pids;$!"
 	else
 		_WriteLockFilesRemote "${TARGET[2]}" &
-		pids="$pids $!"
+		pids="$pids;$!"
 	fi
-	WaitForPids $pids
+	WaitForTaskCompletion $pids 720 1800 ${FUNCNAME[0]} true
 }
 
 function _UnlockReplicasLocal {
@@ -1389,13 +1367,13 @@ function SoftDelete {
 		pids="$!"
 		if [ "$REMOTE_OPERATION" != "yes" ]; then
 			_SoftDeleteLocal "${TARGET[0]}" "${TARGET[1]}${TARGET[4]}" $CONFLICT_BACKUP_DAYS &
-			pids="$pids $!"
+			pids="$pids;$!"
 		else
 			_SoftDeleteRemote "${TARGET[0]}" "${TARGET[1]}${TARGET[4]}" $CONFLICT_BACKUP_DAYS &
-			pids="$pids $!"
+			pids="$pids;$!"
 		fi
 	fi
-	WaitForPids $pids
+	WaitForTaskCompletion $pids 720 1800 ${FUNCNAME[0]} false
 
 	if [ "$SOFT_DELETE" != "no" ] && [ $SOFT_DELETE_DAYS -ne 0 ]; then
 		Logger "Running soft deletion cleanup." "NOTICE"
@@ -1404,13 +1382,13 @@ function SoftDelete {
 		pids="$!"
 		if [ "$REMOTE_OPERATION" != "yes" ]; then
 			_SoftDeleteLocal "${TARGET[0]}" "${TARGET[1]}${TARGET[5]}" $SOFT_DELETE_DAYS &
-			pids="$pids $!"
+			pids="$pids;$!"
 		else
 			_SoftDeleteRemote "${TARGET[0]}" "${TARGET[1]}${TARGET[5]}" $SOFT_DELETE_DAYS &
-			pids="$pids $!"
+			pids="$pids;$!"
 		fi
 	fi
-	WaitForPids $pids
+	WaitForTaskCompletion $pids 720 1800 ${FUNCNAME[0]} false
 }
 
 function Init {
