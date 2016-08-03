@@ -292,6 +292,11 @@ function _CheckDiskSpaceRemote {
 function CheckDiskSpace {
 	__CheckArguments 0 $# ${FUNCNAME[0]} "$@"	#__WITH_PARANOIA_DEBUG
 
+	if [ $MINIMUM_SPACE -eq 0 ]; then
+		Logger "Skipped minimum space check." "NOTICE"
+		return 0
+	fi
+
 	local pids
 
 	_CheckDiskSpaceLocal "${INITIATOR[1]}" &
