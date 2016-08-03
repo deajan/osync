@@ -812,6 +812,7 @@ function WaitForTaskCompletion {
 
 	Logger "${FUNCNAME[0]} ended for [$caller_name] using [$pidCount] subprocesses with [$errorcount] errors." "PARANOIA_DEBUG"	#__WITH_PARANOIA_DEBUG
 	if [ $exit_on_error == true ] && [ $errorcount -gt 0 ]; then
+		Logger "Stopping execution." "CRITICAL"
 		exit 1337
 	else
 		return $errorcount
@@ -1044,6 +1045,8 @@ function RunRemoteCommand {
 function RunBeforeHook {
 	__CheckArguments 0 $# ${FUNCNAME[0]} "$@"	#__WITH_PARANOIA_DEBUG
 
+	local pids=
+
 	if [ "$LOCAL_RUN_BEFORE_CMD" != "" ]; then
 		RunLocalCommand "$LOCAL_RUN_BEFORE_CMD" $MAX_EXEC_TIME_PER_CMD_BEFORE &
 		pids="$!"
@@ -1053,11 +1056,15 @@ function RunBeforeHook {
 		RunRemoteCommand "$REMOTE_RUN_BEFORE_CMD" $MAX_EXEC_TIME_PER_CMD_BEFORE &
 		pids="$pids;$!"
 	fi
-	WaitForTaskCompletion $pids 0 0 ${FUNCNAME[0]} false
+	if [ "$pids" != "" ]; then
+		WaitForTaskCompletion $pids 0 0 ${FUNCNAME[0]} false
+	fi
 }
 
 function RunAfterHook {
 	__CheckArguments 0 $# ${FUNCNAME[0]} "$@"	#__WITH_PARANOIA_DEBUG
+
+	local pids
 
 	if [ "$LOCAL_RUN_AFTER_CMD" != "" ]; then
 		RunLocalCommand "$LOCAL_RUN_AFTER_CMD" $MAX_EXEC_TIME_PER_CMD_AFTER &
@@ -1068,7 +1075,9 @@ function RunAfterHook {
 		RunRemoteCommand "$REMOTE_RUN_AFTER_CMD" $MAX_EXEC_TIME_PER_CMD_AFTER &
 		pids="$pids;$!"
 	fi
-	WaitForTaskCompletion $pids 0 0 ${FUNCNAME[0]} false
+	if [ "$pids" != "" ]; then
+		WaitForTaskCompletion $pids 0 0 ${FUNCNAME[0]} false
+	fi
 }
 
 function CheckConnectivityRemoteHost {
