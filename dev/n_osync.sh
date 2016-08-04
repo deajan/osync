@@ -4,10 +4,8 @@ PROGRAM="osync" # Rsync based two way sync engine with fault tolerance
 AUTHOR="(C) 2013-2016 by Orsiris de Jong"
 CONTACT="http://www.netpower.fr/osync - ozy@netpower.fr"
 PROGRAM_VERSION=1.2-dev-parallel-unstable
-PROGRAM_BUILD=2016080206
+PROGRAM_BUILD=2016080401
 IS_STABLE=no
-
-source "./ofunctions.sh"
 
 #	Function Name		Is parallel	#__WITH_PARANOIA_DEBUG
 
@@ -44,13 +42,11 @@ source "./ofunctions.sh"
 #	UnlockReplicas		yes		#__WITH_PARANOIA_DEBUG
 #	CleanUp			no		#__WITH_PARANOIA_DEBUG
 
-
+source "./ofunctions.sh"
+_LOGGER_PREFIX="time"
 
 ## Working directory. This directory exists in any replica and contains state files, backups, soft deleted files etc
 OSYNC_DIR=".osync_workdir"
-
-_LOGGER_PREFIX="time"
-_LOGGER_STDERR=0
 
 function TrapStop {
 	if [ $SOFT_STOP -eq 0 ]; then
@@ -68,7 +64,7 @@ function TrapStop {
 }
 
 function TrapQuit {
-	local exitcode=
+	local exitcode
 
 	if [ $ERROR_ALERT -ne 0 ]; then
 		UnlockReplicas
@@ -330,7 +326,7 @@ function _CreateStateDirsRemote {
 	local replica_state_dir="${1}"
 	__CheckArguments 1 $# ${FUNCNAME[0]} "$@"	#__WITH_PARANOIA_DEBUG
 
-	local cmd=
+	local cmd
 
 	CheckConnectivity3rdPartyHosts
 	CheckConnectivityRemoteHost
@@ -589,8 +585,8 @@ function tree_list {
 	local replica_type="${2}" # replica type: initiator, target
 	local tree_filename="${3}" # filename to output tree (will be prefixed with $replica_type)
 
-	local escaped_replica_path=
-	local rsync_cmd=
+	local escaped_replica_path
+	local rsync_cmd
 
 	__CheckArguments 3 $# ${FUNCNAME[0]} "$@"	#__WITH_PARANOIA_DEBUG
 
@@ -629,7 +625,7 @@ function delete_list {
 	local deleted_failed_list_file="${5}" # file containing files that could not be deleted on last run, will be prefixed with replica type
 	__CheckArguments 5 $# ${FUNCNAME[0]} "$@"	#__WITH_PARANOIA_DEBUG
 
-	local cmd=
+	local cmd
 
 	Logger "Creating $replica_type replica deleted file list." "NOTICE"
 	if [ -f "${INITIATOR[1]}${INITIATOR[3]}/$replica_type$TREE_AFTER_FILENAME_NO_SUFFIX" ]; then
@@ -674,7 +670,8 @@ function _get_file_ctime_mtime_remote {
 	local file_list="${3}"
 	__CheckArguments 3 $# ${FUNCNAME[0]} "$@"	#__WITH_PARANOIA_DEBUG
 
-	local cmd=
+	local cmd
+
 	cmd='cat "'$file_list'" | '$SSH_CMD' "while read file; do '$REMOTE_STAT_CTIME_MTIME_CMD' \"'$replica_path'\$file\"; done | sort" > "'$RUN_DIR/$PROGRAM.ctime_mtime.$replica_type.$SCRIPT_PID'"'
 	Logger "CMD: $cmd" "DEBUG"
 	eval $cmd
@@ -696,8 +693,8 @@ function sync_attrs {
 	local delete_list_filename="$DELETED_LIST_FILENAME" # Contains deleted list filename, will be prefixed with replica type
 	__CheckArguments 2 $# ${FUNCNAME[0]} "$@"	#__WITH_PARANOIA_DEBUG
 
-	local rsync_cmd=
-	local retval=
+	local rsync_cmd
+	local retval
 
 	Logger "Getting list of files that need updates." "NOTICE"
 
@@ -811,8 +808,8 @@ function sync_update {
 	local delete_list_filename="${3}" # Contains deleted list filename, will be prefixed with replica type
 	__CheckArguments 3 $# ${FUNCNAME[0]} "$@"	#__WITH_PARANOIA_DEBUG
 
-	local rsync_cmd=
-	local retval=
+	local rsync_cmd
+	local retval
 
 	Logger "Updating $destination_replica replica." "NOTICE"
 	if [ "$source_replica" == "${INITIATOR[0]}" ]; then
@@ -868,7 +865,7 @@ function _delete_local {
 	local deleted_failed_list_file="${4}" # file containing files that could not be deleted on last run, will be prefixed with replica type
 	__CheckArguments 4 $# ${FUNCNAME[0]} "$@"	#__WITH_PARANOIA_DEBUG
 
-	local parentdir=
+	local parentdir
 
 	## On every run, check wheter the next item is already deleted because it is included in a directory already deleted
 	local previous_file=""
@@ -930,8 +927,8 @@ function _delete_remote {
 	local deleted_failed_list_file="${4}" # file containing files that could not be deleted on last run, will be prefixed with replica type
 	__CheckArguments 4 $# ${FUNCNAME[0]} "$@"	#__WITH_PARANOIA_DEBUG
 
-	local esc_dest_dir=
-	local rsync_cmd=
+	local esc_dest_dir
+	local rsync_cmd
 
 	## This is a special coded function. Need to redelcare local functions on remote host, passing all needed variables as escaped arguments to ssh command.
 	## Anything beetween << ENDSSH and ENDSSH will be executed remotely
@@ -1065,8 +1062,8 @@ function deletion_propagation {
 	local deleted_failed_list_file="${3}" # file containing files that could not be deleted on last run, will be prefixed with replica type
 	__CheckArguments 3 $# ${FUNCNAME[0]} "$@"	#__WITH_PARANOIA_DEBUG
 
-	local replica_dir=
-	local delete_dir=
+	local replica_dir
+	local delete_dir
 
 	Logger "Propagating deletions to $replica_type replica." "NOTICE"
 
@@ -1293,7 +1290,7 @@ function _SoftDeleteLocal {
 	local change_time="${3}"
 	__CheckArguments 3 $# ${FUNCNAME[0]} "$@"	#__WITH_PARANOIA_DEBUG
 
-	local retval=
+	local retval
 
 	if [ -d "$replica_deletion_path" ]; then
 		if [ $_DRYRUN -eq 1 ]; then
@@ -1332,7 +1329,7 @@ function _SoftDeleteRemote {
 	local change_time="${3}"
 	__CheckArguments 3 $# ${FUNCNAME[0]} "$@"	#__WITH_PARANOIA_DEBUG
 
-	local retval=
+	local retval
 
 	CheckConnectivity3rdPartyHosts
 	CheckConnectivityRemoteHost
@@ -1387,8 +1384,8 @@ function SoftDelete {
 			_SoftDeleteRemote "${TARGET[0]}" "${TARGET[1]}${TARGET[4]}" $CONFLICT_BACKUP_DAYS &
 			pids="$pids;$!"
 		fi
+		WaitForTaskCompletion $pids 720 1800 ${FUNCNAME[0]} false
 	fi
-	WaitForTaskCompletion $pids 720 1800 ${FUNCNAME[0]} false
 
 	if [ "$SOFT_DELETE" != "no" ] && [ $SOFT_DELETE_DAYS -ne 0 ]; then
 		Logger "Running soft deletion cleanup." "NOTICE"
@@ -1402,8 +1399,8 @@ function SoftDelete {
 			_SoftDeleteRemote "${TARGET[0]}" "${TARGET[1]}${TARGET[5]}" $SOFT_DELETE_DAYS &
 			pids="$pids;$!"
 		fi
+		WaitForTaskCompletion $pids 720 1800 ${FUNCNAME[0]} false
 	fi
-	WaitForTaskCompletion $pids 720 1800 ${FUNCNAME[0]} false
 }
 
 function Init {
@@ -1618,8 +1615,8 @@ function Usage {
 function SyncOnChanges {
 	__CheckArguments 0 $# ${FUNCNAME[0]} "$@"	#__WITH_PARANOIA_DEBUG
 
-	local cmd=
-	local retval=
+	local cmd
+	local retval
 
 	if ! type inotifywait > /dev/null 2>&1 ; then
 		Logger "No inotifywait command found. Cannot monitor changes." "CRITICAL"
