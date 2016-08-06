@@ -11,12 +11,14 @@ RECENT CHANGES
 	- Added parallel execution for most secondary fuctions
 	- Lowered sleep time in wait functions
 	- Removed trivial sleep and forking in remote deletion code, send the whole function to background instead
+	! Unlock functions no longer launched if locking failed
 - Improved WaitFor... functions to accept multiple pids
-! Improved KillChilds function to accept multiple pids
+- Added KillAllChilds function to accept multiple pids
 - Improved logging
 
 XX Xxx 2016: osync v1.1.1 released
 
+- Fixed bogus rsync pattern file adding
 - Fixed soft deletion always enabled on target
 - Fixed problem with attributes file list function
 - Fixed deletion propagation code

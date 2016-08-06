@@ -11,7 +11,7 @@ IS_STABLE=no
 
 #### MINIMAL-FUNCTION-SET BEGIN ####
 
-## FUNC_BUILD=2016080402
+## FUNC_BUILD=2016080601
 ## BEGIN Generic functions for osync & obackup written in 2013-2016 by Orsiris de Jong - http://www.netpower.fr - ozy@netpower.fr
 
 #TODO: set _LOGGER_PREFIX in other apps, specially for osync daemon mode
@@ -111,7 +111,6 @@ function _Logger {
 function Logger {
 	local value="${1}" # Sentence to log (in double quotes)
 	local level="${2}" # Log level: PARANOIA_DEBUG, DEBUG, NOTICE, WARN, ERROR, CRITIAL
-
 
 	if [ "$_LOGGER_PREFIX" == "time" ]; then
 		prefix="TIME: $SECONDS - "
@@ -1040,8 +1039,6 @@ function RsyncPatternsFromAdd {
         local pattern_type="${1}"
         local pattern_from="${2}"
 
-	local pattern_from=
-
         ## Check if the exclude list has a full path, and if not, add the config file path if there is one
         if [ "$(basename $pattern_from)" == "$pattern_from" ]; then
                 pattern_from="$(dirname $CONFIG_FILE)/$pattern_from"
@@ -1539,7 +1536,6 @@ function _CreateStateDirsRemote {
 	fi
 }
 
-#TODO: also create deleted and backup dirs
 function CreateStateDirs {
 
 	local pids
@@ -1643,7 +1639,6 @@ function CheckLocks {
 		fi
 	fi
 
-	#TODO: do not parallelize the detection of locks because of pids
 	_CheckLocksLocal "${INITIATOR[2]}" &
 	pids="$!"
 	if [ "$REMOTE_OPERATION" != "yes" ]; then
@@ -1909,7 +1904,6 @@ function sync_attrs {
 		fi
 	fi
 
-	#TODO _get_file_ctime_mtime_remote can be sent into background only if waitfortaskcompletion is removed from sub function
 	Logger "Getting ctimes for pending files on initiator." "NOTICE"
 	_get_file_ctime_mtime_local "${INITIATOR[1]}" "${INITIATOR[0]}" "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}-cleaned.$SCRIPT_PID"
 
@@ -2050,7 +2044,10 @@ function _delete_local {
 	## On every run, check wheter the next item is already deleted because it is included in a directory already deleted
 	local previous_file=""
 
-	#if [ -d "$replica_dir$deletion_dir" ];then #TODO
+	#TODO: fix and add same to remote
+	if [ -d "$replica_dir$deletion_dir" ]; then
+		$COMMAND_SUDO mkdir -p "$replica_dir$deletion_dir"
+	fi
 
 
 	OLD_IFS=$IFS
@@ -2131,7 +2128,7 @@ $SSH_CMD ERROR_ALERT=0 sync_on_changes=$sync_on_changes _SILENT=$_SILENT _DEBUG=
 	## The following lines are executed remotely
 	function _logger {
 		local value="${1}" # What to log
-		echo -e "$value" >&2#TODO do not output to logfile
+		echo -e "$value" >&2 #TODO logfile output missing
 
 		if [ $_SILENT -eq 0 ]; then
 		echo -e "$value"

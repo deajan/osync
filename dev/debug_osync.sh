@@ -4,10 +4,47 @@ PROGRAM="osync" # Rsync based two way sync engine with fault tolerance
 AUTHOR="(C) 2013-2016 by Orsiris de Jong"
 CONTACT="http://www.netpower.fr/osync - ozy@netpower.fr"
 PROGRAM_VERSION=1.2-dev-parallel-unstable
-PROGRAM_BUILD=2016080206
+PROGRAM_BUILD=2016080401
 IS_STABLE=no
 
-## FUNC_BUILD=2016080306
+#	Function Name		Is parallel	#__WITH_PARANOIA_DEBUG
+
+#	GetLocalOS		no		#__WITH_PARANOIA_DEBUG
+#	InitLocalOSSettings	no		#__WITH_PARANOIA_DEBUG
+#	CheckEnvironment	no		#__WITH_PARANOIA_DEBUG
+#	PreInit			no		#__WITH_PARANOIA_DEBUG
+#	Init			no		#__WITH_PARANOIA_DEBUG
+#	PostInit		no		#__WITH_PARANOIA_DEBUG
+#	GetRemoteOS		no		#__WITH_PARANOIA_DEBUG
+#	InitRemoteOSSettings	no		#__WITH_PARANOIA_DEBUG
+#	CheckReplicaPaths	yes		#__WITH_PARANOIA_DEBUG
+#	CheckDiskSpace		yes		#__WITH_PARANOIA_DEBUG
+#	RunBeforeHook		yes		#__WITH_PARANOIA_DEBUG
+#	Main			no		#__WITH_PARANOIA_DEBUG
+#	CreateStateDirs		yes		#__WITH_PARANOIA_DEBUG
+#	CheckLocks		yes		#__WITH_PARANOIA_DEBUG
+#	WriteLockFiles		yes		#__WITH_PARANOIA_DEBUG
+#	Sync			no		#__WITH_PARANOIA_DEBUG
+#	tree_list		could		#__WITH_PARANOIA_DEBUG
+#	tree_list		could		#__WITH_PARANOIA_DEBUG
+#	delete_list		could		#__WITH_PARANOIA_DEBUG
+#	delete_list		could		#__WITH_PARANOIA_DEBUG
+#	sync_attrs		no		#__WITH_PARANOIA_DEBUG
+#	_get_file_ctime_mtime	yes		#__WITH_PARANOIA_DEBUG
+#	sync_update		no		#__WITH_PARANOIA_DEBUG
+#	sync_update		no		#__WITH_PARANOIA_DEBUG
+#	deletion_propagation	could		#__WITH_PARANOIA_DEBUG
+#	deletion_propagation	could		#__WITH_PARANOIA_DEBUG
+#	tree_list		could		#__WITH_PARANOIA_DEBUG
+#	tree_list		could		#__WITH_PARANOIA_DEBUG
+#	SoftDelete		yes		#__WITH_PARANOIA_DEBUG
+#	RunAfterHook		yes		#__WITH_PARANOIA_DEBUG
+#	UnlockReplicas		yes		#__WITH_PARANOIA_DEBUG
+#	CleanUp			no		#__WITH_PARANOIA_DEBUG
+
+#### MINIMAL-FUNCTION-SET BEGIN ####
+
+## FUNC_BUILD=2016080601
 ## BEGIN Generic functions for osync & obackup written in 2013-2016 by Orsiris de Jong - http://www.netpower.fr - ozy@netpower.fr
 
 #TODO: set _LOGGER_PREFIX in other apps, specially for osync daemon mode
@@ -19,8 +56,6 @@ if ! type "$BASH" > /dev/null; then
 	exit 127
 fi
 
-#### obackup & osync specific code BEGIN ####
-
 ## Log a state message every $KEEP_LOGGING seconds. Should not be equal to soft or hard execution time so your log will not be unnecessary big.
 KEEP_LOGGING=1801
 
@@ -30,13 +65,12 @@ export LC_ALL=C
 # Standard alert mail body
 MAIL_ALERT_MSG="Execution of $PROGRAM instance $INSTANCE_ID on $(date) has warnings/errors."
 
-#### obackup & osync specific code END ####
-
-#### MINIMAL-FUNCTION-SET BEGIN ####
-
-# Environment variables
+# Environment variables that can be overriden by programs
 _DRYRUN=0
 _SILENT=0
+_LOGGER_PREFIX="date"
+_LOGGER_STDERR=0
+
 
 # Initial error status, logging 'WARN', 'ERROR' or 'CRITICAL' will enable alerts flags
 ERROR_ALERT=0
@@ -92,7 +126,8 @@ ALERT_LOG_FILE="$RUN_DIR/$PROGRAM.last.log"
 
 function Dummy {
 	__CheckArguments 0 $# ${FUNCNAME[0]} "$@"	#__WITH_PARANOIA_DEBUG
-	sleep .1
+
+	sleep $SLEEP_TIME
 }
 
 # Sub function of Logger
@@ -100,6 +135,7 @@ function _Logger {
 	local svalue="${1}" # What to log to stdout
 	local lvalue="${2:-$svalue}" # What to log to logfile, defaults to screen value
 	local evalue="${3}" # What to log to stderr
+
 	echo -e "$lvalue" >> "$LOG_FILE"
 
 	if [ "$_LOGGER_STDERR" -eq 1 ]; then
@@ -158,6 +194,8 @@ function _QuickLogger {
 	local value="${1}"
 	local destination="${2}" # Destination: stdout, log, both
 
+	__CheckArguments 2 $# ${FUNCNAME[0]} "$@"	#__WITH_PARANOIA_DEBUG
+
 	if ([ "$destination" == "log" ] || [ "$destination" == "both" ]); then
 		echo -e "$(date) - $value" >> "$LOG_FILE"
 	elif ([ "$destination" == "stdout" ] || [ "$destination" == "both" ]); then
@@ -168,6 +206,8 @@ function _QuickLogger {
 # Generic quick logging function
 function QuickLogger {
 	local value="${1}"
+
+	__CheckArguments 1 $# ${FUNCNAME[0]} "$@"	#__WITH_PARANOIA_DEBUG
 
 	if [ "$_SILENT" -eq 1 ]; then
 		_QuickLogger "$value" "log"
@@ -210,6 +250,8 @@ function KillChilds {
 
 function KillAllChilds {
 	local pids="${1}" # List of parent pids to kill separated by semi-colon
+
+	__CheckArguments 1 $# ${FUNCNAME[0]} "$@"	#__WITH_PARANOIA_DEBUG
 
 	local errorcount=0
 
@@ -532,8 +574,6 @@ function LoadConfigFile {
 	CONFIG_FILE="$config_file"
 }
 
-#### MINIMAL-FUNCTION-SET END ####
-
 function Spinner {
 	if [ $_SILENT -eq 1 ]; then
 		return 0
@@ -566,6 +606,139 @@ function Spinner {
 	;;
 	esac
 }
+
+function WaitForTaskCompletion {
+	local pids="${1}" # pids to wait for, separated by semi-colon
+	local soft_max_time="${2}" # If program with pid $pid takes longer than $soft_max_time seconds, will log a warning, unless $soft_max_time equals 0.
+	local hard_max_time="${3}" # If program with pid $pid takes longer than $hard_max_time seconds, will stop execution, unless $hard_max_time equals 0.
+	local caller_name="${4}" # Who called this function
+	local exit_on_error="${5:-false}" # Should the function exit on subprocess errors
+
+	Logger "${FUNCNAME[0]} called by [$caller_name]." "PARANOIA_DEBUG"	#__WITH_PARANOIA_DEBUG
+	__CheckArguments 5 $# ${FUNCNAME[0]} "$@"				#__WITH_PARANOIA_DEBUG
+
+	local soft_alert=0 # Does a soft alert need to be triggered, if yes, send an alert once
+	local log_ttime=0 # local time instance for comparaison
+
+	local seconds_begin=$SECONDS # Seconds since the beginning of the script
+	local exec_time=0 # Seconds since the beginning of this function
+
+	local retval=0 # return value of monitored pid process
+	local errorcount=0 # Number of pids that finished with errors
+
+	local pidCount # number of given pids
+
+	IFS=';' read -a pidsArray <<< "$pids"
+	pidCount=${#pidsArray[@]}
+
+	while [ ${#pidsArray[@]} -gt 0 ]; do
+		newPidsArray=()
+		for pid in "${pidsArray[@]}"; do
+			if kill -0 $pid > /dev/null 2>&1; then
+				newPidsArray+=($pid)
+			else
+				wait $pid
+				result=$?
+				if [ $result -ne 0 ]; then
+					errorcount=$((errorcount+1))
+					Logger "${FUNCNAME[0]} called by [$caller_name] finished monitoring [$pid] with exitcode [$result]." "DEBUG"
+				fi
+			fi
+		done
+
+		Spinner
+		exec_time=$(($SECONDS - $seconds_begin))
+		if [ $((($exec_time + 1) % $KEEP_LOGGING)) -eq 0 ]; then
+			if [ $log_ttime -ne $exec_time ]; then
+				log_ttime=$exec_time
+				Logger "Current tasks still running with pids [${pidsArray[@]}]." "NOTICE"
+			fi
+		fi
+
+		if [ $exec_time -gt $soft_max_time ]; then
+			if [ $soft_alert -eq 0 ] && [ $soft_max_time -ne 0 ]; then
+				Logger "Max soft execution time exceeded for task [$caller_name] with pids [${pidsArray[@]}]." "WARN"
+				soft_alert=1
+				SendAlert
+
+			fi
+			if [ $exec_time -gt $hard_max_time ] && [ $hard_max_time -ne 0 ]; then
+				Logger "Max hard execution time exceeded for task [$caller_name] with pids [${pidsArray[@]}]. Stopping task execution." "ERROR"
+				KillChilds $pid
+				if [ $? == 0 ]; then
+					Logger "Task stopped successfully" "NOTICE"
+					#return 0
+				else
+					errrorcount=$((errorcount+1))
+					#return 1
+				fi
+			fi
+		fi
+
+		pidsArray=("${newPidsArray[@]}")
+		sleep $SLEEP_TIME
+	done
+
+	Logger "${FUNCNAME[0]} ended for [$caller_name] using [$pidCount] subprocesses with [$errorcount] errors." "PARANOIA_DEBUG"	#__WITH_PARANOIA_DEBUG
+	if [ $exit_on_error == true ] && [ $errorcount -gt 0 ]; then
+		Logger "Stopping execution." "CRITICAL"
+		exit 1337
+	else
+		return $errorcount
+	fi
+}
+
+function WaitForCompletion {
+	local pid="${1}" # pid to wait for
+	local soft_max_time="${2}" # If program with pid $pid takes longer than $soft_max_time seconds, will log a warning, unless $soft_max_time equals 0.
+	local hard_max_time="${3}" # If program with pid $pid takes longer than $hard_max_time seconds, will stop execution, unless $hard_max_time equals 0.
+	local caller_name="${4}" # Who called this function
+	Logger "${FUNCNAME[0]} called by [$caller_name]" "PARANOIA_DEBUG"	#__WITH_PARANOIA_DEBUG
+	__CheckArguments 4 $# ${FUNCNAME[0]} "$@"				#__WITH_PARANOIA_DEBUG
+
+	local soft_alert=0 # Does a soft alert need to be triggered, if yes, send an alert once
+	local log_time=0 # local time instance for comparaison
+
+	local seconds_begin=$SECONDS # Seconds since the beginning of the script
+	local exec_time=0 # Seconds since the beginning of this function
+
+	local retval=0 # return value of monitored pid process
+
+	while eval "$PROCESS_TEST_CMD" > /dev/null
+	do
+		Spinner
+		if [ $((($SECONDS + 1) % $KEEP_LOGGING)) -eq 0 ]; then
+			if [ $log_time -ne $SECONDS ]; then
+				log_time=$SECONDS
+				Logger "Current task still running." "NOTICE"
+			fi
+		fi
+		if [ $SECONDS -gt $soft_max_time ]; then
+			if [ $soft_alert -eq 0 ] && [ $soft_max_time != 0 ]; then
+				Logger "Max soft execution time exceeded for script." "WARN"
+				soft_alert=1
+				SendAlert
+			fi
+			if [ $SECONDS -gt $hard_max_time ] && [ $hard_max_time != 0 ]; then
+				Logger "Max hard execution time exceeded for script in [$caller_name]. Stopping current task execution." "ERROR"
+				KillChilds $pid
+				if [ $? == 0 ]; then
+					Logger "Task stopped successfully" "NOTICE"
+					return 0
+				else
+					return 1
+				fi
+			fi
+		fi
+		sleep $SLEEP_TIME
+	done
+	wait $pid
+	retval=$?
+	Logger "${FUNCNAME[0]} ended for [$caller_name] with status $retval." "PARANOIA_DEBUG"	#__WITH_PARANOIA_DEBUG
+	return $retval
+}
+
+#### MINIMAL-FUNCTION-SET END ####
 
 # obsolete, use StripQuotes
 function SedStripQuotes {
@@ -745,244 +918,6 @@ function GetRemoteOS {
 
 		Logger "Remote OS: [$remote_os_var]." "DEBUG"
 	fi
-}
-
-function WaitForTaskCompletion {
-	local pids="${1}" # pids to wait for, separated by semi-colon
-	local soft_max_time="${2}" # If program with pid $pid takes longer than $soft_max_time seconds, will log a warning, unless $soft_max_time equals 0.
-	local hard_max_time="${3}" # If program with pid $pid takes longer than $hard_max_time seconds, will stop execution, unless $hard_max_time equals 0.
-	local caller_name="${4}" # Who called this function
-	local exit_on_error="${5:-false}" # Should the function exit on subprocess errors
-
-	Logger "${FUNCNAME[0]} called by [$caller_name]." "PARANOIA_DEBUG"	#__WITH_PARANOIA_DEBUG
-	__CheckArguments 5 $# ${FUNCNAME[0]} "$@"				#__WITH_PARANOIA_DEBUG
-
-	local soft_alert=0 # Does a soft alert need to be triggered, if yes, send an alert once
-	local log_ttime=0 # local time instance for comparaison
-
-	local seconds_begin=$SECONDS # Seconds since the beginning of the script
-	local exec_time=0 # Seconds since the beginning of this function
-
-	local retval=0 # return value of monitored pid process
-	local errorcount=0 # Number of pids that finished with errors
-
-	local pidCount # number of given pids
-
-	IFS=';' read -a pidsArray <<< "$pids"
-	pidCount=${#pidsArray[@]}
-
-	while [ ${#pidsArray[@]} -gt 0 ]; do
-		newPidsArray=()
-		for pid in "${pidsArray[@]}"; do
-			if kill -0 $pid > /dev/null 2>&1; then
-				newPidsArray+=($pid)
-			else
-				wait $pid
-				result=$?
-				if [ $result -ne 0 ]; then
-					errorcount=$((errorcount+1))
-					Logger "${FUNCNAME[0]} called by [$caller_name] finished monitoring [$pid] with exitcode [$result]." "DEBUG"
-				fi
-			fi
-		done
-
-		Spinner
-		exec_time=$(($SECONDS - $seconds_begin))
-		if [ $((($exec_time + 1) % $KEEP_LOGGING)) -eq 0 ]; then
-			if [ $log_ttime -ne $exec_time ]; then
-				log_ttime=$exec_time
-				Logger "Current tasks still running with pids [${pidsArray[@]}]." "NOTICE"
-			fi
-		fi
-
-		if [ $exec_time -gt $soft_max_time ]; then
-			if [ $soft_alert -eq 0 ] && [ $soft_max_time -ne 0 ]; then
-				Logger "Max soft execution time exceeded for task [$caller_name] with pids [${pidsArray[@]}]." "WARN"
-				soft_alert=1
-				SendAlert
-
-			fi
-			if [ $exec_time -gt $hard_max_time ] && [ $hard_max_time -ne 0 ]; then
-				Logger "Max hard execution time exceeded for task [$caller_name] with pids [${pidsArray[@]}]. Stopping task execution." "ERROR"
-				KillChilds $pid
-				if [ $? == 0 ]; then
-					Logger "Task stopped successfully" "NOTICE"
-					#return 0
-				else
-					errrorcount=$((errorcount+1))
-					#return 1
-				fi
-			fi
-		fi
-
-		pidsArray=("${newPidsArray[@]}")
-		sleep $SLEEP_TIME
-	done
-
-	Logger "${FUNCNAME[0]} ended for [$caller_name] using [$pidCount] subprocesses with [$errorcount] errors." "PARANOIA_DEBUG"	#__WITH_PARANOIA_DEBUG
-	if [ $exit_on_error == true ] && [ $errorcount -gt 0 ]; then
-		Logger "Stopping execution." "CRITICAL"
-		exit 1337
-	else
-		return $errorcount
-	fi
-}
-
-function WaitForOldTaskCompletion {
-	local pid="${1}" # pid to wait for
-	local soft_max_time="${2}" # If program with pid $pid takes longer than $soft_max_time seconds, will log a warning, unless $soft_max_time equals 0.
-	local hard_max_time="${3}" # If program with pid $pid takes longer than $hard_max_time seconds, will stop execution, unless $hard_max_time equals 0.
-	local caller_name="${4}" # Who called this function
-
-	Logger "${FUNCNAME[0]} called by [$caller_name]." "PARANOIA_DEBUG"	#__WITH_PARANOIA_DEBUG
-	__CheckArguments 4 $# ${FUNCNAME[0]} "$@"				#__WITH_PARANOIA_DEBUG
-
-	local soft_alert=0 # Does a soft alert need to be triggered, if yes, send an alert once
-	local log_ttime=0 # local time instance for comparaison
-
-	local seconds_begin=$SECONDS # Seconds since the beginning of the script
-	local exec_time=0 # Seconds since the beginning of this function
-
-	local retval=0 # return value of monitored pid process
-
-	while kill -0 $pid > /dev/null 2>&1
-	do
-		Spinner
-		exec_time=$(($SECONDS - $seconds_begin))
-		if [ $((($exec_time + 1) % $KEEP_LOGGING)) -eq 0 ]; then
-			if [ $log_ttime -ne $exec_time ]; then
-				log_ttime=$exec_time
-				Logger "Current task still running with pid [$pid]." "NOTICE"
-			fi
-		fi
-		if [ $exec_time -gt $soft_max_time ]; then
-			if [ $soft_alert -eq 0 ] && [ $soft_max_time -ne 0 ]; then
-				Logger "Max soft execution time exceeded for task [$caller_name] with pid [$pid]." "WARN"
-				soft_alert=1
-				SendAlert
-
-			fi
-			if [ $exec_time -gt $hard_max_time ] && [ $hard_max_time -ne 0 ]; then
-				Logger "Max hard execution time exceeded for task [$caller_name] with pid [$pid]. Stopping task execution." "ERROR"
-				KillChilds $pid
-				if [ $? == 0 ]; then
-					Logger "Task stopped successfully" "NOTICE"
-					return 0
-				else
-					return 1
-				fi
-			fi
-		fi
-		sleep $SLEEP_TIME
-	done
-	wait $pid
-	retval=$?
-	Logger "${FUNCNAME[0]} ended for [$caller_name] with status $retval." "PARANOIA_DEBUG"	#__WITH_PARANOIA_DEBUG
-	return $retval
-}
-
-function WaitForXTaskCompletion {
-	local pids="${1}" # pids to wait for, separated by semi-colon
-	local soft_max_time="${2}" # If program with pid $pid takes longer than $soft_max_time seconds, will log a warning, unless $soft_max_time equals 0.
-	local hard_max_time="${3}" # If program with pid $pid takes longer than $hard_max_time seconds, will stop execution, unless $hard_max_time equals 0.
-	local caller_name="${4}" # Who called this function
-	local exit_on_error="${5}" # Should the function exit on subprocess errors
-
-	Logger "${FUNCNAME[0]} called by [$caller_name]." "PARANOIA_DEBUG"	#__WITH_PARANOIA_DEBUG
-	__CheckArguments 4 $# ${FUNCNAME[0]} "$@"				#__WITH_PARANOIA_DEBUG
-
-	local soft_alert=0 # Does a soft alert need to be triggered, if yes, send an alert once
-	local log_ttime=0 # local time instance for comparaison
-
-	local seconds_begin=$SECONDS # Seconds since the beginning of the script
-	local exec_time=0 # Seconds since the beginning of this function
-
-	local retval=0 # return value of monitored pid process
-
-	while kill -0 $pids > /dev/null 2>&1
-	do
-		Spinner
-		exec_time=$(($SECONDS - $seconds_begin))
-		if [ $((($exec_time + 1) % $KEEP_LOGGING)) -eq 0 ]; then
-			if [ $log_ttime -ne $exec_time ]; then
-				log_ttime=$exec_time
-				Logger "Current task still running with pid [$pid]." "NOTICE"
-			fi
-		fi
-		if [ $exec_time -gt $soft_max_time ]; then
-			if [ $soft_alert -eq 0 ] && [ $soft_max_time -ne 0 ]; then
-				Logger "Max soft execution time exceeded for task [$caller_name] with pid [$pid]." "WARN"
-				soft_alert=1
-				SendAlert
-
-			fi
-			if [ $exec_time -gt $hard_max_time ] && [ $hard_max_time -ne 0 ]; then
-				Logger "Max hard execution time exceeded for task [$caller_name] with pid [$pid]. Stopping task execution." "ERROR"
-				KillChilds $pid
-				if [ $? == 0 ]; then
-					Logger "Task stopped successfully" "NOTICE"
-					return 0
-				else
-					return 1
-				fi
-			fi
-		fi
-		sleep $SLEEP_TIME
-	done
-	wait $pid
-	retval=$?
-	Logger "${FUNCNAME[0]} ended for [$caller_name] with status $retval." "PARANOIA_DEBUG"	#__WITH_PARANOIA_DEBUG
-	return $retval
-}
-
-function WaitForCompletion {
-	local pid="${1}" # pid to wait for
-	local soft_max_time="${2}" # If program with pid $pid takes longer than $soft_max_time seconds, will log a warning, unless $soft_max_time equals 0.
-	local hard_max_time="${3}" # If program with pid $pid takes longer than $hard_max_time seconds, will stop execution, unless $hard_max_time equals 0.
-	local caller_name="${4}" # Who called this function
-	Logger "${FUNCNAME[0]} called by [$caller_name]" "PARANOIA_DEBUG"	#__WITH_PARANOIA_DEBUG
-	__CheckArguments 4 $# ${FUNCNAME[0]} "$@"				#__WITH_PARANOIA_DEBUG
-
-	local soft_alert=0 # Does a soft alert need to be triggered, if yes, send an alert once
-	local log_time=0 # local time instance for comparaison
-
-	local seconds_begin=$SECONDS # Seconds since the beginning of the script
-	local exec_time=0 # Seconds since the beginning of this function
-
-	local retval=0 # return value of monitored pid process
-
-	while eval "$PROCESS_TEST_CMD" > /dev/null
-	do
-		Spinner
-		if [ $((($SECONDS + 1) % $KEEP_LOGGING)) -eq 0 ]; then
-			if [ $log_time -ne $SECONDS ]; then
-				log_time=$SECONDS
-				Logger "Current task still running." "NOTICE"
-			fi
-		fi
-		if [ $SECONDS -gt $soft_max_time ]; then
-			if [ $soft_alert -eq 0 ] && [ $soft_max_time != 0 ]; then
-				Logger "Max soft execution time exceeded for script." "WARN"
-				soft_alert=1
-				SendAlert
-			fi
-			if [ $SECONDS -gt $hard_max_time ] && [ $hard_max_time != 0 ]; then
-				Logger "Max hard execution time exceeded for script in [$caller_name]. Stopping current task execution." "ERROR"
-				KillChilds $pid
-				if [ $? == 0 ]; then
-					Logger "Task stopped successfully" "NOTICE"
-					return 0
-				else
-					return 1
-				fi
-			fi
-		fi
-		sleep $SLEEP_TIME
-	done
-	wait $pid
-	retval=$?
-	Logger "${FUNCNAME[0]} ended for [$caller_name] with status $retval." "PARANOIA_DEBUG"	#__WITH_PARANOIA_DEBUG
-	return $retval
 }
 
 function RunLocalCommand {
@@ -1209,8 +1144,6 @@ function RsyncPatternsFromAdd {
         local pattern_from="${2}"
 	__CheckArguments 2 $# ${FUNCNAME[0]} "$@"    #__WITH_PARANOIA_DEBUG
 
-	local pattern_from=
-
         ## Check if the exclude list has a full path, and if not, add the config file path if there is one
         if [ "$(basename $pattern_from)" == "$pattern_from" ]; then
                 pattern_from="$(dirname $CONFIG_FILE)/$pattern_from"
@@ -1424,49 +1357,10 @@ function InitRemoteOSSettings {
 }
 
 ## END Generic functions
-
-#	Function Name		Is parallel	#__WITH_PARANOIA_DEBUG
-
-#	GetLocalOS		no		#__WITH_PARANOIA_DEBUG
-#	InitLocalOSSettings	no		#__WITH_PARANOIA_DEBUG
-#	CheckEnvironment	no		#__WITH_PARANOIA_DEBUG
-#	PreInit			no		#__WITH_PARANOIA_DEBUG
-#	Init			no		#__WITH_PARANOIA_DEBUG
-#	PostInit		no		#__WITH_PARANOIA_DEBUG
-#	GetRemoteOS		no		#__WITH_PARANOIA_DEBUG
-#	InitRemoteOSSettings	no		#__WITH_PARANOIA_DEBUG
-#	CheckReplicaPaths	yes		#__WITH_PARANOIA_DEBUG
-#	CheckDiskSpace		yes		#__WITH_PARANOIA_DEBUG
-#	RunBeforeHook		yes		#__WITH_PARANOIA_DEBUG
-#	Main			no		#__WITH_PARANOIA_DEBUG
-#	CreateStateDirs		yes		#__WITH_PARANOIA_DEBUG
-#	CheckLocks		yes		#__WITH_PARANOIA_DEBUG
-#	WriteLockFiles		yes		#__WITH_PARANOIA_DEBUG
-#	Sync			no		#__WITH_PARANOIA_DEBUG
-#	tree_list		no		#__WITH_PARANOIA_DEBUG
-#	tree_list		no		#__WITH_PARANOIA_DEBUG
-#	delete_list		no		#__WITH_PARANOIA_DEBUG
-#	delete_list		no		#__WITH_PARANOIA_DEBUG
-#	sync_attrs		no		#__WITH_PARANOIA_DEBUG
-#	_get_file_ctime_mtime	yes		#__WITH_PARANOIA_DEBUG
-#	sync_update		no		#__WITH_PARANOIA_DEBUG
-#	sync_update		no		#__WITH_PARANOIA_DEBUG
-#	deletion_propagation	no		#__WITH_PARANOIA_DEBUG
-#	deletion_propagation	no		#__WITH_PARANOIA_DEBUG
-#	tree_list		no		#__WITH_PARANOIA_DEBUG
-#	tree_list		no		#__WITH_PARANOIA_DEBUG
-#	SoftDelete		yes		#__WITH_PARANOIA_DEBUG
-#	RunAfterHook		yes		#__WITH_PARANOIA_DEBUG
-#	UnlockReplicas		yes		#__WITH_PARANOIA_DEBUG
-#	CleanUp			no		#__WITH_PARANOIA_DEBUG
-
-
+_LOGGER_PREFIX="time"
 
 ## Working directory. This directory exists in any replica and contains state files, backups, soft deleted files etc
 OSYNC_DIR=".osync_workdir"
-
-_LOGGER_PREFIX="time"
-_LOGGER_STDERR=0
 
 function TrapStop {
 	if [ $SOFT_STOP -eq 0 ]; then
@@ -1484,7 +1378,7 @@ function TrapStop {
 }
 
 function TrapQuit {
-	local exitcode=
+	local exitcode
 
 	if [ $ERROR_ALERT -ne 0 ]; then
 		UnlockReplicas
@@ -1746,7 +1640,7 @@ function _CreateStateDirsRemote {
 	local replica_state_dir="${1}"
 	__CheckArguments 1 $# ${FUNCNAME[0]} "$@"	#__WITH_PARANOIA_DEBUG
 
-	local cmd=
+	local cmd
 
 	CheckConnectivity3rdPartyHosts
 	CheckConnectivityRemoteHost
@@ -1762,7 +1656,6 @@ function _CreateStateDirsRemote {
 	fi
 }
 
-#TODO: also create deleted and backup dirs
 function CreateStateDirs {
 	__CheckArguments 0 $# ${FUNCNAME[0]} "$@"	#__WITH_PARANOIA_DEBUG
 
@@ -1870,7 +1763,6 @@ function CheckLocks {
 		fi
 	fi
 
-	#TODO: do not parallelize the detection of locks because of pids
 	_CheckLocksLocal "${INITIATOR[2]}" &
 	pids="$!"
 	if [ "$REMOTE_OPERATION" != "yes" ]; then
@@ -2005,8 +1897,8 @@ function tree_list {
 	local replica_type="${2}" # replica type: initiator, target
 	local tree_filename="${3}" # filename to output tree (will be prefixed with $replica_type)
 
-	local escaped_replica_path=
-	local rsync_cmd=
+	local escaped_replica_path
+	local rsync_cmd
 
 	__CheckArguments 3 $# ${FUNCNAME[0]} "$@"	#__WITH_PARANOIA_DEBUG
 
@@ -2045,7 +1937,7 @@ function delete_list {
 	local deleted_failed_list_file="${5}" # file containing files that could not be deleted on last run, will be prefixed with replica type
 	__CheckArguments 5 $# ${FUNCNAME[0]} "$@"	#__WITH_PARANOIA_DEBUG
 
-	local cmd=
+	local cmd
 
 	Logger "Creating $replica_type replica deleted file list." "NOTICE"
 	if [ -f "${INITIATOR[1]}${INITIATOR[3]}/$replica_type$TREE_AFTER_FILENAME_NO_SUFFIX" ]; then
@@ -2090,7 +1982,8 @@ function _get_file_ctime_mtime_remote {
 	local file_list="${3}"
 	__CheckArguments 3 $# ${FUNCNAME[0]} "$@"	#__WITH_PARANOIA_DEBUG
 
-	local cmd=
+	local cmd
+
 	cmd='cat "'$file_list'" | '$SSH_CMD' "while read file; do '$REMOTE_STAT_CTIME_MTIME_CMD' \"'$replica_path'\$file\"; done | sort" > "'$RUN_DIR/$PROGRAM.ctime_mtime.$replica_type.$SCRIPT_PID'"'
 	Logger "CMD: $cmd" "DEBUG"
 	eval $cmd
@@ -2112,8 +2005,8 @@ function sync_attrs {
 	local delete_list_filename="$DELETED_LIST_FILENAME" # Contains deleted list filename, will be prefixed with replica type
 	__CheckArguments 2 $# ${FUNCNAME[0]} "$@"	#__WITH_PARANOIA_DEBUG
 
-	local rsync_cmd=
-	local retval=
+	local rsync_cmd
+	local retval
 
 	Logger "Getting list of files that need updates." "NOTICE"
 
@@ -2146,7 +2039,6 @@ function sync_attrs {
 		fi
 	fi
 
-	#TODO _get_file_ctime_mtime_remote can be sent into background only if waitfortaskcompletion is removed from sub function
 	Logger "Getting ctimes for pending files on initiator." "NOTICE"
 	_get_file_ctime_mtime_local "${INITIATOR[1]}" "${INITIATOR[0]}" "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}-cleaned.$SCRIPT_PID"
 
@@ -2227,8 +2119,8 @@ function sync_update {
 	local delete_list_filename="${3}" # Contains deleted list filename, will be prefixed with replica type
 	__CheckArguments 3 $# ${FUNCNAME[0]} "$@"	#__WITH_PARANOIA_DEBUG
 
-	local rsync_cmd=
-	local retval=
+	local rsync_cmd
+	local retval
 
 	Logger "Updating $destination_replica replica." "NOTICE"
 	if [ "$source_replica" == "${INITIATOR[0]}" ]; then
@@ -2284,12 +2176,15 @@ function _delete_local {
 	local deleted_failed_list_file="${4}" # file containing files that could not be deleted on last run, will be prefixed with replica type
 	__CheckArguments 4 $# ${FUNCNAME[0]} "$@"	#__WITH_PARANOIA_DEBUG
 
-	local parentdir=
+	local parentdir
 
 	## On every run, check wheter the next item is already deleted because it is included in a directory already deleted
 	local previous_file=""
 
-	#if [ -d "$replica_dir$deletion_dir" ];then #TODO
+	#TODO: fix and add same to remote
+	if [ -d "$replica_dir$deletion_dir" ]; then
+		$COMMAND_SUDO mkdir -p "$replica_dir$deletion_dir"
+	fi
 
 
 	OLD_IFS=$IFS
@@ -2346,8 +2241,8 @@ function _delete_remote {
 	local deleted_failed_list_file="${4}" # file containing files that could not be deleted on last run, will be prefixed with replica type
 	__CheckArguments 4 $# ${FUNCNAME[0]} "$@"	#__WITH_PARANOIA_DEBUG
 
-	local esc_dest_dir=
-	local rsync_cmd=
+	local esc_dest_dir
+	local rsync_cmd
 
 	## This is a special coded function. Need to redelcare local functions on remote host, passing all needed variables as escaped arguments to ssh command.
 	## Anything beetween << ENDSSH and ENDSSH will be executed remotely
@@ -2371,7 +2266,7 @@ $SSH_CMD ERROR_ALERT=0 sync_on_changes=$sync_on_changes _SILENT=$_SILENT _DEBUG=
 	## The following lines are executed remotely
 	function _logger {
 		local value="${1}" # What to log
-		echo -e "$value" >&2#TODO do not output to logfile
+		echo -e "$value" >&2 #TODO logfile output missing
 
 		if [ $_SILENT -eq 0 ]; then
 		echo -e "$value"
@@ -2481,8 +2376,8 @@ function deletion_propagation {
 	local deleted_failed_list_file="${3}" # file containing files that could not be deleted on last run, will be prefixed with replica type
 	__CheckArguments 3 $# ${FUNCNAME[0]} "$@"	#__WITH_PARANOIA_DEBUG
 
-	local replica_dir=
-	local delete_dir=
+	local replica_dir
+	local delete_dir
 
 	Logger "Propagating deletions to $replica_type replica." "NOTICE"
 
@@ -2709,7 +2604,7 @@ function _SoftDeleteLocal {
 	local change_time="${3}"
 	__CheckArguments 3 $# ${FUNCNAME[0]} "$@"	#__WITH_PARANOIA_DEBUG
 
-	local retval=
+	local retval
 
 	if [ -d "$replica_deletion_path" ]; then
 		if [ $_DRYRUN -eq 1 ]; then
@@ -2748,7 +2643,7 @@ function _SoftDeleteRemote {
 	local change_time="${3}"
 	__CheckArguments 3 $# ${FUNCNAME[0]} "$@"	#__WITH_PARANOIA_DEBUG
 
-	local retval=
+	local retval
 
 	CheckConnectivity3rdPartyHosts
 	CheckConnectivityRemoteHost
@@ -2803,8 +2698,8 @@ function SoftDelete {
 			_SoftDeleteRemote "${TARGET[0]}" "${TARGET[1]}${TARGET[4]}" $CONFLICT_BACKUP_DAYS &
 			pids="$pids;$!"
 		fi
+		WaitForTaskCompletion $pids 720 1800 ${FUNCNAME[0]} false
 	fi
-	WaitForTaskCompletion $pids 720 1800 ${FUNCNAME[0]} false
 
 	if [ "$SOFT_DELETE" != "no" ] && [ $SOFT_DELETE_DAYS -ne 0 ]; then
 		Logger "Running soft deletion cleanup." "NOTICE"
@@ -2818,8 +2713,8 @@ function SoftDelete {
 			_SoftDeleteRemote "${TARGET[0]}" "${TARGET[1]}${TARGET[5]}" $SOFT_DELETE_DAYS &
 			pids="$pids;$!"
 		fi
+		WaitForTaskCompletion $pids 720 1800 ${FUNCNAME[0]} false
 	fi
-	WaitForTaskCompletion $pids 720 1800 ${FUNCNAME[0]} false
 }
 
 function Init {
@@ -3034,8 +2929,8 @@ function Usage {
 function SyncOnChanges {
 	__CheckArguments 0 $# ${FUNCNAME[0]} "$@"	#__WITH_PARANOIA_DEBUG
 
-	local cmd=
-	local retval=
+	local cmd
+	local retval
 
 	if ! type inotifywait > /dev/null 2>&1 ; then
 		Logger "No inotifywait command found. Cannot monitor changes." "CRITICAL"
