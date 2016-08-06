@@ -9,6 +9,7 @@ RECENT CHANGES
 
 XX Xxx 2016: osync v1.1.1 released
 
+- Fixed bogus rsync pattern additions
 - Fixed soft deletion always enabled on target
 - Fixed problem with attributes file list function
 - Fixed deletion propagation code

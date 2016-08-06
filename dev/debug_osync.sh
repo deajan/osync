@@ -7,7 +7,7 @@ PROGRAM_VERSION=1.1.1
 PROGRAM_BUILD=2016080203
 IS_STABLE=yes
 
-## FUNC_BUILD=2016071902
+## FUNC_BUILD=2016071902-b
 ## BEGIN Generic functions for osync & obackup written in 2013-2016 by Orsiris de Jong - http://www.netpower.fr - ozy@netpower.fr
 
 ## type -p does not work on platforms other than linux (bash). If if does not work, always assume output is not a zero exitcode
@@ -1040,8 +1040,6 @@ function RsyncPatternsFromAdd {
         local pattern_type="${1}"
         local pattern_from="${2}"
 	__CheckArguments 2 $# ${FUNCNAME[0]} "$@"    #__WITH_PARANOIA_DEBUG
-
-	local pattern_from=
 
         ## Check if the exclude list has a full path, and if not, add the config file path if there is one
         if [ "$(basename $pattern_from)" == "$pattern_from" ]; then
