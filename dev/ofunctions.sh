@@ -1,6 +1,6 @@
 #### MINIMAL-FUNCTION-SET BEGIN ####
 
-## FUNC_BUILD=2016080701
+## FUNC_BUILD=2016080702
 ## BEGIN Generic functions for osync & obackup written in 2013-2016 by Orsiris de Jong - http://www.netpower.fr - ozy@netpower.fr
 
 #TODO: set _LOGGER_PREFIX in other apps, specially for osync daemon mode
@@ -572,7 +572,7 @@ function WaitForTaskCompletion {
 	local counting="{6:-true}" # Count time since function launch if true, script launch if false
 
 	Logger "${FUNCNAME[0]} called by [$caller_name]." "PARANOIA_DEBUG"	#__WITH_PARANOIA_DEBUG
-	__CheckArguments 5 $# ${FUNCNAME[0]} "$@"				#__WITH_PARANOIA_DEBUG
+	__CheckArguments 6 $# ${FUNCNAME[0]} "$@"				#__WITH_PARANOIA_DEBUG
 
 	local soft_alert=0 # Does a soft alert need to be triggered, if yes, send an alert once
 	local log_ttime=0 # local time instance for comparaison

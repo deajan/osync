@@ -1,17 +1,19 @@
 #!/usr/bin/env bash
 
+# Remove Waitfor function in already sent to background functions to reduce code overhead
+
 PROGRAM="osync" # Rsync based two way sync engine with fault tolerance
 AUTHOR="(C) 2013-2016 by Orsiris de Jong"
 CONTACT="http://www.netpower.fr/osync - ozy@netpower.fr"
 PROGRAM_VERSION=1.2-dev-parallel-unstable
-PROGRAM_BUILD=2016080401
+PROGRAM_BUILD=2016080701
 IS_STABLE=no
 
 
 
 #### MINIMAL-FUNCTION-SET BEGIN ####
 
-## FUNC_BUILD=2016080601
+## FUNC_BUILD=2016080702
 ## BEGIN Generic functions for osync & obackup written in 2013-2016 by Orsiris de Jong - http://www.netpower.fr - ozy@netpower.fr
 
 #TODO: set _LOGGER_PREFIX in other apps, specially for osync daemon mode
@@ -563,6 +565,7 @@ function WaitForTaskCompletion {
 	local hard_max_time="${3}" # If program with pid $pid takes longer than $hard_max_time seconds, will stop execution, unless $hard_max_time equals 0.
 	local caller_name="${4}" # Who called this function
 	local exit_on_error="${5:-false}" # Should the function exit on subprocess errors
+	local counting="{6:-true}" # Count time since function launch if true, script launch if false
 
 
 	local soft_alert=0 # Does a soft alert need to be triggered, if yes, send an alert once
@@ -595,7 +598,12 @@ function WaitForTaskCompletion {
 		done
 
 		Spinner
-		exec_time=$(($SECONDS - $seconds_begin))
+		if [ $counting == true ]; then
+			exec_time=$(($SECONDS - $seconds_begin))
+		else
+			exec_time=$SECONDS
+		fi
+
 		if [ $((($exec_time + 1) % $KEEP_LOGGING)) -eq 0 ]; then
 			if [ $log_ttime -ne $exec_time ]; then
 				log_ttime=$exec_time
@@ -615,10 +623,8 @@ function WaitForTaskCompletion {
 				KillChilds $pid
 				if [ $? == 0 ]; then
 					Logger "Task stopped successfully" "NOTICE"
-					#return 0
 				else
 					errrorcount=$((errorcount+1))
-					#return 1
 				fi
 			fi
 		fi
@@ -635,51 +641,13 @@ function WaitForTaskCompletion {
 	fi
 }
 
-function WaitForCompletion {
-	local pid="${1}" # pid to wait for
-	local soft_max_time="${2}" # If program with pid $pid takes longer than $soft_max_time seconds, will log a warning, unless $soft_max_time equals 0.
-	local hard_max_time="${3}" # If program with pid $pid takes longer than $hard_max_time seconds, will stop execution, unless $hard_max_time equals 0.
-	local caller_name="${4}" # Who called this function
+function CleanUp {
 
-	local soft_alert=0 # Does a soft alert need to be triggered, if yes, send an alert once
-	local log_time=0 # local time instance for comparaison
-
-	local seconds_begin=$SECONDS # Seconds since the beginning of the script
-	local exec_time=0 # Seconds since the beginning of this function
-
-	local retval=0 # return value of monitored pid process
-
-	while eval "$PROCESS_TEST_CMD" > /dev/null
-	do
-		Spinner
-		if [ $((($SECONDS + 1) % $KEEP_LOGGING)) -eq 0 ]; then
-			if [ $log_time -ne $SECONDS ]; then
-				log_time=$SECONDS
-				Logger "Current task still running." "NOTICE"
-			fi
-		fi
-		if [ $SECONDS -gt $soft_max_time ]; then
-			if [ $soft_alert -eq 0 ] && [ $soft_max_time != 0 ]; then
-				Logger "Max soft execution time exceeded for script." "WARN"
-				soft_alert=1
-				SendAlert
-			fi
-			if [ $SECONDS -gt $hard_max_time ] && [ $hard_max_time != 0 ]; then
-				Logger "Max hard execution time exceeded for script in [$caller_name]. Stopping current task execution." "ERROR"
-				KillChilds $pid
-				if [ $? == 0 ]; then
-					Logger "Task stopped successfully" "NOTICE"
-					return 0
-				else
-					return 1
-				fi
-			fi
-		fi
-		sleep $SLEEP_TIME
-	done
-	wait $pid
-	retval=$?
-	return $retval
+	if [ "$_DEBUG" != "yes" ]; then
+		rm -f "$RUN_DIR/$PROGRAM."*".$SCRIPT_PID"
+		# Fix for sed -i requiring backup extension for BSD & Mac (see all sed -i statements)
+		rm -f "$RUN_DIR/$PROGRAM."*".$SCRIPT_PID.tmp"
+	fi
 }
 
 #### MINIMAL-FUNCTION-SET END ####
@@ -750,15 +718,6 @@ function urlDecode {
     printf '%b' "${url_encoded//%/\\x}"
 }
 
-function CleanUp {
-
-	if [ "$_DEBUG" != "yes" ]; then
-		rm -f "$RUN_DIR/$PROGRAM."*".$SCRIPT_PID"
-		# Fix for sed -i requiring backup extension for BSD & Mac (see all sed -i statements)
-		rm -f "$RUN_DIR/$PROGRAM."*".$SCRIPT_PID.tmp"
-	fi
-}
-
 function GetLocalOS {
 
 	local local_os_var=
@@ -808,19 +767,19 @@ function GetRemoteOS {
 		cmd=$SSH_CMD' "uname -spio" > "'$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$SCRIPT_PID'" 2>&1'
 		Logger "cmd: $cmd" "DEBUG"
 		eval "$cmd" &
-		WaitForTaskCompletion $! 120 240 ${FUNCNAME[0]}"-1"
+		WaitForTaskCompletion $! 120 240 ${FUNCNAME[0]}"-1" false true
 		retval=$?
 		if [ $retval != 0 ]; then
 			cmd=$SSH_CMD' "uname -v" > "'$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$SCRIPT_PID'" 2>&1'
 			Logger "cmd: $cmd" "DEBUG"
 			eval "$cmd" &
-			WaitForTaskCompletion $! 120 240 ${FUNCNAME[0]}"-2"
+			WaitForTaskCompletion $! 120 240 ${FUNCNAME[0]}"-2" false true
 			retval=$?
 			if [ $retval != 0 ]; then
 				cmd=$SSH_CMD' "uname" > "'$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$SCRIPT_PID'" 2>&1'
 				Logger "cmd: $cmd" "DEBUG"
 				eval "$cmd" &
-				WaitForTaskCompletion $! 120 240 ${FUNCNAME[0]}"-3"
+				WaitForTaskCompletion $! 120 240 ${FUNCNAME[0]}"-3" false true
 				retval=$?
 				if [ $retval != 0 ]; then
 					Logger "Cannot Get remote OS type." "ERROR"
@@ -872,7 +831,7 @@ function RunLocalCommand {
 
 	Logger "Running command [$command] on local host." "NOTICE"
 	eval "$command" > "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$SCRIPT_PID" 2>&1 &
-	WaitForTaskCompletion $! 0 $hard_max_time ${FUNCNAME[0]}
+	WaitForTaskCompletion $! 0 $hard_max_time ${FUNCNAME[0]} false true
 	retval=$?
 	if [ $retval -eq 0 ]; then
 		Logger "Command succeded." "NOTICE"
@@ -906,7 +865,7 @@ function RunRemoteCommand {
 	cmd=$SSH_CMD' "$command" > "'$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$SCRIPT_PID'" 2>&1'
 	Logger "cmd: $cmd" "DEBUG"
 	eval "$cmd" &
-	WaitForTaskCompletion $! 0 $hard_max_time ${FUNCNAME[0]}
+	WaitForTaskCompletion $! 0 $hard_max_time ${FUNCNAME[0]} false true
 	retval=$?
 	if [ $retval -eq 0 ]; then
 		Logger "Command succeded." "NOTICE"
@@ -939,7 +898,7 @@ function RunBeforeHook {
 		pids="$pids;$!"
 	fi
 	if [ "$pids" != "" ]; then
-		WaitForTaskCompletion $pids 0 0 ${FUNCNAME[0]} false
+		WaitForTaskCompletion $pids 0 0 ${FUNCNAME[0]} false true
 	fi
 }
 
@@ -957,7 +916,7 @@ function RunAfterHook {
 		pids="$pids;$!"
 	fi
 	if [ "$pids" != "" ]; then
-		WaitForTaskCompletion $pids 0 0 ${FUNCNAME[0]} false
+		WaitForTaskCompletion $pids 0 0 ${FUNCNAME[0]} false true
 	fi
 }
 
@@ -967,7 +926,7 @@ function CheckConnectivityRemoteHost {
 
 		if [ "$REMOTE_HOST_PING" != "no" ] && [ "$REMOTE_OPERATION" != "no" ]; then
 			eval "$PING_CMD $REMOTE_HOST > /dev/null 2>&1" &
-			WaitForTaskCompletion $! 180 180 ${FUNCNAME[0]}
+			WaitForTaskCompletion $! 180 180 ${FUNCNAME[0]} false true
 			if [ $? != 0 ]; then
 				Logger "Cannot ping $REMOTE_HOST" "ERROR"
 				return 1
@@ -987,7 +946,7 @@ function CheckConnectivity3rdPartyHosts {
 			for i in $REMOTE_3RD_PARTY_HOSTS
 			do
 				eval "$PING_CMD $i > /dev/null 2>&1" &
-				WaitForTaskCompletion $! 360 360 ${FUNCNAME[0]}
+				WaitForTaskCompletion $! 360 360 ${FUNCNAME[0]} false true
 				if [ $? != 0 ]; then
 					Logger "Cannot ping 3rd party host $i" "NOTICE"
 				else
@@ -1201,14 +1160,9 @@ function InitLocalOSSettings {
         ## Ping command is not the same
         if [ "$LOCAL_OS" == "msys" ]; then
                 FIND_CMD=$(dirname $BASH)/find
-                # PROCESS_TEST_CMD assumes there is a variable $pid
-		# Tested on MSYS and cygwin
-                PROCESS_TEST_CMD='ps -a | awk "{\$1=\$1}\$1" | awk "{print \$1}" | grep $pid'
                 PING_CMD='$SYSTEMROOT\system32\ping -n 2'
         else
                 FIND_CMD=find
-                # PROCESS_TEST_CMD assumes there is a variable $pid
-                PROCESS_TEST_CMD='ps -p$pid'
                 PING_CMD="ping -c 2 -i .2"
         fi
 
@@ -1400,7 +1354,7 @@ function _CheckReplicaPathsRemote {
 	cmd=$SSH_CMD' "if [ ! -w \"'$replica_path'\" ];then exit 1; fi" 2>&1'
 	Logger "cmd: $cmd" "DEBUG"
 	eval "$cmd" &
-	WaitForTaskCompletion $! 720 1800 ${FUNCNAME[0]}
+	WaitForTaskCompletion $! 720 1800 ${FUNCNAME[0]} false true
 	if [ $? != 0 ]; then
 		Logger "Remote replica path [$replica_path] is not writable." "CRITICAL"
 		exit 1
@@ -1409,7 +1363,7 @@ function _CheckReplicaPathsRemote {
 	cmd=$SSH_CMD' "if ! [ -d \"'$replica_path'\" ]; then if [ \"'$CREATE_DIRS'\" == \"yes\" ]; then '$COMMAND_SUDO' mkdir -p \"'$replica_path'\"; fi; fi" > "'$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$SCRIPT_PID'" 2>&1'
 	Logger "cmd: $cmd" "DEBUG"
 	eval "$cmd" &
-	WaitForTaskCompletion $! 720 1800 ${FUNCNAME[0]}
+	WaitForTaskCompletion $! 720 1800 ${FUNCNAME[0]} false true
 	if [ $? != 0 ]; then
 		Logger "Cannot create remote replica path [$replica_path]." "CRITICAL"
 		Logger "Command output:\n$(cat $RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$SCRIPT_PID)" "ERROR"
@@ -1440,7 +1394,7 @@ function CheckReplicaPaths {
 		_CheckReplicaPathsRemote "${TARGET[1]}" &
 		pids="$pids;$!"
 	fi
-	WaitForTaskCompletion $pids 720 1800 ${FUNCNAME[0]} true
+	WaitForTaskCompletion $pids 720 1800 ${FUNCNAME[0]} true true
 }
 
 function _CheckDiskSpaceLocal {
@@ -1470,7 +1424,7 @@ function _CheckDiskSpaceRemote {
 	cmd=$SSH_CMD' "'$COMMAND_SUDO' df -P \"'$replica_path'\"" > "'$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$SCRIPT_PID'" 2>&1'
 	Logger "cmd: $cmd" "DEBUG"
 	eval "$cmd" &
-	WaitForTaskCompletion $! 720 1800 ${FUNCNAME[0]}
+	WaitForTaskCompletion $! 720 1800 ${FUNCNAME[0]} false true
 	if [ $? != 0 ]; then
 		Logger "Cannot get free space on target [$replica_path]." "ERROR"
 		Logger "Command output:\n$(cat $RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$SCRIPT_PID)" "NOTICE"
@@ -1500,7 +1454,7 @@ function CheckDiskSpace {
 		_CheckDiskSpaceRemote "${TARGET[1]}" &
 		pids="$pids;$!"
 	fi
-	WaitForTaskCompletion $pids 720 1800 ${FUNCNAME[0]} false
+	WaitForTaskCompletion $pids 720 1800 ${FUNCNAME[0]} false true
 }
 
 
@@ -1528,7 +1482,7 @@ function _CreateStateDirsRemote {
 	cmd=$SSH_CMD' "if ! [ -d \"'$replica_state_dir'\" ]; then '$COMMAND_SUDO' mkdir -p \"'$replica_state_dir'\"; fi" > "'$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$SCRIPT_PID'" 2>&1'
 	Logger "cmd: $cmd" "DEBUG"
 	eval "$cmd" &
-	WaitForTaskCompletion $! 720 1800 ${FUNCNAME[0]}
+	WaitForTaskCompletion $! 720 1800 ${FUNCNAME[0]} false true
 	if [ $? != 0 ]; then
 		Logger "Cannot create remote state dir [$replica_state_dir]." "CRITICAL"
 		Logger "Command output:\n$(cat $RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$SCRIPT_PID)" "ERROR"
@@ -1549,7 +1503,7 @@ function CreateStateDirs {
 		_CreateStateDirsRemote "${TARGET[1]}${TARGET[3]}" &
 		pids="$pids;$!"
 	fi
-	WaitForTaskCompletion $pids 720 1800 ${FUNCNAME[0]} true
+	WaitForTaskCompletion $pids 720 1800 ${FUNCNAME[0]} true true
 }
 
 function _CheckLocksLocal {
@@ -1588,7 +1542,7 @@ function _CheckLocksRemote {
 	cmd=$SSH_CMD' "if [ -f \"'$lockfile'\" ]; then cat \"'$lockfile'\"; fi" > "'$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$SCRIPT_PID'"'
 	Logger "cmd: $cmd" "DEBUG"
 	eval "$cmd" &
-	WaitForTaskCompletion $! 720 1800 ${FUNCNAME[0]}
+	WaitForTaskCompletion $! 720 1800 ${FUNCNAME[0]} false true
 	if [ $? != 0 ]; then
 		if [ -f "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$SCRIPT_PID" ]; then
 			lockfile_content=$(cat $RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$SCRIPT_PID)
@@ -1648,7 +1602,7 @@ function CheckLocks {
 		_CheckLocksRemote "${TARGET[2]}" &
 		pids="$pids;$!"
 	fi
-	WaitForTaskCompletion $pids 720 1800 ${FUNCNAME[0]} true
+	WaitForTaskCompletion $pids 720 1800 ${FUNCNAME[0]} true true
 	WriteLockFiles
 }
 
@@ -1675,7 +1629,7 @@ function _WriteLockFilesRemote {
 	cmd=$SSH_CMD' "echo '$SCRIPT_PID@$INSTANCE_ID' | '$COMMAND_SUDO' tee \"'$lockfile'\"" > /dev/null 2>&1'
 	Logger "cmd: $cmd" "DEBUG"
 	eval "$cmd" &
-	WaitForTaskCompletion $! 720 1800 ${FUNCNAME[0]}
+	WaitForTaskCompletion $! 720 1800 ${FUNCNAME[0]} false true
 	if [ $? != 0 ]; then
 		Logger "Could not set lock on remote $replica_type replica." "CRITICAL"
 		exit 1
@@ -1697,7 +1651,7 @@ function WriteLockFiles {
 		_WriteLockFilesRemote "${TARGET[2]}" &
 		pids="$pids;$!"
 	fi
-	WaitForTaskCompletion $pids 720 1800 ${FUNCNAME[0]} true
+	WaitForTaskCompletion $pids 720 1800 ${FUNCNAME[0]} true true
 	LOCK_FILES_EXIST=1
 }
 
@@ -1725,7 +1679,7 @@ function _UnlockReplicasRemote {
 	cmd=$SSH_CMD' "if [ -f \"'$lockfile'\" ]; then '$COMMAND_SUDO' rm -f \"'$lockfile'\"; fi" > "'$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$SCRIPT_PID'" 2>&1'
 	Logger "cmd: $cmd" "DEBUG"
 	eval "$cmd" &
-	WaitForTaskCompletion $! 720 1800 ${FUNCNAME[0]}
+	WaitForTaskCompletion $! 720 1800 ${FUNCNAME[0]} false true
 	if [ $? != 0 ]; then
 		Logger "Could not unlock remote replica." "ERROR"
 		Logger "Command Output:\n$(cat $RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$SCRIPT_PID)" "NOTICE"
@@ -1752,7 +1706,7 @@ function UnlockReplicas {
 		_UnlockReplicasRemote "${TARGET[2]}" &
 		pids="$pids;$!"
 	fi
-	WaitForTaskCompletion $pids 720 1800 ${FUNCNAME[0]} false
+	WaitForTaskCompletion $pids 720 1800 ${FUNCNAME[0]} false true
 }
 
 ###### Sync core functions
@@ -1783,9 +1737,9 @@ function tree_list {
 	fi
 	Logger "RSYNC_CMD: $rsync_cmd" "DEBUG"
 	## Redirect commands stderr here to get rsync stderr output in logfile with eval "$rsync_cmd" 2>> "$LOG_FILE"
-	## When log writing fails, $! is empty and WaitForCompletion fails.  Removing the 2>> log
+	## When log writing fails, $! is empty and WaitForTaskCompletion fails.  Removing the 2>> log
 	eval "$rsync_cmd"
-	WaitForCompletion $! $SOFT_MAX_EXEC_TIME $HARD_MAX_EXEC_TIME ${FUNCNAME[0]}
+	WaitForTaskCompletion $! $SOFT_MAX_EXEC_TIME $HARD_MAX_EXEC_TIME ${FUNCNAME[0]} false false
 	retval=$?
 	## Retval 24 = some files vanished while creating list
 	if ([ $retval == 0 ] || [ $retval == 24 ]) && [ -f "$RUN_DIR/$PROGRAM.$replica_type.$SCRIPT_PID" ]; then
@@ -1853,7 +1807,7 @@ function _get_file_ctime_mtime_remote {
 	cmd='cat "'$file_list'" | '$SSH_CMD' "while read file; do '$REMOTE_STAT_CTIME_MTIME_CMD' \"'$replica_path'\$file\"; done | sort" > "'$RUN_DIR/$PROGRAM.ctime_mtime.$replica_type.$SCRIPT_PID'"'
 	Logger "CMD: $cmd" "DEBUG"
 	eval $cmd
-	WaitForCompletion $! $SOFT_MAX_EXEC_TIME $HARD_MAX_EXEC_TIME ${FUNCNAME[0]}
+	WaitForTaskCompletion $! $SOFT_MAX_EXEC_TIME $HARD_MAX_EXEC_TIME ${FUNCNAME[0]} false false
 	if [ $? != 0 ]; then
 		Logger "Getting file attributes failed [$retval] on $replica_type. Stopping execution." "CRITICAL"
 		if [ $_VERBOSE -eq 0 ] && [ -f "$RUN_DIR/$PROGRAM.ctime_mtime.$replica_type.$SCRIPT_PID" ]; then
@@ -1884,7 +1838,7 @@ function sync_attrs {
 	fi
 	Logger "RSYNC_CMD: $rsync_cmd" "DEBUG"
 	eval "$rsync_cmd"
-	WaitForCompletion $! $SOFT_MAX_EXEC_TIME $HARD_MAX_EXEC_TIME ${FUNCNAME[0]}
+	WaitForTaskCompletion $! $SOFT_MAX_EXEC_TIME $HARD_MAX_EXEC_TIME ${FUNCNAME[0]} false false
 	retval=$?
 	if [ $_VERBOSE -eq 1 ] && [ -f "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$SCRIPT_PID" ]; then
 		Logger "List:\n$(cat $RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$SCRIPT_PID)" "NOTICE"
@@ -1960,7 +1914,7 @@ function sync_attrs {
 
 	Logger "RSYNC_CMD: $rsync_cmd" "DEBUG"
 	eval "$rsync_cmd"
-	WaitForCompletion $! $SOFT_MAX_EXEC_TIME $HARD_MAX_EXEC_TIME ${FUNCNAME[0]}
+	WaitForTaskCompletion $! $SOFT_MAX_EXEC_TIME $HARD_MAX_EXEC_TIME ${FUNCNAME[0]} false false
 	retval=$?
 	if [ $_VERBOSE -eq 1 ] && [ -f "$RUN_DIR/$PROGRAM.attr-update.$dest_replica.$SCRIPT_PID" ]; then
 		Logger "List:\n$(cat $RUN_DIR/$PROGRAM.attr-update.$dest_replica.$SCRIPT_PID)" "NOTICE"
@@ -2014,7 +1968,7 @@ function sync_update {
 	fi
 	Logger "RSYNC_CMD: $rsync_cmd" "DEBUG"
 	eval "$rsync_cmd"
-	WaitForCompletion $! $SOFT_MAX_EXEC_TIME $HARD_MAX_EXEC_TIME ${FUNCNAME[0]}
+	WaitForTaskCompletion $! $SOFT_MAX_EXEC_TIME $HARD_MAX_EXEC_TIME ${FUNCNAME[0]} false false
 	retval=$?
 	if [ $_VERBOSE -eq 1 ] && [ -f "$RUN_DIR/$PROGRAM.update.$destination_replica.$SCRIPT_PID" ]; then
 		Logger "List:\n$(cat $RUN_DIR/$PROGRAM.update.$destination_replica.$SCRIPT_PID)" "NOTICE"
@@ -2247,7 +2201,7 @@ function deletion_propagation {
 		delete_dir="${INITIATOR[5]}"
 
 		_delete_local "$replica_dir" "${TARGET[0]}$deleted_list_file" "$delete_dir" "${TARGET[0]}$deleted_failed_list_file" &
-		WaitForCompletion $! $SOFT_MAX_EXEC_TIME $HARD_MAX_EXEC_TIME ${FUNCNAME[0]}
+		WaitForTaskCompletion $! $SOFT_MAX_EXEC_TIME $HARD_MAX_EXEC_TIME ${FUNCNAME[0]} false false
 		retval=$?
 		if [ $retval != 0 ]; then
 			Logger "Deletion on replica $replica_type failed." "CRITICAL"
@@ -2262,7 +2216,7 @@ function deletion_propagation {
 		else
 			_delete_local "$replica_dir" "${INITIATOR[0]}$deleted_list_file" "$delete_dir" "${INITIATOR[0]}$deleted_failed_list_file" &
 		fi
-		WaitForCompletion $! $SOFT_MAX_EXEC_TIME $HARD_MAX_EXEC_TIME ${FUNCNAME[0]}
+		WaitForTaskCompletion $! $SOFT_MAX_EXEC_TIME $HARD_MAX_EXEC_TIME ${FUNCNAME[0]} false false
 		retval=$?
 		if [ $retval == 0 ]; then
 			if [ -f "$RUN_DIR/$PROGRAM._delete_remote.$SCRIPT_PID" ] && [ $_VERBOSE -eq 1 ]; then
@@ -2483,7 +2437,7 @@ function _SoftDeleteLocal {
 		else
 			Dummy &
 		fi
-		WaitForCompletion $! $SOFT_MAX_EXEC_TIME $HARD_MAX_EXEC_TIME ${FUNCNAME[0]}
+		WaitForTaskCompletion $! $SOFT_MAX_EXEC_TIME $HARD_MAX_EXEC_TIME ${FUNCNAME[0]} false false
 		retval=$?
 		if [ $retval -ne 0 ]; then
 			Logger "Error while executing cleanup on $replica_type replica." "ERROR"
@@ -2517,7 +2471,7 @@ function _SoftDeleteRemote {
 		cmd=$SSH_CMD' "if [ -d \"'$replica_deletion_path'\" ]; then '$COMMAND_SUDO' '$REMOTE_FIND_CMD' \"'$replica_deletion_path'/\" -type f -ctime +'$change_time' -print0 | xargs -0 -I {} echo Will delete file {} && '$REMOTE_FIND_CMD' \"'$replica_deletion_path'/\" -type d -empty -ctime '$change_time' -print0 | xargs -0 -I {} echo Will delete directory {}; else echo \"No remote backup/deletion directory.\"; fi" > "'$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$SCRIPT_PID'" 2>&1'
 		Logger "cmd: $cmd" "DEBUG"
 		eval "$cmd" &
-		WaitForCompletion $! $SOFT_MAX_EXEC_TIME $HARD_MAX_EXEC_TIME ${FUNCNAME[0]}
+		WaitForTaskCompletion $! $SOFT_MAX_EXEC_TIME $HARD_MAX_EXEC_TIME ${FUNCNAME[0]} false false
 		Logger "Command output:\n$(cat $RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$SCRIPT_PID)" "NOTICE"
 	fi
 
@@ -2529,7 +2483,7 @@ function _SoftDeleteRemote {
 	else
 		Dummy &
 	fi
-	WaitForCompletion $! $SOFT_MAX_EXEC_TIME $HARD_MAX_EXEC_TIME ${FUNCNAME[0]}
+	WaitForTaskCompletion $! $SOFT_MAX_EXEC_TIME $HARD_MAX_EXEC_TIME ${FUNCNAME[0]} false false
 	retval=$?
 	if [ $retval -ne 0 ]; then
 		Logger "Error while executing cleanup on remote $replica_type replica." "ERROR"
@@ -2555,7 +2509,7 @@ function SoftDelete {
 			_SoftDeleteRemote "${TARGET[0]}" "${TARGET[1]}${TARGET[4]}" $CONFLICT_BACKUP_DAYS &
 			pids="$pids;$!"
 		fi
-		WaitForTaskCompletion $pids 720 1800 ${FUNCNAME[0]} false
+		WaitForTaskCompletion $pids 720 1800 ${FUNCNAME[0]} false true
 	fi
 
 	if [ "$SOFT_DELETE" != "no" ] && [ $SOFT_DELETE_DAYS -ne 0 ]; then
@@ -2570,7 +2524,7 @@ function SoftDelete {
 			_SoftDeleteRemote "${TARGET[0]}" "${TARGET[1]}${TARGET[5]}" $SOFT_DELETE_DAYS &
 			pids="$pids;$!"
 		fi
-		WaitForTaskCompletion $pids 720 1800 ${FUNCNAME[0]} false
+		WaitForTaskCompletion $pids 720 1800 ${FUNCNAME[0]} false true
 	fi
 }
 
