@@ -6,7 +6,7 @@ PROGRAM="osync" # Rsync based two way sync engine with fault tolerance
 AUTHOR="(C) 2013-2016 by Orsiris de Jong"
 CONTACT="http://www.netpower.fr/osync - ozy@netpower.fr"
 PROGRAM_VERSION=1.2-dev-parallel-unstable
-PROGRAM_BUILD=2016080701
+PROGRAM_BUILD=2016080802
 IS_STABLE=no
 
 #	Function Name		Is parallel	#__WITH_PARANOIA_DEBUG
@@ -46,7 +46,7 @@ IS_STABLE=no
 
 #### MINIMAL-FUNCTION-SET BEGIN ####
 
-## FUNC_BUILD=2016080702
+## FUNC_BUILD=2016080806
 ## BEGIN Generic functions for osync & obackup written in 2013-2016 by Orsiris de Jong - http://www.netpower.fr - ozy@netpower.fr
 
 #TODO: set _LOGGER_PREFIX in other apps, specially for osync daemon mode
@@ -359,7 +359,7 @@ function SendAlert {
 	fi
 
 	# Windows specific
-        if type "mailsend.exe" > /dev/null 2>&1 ; then
+	if type "mailsend.exe" > /dev/null 2>&1 ; then
 
 		if [ "$SMTP_ENCRYPTION" != "tls" ] && [ "$SMTP_ENCRYPTION" != "ssl" ]  && [ "$SMTP_ENCRYPTION" != "none" ]; then
 			Logger "Bogus smtp encryption, assuming none." "WARN"
@@ -372,14 +372,14 @@ function SendAlert {
 		if [ "$SMTP_USER" != "" ] && [ "$SMTP_USER" != "" ]; then
 			auth_string="-auth -user \"$SMTP_USER\" -pass \"$SMTP_PASSWORD\""
 		fi
-                $(type mailsend.exe) -f $SENDER_MAIL -t "$DESTINATION_MAILS" -sub "$subject" -M "$MAIL_ALERT_MSG" -attach "$attachment" -smtp "$SMTP_SERVER" -port "$SMTP_PORT" $encryption_string $auth_string
-                if [ $? != 0 ]; then
-                        Logger "Cannot send mail via $(type mailsend.exe) !!!" "WARN"
-                else
-                        Logger "Sent mail using mailsend.exe command with attachment." "NOTICE"
-                        return 0
-                fi
-        fi
+		$(type mailsend.exe) -f $SENDER_MAIL -t "$DESTINATION_MAILS" -sub "$subject" -M "$MAIL_ALERT_MSG" -attach "$attachment" -smtp "$SMTP_SERVER" -port "$SMTP_PORT" $encryption_string $auth_string
+		if [ $? != 0 ]; then
+			Logger "Cannot send mail via $(type mailsend.exe) !!!" "WARN"
+		else
+			Logger "Sent mail using mailsend.exe command with attachment." "NOTICE"
+			return 0
+		fi
+	fi
 
 	# Windows specific, kept for compatibility (sendemail from http://caspian.dotconf.net/menu/Software/SendEmail/)
 	if type sendemail > /dev/null 2>&1 ; then
@@ -499,7 +499,7 @@ function SendEmail {
 	fi
 
 	# Windows specific
-        if type "mailsend.exe" > /dev/null 2>&1 ; then
+	if type "mailsend.exe" > /dev/null 2>&1 ; then
 		if [ "$sender_email" == "" ]; then
 			Logger "Missing sender email." "ERROR"
 			return 1
@@ -523,14 +523,14 @@ function SendEmail {
 		if [ "$smtp_user" != "" ] && [ "$smtp_password" != "" ]; then
 			auth_string="-auth -user \"$smtp_user\" -pass \"$smtp_password\""
 		fi
-                $(type mailsend.exe) -f "$sender_email" -t "$destination_mails" -sub "$subject" -M "$message" -attach "$attachment" -smtp "$smtp_server" -port "$smtp_port" $encryption_string $auth_string
-                if [ $? != 0 ]; then
-                        Logger "Cannot send mail via $(type mailsend.exe) !!!" "WARN"
-                else
-                        Logger "Sent mail using mailsend.exe command with attachment." "NOTICE"
-                        return 0
-                fi
-        fi
+		$(type mailsend.exe) -f "$sender_email" -t "$destination_mails" -sub "$subject" -M "$message" -attach "$attachment" -smtp "$smtp_server" -port "$smtp_port" $encryption_string $auth_string
+		if [ $? != 0 ]; then
+			Logger "Cannot send mail via $(type mailsend.exe) !!!" "WARN"
+		else
+			Logger "Sent mail using mailsend.exe command with attachment." "NOTICE"
+			return 0
+		fi
+	fi
 
 	# pfSense specific
 	if [ -f /usr/local/bin/mail.php ]; then
@@ -609,13 +609,19 @@ function Spinner {
 	esac
 }
 
+# Array to string converter, see http://stackoverflow.com/questions/1527049/bash-join-elements-of-an-array
+# usage: joinString separaratorChar Array
+function joinString {
+	local IFS="$1"; shift; echo "$*";
+}
+
 function WaitForTaskCompletion {
 	local pids="${1}" # pids to wait for, separated by semi-colon
 	local soft_max_time="${2}" # If program with pid $pid takes longer than $soft_max_time seconds, will log a warning, unless $soft_max_time equals 0.
 	local hard_max_time="${3}" # If program with pid $pid takes longer than $hard_max_time seconds, will stop execution, unless $hard_max_time equals 0.
 	local caller_name="${4}" # Who called this function
 	local exit_on_error="${5:-false}" # Should the function exit on subprocess errors
-	local counting="{6:-true}" # Count time since function launch if true, script launch if false
+	local counting="${6:-true}" # Count time since function launch if true, script launch if false
 
 	Logger "${FUNCNAME[0]} called by [$caller_name]." "PARANOIA_DEBUG"	#__WITH_PARANOIA_DEBUG
 	__CheckArguments 6 $# ${FUNCNAME[0]} "$@"				#__WITH_PARANOIA_DEBUG
@@ -659,25 +665,27 @@ function WaitForTaskCompletion {
 		if [ $((($exec_time + 1) % $KEEP_LOGGING)) -eq 0 ]; then
 			if [ $log_ttime -ne $exec_time ]; then
 				log_ttime=$exec_time
-				Logger "Current tasks still running with pids [${pidsArray[@]}]." "NOTICE"
+				Logger "Current tasks still running with pids [$(joinString , ${pidsArray[@]})]." "NOTICE"
 			fi
 		fi
 
 		if [ $exec_time -gt $soft_max_time ]; then
 			if [ $soft_alert -eq 0 ] && [ $soft_max_time -ne 0 ]; then
-				Logger "Max soft execution time exceeded for task [$caller_name] with pids [${pidsArray[@]}]." "WARN"
+				Logger "Max soft execution time exceeded for task [$caller_name] with pids [$(joinString , ${pidsArray[@]})]." "WARN"
 				soft_alert=1
 				SendAlert
 
 			fi
 			if [ $exec_time -gt $hard_max_time ] && [ $hard_max_time -ne 0 ]; then
-				Logger "Max hard execution time exceeded for task [$caller_name] with pids [${pidsArray[@]}]. Stopping task execution." "ERROR"
+				Logger "Max hard execution time exceeded for task [$caller_name] with pids [$(joinString , ${pidsArray[@]})]. Stopping task execution." "ERROR"
 				KillChilds $pid
 				if [ $? == 0 ]; then
-					Logger "Task stopped successfully" "NOTICE"
+					Logger "Task stopped successfully." "NOTICE"
 				else
-					errrorcount=$((errorcount+1))
+					Logger "Could not stop task." "ERROR"
 				fi
+				SendAlert
+				errrorcount=$((errorcount+1))
 			fi
 		fi
 
@@ -708,7 +716,7 @@ function CleanUp {
 
 # obsolete, use StripQuotes
 function SedStripQuotes {
-        echo $(echo $1 | sed "s/^\([\"']\)\(.*\)\1\$/\2/g")
+	echo $(echo $1 | sed "s/^\([\"']\)\(.*\)\1\$/\2/g")
 }
 
 # Usage: var=$(StripSingleQuotes "$var")
@@ -987,7 +995,7 @@ function CheckConnectivityRemoteHost {
 
 		if [ "$REMOTE_HOST_PING" != "no" ] && [ "$REMOTE_OPERATION" != "no" ]; then
 			eval "$PING_CMD $REMOTE_HOST > /dev/null 2>&1" &
-			WaitForTaskCompletion $! 180 180 ${FUNCNAME[0]} false true
+			WaitForTaskCompletion $! 10 180 ${FUNCNAME[0]} false true
 			if [ $? != 0 ]; then
 				Logger "Cannot ping $REMOTE_HOST" "ERROR"
 				return 1
@@ -999,26 +1007,29 @@ function CheckConnectivityRemoteHost {
 function CheckConnectivity3rdPartyHosts {
 	__CheckArguments 0 $# ${FUNCNAME[0]} "$@"	#__WITH_PARANOIA_DEBUG
 
+	local remote_3rd_party_success
+	local pids
+
 	if [ "$_PARANOIA_DEBUG" != "yes" ]; then # Do not loose time in paranoia debug
 
 		if [ "$REMOTE_3RD_PARTY_HOSTS" != "" ]; then
 			remote_3rd_party_success=0
-			OLD_IFS=$IFS
-			IFS=$' \t\n'
 			for i in $REMOTE_3RD_PARTY_HOSTS
 			do
 				eval "$PING_CMD $i > /dev/null 2>&1" &
-				WaitForTaskCompletion $! 360 360 ${FUNCNAME[0]} false true
+				WaitForTaskCompletion $! 10 360 ${FUNCNAME[0]} false true
 				if [ $? != 0 ]; then
 					Logger "Cannot ping 3rd party host $i" "NOTICE"
 				else
 					remote_3rd_party_success=1
 				fi
 			done
-			IFS=$OLD_IFS
+
 			if [ $remote_3rd_party_success -ne 1 ]; then
 				Logger "No remote 3rd party host responded to ping. No internet ?" "ERROR"
 				return 1
+			else
+				return 0
 			fi
 		fi
 	fi
@@ -1029,37 +1040,37 @@ function __CheckArguments {
 	# Checks the number of arguments of a function and raises an error if some are missing
 
 	if [ "$_DEBUG" == "yes" ]; then
-                local number_of_arguments="${1}" # Number of arguments the tested function should have
-                local number_of_given_arguments="${2}" # Number of arguments that have been passed
-                local function_name="${3}" # Function name that called __CheckArguments
+		local number_of_arguments="${1}" # Number of arguments the tested function should have
+		local number_of_given_arguments="${2}" # Number of arguments that have been passed
+		local function_name="${3}" # Function name that called __CheckArguments
 
 		if [ "$_PARANOIA_DEBUG" == "yes" ]; then
 			Logger "Entering function [$function_name]." "DEBUG"
 		fi
 
-                # All arguments of the function to check are passed as array in ${4} (the function call waits for $@)
-                # If any of the arguments contains spaces, bash things there are two aguments
-                # In order to avoid this, we need to iterate over ${4} and count
+		# All arguments of the function to check are passed as array in ${4} (the function call waits for $@)
+		# If any of the arguments contains spaces, bash things there are two aguments
+		# In order to avoid this, we need to iterate over ${4} and count
 
-                local iterate=4
-                local fetch_arguments=1
-                local arg_list=""
-                while [ $fetch_arguments -eq 1 ]; do
-                        cmd='argument=${'$iterate'}'
-                        eval $cmd
-                        if [ "$argument" = "" ]; then
-                                fetch_arguments=0
-                        else
-                                arg_list="$arg_list [Argument $(($iterate-3)): $argument]"
-                                iterate=$(($iterate+1))
-                        fi
-                done
-                local counted_arguments=$((iterate-4))
+		local iterate=4
+		local fetch_arguments=1
+		local arg_list=""
+		while [ $fetch_arguments -eq 1 ]; do
+			cmd='argument=${'$iterate'}'
+			eval $cmd
+			if [ "$argument" = "" ]; then
+				fetch_arguments=0
+			else
+				arg_list="$arg_list [Argument $(($iterate-3)): $argument]"
+				iterate=$(($iterate+1))
+			fi
+		done
+		local counted_arguments=$((iterate-4))
 
-                if [ $counted_arguments -ne $number_of_arguments ]; then
-                        Logger "Function $function_name may have inconsistent number of arguments. Expected: $number_of_arguments, count: $counted_arguments, bash seen: $number_of_given_arguments. see log file." "ERROR"
-                        Logger "Arguments passed: $arg_list" "ERROR"
-                fi
+		if [ $counted_arguments -ne $number_of_arguments ]; then
+			Logger "Function $function_name may have inconsistent number of arguments. Expected: $number_of_arguments, count: $counted_arguments, bash seen: $number_of_given_arguments. see log file." "ERROR"
+			Logger "Arguments passed: $arg_list" "ERROR"
+		fi
 	fi
 }
 
@@ -1070,7 +1081,7 @@ function RsyncPatternsAdd {
 	local pattern="${2}"
 	__CheckArguments 2 $# ${FUNCNAME[0]} "$@"	#__WITH_PARANOIA_DEBUG
 
-	local rest=
+	local rest
 
 	# Disable globbing so wildcards from exclusions do not get expanded
 	set -f
@@ -1096,214 +1107,222 @@ function RsyncPatternsAdd {
 }
 
 function RsyncPatternsFromAdd {
-        local pattern_type="${1}"
-        local pattern_from="${2}"
+	local pattern_type="${1}"
+	local pattern_from="${2}"
 	__CheckArguments 2 $# ${FUNCNAME[0]} "$@"    #__WITH_PARANOIA_DEBUG
 
-        ## Check if the exclude list has a full path, and if not, add the config file path if there is one
-        if [ "$(basename $pattern_from)" == "$pattern_from" ]; then
-                pattern_from="$(dirname $CONFIG_FILE)/$pattern_from"
-        fi
+	## Check if the exclude list has a full path, and if not, add the config file path if there is one
+	if [ "$(basename $pattern_from)" == "$pattern_from" ]; then
+		pattern_from="$(dirname $CONFIG_FILE)/$pattern_from"
+	fi
 
-        if [ -e "$pattern_from" ]; then
-                RSYNC_PATTERNS="$RSYNC_PATTERNS --"$pattern_type"-from=\"$pattern_from\""
-        fi
+	if [ -e "$pattern_from" ]; then
+		RSYNC_PATTERNS="$RSYNC_PATTERNS --"$pattern_type"-from=\"$pattern_from\""
+	fi
 }
 
 function RsyncPatterns {
-        __CheckArguments 0 $# ${FUNCNAME[0]} "$@"    #__WITH_PARANOIA_DEBUG
+	__CheckArguments 0 $# ${FUNCNAME[0]} "$@"    #__WITH_PARANOIA_DEBUG
 
-        if [ "$RSYNC_PATTERN_FIRST" == "exclude" ]; then
-                RsyncPatternsAdd "exclude" "$RSYNC_EXCLUDE_PATTERN"
-                if [ "$RSYNC_EXCLUDE_FROM" != "" ]; then
-                        RsyncPatternsFromAdd "exclude" "$RSYNC_EXCLUDE_FROM"
-                fi
-                RsyncPatternsAdd "$RSYNC_INCLUDE_PATTERN" "include"
-                if [ "$RSYNC_INCLUDE_FROM" != "" ]; then
-                        RsyncPatternsFromAdd "include" "$RSYNC_INCLUDE_FROM"
-                fi
-        elif [ "$RSYNC_PATTERN_FIRST" == "include" ]; then
-                RsyncPatternsAdd "include" "$RSYNC_INCLUDE_PATTERN"
-                if [ "$RSYNC_INCLUDE_FROM" != "" ]; then
-                        RsyncPatternsFromAdd "include" "$RSYNC_INCLUDE_FROM"
-                fi
-                RsyncPatternsAdd "exclude" "$RSYNC_EXCLUDE_PATTERN"
-                if [ "$RSYNC_EXCLUDE_FROM" != "" ]; then
-                        RsyncPatternsFromAdd "exclude" "$RSYNC_EXCLUDE_FROM"
-                fi
-        else
-                Logger "Bogus RSYNC_PATTERN_FIRST value in config file. Will not use rsync patterns." "WARN"
-        fi
+       if [ "$RSYNC_PATTERN_FIRST" == "exclude" ]; then
+		if [ "$RSYNC_EXCLUDE_PATTERN" != "" ]; then
+			RsyncPatternsAdd "exclude" "$RSYNC_EXCLUDE_PATTERN"
+		fi
+		if [ "$RSYNC_EXCLUDE_FROM" != "" ]; then
+			RsyncPatternsFromAdd "exclude" "$RSYNC_EXCLUDE_FROM"
+		fi
+		if [ "$RSYNC_INCLUDE_PATTERN" != "" ]; then
+			RsyncPatternsAdd "$RSYNC_INCLUDE_PATTERN" "include"
+		fi
+		if [ "$RSYNC_INCLUDE_FROM" != "" ]; then
+			RsyncPatternsFromAdd "include" "$RSYNC_INCLUDE_FROM"
+		fi
+	elif [ "$RSYNC_PATTERN_FIRST" == "include" ]; then
+		if [ "$RSYNC_INCLUDE_PATTERN" != "" ]; then
+			RsyncPatternsAdd "include" "$RSYNC_INCLUDE_PATTERN"
+		fi
+		if [ "$RSYNC_INCLUDE_FROM" != "" ]; then
+			RsyncPatternsFromAdd "include" "$RSYNC_INCLUDE_FROM"
+		fi
+		if [ "$RSYNC_EXCLUDE_PATTERN" != "" ]; then
+			RsyncPatternsAdd "exclude" "$RSYNC_EXCLUDE_PATTERN"
+		fi
+		if [ "$RSYNC_EXCLUDE_FROM" != "" ]; then
+			RsyncPatternsFromAdd "exclude" "$RSYNC_EXCLUDE_FROM"
+		fi
+	else
+		Logger "Bogus RSYNC_PATTERN_FIRST value in config file. Will not use rsync patterns." "WARN"
+	fi
 }
 
 function PreInit {
 	 __CheckArguments 0 $# ${FUNCNAME[0]} "$@"    #__WITH_PARANOIA_DEBUG
 
 	## SSH compression
-        if [ "$SSH_COMPRESSION" != "no" ]; then
-                SSH_COMP=-C
-        else
-                SSH_COMP=
-        fi
+	if [ "$SSH_COMPRESSION" != "no" ]; then
+		SSH_COMP=-C
+	else
+		SSH_COMP=
+	fi
 
 	## Ignore SSH known host verification
 	if [ "$SSH_IGNORE_KNOWN_HOSTS" == "yes" ]; then
 		SSH_OPTS="-o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no"
 	fi
 
-        ## Support for older config files without RSYNC_EXECUTABLE option
-        if [ "$RSYNC_EXECUTABLE" == "" ]; then
-                RSYNC_EXECUTABLE=rsync
-        fi
+	## Support for older config files without RSYNC_EXECUTABLE option
+	if [ "$RSYNC_EXECUTABLE" == "" ]; then
+		RSYNC_EXECUTABLE=rsync
+	fi
 
-        ## Sudo execution option
-        if [ "$SUDO_EXEC" == "yes" ]; then
-                if [ "$RSYNC_REMOTE_PATH" != "" ]; then
-                        RSYNC_PATH="sudo $RSYNC_REMOTE_PATH/$RSYNC_EXECUTABLE"
-                else
-                        RSYNC_PATH="sudo $RSYNC_EXECUTABLE"
-                fi
-                COMMAND_SUDO="sudo"
-        else
-                if [ "$RSYNC_REMOTE_PATH" != "" ]; then
-                        RSYNC_PATH="$RSYNC_REMOTE_PATH/$RSYNC_EXECUTABLE"
-                else
-                        RSYNC_PATH="$RSYNC_EXECUTABLE"
-                fi
-                COMMAND_SUDO=""
-        fi
+	## Sudo execution option
+	if [ "$SUDO_EXEC" == "yes" ]; then
+		if [ "$RSYNC_REMOTE_PATH" != "" ]; then
+			RSYNC_PATH="sudo $RSYNC_REMOTE_PATH/$RSYNC_EXECUTABLE"
+		else
+			RSYNC_PATH="sudo $RSYNC_EXECUTABLE"
+		fi
+		COMMAND_SUDO="sudo"
+	else
+		if [ "$RSYNC_REMOTE_PATH" != "" ]; then
+			RSYNC_PATH="$RSYNC_REMOTE_PATH/$RSYNC_EXECUTABLE"
+		else
+			RSYNC_PATH="$RSYNC_EXECUTABLE"
+		fi
+		COMMAND_SUDO=""
+	fi
 
 	 ## Set rsync default arguments
-        RSYNC_ARGS="-rltD"
+	RSYNC_ARGS="-rltD"
 	RSYNC_ATTR_ARGS="-pgo"
 	if [ "$_DRYRUN" -eq 1 ]; then
 		RSYNC_DRY_ARG="-n"
-                DRY_WARNING="/!\ DRY RUN"
+		DRY_WARNING="/!\ DRY RUN"
 	else
 		RSYNC_DRY_ARG=""
 	fi
 
-        if [ "$PRESERVE_ACL" == "yes" ]; then
-                RSYNC_ATTR_ARGS=$RSYNC_ATTR_ARGS" -A"
-        fi
-        if [ "$PRESERVE_XATTR" == "yes" ]; then
-                RSYNC_ATTR_ARGS=$RSYNC_ATTR_ARGS" -X"
-        fi
-        if [ "$RSYNC_COMPRESS" == "yes" ]; then
-                RSYNC_ARGS=$RSYNC_ARGS" -z"
-        fi
-        if [ "$COPY_SYMLINKS" == "yes" ]; then
-                RSYNC_ARGS=$RSYNC_ARGS" -L"
-        fi
-        if [ "$KEEP_DIRLINKS" == "yes" ]; then
-                RSYNC_ARGS=$RSYNC_ARGS" -K"
-        fi
-        if [ "$PRESERVE_HARDLINKS" == "yes" ]; then
-                RSYNC_ARGS=$RSYNC_ARGS" -H"
-        fi
-        if [ "$CHECKSUM" == "yes" ]; then
-                RSYNC_TYPE_ARGS=$RSYNC_TYPE_ARGS" --checksum"
-        fi
-        if [ "$BANDWIDTH" != "" ] && [ "$BANDWIDTH" != "0" ]; then
-                RSYNC_ARGS=$RSYNC_ARGS" --bwlimit=$BANDWIDTH"
-        fi
+	if [ "$PRESERVE_ACL" == "yes" ]; then
+		RSYNC_ATTR_ARGS=$RSYNC_ATTR_ARGS" -A"
+	fi
+	if [ "$PRESERVE_XATTR" == "yes" ]; then
+		RSYNC_ATTR_ARGS=$RSYNC_ATTR_ARGS" -X"
+	fi
+	if [ "$RSYNC_COMPRESS" == "yes" ]; then
+		RSYNC_ARGS=$RSYNC_ARGS" -z"
+	fi
+	if [ "$COPY_SYMLINKS" == "yes" ]; then
+		RSYNC_ARGS=$RSYNC_ARGS" -L"
+	fi
+	if [ "$KEEP_DIRLINKS" == "yes" ]; then
+		RSYNC_ARGS=$RSYNC_ARGS" -K"
+	fi
+	if [ "$PRESERVE_HARDLINKS" == "yes" ]; then
+		RSYNC_ARGS=$RSYNC_ARGS" -H"
+	fi
+	if [ "$CHECKSUM" == "yes" ]; then
+		RSYNC_TYPE_ARGS=$RSYNC_TYPE_ARGS" --checksum"
+	fi
+	if [ "$BANDWIDTH" != "" ] && [ "$BANDWIDTH" != "0" ]; then
+		RSYNC_ARGS=$RSYNC_ARGS" --bwlimit=$BANDWIDTH"
+	fi
 
-        if [ "$PARTIAL" == "yes" ]; then
-                RSYNC_ARGS=$RSYNC_ARGS" --partial --partial-dir=\"$PARTIAL_DIR\""
-                RSYNC_PARTIAL_EXCLUDE="--exclude=\"$PARTIAL_DIR\""
-        fi
+	if [ "$PARTIAL" == "yes" ]; then
+		RSYNC_ARGS=$RSYNC_ARGS" --partial --partial-dir=\"$PARTIAL_DIR\""
+		RSYNC_PARTIAL_EXCLUDE="--exclude=\"$PARTIAL_DIR\""
+	fi
 
 	if [ "$DELTA_COPIES" != "no" ]; then
-                RSYNC_ARGS=$RSYNC_ARGS" --no-whole-file"
-        else
-            	RSYNC_ARGS=$RSYNC_ARGS" --whole-file"
-        fi
+		RSYNC_ARGS=$RSYNC_ARGS" --no-whole-file"
+	else
+		RSYNC_ARGS=$RSYNC_ARGS" --whole-file"
+	fi
 
 	 ## Set compression executable and extension
-        COMPRESSION_LEVEL=3
-        if type xz > /dev/null 2>&1
-        then
-                COMPRESSION_PROGRAM="| xz -$COMPRESSION_LEVEL"
-                COMPRESSION_EXTENSION=.xz
-        elif type lzma > /dev/null 2>&1
-        then
-                COMPRESSION_PROGRAM="| lzma -$COMPRESSION_LEVEL"
-                COMPRESSION_EXTENSION=.lzma
-        elif type pigz > /dev/null 2>&1
-        then
-                COMPRESSION_PROGRAM="| pigz -$COMPRESSION_LEVEL"
-              	COMPRESSION_EXTENSION=.gz
+	COMPRESSION_LEVEL=3
+	if type xz > /dev/null 2>&1
+	then
+		COMPRESSION_PROGRAM="| xz -$COMPRESSION_LEVEL"
+		COMPRESSION_EXTENSION=.xz
+	elif type lzma > /dev/null 2>&1
+	then
+		COMPRESSION_PROGRAM="| lzma -$COMPRESSION_LEVEL"
+		COMPRESSION_EXTENSION=.lzma
+	elif type pigz > /dev/null 2>&1
+	then
+		COMPRESSION_PROGRAM="| pigz -$COMPRESSION_LEVEL"
+		COMPRESSION_EXTENSION=.gz
 		# obackup specific
-                COMPRESSION_OPTIONS=--rsyncable
-        elif type gzip > /dev/null 2>&1
-        then
-                COMPRESSION_PROGRAM="| gzip -$COMPRESSION_LEVEL"
-                COMPRESSION_EXTENSION=.gz
+		COMPRESSION_OPTIONS=--rsyncable
+	elif type gzip > /dev/null 2>&1
+	then
+		COMPRESSION_PROGRAM="| gzip -$COMPRESSION_LEVEL"
+		COMPRESSION_EXTENSION=.gz
 		# obackup specific
-                COMPRESSION_OPTIONS=--rsyncable
-        else
-                COMPRESSION_PROGRAM=
-                COMPRESSION_EXTENSION=
-        fi
-        ALERT_LOG_FILE="$ALERT_LOG_FILE$COMPRESSION_EXTENSION"
+		COMPRESSION_OPTIONS=--rsyncable
+	else
+		COMPRESSION_PROGRAM=
+		COMPRESSION_EXTENSION=
+	fi
+	ALERT_LOG_FILE="$ALERT_LOG_FILE$COMPRESSION_EXTENSION"
 }
 
 function PostInit {
-        __CheckArguments 0 $# ${FUNCNAME[0]} "$@"    #__WITH_PARANOIA_DEBUG
+	__CheckArguments 0 $# ${FUNCNAME[0]} "$@"    #__WITH_PARANOIA_DEBUG
 
 	# Define remote commands
-        SSH_CMD="$(type -p ssh) $SSH_COMP -i $SSH_RSA_PRIVATE_KEY $SSH_OPTS $REMOTE_USER@$REMOTE_HOST -p $REMOTE_PORT"
-        SCP_CMD="$(type -p scp) $SSH_COMP -i $SSH_RSA_PRIVATE_KEY -P $REMOTE_PORT"
-        RSYNC_SSH_CMD="$(type -p ssh) $SSH_COMP -i $SSH_RSA_PRIVATE_KEY $SSH_OPTS -p $REMOTE_PORT"
+	SSH_CMD="$(type -p ssh) $SSH_COMP -i $SSH_RSA_PRIVATE_KEY $SSH_OPTS $REMOTE_USER@$REMOTE_HOST -p $REMOTE_PORT"
+	SCP_CMD="$(type -p scp) $SSH_COMP -i $SSH_RSA_PRIVATE_KEY -P $REMOTE_PORT"
+	RSYNC_SSH_CMD="$(type -p ssh) $SSH_COMP -i $SSH_RSA_PRIVATE_KEY $SSH_OPTS -p $REMOTE_PORT"
 }
 
 function InitLocalOSSettings {
-        __CheckArguments 0 $# ${FUNCNAME[0]} "$@"    #__WITH_PARANOIA_DEBUG
+	__CheckArguments 0 $# ${FUNCNAME[0]} "$@"    #__WITH_PARANOIA_DEBUG
 
-        ## If running under Msys, some commands do not run the same way
-        ## Using mingw version of find instead of windows one
-        ## Getting running processes is quite different
-        ## Ping command is not the same
-        if [ "$LOCAL_OS" == "msys" ]; then
-                FIND_CMD=$(dirname $BASH)/find
-                PING_CMD='$SYSTEMROOT\system32\ping -n 2'
-        else
-                FIND_CMD=find
-                PING_CMD="ping -c 2 -i .2"
-        fi
+	## If running under Msys, some commands do not run the same way
+	## Using mingw version of find instead of windows one
+	## Getting running processes is quite different
+	## Ping command is not the same
+	if [ "$LOCAL_OS" == "msys" ]; then
+		FIND_CMD=$(dirname $BASH)/find
+		PING_CMD='$SYSTEMROOT\system32\ping -n 2'
+	else
+		FIND_CMD=find
+		PING_CMD="ping -c 2 -i .2"
+	fi
 
-        ## Stat command has different syntax on Linux and FreeBSD/MacOSX
-        if [ "$LOCAL_OS" == "MacOSX" ] || [ "$LOCAL_OS" == "BSD" ]; then
-                STAT_CMD="stat -f \"%Sm\""
+	## Stat command has different syntax on Linux and FreeBSD/MacOSX
+	if [ "$LOCAL_OS" == "MacOSX" ] || [ "$LOCAL_OS" == "BSD" ]; then
+		STAT_CMD="stat -f \"%Sm\""
 		STAT_CTIME_MTIME_CMD="stat -f %N;%c;%m"
-        else
-                STAT_CMD="stat --format %y"
+	else
+		STAT_CMD="stat --format %y"
 		STAT_CTIME_MTIME_CMD="stat -c %n;%Z;%Y"
-        fi
+	fi
 }
 
 function InitRemoteOSSettings {
-        __CheckArguments 0 $# ${FUNCNAME[0]} "$@"    #__WITH_PARANOIA_DEBUG
+	__CheckArguments 0 $# ${FUNCNAME[0]} "$@"    #__WITH_PARANOIA_DEBUG
 
-        ## MacOSX does not use the -E parameter like Linux or BSD does (-E is mapped to extended attrs instead of preserve executability)
-        if [ "$LOCAL_OS" != "MacOSX" ] && [ "$REMOTE_OS" != "MacOSX" ]; then
-                RSYNC_ATTR_ARGS=$RSYNC_ATTR_ARGS" -E"
-        fi
+	## MacOSX does not use the -E parameter like Linux or BSD does (-E is mapped to extended attrs instead of preserve executability)
+	if [ "$LOCAL_OS" != "MacOSX" ] && [ "$REMOTE_OS" != "MacOSX" ]; then
+		RSYNC_ATTR_ARGS=$RSYNC_ATTR_ARGS" -E"
+	fi
 
-        if [ "$REMOTE_OS" == "msys" ]; then
-                REMOTE_FIND_CMD=$(dirname $BASH)/find
-        else
-                REMOTE_FIND_CMD=find
-        fi
+	if [ "$REMOTE_OS" == "msys" ]; then
+		REMOTE_FIND_CMD=$(dirname $BASH)/find
+	else
+		REMOTE_FIND_CMD=find
+	fi
 
-        ## Stat command has different syntax on Linux and FreeBSD/MacOSX
-        if [ "$LOCAL_OS" == "MacOSX" ] || [ "$LOCAL_OS" == "BSD" ]; then
-                REMOTE_STAT_CMD="stat -f \"%Sm\""
+	## Stat command has different syntax on Linux and FreeBSD/MacOSX
+	if [ "$LOCAL_OS" == "MacOSX" ] || [ "$LOCAL_OS" == "BSD" ]; then
+		REMOTE_STAT_CMD="stat -f \"%Sm\""
 		REMOTE_STAT_CTIME_MTIME_CMD="stat -f \\\"%N;%c;%m\\\""
-        else
-                REMOTE_STAT_CMD="stat --format %y"
+	else
+		REMOTE_STAT_CMD="stat --format %y"
 		REMOTE_STAT_CTIME_MTIME_CMD="stat -c \\\"%n;%Z;%Y\\\""
-        fi
+	fi
 
 }
 
@@ -1464,8 +1483,7 @@ function _CheckReplicaPathsRemote {
 
 	cmd=$SSH_CMD' "if [ ! -w \"'$replica_path'\" ];then exit 1; fi" 2>&1'
 	Logger "cmd: $cmd" "DEBUG"
-	eval "$cmd" &
-	WaitForTaskCompletion $! 720 1800 ${FUNCNAME[0]} false true
+	eval "$cmd"
 	if [ $? != 0 ]; then
 		Logger "Remote replica path [$replica_path] is not writable." "CRITICAL"
 		exit 1
@@ -1473,8 +1491,7 @@ function _CheckReplicaPathsRemote {
 
 	cmd=$SSH_CMD' "if ! [ -d \"'$replica_path'\" ]; then if [ \"'$CREATE_DIRS'\" == \"yes\" ]; then '$COMMAND_SUDO' mkdir -p \"'$replica_path'\"; fi; fi" > "'$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$SCRIPT_PID'" 2>&1'
 	Logger "cmd: $cmd" "DEBUG"
-	eval "$cmd" &
-	WaitForTaskCompletion $! 720 1800 ${FUNCNAME[0]} false true
+	eval "$cmd"
 	if [ $? != 0 ]; then
 		Logger "Cannot create remote replica path [$replica_path]." "CRITICAL"
 		Logger "Command output:\n$(cat $RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$SCRIPT_PID)" "ERROR"
@@ -1537,8 +1554,7 @@ function _CheckDiskSpaceRemote {
 
 	cmd=$SSH_CMD' "'$COMMAND_SUDO' df -P \"'$replica_path'\"" > "'$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$SCRIPT_PID'" 2>&1'
 	Logger "cmd: $cmd" "DEBUG"
-	eval "$cmd" &
-	WaitForTaskCompletion $! 720 1800 ${FUNCNAME[0]} false true
+	eval "$cmd"
 	if [ $? != 0 ]; then
 		Logger "Cannot get free space on target [$replica_path]." "ERROR"
 		Logger "Command output:\n$(cat $RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$SCRIPT_PID)" "NOTICE"
@@ -1598,8 +1614,7 @@ function _CreateStateDirsRemote {
 
 	cmd=$SSH_CMD' "if ! [ -d \"'$replica_state_dir'\" ]; then '$COMMAND_SUDO' mkdir -p \"'$replica_state_dir'\"; fi" > "'$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$SCRIPT_PID'" 2>&1'
 	Logger "cmd: $cmd" "DEBUG"
-	eval "$cmd" &
-	WaitForTaskCompletion $! 720 1800 ${FUNCNAME[0]} false true
+	eval "$cmd"
 	if [ $? != 0 ]; then
 		Logger "Cannot create remote state dir [$replica_state_dir]." "CRITICAL"
 		Logger "Command output:\n$(cat $RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$SCRIPT_PID)" "ERROR"
@@ -1661,8 +1676,7 @@ function _CheckLocksRemote {
 
 	cmd=$SSH_CMD' "if [ -f \"'$lockfile'\" ]; then cat \"'$lockfile'\"; fi" > "'$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$SCRIPT_PID'"'
 	Logger "cmd: $cmd" "DEBUG"
-	eval "$cmd" &
-	WaitForTaskCompletion $! 720 1800 ${FUNCNAME[0]} false true
+	eval "$cmd"
 	if [ $? != 0 ]; then
 		if [ -f "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$SCRIPT_PID" ]; then
 			lockfile_content=$(cat $RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$SCRIPT_PID)
@@ -1751,8 +1765,7 @@ function _WriteLockFilesRemote {
 
 	cmd=$SSH_CMD' "echo '$SCRIPT_PID@$INSTANCE_ID' | '$COMMAND_SUDO' tee \"'$lockfile'\"" > /dev/null 2>&1'
 	Logger "cmd: $cmd" "DEBUG"
-	eval "$cmd" &
-	WaitForTaskCompletion $! 720 1800 ${FUNCNAME[0]} false true
+	eval "$cmd"
 	if [ $? != 0 ]; then
 		Logger "Could not set lock on remote $replica_type replica." "CRITICAL"
 		exit 1
@@ -1804,8 +1817,7 @@ function _UnlockReplicasRemote {
 
 	cmd=$SSH_CMD' "if [ -f \"'$lockfile'\" ]; then '$COMMAND_SUDO' rm -f \"'$lockfile'\"; fi" > "'$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$SCRIPT_PID'" 2>&1'
 	Logger "cmd: $cmd" "DEBUG"
-	eval "$cmd" &
-	WaitForTaskCompletion $! 720 1800 ${FUNCNAME[0]} false true
+	eval "$cmd"
 	if [ $? != 0 ]; then
 		Logger "Could not unlock remote replica." "ERROR"
 		Logger "Command Output:\n$(cat $RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$SCRIPT_PID)" "NOTICE"
@@ -1937,8 +1949,7 @@ function _get_file_ctime_mtime_remote {
 
 	cmd='cat "'$file_list'" | '$SSH_CMD' "while read file; do '$REMOTE_STAT_CTIME_MTIME_CMD' \"'$replica_path'\$file\"; done | sort" > "'$RUN_DIR/$PROGRAM.ctime_mtime.$replica_type.$SCRIPT_PID'"'
 	Logger "CMD: $cmd" "DEBUG"
-	eval $cmd
-	WaitForTaskCompletion $! $SOFT_MAX_EXEC_TIME $HARD_MAX_EXEC_TIME ${FUNCNAME[0]} false false
+	eval "$cmd"
 	if [ $? != 0 ]; then
 		Logger "Getting file attributes failed [$retval] on $replica_type. Stopping execution." "CRITICAL"
 		if [ $_VERBOSE -eq 0 ] && [ -f "$RUN_DIR/$PROGRAM.ctime_mtime.$replica_type.$SCRIPT_PID" ]; then
@@ -1991,14 +2002,18 @@ function sync_attrs {
 	fi
 
 	Logger "Getting ctimes for pending files on initiator." "NOTICE"
-	_get_file_ctime_mtime_local "${INITIATOR[1]}" "${INITIATOR[0]}" "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}-cleaned.$SCRIPT_PID"
+	_get_file_ctime_mtime_local "${INITIATOR[1]}" "${INITIATOR[0]}" "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}-cleaned.$SCRIPT_PID" &
+	pids="$!"
 
 	Logger "Getting ctimes for pending files on target." "NOTICE"
 	if [ "$REMOTE_OPERATION" != "yes" ]; then
-		_get_file_ctime_mtime_local "${TARGET[1]}" "${TARGET[0]}" "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}-cleaned.$SCRIPT_PID"
+		_get_file_ctime_mtime_local "${TARGET[1]}" "${TARGET[0]}" "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}-cleaned.$SCRIPT_PID" &
+		pids="$pids;$!"
 	else
-		_get_file_ctime_mtime_remote "${TARGET[1]}" "${TARGET[0]}" "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}-cleaned.$SCRIPT_PID"
+		_get_file_ctime_mtime_remote "${TARGET[1]}" "${TARGET[0]}" "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}-cleaned.$SCRIPT_PID" &
+		pids="$pids;$!"
 	fi
+	WaitForTaskCompletion $pids 1800 0 ${FUNCNAME[0]} false true
 
 	# If target gets updated first, then sync_attr must update initiator's attrs first
 	# For join, remove leading replica paths
@@ -2137,11 +2152,7 @@ function _delete_local {
 		$COMMAND_SUDO mkdir -p "$replica_dir$deletion_dir"
 	fi
 
-
-	OLD_IFS=$IFS
-	IFS=$'\r\n'
-	for files in $(cat "${INITIATOR[1]}${INITIATOR[3]}/$deleted_list_file")
-	do
+	while read files; do
 		if [[ "$files" != "$previous_file/"* ]] && [ "$files" != "" ]; then
 			if [ $_VERBOSE -eq 1 ]; then
 				Logger "Soft deleting $replica_dir$files" "NOTICE"
@@ -2181,8 +2192,7 @@ function _delete_local {
 			fi
 			previous_file="$files"
 		fi
-	done
-	IFS=$OLD_IFS
+	done < "${INITIATOR[1]}${INITIATOR[3]}/$deleted_list_file"
 }
 
 function _delete_remote {
@@ -2257,10 +2267,7 @@ $SSH_CMD ERROR_ALERT=0 sync_on_changes=$sync_on_changes _SILENT=$_SILENT _DEBUG=
 
 	## On every run, check wheter the next item is already deleted because it is included in a directory already deleted
 	previous_file=""
-	OLD_IFS=$IFS
-	IFS=$'\r\n'
-	for files in $(cat "$FILE_LIST")
-	do
+	while read files; do
 		if [[ "$files" != "$previous_file/"* ]] && [ "$files" != "" ]; then
 			if [ $_VERBOSE -eq 1 ]; then
 				Logger "Soft deleting $REPLICA_DIR$files" "NOTICE"
@@ -2300,8 +2307,7 @@ $SSH_CMD ERROR_ALERT=0 sync_on_changes=$sync_on_changes _SILENT=$_SILENT _DEBUG=
 			fi
 			previous_file="$files"
 		fi
-	done
-	IFS=$OLD_IFS
+	done < "$FILE_LIST"
 ENDSSH
 
 	## Copy back the deleted failed file list
@@ -2418,7 +2424,7 @@ function Sync {
 	## This replaces the case statement because ;& operator is not supported in bash 3.2... Code is more messy than case :(
 	if [ "$resume_sync" == "none" ] || [ "$resume_sync" == "noresume" ] || [ "$resume_sync" == "${SYNC_ACTION[0]}.fail" ]; then
 		#initiator_tree_current
-		tree_list "${INITIATOR[1]}" "${INITIATOR[0]}" "$TREE_CURRENT_FILENAME"
+		tree_list "${INITIATOR[1]}" "${INITIATOR[0]}" "$TREE_CURRENT_FILENAME" #TODO: parallelize: Need WaitForTaskCompletion to return array with pid=error
 		if [ $? == 0 ]; then
 			echo "${SYNC_ACTION[0]}.success" > "${INITIATOR[7]}"
 		else
@@ -2563,19 +2569,20 @@ function _SoftDeleteLocal {
 		else
 			Logger "Removing files older than $change_time days on $replica_type replica." "NOTICE"
 		fi
-			if [ $_VERBOSE -eq 1 ]; then
+
+		if [ $_VERBOSE -eq 1 ]; then
 			# Cannot launch log function from xargs, ugly hack
 			$FIND_CMD "$replica_deletion_path/" -type f -ctime +$change_time -print0 | xargs -0 -I {} echo "Will delete file {}" >> "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$SCRIPT_PID"
 			Logger "Command output:\n$(cat $RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$SCRIPT_PID)" "NOTICE"
 			$FIND_CMD "$replica_deletion_path/" -type d -empty -ctime +$change_time -print0 | xargs -0 -I {} echo "Will delete directory {}" >> "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$SCRIPT_PID"
 			Logger "Command output:\n$(cat $RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$SCRIPT_PID)" "NOTICE"
 		fi
-			if [ $_DRYRUN -ne 1 ]; then
-			$FIND_CMD "$replica_deletion_path/" -type f -ctime +$change_time -print0 | xargs -0 -I {} rm -f "{}" && $FIND_CMD "$replica_deletion_path/" -type d -empty -ctime +$change_time -print0 | xargs -0 -I {} rm -rf "{}" >> "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$SCRIPT_PID" 2>&1 &
+
+		if [ $_DRYRUN -ne 1 ]; then
+			$FIND_CMD "$replica_deletion_path/" -type f -ctime +$change_time -print0 | xargs -0 -I {} rm -f "{}" && $FIND_CMD "$replica_deletion_path/" -type d -empty -ctime +$change_time -print0 | xargs -0 -I {} rm -rf "{}" >> "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$SCRIPT_PID" 2>&1
 		else
-			Dummy &
+			Dummy
 		fi
-		WaitForTaskCompletion $! $SOFT_MAX_EXEC_TIME $HARD_MAX_EXEC_TIME ${FUNCNAME[0]} false false
 		retval=$?
 		if [ $retval -ne 0 ]; then
 			Logger "Error while executing cleanup on $replica_type replica." "ERROR"
@@ -2609,8 +2616,7 @@ function _SoftDeleteRemote {
 		# Cannot launch log function from xargs, ugly hack
 		cmd=$SSH_CMD' "if [ -d \"'$replica_deletion_path'\" ]; then '$COMMAND_SUDO' '$REMOTE_FIND_CMD' \"'$replica_deletion_path'/\" -type f -ctime +'$change_time' -print0 | xargs -0 -I {} echo Will delete file {} && '$REMOTE_FIND_CMD' \"'$replica_deletion_path'/\" -type d -empty -ctime '$change_time' -print0 | xargs -0 -I {} echo Will delete directory {}; else echo \"No remote backup/deletion directory.\"; fi" > "'$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$SCRIPT_PID'" 2>&1'
 		Logger "cmd: $cmd" "DEBUG"
-		eval "$cmd" &
-		WaitForTaskCompletion $! $SOFT_MAX_EXEC_TIME $HARD_MAX_EXEC_TIME ${FUNCNAME[0]} false false
+		eval "$cmd"
 		Logger "Command output:\n$(cat $RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$SCRIPT_PID)" "NOTICE"
 	fi
 
@@ -2618,11 +2624,10 @@ function _SoftDeleteRemote {
 		cmd=$SSH_CMD' "if [ -d \"'$replica_deletion_path'\" ]; then '$COMMAND_SUDO' '$REMOTE_FIND_CMD' \"'$replica_deletion_path'/\" -type f -ctime +'$change_time' -print0 | xargs -0 -I {} rm -f \"{}\" && '$REMOTE_FIND_CMD' \"'$replica_deletion_path'/\" -type d -empty -ctime '$change_time' -print0 | xargs -0 -I {} rm -rf \"{}\"; else echo \"No remote backup/deletion directory.\"; fi" > "'$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$SCRIPT_PID'" 2>&1'
 
 		Logger "cmd: $cmd" "DEBUG"
-		eval "$cmd" &
+		eval "$cmd"
 	else
-		Dummy &
+		Dummy
 	fi
-	WaitForTaskCompletion $! $SOFT_MAX_EXEC_TIME $HARD_MAX_EXEC_TIME ${FUNCNAME[0]} false false
 	retval=$?
 	if [ $retval -ne 0 ]; then
 		Logger "Error while executing cleanup on remote $replica_type replica." "ERROR"
@@ -2890,8 +2895,7 @@ function SyncOnChanges {
 
 	Logger "#### Running osync in file monitor mode." "NOTICE"
 
-	while true
-	do
+	while true; do
 		if [ "$ConfigFile" != "" ]; then
 			cmd='bash '$osync_cmd' "'$ConfigFile'" '$opts
 		else
@@ -2946,8 +2950,7 @@ then
 fi
 
 first=1
-for i in "$@"
-do
+for i in "$@"; do
 	case $i in
 		--dry)
 		_DRYRUN=1
