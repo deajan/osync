@@ -6,7 +6,7 @@ PROGRAM="osync" # Rsync based two way sync engine with fault tolerance
 AUTHOR="(C) 2013-2016 by Orsiris de Jong"
 CONTACT="http://www.netpower.fr/osync - ozy@netpower.fr"
 PROGRAM_VERSION=1.2-dev-parallel-unstable
-PROGRAM_BUILD=2016080802
+PROGRAM_BUILD=2016080803
 IS_STABLE=no
 
 
@@ -1806,7 +1806,7 @@ function _get_file_ctime_mtime_local {
 	local file_list="${3}" # Contains list of files to get time attrs
 
 	echo -n "" > "$RUN_DIR/$PROGRAM.ctime_mtime.$replica_type.$SCRIPT_PID"
-	while read file; do $STAT_CTIME_MTIME_CMD "$replica_path$file" | sort >> "$RUN_DIR/$PROGRAM.ctime_mtime.$replica_type.$SCRIPT_PID"; done < "$file_list"
+	while read -r file; do $STAT_CTIME_MTIME_CMD "$replica_path$file" | sort >> "$RUN_DIR/$PROGRAM.ctime_mtime.$replica_type.$SCRIPT_PID"; done < "$file_list"
 }
 
 function _get_file_ctime_mtime_remote {
@@ -1816,7 +1816,7 @@ function _get_file_ctime_mtime_remote {
 
 	local cmd
 
-	cmd='cat "'$file_list'" | '$SSH_CMD' "while read file; do '$REMOTE_STAT_CTIME_MTIME_CMD' \"'$replica_path'\$file\"; done | sort" > "'$RUN_DIR/$PROGRAM.ctime_mtime.$replica_type.$SCRIPT_PID'"'
+	cmd='cat "'$file_list'" | '$SSH_CMD' "while read -r file; do '$REMOTE_STAT_CTIME_MTIME_CMD' \"'$replica_path'\$file\"; done | sort" > "'$RUN_DIR/$PROGRAM.ctime_mtime.$replica_type.$SCRIPT_PID'"'
 	Logger "CMD: $cmd" "DEBUG"
 	eval "$cmd"
 	if [ $? != 0 ]; then
@@ -2018,7 +2018,7 @@ function _delete_local {
 		$COMMAND_SUDO mkdir -p "$replica_dir$deletion_dir"
 	fi
 
-	while read files; do
+	while read -r files; do
 		if [[ "$files" != "$previous_file/"* ]] && [ "$files" != "" ]; then
 			if [ $_VERBOSE -eq 1 ]; then
 				Logger "Soft deleting $replica_dir$files" "NOTICE"
@@ -2132,7 +2132,7 @@ $SSH_CMD ERROR_ALERT=0 sync_on_changes=$sync_on_changes _SILENT=$_SILENT _DEBUG=
 
 	## On every run, check wheter the next item is already deleted because it is included in a directory already deleted
 	previous_file=""
-	while read files; do
+	while read -r files; do
 		if [[ "$files" != "$previous_file/"* ]] && [ "$files" != "" ]; then
 			if [ $_VERBOSE -eq 1 ]; then
 				Logger "Soft deleting $REPLICA_DIR$files" "NOTICE"
