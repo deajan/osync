@@ -1,6 +1,6 @@
 #### MINIMAL-FUNCTION-SET BEGIN ####
 
-## FUNC_BUILD=2016080901
+## FUNC_BUILD=2016080903
 ## BEGIN Generic functions for osync & obackup written in 2013-2016 by Orsiris de Jong - http://www.netpower.fr - ozy@netpower.fr
 
 #TODO: set _LOGGER_PREFIX in other apps, specially for osync daemon mode
@@ -569,6 +569,9 @@ function joinString {
 	local IFS="$1"; shift; echo "$*";
 }
 
+# Time control function for background processes, suitable for multiple synchronous processes
+# Fills a global variable called WAIT_FOR_TASK_COMPLETION that contains list of failed pids in format pid1:result1;pid2:result2
+# Warning: Don't imbricate this function into another run if you plan to use the global variable output
 function WaitForTaskCompletion {
 	local pids="${1}" # pids to wait for, separated by semi-colon
 	local soft_max_time="${2}" # If program with pid $pid takes longer than $soft_max_time seconds, will log a warning, unless $soft_max_time equals 0.
@@ -594,6 +597,8 @@ function WaitForTaskCompletion {
 	IFS=';' read -a pidsArray <<< "$pids"
 	pidCount=${#pidsArray[@]}
 
+	WAIT_FOR_TASK_COMPLETION=""
+
 	while [ ${#pidsArray[@]} -gt 0 ]; do
 		newPidsArray=()
 		for pid in "${pidsArray[@]}"; do
@@ -605,6 +610,11 @@ function WaitForTaskCompletion {
 				if [ $result -ne 0 ]; then
 					errorcount=$((errorcount+1))
 					Logger "${FUNCNAME[0]} called by [$caller_name] finished monitoring [$pid] with exitcode [$result]." "DEBUG"
+					if [ "$WAIT_FOR_TASK_COMPLETION" == "" ]; then
+						WAIT_FOR_TASK_COMPLETION="$pid:$result"
+					else
+						WAIT_FOR_TASK_COMPLETION=";$pid:$result"
+					fi
 				fi
 			fi
 		done
