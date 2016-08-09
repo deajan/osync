@@ -7,6 +7,8 @@ KNOWN ISSUES
 RECENT CHANGES
 --------------
 
+- Added options to ignore permissions, ownership and groups
+- Refactored WaitFor... functions into one
 - Improved execution speed
 	- Added parallel execution for most secondary fuctions
 	- Lowered sleep time in wait functions
