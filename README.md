@@ -37,7 +37,7 @@ You can download the latest stable release of Osync at www.netpower.fr/osync or 
 
 You may also get the last development version at https://github.com/deajan/osync with the following command
 
-	$ git clone -b "v1.1.1" https://github.com/deajan/osync
+	$ git clone -b "v1.1-maint" https://github.com/deajan/osync
 	$ cd osync
 	$ sh install.sh
 
