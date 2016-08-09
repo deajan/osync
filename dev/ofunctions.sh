@@ -1267,10 +1267,11 @@ function InitLocalOSSettings {
 function InitRemoteOSSettings {
 	__CheckArguments 0 $# ${FUNCNAME[0]} "$@"    #__WITH_PARANOIA_DEBUG
 
+	#TODO: fix add -E when both initiator and targets don't run MacOSX and PRESERVE_EXECUTABILITY=yes
 	## MacOSX does not use the -E parameter like Linux or BSD does (-E is mapped to extended attrs instead of preserve executability)
-	if [ "$LOCAL_OS" != "MacOSX" ] && [ "$REMOTE_OS" != "MacOSX" ]; then
-		RSYNC_ATTR_ARGS=$RSYNC_ATTR_ARGS" -E"
-	fi
+	#if [ "$LOCAL_OS" != "MacOSX" ] && [ "$REMOTE_OS" != "MacOSX" ]; then
+	#	RSYNC_ATTR_ARGS=$RSYNC_ATTR_ARGS" -E"
+	#fi
 
 	if [ "$REMOTE_OS" == "msys" ]; then
 		REMOTE_FIND_CMD=$(dirname $BASH)/find
