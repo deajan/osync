@@ -6,7 +6,7 @@ PROGRAM="osync" # Rsync based two way sync engine with fault tolerance
 AUTHOR="(C) 2013-2016 by Orsiris de Jong"
 CONTACT="http://www.netpower.fr/osync - ozy@netpower.fr"
 PROGRAM_VERSION=1.2-dev-parallel-unstable
-PROGRAM_BUILD=2016080901
+PROGRAM_BUILD=2016080902
 IS_STABLE=no
 
 #	Function Name		Is parallel	#__WITH_PARANOIA_DEBUG
@@ -1094,15 +1094,14 @@ function deletion_propagation {
 	fi
 }
 
-###### Sync function in 6 steps (functions above)
+###### Sync function in 6 steps
 ######
-###### Step 1: Create current tree list for initiator and target replicas (Steps 1M and 1S)
-###### Step 2: Create deleted file list for initiator and target replicas (Steps 2M and 2S)
-###### Steps 3a & 3b can be skipped depending on $RSYNC_ATTR_ARGS is empty or not
-###### Step 3a: Update initiator and target file attributes only
-###### Step 3b: Update initiator and target replicas (Steps 3M and 3S, order depending on conflict prevalence)
-###### Step 4: Deleted file propagation to initiator and target replicas (Steps 4M and 4S)
-###### Step 5: Create after run tree list for initiator and target replicas (Steps 5M and 5S)
+###### Step 0a & 0b: Create current file list of replicas
+###### Step 1a & 1b: Create deleted file list of replicas
+###### Step 3: Update file attributes
+###### Step 3a & 3b: Update replicas
+###### Step 4a & 4b: Propagate deletions on replicas
+###### Step 5a & 5b: Create after run file list of replicas
 
 function Sync {
 	__CheckArguments 0 $# ${FUNCNAME[0]} "$@"	#__WITH_PARANOIA_DEBUG
@@ -1543,6 +1542,7 @@ function Init {
 	#${REPLICA[7]}  contains full initiator last action file path
 	#${REPLICA[8]}  contains full target last action file path
 	#${REPLICA[9]}  contains full resume count file path
+
 	# Local variables used for state filenames
 	local lock_filename="lock"
 	local state_dir="state"
@@ -1630,22 +1630,6 @@ function Init {
 	'replica-tree-after'
 	'synced'
 	)
-
-	## Sync function actions (0-10)
-	#SYNC_ACTION=(
-	#'initiator-replica-tree'
-	#'target-replica-tree'
-	#'initiator-deleted-list'
-	#'target-deleted-list'
-	#'sync-attrs'
-	#'update-initiator-replica'
-	#'update-target-replica'
-	#'delete-propagation-target'
-	#'delete-propagation-initiator'
-	#'initiator-replica-tree-after'
-	#'target-replica-tree-after'
-	#'sync.success'
-	#)
 }
 
 function Main {
