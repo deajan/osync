@@ -1,5 +1,8 @@
 #!/usr/bin/env bash
 
+#TODO: add update script for -pgo options
+# Also eliminate ACL sync script if all preserve = no
+
 # Remove Waitfor function in already sent to background functions to reduce code overhead
 
 PROGRAM="osync" # Rsync based two way sync engine with fault tolerance
@@ -46,7 +49,7 @@ IS_STABLE=no
 
 #### MINIMAL-FUNCTION-SET BEGIN ####
 
-## FUNC_BUILD=2016080806
+## FUNC_BUILD=2016080901
 ## BEGIN Generic functions for osync & obackup written in 2013-2016 by Orsiris de Jong - http://www.netpower.fr - ozy@netpower.fr
 
 #TODO: set _LOGGER_PREFIX in other apps, specially for osync daemon mode
@@ -1194,13 +1197,22 @@ function PreInit {
 
 	 ## Set rsync default arguments
 	RSYNC_ARGS="-rltD"
-	RSYNC_ATTR_ARGS="-pgo"
 	if [ "$_DRYRUN" -eq 1 ]; then
 		RSYNC_DRY_ARG="-n"
 		DRY_WARNING="/!\ DRY RUN"
 	else
 		RSYNC_DRY_ARG=""
 	fi
+
+	RSYNC_ATTR_ARGS=""
+	if [ "$PRESERVE_PERMISSIONS" != "no" ]; then
+		RSYNC_ATTR_ARGS=$RSYNC_ATTR_ARGS" -p"
+	fi
+	if [ "$PRESERVE_OWNER" != "no" ]; then
+		RSYNC_ATTR_ARGS=$RSYNC_ATTR_ARGS" -o"
+	fi
+	if [ "$PRESERVE_GROUP" != "no" ]; then
+		RSYNC_ATTR_ARGS=$RSYNC_ATTR_ARGS" -g"
 
 	if [ "$PRESERVE_ACL" == "yes" ]; then
 		RSYNC_ATTR_ARGS=$RSYNC_ATTR_ARGS" -A"

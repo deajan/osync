@@ -1164,7 +1164,7 @@ function PreInit {
 	fi
 	if [ "$PRESERVE_GROUP" != "no" ]; then
 		RSYNC_ATTR_ARGS=$RSYNC_ATTR_ARGS" -g"
-
+	fi
 	if [ "$PRESERVE_ACL" == "yes" ]; then
 		RSYNC_ATTR_ARGS=$RSYNC_ATTR_ARGS" -A"
 	fi

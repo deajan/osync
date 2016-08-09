@@ -1,5 +1,8 @@
 #!/usr/bin/env bash
 
+#TODO: add update script for -pgo options
+# Also eliminate ACL sync script if all preserve = no
+
 # Remove Waitfor function in already sent to background functions to reduce code overhead
 
 PROGRAM="osync" # Rsync based two way sync engine with fault tolerance
