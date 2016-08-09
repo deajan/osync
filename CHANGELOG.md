@@ -7,6 +7,8 @@ KNOWN ISSUES
 RECENT CHANGES
 --------------
 
+! Parallelized sync functions
+	! Drawback bandwidth parameter
 - Added options to ignore permissions, ownership and groups
 - Refactored WaitFor... functions into one
 - Improved execution speed
