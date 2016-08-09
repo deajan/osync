@@ -1100,6 +1100,7 @@ function deletion_propagation {
 ######
 ###### Step 1: Create current tree list for initiator and target replicas (Steps 1M and 1S)
 ###### Step 2: Create deleted file list for initiator and target replicas (Steps 2M and 2S)
+###### Steps 3a & 3b can be skipped depending on $RSYNC_ATTR_ARGS is empty or not
 ###### Step 3a: Update initiator and target file attributes only
 ###### Step 3b: Update initiator and target replicas (Steps 3M and 3S, order depending on conflict prevalence)
 ###### Step 4: Deleted file propagation to initiator and target replicas (Steps 4M and 4S)
@@ -1181,15 +1182,20 @@ function Sync {
 		fi
 		resume_sync="resumed"
 	fi
-	if [ "$resume_sync" == "resumed" ] || [ "$resume_sync" == "${SYNC_ACTION[3]}.success" ] || [ "$resume_sync" == "${SYNC_ACTION[4]}.fail" ]; then
-		sync_attrs "${INITIATOR[1]}" "$TARGET_SYNC_DIR"
-		if [ $? == 0 ]; then
-			echo "${SYNC_ACTION[4]}.success" > "${INITIATOR[7]}"
-		else
-			echo "${SYNC_ACTION[4]}.fail" > "${INITIATOR[7]}"
+	if [ "$RSYNC_ATTR_ARGS" != "" ]; then
+		if [ "$resume_sync" == "resumed" ] || [ "$resume_sync" == "${SYNC_ACTION[3]}.success" ] || [ "$resume_sync" == "${SYNC_ACTION[4]}.fail" ]; then
+			sync_attrs "${INITIATOR[1]}" "$TARGET_SYNC_DIR"
+			if [ $? == 0 ]; then
+				echo "${SYNC_ACTION[4]}.success" > "${INITIATOR[7]}"
+			else
+				echo "${SYNC_ACTION[4]}.fail" > "${INITIATOR[7]}"
+			fi
+			resume_sync="resumed"
 		fi
-		resume_sync="resumed"
+	else
+		echo "${SYNC_ACTION[4]}.success" > "${INITIATOR[7]}"
 	fi
+
 	if [ "$resume_sync" == "resumed" ] || [ "$resume_sync" == "${SYNC_ACTION[4]}.success" ] || [ "$resume_sync" == "${SYNC_ACTION[5]}.fail" ] || [ "$resume_sync" == "${SYNC_ACTION[6]}.fail" ] || [ "$resume_sync" == "${SYNC_ACTION[5]}.success" ] || [ "$resume_sync" == "${SYNC_ACTION[6]}.success" ]; then
 		if [ "$CONFLICT_PREVALANCE" == "${TARGET[0]}" ]; then
 			if [ "$resume_sync" == "resumed" ] || [ "$resume_sync" == "${SYNC_ACTION[4]}.success" ] || [ "$resume_sync" == "${SYNC_ACTION[5]}.fail" ]; then
