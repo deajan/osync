@@ -2,11 +2,11 @@
 
 PROGRAM="osync instance upgrade script"
 SUBPROGRAM="osync"
-AUTHOR="(C) 2015 by Orsiris \"Ozy\" de Jong"
+AUTHOR="(C) 2016 by Orsiris de Jong"
 CONTACT="http://www.netpower.fr/osync - ozy@netpower.fr"
-OLD_PROGRAM_VERSION="1.0x"
-NEW_PROGRAM_VERSION="v1.1x"
-PROGRAM_BUILD=2016041301
+OLD_PROGRAM_VERSION="v1.0x-v1.1x"
+NEW_PROGRAM_VERSION="v1.2x"
+PROGRAM_BUILD=2016080901
 
 ## type -p does not work on platforms other than linux (bash). If if does not work, always assume output is not a zero exitcode
 if ! type "$BASH" > /dev/null; then
@@ -313,7 +313,7 @@ function RewriteConfigFiles {
 	local config_file="${1}"
 
 	if ((! grep "MASTER_SYNC_DIR=" "$config_file" > /dev/null) && (! grep "INITIATOR_SYNC_DIR=" "$config_file" > /dev/null)); then
-		echo "Config file [$config_file] does not seem to be an osync v1.0x or v1.1-dev file."
+		echo "Config file [$config_file] does not seem to be an osync v1.0x or v1.1x file."
 		exit 1
 	fi
 
@@ -349,6 +349,22 @@ function RewriteConfigFiles {
 
 	if ! grep "^RSYNC_INCLUDE_FROM=" "$config_file" > /dev/null; then
 		sed -i'.tmp' '/^RSYNC_EXCLUDE_FROM=*/a\'$'\n''RSYNC_INCLUDE_FROM=""\'$'\n''' "$config_file"
+	fi
+
+	if ! grep "^PRESERVE_PERMISSIONS=" "$config_file" > /dev/null; then
+		sed -i'.tmp' '/^REMOTE_3RD_PARTY_HOSTS=*/a\'$'\n''PRESERVE_PERMISSIONS=yes\'$'\n''' "$config_file"
+	fi
+
+	if ! grep "^PRESERVE_OWNER=" "$config_file" > /dev/null; then
+		sed -i'.tmp' '/^PRESERVE_PERMISSIONS=*/a\'$'\n''PRESERVE_OWNER=yes\'$'\n''' "$config_file"
+	fi
+
+	if ! grep "^PRESERVE_GROUP=" "$config_file" > /dev/null; then
+		sed -i'.tmp' '/^PRESERVE_OWNER=*/a\'$'\n''PRESERVE_GROUP=yes\'$'\n''' "$config_file"
+	fi
+
+	if ! grep "^PRESERVE_EXECUTABILITY=" "$config_file" > /dev/null; then
+		sed -i'.tmp' '/^PRESERVE_GROUP=*/a\'$'\n''PRESERVE_EXECUTABILITY=yes\'$'\n''' "$config_file"
 	fi
 
 	if ! grep "^CHECKSUM=" "$config_file" > /dev/null; then
