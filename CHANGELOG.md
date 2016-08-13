@@ -6,21 +6,24 @@ KNOWN ISSUES
 
 RECENT CHANGES
 --------------
-
-! Parallelized sync functions
-	! Drawback bandwidth parameter
+! update doc on sudoers paths
+- Parallelized sync functions
+	#TODO: explain bandwidth parameter, and CONFLICT_PREVALANCE option
 - Added options to ignore permissions, ownership and groups
 - Refactored WaitFor... functions into one
 - Improved execution speed
 	- Added parallel execution for most secondary fuctions
 	- Lowered sleep time in wait functions
 	- Removed trivial sleep and forking in remote deletion code, send the whole function to background instead
-	! Unlock functions no longer launched if locking failed
+	- Unlock functions no longer launched if locking failed
 - Improved WaitFor... functions to accept multiple pids
 - Added KillAllChilds function to accept multiple pids
 - Improved logging
 
-XX Xxx 2016: osync v1.1.1 released
+XX xxx 2016: osync v1.1.2 released
+- Fixed soft deletion when SUDO_EXEC is enabled
+
+06 Aug 2016: osync v1.1.1 released
 
 - Fixed bogus rsync pattern file adding
 - Fixed soft deletion always enabled on target
