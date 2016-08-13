@@ -1,10 +1,7 @@
 #### MINIMAL-FUNCTION-SET BEGIN ####
 
-## FUNC_BUILD=2016080903
+## FUNC_BUILD=2016081201
 ## BEGIN Generic functions for osync & obackup written in 2013-2016 by Orsiris de Jong - http://www.netpower.fr - ozy@netpower.fr
-
-#TODO: set _LOGGER_PREFIX in other apps, specially for osync daemon mode
-#TODO: set _LOGGER_STDERR in other apps
 
 ## type -p does not work on platforms other than linux (bash). If if does not work, always assume output is not a zero exitcode
 if ! type "$BASH" > /dev/null; then
@@ -1279,9 +1276,11 @@ function InitRemoteOSSettings {
 
 	#TODO: fix add -E when both initiator and targets don't run MacOSX and PRESERVE_EXECUTABILITY=yes
 	## MacOSX does not use the -E parameter like Linux or BSD does (-E is mapped to extended attrs instead of preserve executability)
-	#if [ "$LOCAL_OS" != "MacOSX" ] && [ "$REMOTE_OS" != "MacOSX" ]; then
-	#	RSYNC_ATTR_ARGS=$RSYNC_ATTR_ARGS" -E"
-	#fi
+	if [ "$PRESERVE_EXECUTABILITY" != "no" ];then
+		if [ "$LOCAL_OS" != "MacOSX" ] && [ "$REMOTE_OS" != "MacOSX" ]; then
+			RSYNC_ATTR_ARGS=$RSYNC_ATTR_ARGS" -E"
+		fi
+	fi
 
 	if [ "$REMOTE_OS" == "msys" ]; then
 		REMOTE_FIND_CMD=$(dirname $BASH)/find
