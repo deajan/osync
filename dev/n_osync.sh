@@ -1,12 +1,12 @@
 #!/usr/bin/env bash
 
-#TODO: handle conflict prevalance
+#TODO(critical): handle conflict prevalance, especially in sync_attrs function
 
 PROGRAM="osync" # Rsync based two way sync engine with fault tolerance
 AUTHOR="(C) 2013-2016 by Orsiris de Jong"
 CONTACT="http://www.netpower.fr/osync - ozy@netpower.fr"
-PROGRAM_VERSION=1.2-dev-parallel-unstable
-PROGRAM_BUILD=2016080902
+PROGRAM_VERSION=1.2-dev-parallel
+PROGRAM_BUILD=2016081301
 IS_STABLE=no
 
 #	Function Name		Is parallel	#__WITH_PARANOIA_DEBUG
@@ -35,8 +35,8 @@ IS_STABLE=no
 #	_get_file_ctime_mtime	yes		#__WITH_PARANOIA_DEBUG
 #	sync_update		yes		#__WITH_PARANOIA_DEBUG
 #	sync_update		yes		#__WITH_PARANOIA_DEBUG
-#	deletion_propagation	yes?		#__WITH_PARANOIA_DEBUG
-#	deletion_propagation	yes?		#__WITH_PARANOIA_DEBUG
+#	deletion_propagation	yes		#__WITH_PARANOIA_DEBUG
+#	deletion_propagation	yes		#__WITH_PARANOIA_DEBUG
 #	tree_list		yes		#__WITH_PARANOIA_DEBUG
 #	tree_list		yes		#__WITH_PARANOIA_DEBUG
 #	SoftDelete		yes		#__WITH_PARANOIA_DEBUG
@@ -159,7 +159,7 @@ function CheckCurrentConfig {
                 eval "$test"
         done
 
-        #TODO-v2.1: Add runtime variable tests (RSYNC_ARGS etc)
+        #TODO(low): Add runtime variable tests (RSYNC_ARGS etc)
 }
 
 ###### Osync specific functions (non shared)
@@ -222,7 +222,7 @@ function CheckReplicaPaths {
 
 	local pids
 
-	#INITIATOR_SYNC_DIR_CANN=$(realpath "${INITIATOR[1]}")	#TODO: investigate realpath & readlink issues on MSYS and busybox here
+	#INITIATOR_SYNC_DIR_CANN=$(realpath "${INITIATOR[1]}")	#TODO(verylow): investigate realpath & readlink issues on MSYS and busybox here
 	#TARGET_SYNC_DIR_CANN=$(realpath "${TARGET[1]})
 
 	#if [ "$REMOTE_OPERATION" != "yes" ]; then
@@ -859,16 +859,14 @@ function _delete_local {
 	__CheckArguments 4 $# ${FUNCNAME[0]} "$@"	#__WITH_PARANOIA_DEBUG
 
 	local parentdir
-
-	## On every run, check wheter the next item is already deleted because it is included in a directory already deleted
 	local previous_file=""
 
-	#TODO: fix and add same to remote
-	if [ -d "$replica_dir$deletion_dir" ]; then
+	if [ -d "$replica_dir$deletion_dir" ] && [ $_DRYRUN -ne 1 ]; then
 		$COMMAND_SUDO mkdir -p "$replica_dir$deletion_dir"
 	fi
 
 	while read -r files; do
+		## On every run, check wheter the next item is already deleted because it is included in a directory already deleted
 		if [[ "$files" != "$previous_file/"* ]] && [ "$files" != "" ]; then
 			if [ $_VERBOSE -eq 1 ]; then
 				Logger "Soft deleting $replica_dir$files" "NOTICE"
@@ -937,13 +935,13 @@ function _delete_remote {
 		exit 1
 	fi
 
-#TODO: check output file without & and sleep 5
+#TODO(critical): check output file without & and sleep 5
 $SSH_CMD ERROR_ALERT=0 sync_on_changes=$sync_on_changes _SILENT=$_SILENT _DEBUG=$_DEBUG _DRYRUN=$_DRYRUN _VERBOSE=$_VERBOSE COMMAND_SUDO=$COMMAND_SUDO FILE_LIST="$(EscapeSpaces "${TARGET[1]}${TARGET[3]}/$deleted_list_file")" REPLICA_DIR="$(EscapeSpaces "$replica_dir")" SOFT_DELETE=$SOFT_DELETE DELETE_DIR="$(EscapeSpaces "$deletion_dir")" FAILED_DELETE_LIST="$(EscapeSpaces "${TARGET[1]}${TARGET[3]}/$deleted_failed_list_file")" 'bash -s' << 'ENDSSH' >> "$RUN_DIR/$PROGRAM.remote_deletion.$SCRIPT_PID" 2>&1
 
 	## The following lines are executed remotely
 	function _logger {
 		local value="${1}" # What to log
-		echo -e "$value" >&2 #TODO logfile output missing
+		echo -e "$value" >&2 #TODO(high): logfile output missing
 
 		if [ $_SILENT -eq 0 ]; then
 		echo -e "$value"
@@ -980,10 +978,14 @@ $SSH_CMD ERROR_ALERT=0 sync_on_changes=$sync_on_changes _SILENT=$_SILENT _DEBUG=
 	> "$FAILED_DELETE_LIST"
 
 	parentdir=
-
-	## On every run, check wheter the next item is already deleted because it is included in a directory already deleted
 	previous_file=""
+
+	if [ -d "$replica_dir$deletion_dir" ] && [ $_DRYRUN -ne 1 ]; then
+		$COMMAND_SUDO mkdir -p "$replica_dir$deletion_dir"
+	fi
+
 	while read -r files; do
+		## On every run, check wheter the next item is already deleted because it is included in a directory already deleted
 		if [[ "$files" != "$previous_file/"* ]] && [ "$files" != "" ]; then
 			if [ $_VERBOSE -eq 1 ]; then
 				Logger "Soft deleting $REPLICA_DIR$files" "NOTICE"
@@ -1058,11 +1060,7 @@ function deletion_propagation {
 		replica_dir="${INITIATOR[1]}"
 		delete_dir="${INITIATOR[5]}"
 
-
-		#TODO: parallelize this !
-
-		_delete_local "$replica_dir" "${TARGET[0]}$deleted_list_file" "$delete_dir" "${TARGET[0]}$deleted_failed_list_file" &
-		WaitForTaskCompletion $! $SOFT_MAX_EXEC_TIME $HARD_MAX_EXEC_TIME ${FUNCNAME[0]} false false
+		_delete_local "$replica_dir" "${TARGET[0]}$deleted_list_file" "$delete_dir" "${TARGET[0]}$deleted_failed_list_file"
 		retval=$?
 		if [ $retval != 0 ]; then
 			Logger "Deletion on replica $replica_type failed." "CRITICAL"
@@ -1073,11 +1071,10 @@ function deletion_propagation {
 		delete_dir="${TARGET[5]}"
 
 		if [ "$REMOTE_OPERATION" == "yes" ]; then
-			_delete_remote "$replica_dir" "${INITIATOR[0]}$deleted_list_file" "$delete_dir" "${INITIATOR[0]}$deleted_failed_list_file" &
+			_delete_remote "$replica_dir" "${INITIATOR[0]}$deleted_list_file" "$delete_dir" "${INITIATOR[0]}$deleted_failed_list_file"
 		else
-			_delete_local "$replica_dir" "${INITIATOR[0]}$deleted_list_file" "$delete_dir" "${INITIATOR[0]}$deleted_failed_list_file" &
+			_delete_local "$replica_dir" "${INITIATOR[0]}$deleted_list_file" "$delete_dir" "${INITIATOR[0]}$deleted_failed_list_file"
 		fi
-		WaitForTaskCompletion $! $SOFT_MAX_EXEC_TIME $HARD_MAX_EXEC_TIME ${FUNCNAME[0]} false false
 		retval=$?
 		if [ $retval == 0 ]; then
 			if [ -f "$RUN_DIR/$PROGRAM._delete_remote.$SCRIPT_PID" ] && [ $_VERBOSE -eq 1 ]; then
@@ -1153,7 +1150,6 @@ function Sync {
 			fi
 		else
 			Logger "Will not resume aborted execution. Too many resume tries [$resumeCount]." "WARN"
-			#echo "noresume" > "${INITIATOR[7]}"
 			echo "0" > "${INITIATOR[9]}"
 			resumeInitiator="none"
 			resumeTarget="none"
@@ -1372,14 +1368,14 @@ function _SoftDeleteLocal {
 
 		if [ $_VERBOSE -eq 1 ]; then
 			# Cannot launch log function from xargs, ugly hack
-			$FIND_CMD "$replica_deletion_path/" -type f -ctime +$change_time -print0 | xargs -0 -I {} echo "Will delete file {}" >> "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$SCRIPT_PID"
+			$COMMAND_SUDO $FIND_CMD "$replica_deletion_path/" -type f -ctime +$change_time -print0 | xargs -0 -I {} echo "Will delete file {}" >> "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$SCRIPT_PID"
 			Logger "Command output:\n$(cat $RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$SCRIPT_PID)" "NOTICE"
-			$FIND_CMD "$replica_deletion_path/" -type d -empty -ctime +$change_time -print0 | xargs -0 -I {} echo "Will delete directory {}" >> "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$SCRIPT_PID"
+			$COMMAND_SUDO $FIND_CMD "$replica_deletion_path/" -type d -empty -ctime +$change_time -print0 | xargs -0 -I {} echo "Will delete directory {}" >> "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$SCRIPT_PID"
 			Logger "Command output:\n$(cat $RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$SCRIPT_PID)" "NOTICE"
 		fi
 
 		if [ $_DRYRUN -ne 1 ]; then
-			$FIND_CMD "$replica_deletion_path/" -type f -ctime +$change_time -print0 | xargs -0 -I {} rm -f "{}" && $FIND_CMD "$replica_deletion_path/" -type d -empty -ctime +$change_time -print0 | xargs -0 -I {} rm -rf "{}" >> "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$SCRIPT_PID" 2>&1
+			$COMMAND_SUDO $FIND_CMD "$replica_deletion_path/" -type f -ctime +$change_time -print0 | xargs -0 -I {} $COMMAND_SUDO rm -f "{}" && $COMMAND_SUDO $FIND_CMD "$replica_deletion_path/" -type d -empty -ctime +$change_time -print0 | xargs -0 -I {} $COMMAND_SUDO rm -rf "{}" >> "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$SCRIPT_PID" 2>&1
 		else
 			Dummy
 		fi
@@ -1414,14 +1410,14 @@ function _SoftDeleteRemote {
 
 	if [ $_VERBOSE -eq 1 ]; then
 		# Cannot launch log function from xargs, ugly hack
-		cmd=$SSH_CMD' "if [ -d \"'$replica_deletion_path'\" ]; then '$COMMAND_SUDO' '$REMOTE_FIND_CMD' \"'$replica_deletion_path'/\" -type f -ctime +'$change_time' -print0 | xargs -0 -I {} echo Will delete file {} && '$REMOTE_FIND_CMD' \"'$replica_deletion_path'/\" -type d -empty -ctime '$change_time' -print0 | xargs -0 -I {} echo Will delete directory {}; else echo \"No remote backup/deletion directory.\"; fi" > "'$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$SCRIPT_PID'" 2>&1'
+		cmd=$SSH_CMD' "if [ -d \"'$replica_deletion_path'\" ]; then '$COMMAND_SUDO' '$REMOTE_FIND_CMD' \"'$replica_deletion_path'/\" -type f -ctime +'$change_time' -print0 | xargs -0 -I {} echo Will delete file {} && '$COMMAND_SUDO' '$REMOTE_FIND_CMD' \"'$replica_deletion_path'/\" -type d -empty -ctime '$change_time' -print0 | xargs -0 -I {} echo Will delete directory {}; else echo \"No remote backup/deletion directory.\"; fi" > "'$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$SCRIPT_PID'" 2>&1'
 		Logger "cmd: $cmd" "DEBUG"
 		eval "$cmd"
 		Logger "Command output:\n$(cat $RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$SCRIPT_PID)" "NOTICE"
 	fi
 
 	if [ $_DRYRUN -ne 1 ]; then
-		cmd=$SSH_CMD' "if [ -d \"'$replica_deletion_path'\" ]; then '$COMMAND_SUDO' '$REMOTE_FIND_CMD' \"'$replica_deletion_path'/\" -type f -ctime +'$change_time' -print0 | xargs -0 -I {} rm -f \"{}\" && '$REMOTE_FIND_CMD' \"'$replica_deletion_path'/\" -type d -empty -ctime '$change_time' -print0 | xargs -0 -I {} rm -rf \"{}\"; else echo \"No remote backup/deletion directory.\"; fi" > "'$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$SCRIPT_PID'" 2>&1'
+		cmd=$SSH_CMD' "if [ -d \"'$replica_deletion_path'\" ]; then '$COMMAND_SUDO' '$REMOTE_FIND_CMD' \"'$replica_deletion_path'/\" -type f -ctime +'$change_time' -print0 | xargs -0 -I {} '$COMMAND_SUDO' rm -f \"{}\" && '$COMMAND_SUDO' '$REMOTE_FIND_CMD' \"'$replica_deletion_path'/\" -type d -empty -ctime '$change_time' -print0 | xargs -0 -I {} '$COMMAND_SUDO' rm -rf \"{}\"; else echo \"No remote backup/deletion directory.\"; fi" > "'$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$SCRIPT_PID'" 2>&1'
 
 		Logger "cmd: $cmd" "DEBUG"
 		eval "$cmd"
@@ -1557,7 +1553,7 @@ function Init {
 		local dry_suffix=
 	fi
 
-	#TODO: integrate this into ${REPLICA[x]}
+	#TODO(low): integrate this into ${REPLICA[x]}
 	TREE_CURRENT_FILENAME="-tree-current-$INSTANCE_ID$dry_suffix"
 	TREE_AFTER_FILENAME="-tree-after-$INSTANCE_ID$dry_suffix"
 	TREE_AFTER_FILENAME_NO_SUFFIX="-tree-after-$INSTANCE_ID"
@@ -1706,7 +1702,6 @@ function SyncOnChanges {
 
 		Logger "#### Monitoring now." "NOTICE"
 		inotifywait --exclude $OSYNC_DIR $RSYNC_PATTERNS $RSYNC_PARTIAL_EXCLUDE -qq -r -e create -e modify -e delete -e move -e attrib --timeout "$MAX_WAIT" "$INITIATOR_SYNC_DIR" &
-		#OSYNC_SUB_PID=$! Not used anymore with killchilds func
 		wait $!
 		retval=$?
 		if [ $retval == 0 ]; then
