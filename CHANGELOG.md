@@ -7,7 +7,10 @@ KNOWN ISSUES
 RECENT CHANGES
 --------------
 
-XX Xxx 2016: osync v1.1.1 released
+XX xxx 2016: osync v1.1.2 released
+- Fixed soft deletion when SUDO_EXEC is enabled
+
+06 Aug 2016: osync v1.1.1 released
 
 - Fixed bogus rsync pattern additions
 - Fixed soft deletion always enabled on target
