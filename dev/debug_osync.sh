@@ -1,12 +1,16 @@
 #!/usr/bin/env bash
 
 #TODO(critical): handle conflict prevalance, especially in sync_attrs function
+#TODO(high): test resume system
+#TODO(critical): test new WaitForTaskCompletion behavior with self=true
+#TODO(low): add keep logging & preserve attr conf entries to preflight check
+#TODO(low): test failed _CreateStateDirsRemote should stop osync
 
 PROGRAM="osync" # Rsync based two way sync engine with fault tolerance
 AUTHOR="(C) 2013-2016 by Orsiris de Jong"
 CONTACT="http://www.netpower.fr/osync - ozy@netpower.fr"
 PROGRAM_VERSION=1.2-dev-parallel
-PROGRAM_BUILD=2016081301
+PROGRAM_BUILD=2016081802
 IS_STABLE=no
 
 #	Function Name		Is parallel	#__WITH_PARANOIA_DEBUG
@@ -46,7 +50,7 @@ IS_STABLE=no
 
 #### MINIMAL-FUNCTION-SET BEGIN ####
 
-## FUNC_BUILD=2016081201
+## FUNC_BUILD=2016081805
 ## BEGIN Generic functions for osync & obackup written in 2013-2016 by Orsiris de Jong - http://www.netpower.fr - ozy@netpower.fr
 
 ## type -p does not work on platforms other than linux (bash). If if does not work, always assume output is not a zero exitcode
@@ -54,9 +58,6 @@ if ! type "$BASH" > /dev/null; then
 	echo "Please run this script only with bash shell. Tested on bash >= 3.2"
 	exit 127
 fi
-
-## Log a state message every $KEEP_LOGGING seconds. Should not be equal to soft or hard execution time so your log will not be unnecessary big.
-KEEP_LOGGING=1801
 
 ## Correct output of sort command (language agnostic sorting)
 export LC_ALL=C
@@ -69,7 +70,9 @@ _DRYRUN=0
 _SILENT=0
 _LOGGER_PREFIX="date"
 _LOGGER_STDERR=0
-
+if [ "$KEEP_LOGGING" == "" ]; then
+        KEEP_LOGGING=1801
+fi
 
 # Initial error status, logging 'WARN', 'ERROR' or 'CRITICAL' will enable alerts flags
 ERROR_ALERT=0
@@ -217,8 +220,8 @@ function QuickLogger {
 
 # Portable child (and grandchild) kill function tester under Linux, BSD and MacOS X
 function KillChilds {
-	local pid="${1}" # Parent pid to kill
-	local self="${2:-false}"
+	local pid="${1}" # Parent pid to kill childs
+	local self="${2:-false}" # Should parent be killed too ?
 
 
 	if children="$(pgrep -P "$pid")"; then
@@ -249,6 +252,7 @@ function KillChilds {
 
 function KillAllChilds {
 	local pids="${1}" # List of parent pids to kill separated by semi-colon
+	local self="${2:-false}" # Should parent be killed too ?
 
 	__CheckArguments 1 $# ${FUNCNAME[0]} "$@"	#__WITH_PARANOIA_DEBUG
 
@@ -256,7 +260,7 @@ function KillAllChilds {
 
 	IFS=';' read -a pidsArray <<< "$pids"
 	for pid in "${pidsArray[@]}"; do
-		KillChilds $pid
+		KillChilds $pid $self
 		if [ $? != 0 ]; then
 			errorcount=$((errorcount+1))
 			fi
@@ -620,8 +624,8 @@ function WaitForTaskCompletion {
 	local soft_max_time="${2}" # If program with pid $pid takes longer than $soft_max_time seconds, will log a warning, unless $soft_max_time equals 0.
 	local hard_max_time="${3}" # If program with pid $pid takes longer than $hard_max_time seconds, will stop execution, unless $hard_max_time equals 0.
 	local caller_name="${4}" # Who called this function
-	local exit_on_error="${5:-false}" # Should the function exit on subprocess errors
-	local counting="${6:-true}" # Count time since function launch if true, script launch if false
+	local counting="${5:-true}" # Count time since function has been launched if true, since script has been launched if false
+	local keep_logging="${6:-0}" # Log a standby message every X seconds. Set to zero to disable logging
 
 	Logger "${FUNCNAME[0]} called by [$caller_name]." "PARANOIA_DEBUG"	#__WITH_PARANOIA_DEBUG
 	__CheckArguments 6 $# ${FUNCNAME[0]} "$@"				#__WITH_PARANOIA_DEBUG
@@ -636,6 +640,7 @@ function WaitForTaskCompletion {
 	local errorcount=0 # Number of pids that finished with errors
 
 	local pidCount # number of given pids
+	local pidState # State of the process
 
 	IFS=';' read -a pidsArray <<< "$pids"
 	pidCount=${#pidsArray[@]}
@@ -646,11 +651,17 @@ function WaitForTaskCompletion {
 		newPidsArray=()
 		for pid in "${pidsArray[@]}"; do
 			if kill -0 $pid > /dev/null 2>&1; then
-				newPidsArray+=($pid)
+				# Handle uninterruptible sleep state or zombies by ommiting them from running process array (How to kill that is already dead ? :)
+				#TODO(high): have this tested on *BSD, Mac & Win
+				pidState=$(ps -p$pid -o state= 2 > /dev/null)
+				if [ "$pidState" != "D" ] && [ "$pidState" != "Z" ]; then
+					newPidsArray+=($pid)
+				fi
 			else
+				# pid is dead, get it's exit code from wait command
 				wait $pid
-				result=$?
-				if [ $result -ne 0 ]; then
+				retval=$?
+				if [ $retval -ne 0 ]; then
 					errorcount=$((errorcount+1))
 					Logger "${FUNCNAME[0]} called by [$caller_name] finished monitoring [$pid] with exitcode [$result]." "DEBUG"
 					if [ "$WAIT_FOR_TASK_COMPLETION" == "" ]; then
@@ -669,10 +680,12 @@ function WaitForTaskCompletion {
 			exec_time=$SECONDS
 		fi
 
-		if [ $((($exec_time + 1) % $KEEP_LOGGING)) -eq 0 ]; then
-			if [ $log_ttime -ne $exec_time ]; then
-				log_ttime=$exec_time
-				Logger "Current tasks still running with pids [$(joinString , ${pidsArray[@]})]." "NOTICE"
+		if [ $keep_logging -ne 0 ]; then
+			if [ $((($exec_time + 1) % $keep_logging)) -eq 0 ]; then
+				if [ $log_ttime -ne $exec_time ]; then # Fix when sleep time lower than 1s
+					log_ttime=$exec_time
+					Logger "Current tasks still running with pids [$(joinString , ${pidsArray[@]})]." "NOTICE"
+				fi
 			fi
 		fi
 
@@ -685,12 +698,14 @@ function WaitForTaskCompletion {
 			fi
 			if [ $exec_time -gt $hard_max_time ] && [ $hard_max_time -ne 0 ]; then
 				Logger "Max hard execution time exceeded for task [$caller_name] with pids [$(joinString , ${pidsArray[@]})]. Stopping task execution." "ERROR"
-				KillChilds $pid
-				if [ $? == 0 ]; then
-					Logger "Task stopped successfully." "NOTICE"
-				else
-					Logger "Could not stop task." "ERROR"
-				fi
+				for pid in "${pidsArray[@]}"; do
+					KillChilds $pid true
+					if [ $? == 0 ]; then
+						Logger "Task with pid [$pid] stopped successfully." "NOTICE"
+					else
+						Logger "Could not stop task with pid [$pid]." "ERROR"
+					fi
+				done
 				SendAlert
 				errrorcount=$((errorcount+1))
 			fi
@@ -701,9 +716,10 @@ function WaitForTaskCompletion {
 	done
 
 	Logger "${FUNCNAME[0]} ended for [$caller_name] using [$pidCount] subprocesses with [$errorcount] errors." "PARANOIA_DEBUG"	#__WITH_PARANOIA_DEBUG
-	if [ $exit_on_error == true ] && [ $errorcount -gt 0 ]; then
-		Logger "Stopping execution." "CRITICAL"
-		exit 1337
+
+	# Return exit code if only one process was monitored, else return number of errors
+	if [ $pidCount -eq 1 ] && [ $errorcount -eq 0 ]; then
+		return $errorcount
 	else
 		return $errorcount
 	fi
@@ -753,7 +769,7 @@ function EscapeSpaces {
 }
 
 function IsNumeric {
-	eval "local value=\"${1}\"" # Needed so variable variables can be processed
+	eval "local value=\"${1}\"" # Needed eval so variable variables can be processed
 
 	local re="^-?[0-9]+([.][0-9]+)?$"
 	if [[ $value =~ $re ]]; then
@@ -782,9 +798,9 @@ function urlEncode {
 }
 
 function urlDecode {
-    local url_encoded="${1//+/ }"
+	local url_encoded="${1//+/ }"
 
-    printf '%b' "${url_encoded//%/\\x}"
+	printf '%b' "${url_encoded//%/\\x}"
 }
 
 function GetLocalOS {
@@ -838,19 +854,19 @@ function GetRemoteOS {
 		cmd=$SSH_CMD' "uname -spio" > "'$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$SCRIPT_PID'" 2>&1'
 		Logger "cmd: $cmd" "DEBUG"
 		eval "$cmd" &
-		WaitForTaskCompletion $! 120 240 ${FUNCNAME[0]}"-1" false true
+		WaitForTaskCompletion $! 120 240 ${FUNCNAME[0]}"-1" true $KEEP_LOGGING
 		retval=$?
 		if [ $retval != 0 ]; then
 			cmd=$SSH_CMD' "uname -v" > "'$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$SCRIPT_PID'" 2>&1'
 			Logger "cmd: $cmd" "DEBUG"
 			eval "$cmd" &
-			WaitForTaskCompletion $! 120 240 ${FUNCNAME[0]}"-2" false true
+			WaitForTaskCompletion $! 120 240 ${FUNCNAME[0]}"-2" true $KEEP_LOGGING
 			retval=$?
 			if [ $retval != 0 ]; then
 				cmd=$SSH_CMD' "uname" > "'$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$SCRIPT_PID'" 2>&1'
 				Logger "cmd: $cmd" "DEBUG"
 				eval "$cmd" &
-				WaitForTaskCompletion $! 120 240 ${FUNCNAME[0]}"-3" false true
+				WaitForTaskCompletion $! 120 240 ${FUNCNAME[0]}"-3" true $KEEP_LOGGING
 				retval=$?
 				if [ $retval != 0 ]; then
 					Logger "Cannot Get remote OS type." "ERROR"
@@ -903,7 +919,7 @@ function RunLocalCommand {
 
 	Logger "Running command [$command] on local host." "NOTICE"
 	eval "$command" > "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$SCRIPT_PID" 2>&1 &
-	WaitForTaskCompletion $! 0 $hard_max_time ${FUNCNAME[0]} false true
+	WaitForTaskCompletion $! 0 $hard_max_time ${FUNCNAME[0]} true $KEEP_LOGGING
 	retval=$?
 	if [ $retval -eq 0 ]; then
 		Logger "Command succeded." "NOTICE"
@@ -938,7 +954,7 @@ function RunRemoteCommand {
 	cmd=$SSH_CMD' "$command" > "'$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$SCRIPT_PID'" 2>&1'
 	Logger "cmd: $cmd" "DEBUG"
 	eval "$cmd" &
-	WaitForTaskCompletion $! 0 $hard_max_time ${FUNCNAME[0]} false true
+	WaitForTaskCompletion $! 0 $hard_max_time ${FUNCNAME[0]} true $KEEP_LOGGING
 	retval=$?
 	if [ $retval -eq 0 ]; then
 		Logger "Command succeded." "NOTICE"
@@ -972,7 +988,7 @@ function RunBeforeHook {
 		pids="$pids;$!"
 	fi
 	if [ "$pids" != "" ]; then
-		WaitForTaskCompletion $pids 0 0 ${FUNCNAME[0]} false true
+		WaitForTaskCompletion $pids 0 0 ${FUNCNAME[0]} true $KEEP_LOGGING
 	fi
 }
 
@@ -991,7 +1007,7 @@ function RunAfterHook {
 		pids="$pids;$!"
 	fi
 	if [ "$pids" != "" ]; then
-		WaitForTaskCompletion $pids 0 0 ${FUNCNAME[0]} false true
+		WaitForTaskCompletion $pids 0 0 ${FUNCNAME[0]} true $KEEP_LOGGING
 	fi
 }
 
@@ -1002,7 +1018,7 @@ function CheckConnectivityRemoteHost {
 
 		if [ "$REMOTE_HOST_PING" != "no" ] && [ "$REMOTE_OPERATION" != "no" ]; then
 			eval "$PING_CMD $REMOTE_HOST > /dev/null 2>&1" &
-			WaitForTaskCompletion $! 10 180 ${FUNCNAME[0]} false true
+			WaitForTaskCompletion $! 10 180 ${FUNCNAME[0]} true $KEEP_LOGGING
 			if [ $? != 0 ]; then
 				Logger "Cannot ping $REMOTE_HOST" "ERROR"
 				return 1
@@ -1024,7 +1040,7 @@ function CheckConnectivity3rdPartyHosts {
 			for i in $REMOTE_3RD_PARTY_HOSTS
 			do
 				eval "$PING_CMD $i > /dev/null 2>&1" &
-				WaitForTaskCompletion $! 10 360 ${FUNCNAME[0]} false true
+				WaitForTaskCompletion $! 10 360 ${FUNCNAME[0]} true $KEEP_LOGGING
 				if [ $? != 0 ]; then
 					Logger "Cannot ping 3rd party host $i" "NOTICE"
 				else
@@ -1345,6 +1361,11 @@ function InitRemoteOSSettings {
 
 }
 
+## IFS debug function
+function PrintIFS {
+	printf "IFS is: %q" "$IFS"
+}
+
 ## END Generic functions
 _LOGGER_PREFIX="time"
 
@@ -1362,7 +1383,7 @@ function TrapStop {
 	if [ $SOFT_STOP -eq 1 ]; then
 		Logger " /!\ WARNING: CTRL+C hit twice. Exiting osync. Please wait while replicas get unlocked..." "WARN"
 		SOFT_STOP=2
-		exit 1
+		exit 2
 	fi
 }
 
@@ -1396,7 +1417,7 @@ function TrapQuit {
 		fi
 		CleanUp
 		Logger "$PROGRAM finished with warnings." "WARN"
-		exitcode=240	# Special exit code for daemon mode not stopping on warnings
+		exitcode=2	# Warning exit code must not force daemon mode to quit
 	else
 		UnlockReplicas
 		if [ "$RUN_AFTER_CMD_ON_ERROR" == "yes" ]; then
@@ -1447,7 +1468,7 @@ function CheckCurrentConfig {
 	fi
 
 	# Check all variables that should contain "yes" or "no"
-	declare -a yes_no_vars=(CREATE_DIRS SUDO_EXEC SSH_COMPRESSION SSH_IGNORE_KNOWN_HOSTS REMOTE_HOST_PING PRESERVE_ACL PRESERVE_XATTR COPY_SYMLINKS KEEP_DIRLINKS PRESERVE_HARDLINKS CHECKSUM RSYNC_COMPRESS CONFLICT_BACKUP CONFLICT_BACKUP_MULTIPLE SOFT_DELETE RESUME_SYNC FORCE_STRANGER_LOCK_RESUME PARTIAL DELTA_COPIES STOP_ON_CMD_ERROR RUN_AFTER_CMD_ON_ERROR)
+	declare -a yes_no_vars=(CREATE_DIRS SUDO_EXEC SSH_COMPRESSION SSH_IGNORE_KNOWN_HOSTS REMOTE_HOST_PING PRESERVE_PERMISSIONS PRESERVE_OWNER PRESERVE_GROUP PRESERVE_EXECUTABILITY PRESERVE_ACL PRESERVE_XATTR COPY_SYMLINKS KEEP_DIRLINKS PRESERVE_HARDLINKS CHECKSUM RSYNC_COMPRESS CONFLICT_BACKUP CONFLICT_BACKUP_MULTIPLE SOFT_DELETE RESUME_SYNC FORCE_STRANGER_LOCK_RESUME PARTIAL DELTA_COPIES STOP_ON_CMD_ERROR RUN_AFTER_CMD_ON_ERROR)
 	for i in "${yes_no_vars[@]}"; do
 		test="if [ \"\$$i\" != \"yes\" ] && [ \"\$$i\" != \"no\" ]; then Logger \"Bogus $i value defined in config file. Correct your config file or update it using the update script if using and old version.\" \"CRITICAL\"; exit 1; fi"
 		eval "$test"
@@ -1542,7 +1563,11 @@ function CheckReplicaPaths {
 		_CheckReplicaPathsRemote "${TARGET[1]}" &
 		pids="$pids;$!"
 	fi
-	WaitForTaskCompletion $pids 720 1800 ${FUNCNAME[0]} true true
+	WaitForTaskCompletion $pids 720 1800 ${FUNCNAME[0]} false $KEEP_LOGGING
+	if [ $? -ne 0 ]; then
+		Logger "Cancelling task." "CRITICAL"
+		exit 1
+	fi
 }
 
 function _CheckDiskSpaceLocal {
@@ -1604,7 +1629,7 @@ function CheckDiskSpace {
 		_CheckDiskSpaceRemote "${TARGET[1]}" &
 		pids="$pids;$!"
 	fi
-	WaitForTaskCompletion $pids 720 1800 ${FUNCNAME[0]} false true
+	WaitForTaskCompletion $pids 720 1800 ${FUNCNAME[0]} true $KEEP_LOGGING
 }
 
 
@@ -1655,7 +1680,11 @@ function CreateStateDirs {
 		_CreateStateDirsRemote "${TARGET[1]}${TARGET[3]}" &
 		pids="$pids;$!"
 	fi
-	WaitForTaskCompletion $pids 720 1800 ${FUNCNAME[0]} true true
+	WaitForTaskCompletion $pids 720 1800 ${FUNCNAME[0]} true $KEEP_LOGGING
+	if [ $? -ne 0 ]; then
+		Logger "Cancelling task." "CRITICAL"
+		exit 1
+	fi
 }
 
 function _CheckLocksLocal {
@@ -1756,7 +1785,11 @@ function CheckLocks {
 		_CheckLocksRemote "${TARGET[2]}" &
 		pids="$pids;$!"
 	fi
-	WaitForTaskCompletion $pids 720 1800 ${FUNCNAME[0]} true true
+	WaitForTaskCompletion $pids 720 1800 ${FUNCNAME[0]} true $KEEP_LOGGING
+	if [ $? -ne 0 ]; then
+		Logger "Cancelling task." "CRITICAL"
+		exit 1
+	fi
 	WriteLockFiles
 }
 
@@ -1807,7 +1840,11 @@ function WriteLockFiles {
 		_WriteLockFilesRemote "${TARGET[2]}" &
 		pids="$pids;$!"
 	fi
-	WaitForTaskCompletion $pids 720 1800 ${FUNCNAME[0]} true true
+	WaitForTaskCompletion $pids 720 1800 ${FUNCNAME[0]} true $KEEP_LOGGINg
+	if [ $? -ne 0 ]; then
+		Logger "Cancelling task." "CRITICAL"
+		exit 1
+	fi
 	LOCK_FILES_EXIST=1
 }
 
@@ -1864,7 +1901,7 @@ function UnlockReplicas {
 		_UnlockReplicasRemote "${TARGET[2]}" &
 		pids="$pids;$!"
 	fi
-	WaitForTaskCompletion $pids 720 1800 ${FUNCNAME[0]} false true
+	WaitForTaskCompletion $pids 720 1800 ${FUNCNAME[0]} true $KEEP_LOGGING
 }
 
 ###### Sync core functions
@@ -1999,7 +2036,8 @@ function sync_attrs {
 	fi
 	Logger "RSYNC_CMD: $rsync_cmd" "DEBUG"
 	eval "$rsync_cmd"
-	WaitForTaskCompletion $! $SOFT_MAX_EXEC_TIME $HARD_MAX_EXEC_TIME ${FUNCNAME[0]} false false
+	WaitForTaskCompletion $! $SOFT_MAX_EXEC_TIME $HARD_MAX_EXEC_TIME ${FUNCNAME[0]} false $KEEP_LOGGING
+	#WIP: return retval from process instead of err count if only one pid is tested
 	retval=$?
 	if [ $_VERBOSE -eq 1 ] && [ -f "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$SCRIPT_PID" ]; then
 		Logger "List:\n$(cat $RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$SCRIPT_PID)" "NOTICE"
@@ -2010,7 +2048,7 @@ function sync_attrs {
 		if [ $_VERBOSE -eq 0 ] && [ -f "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$SCRIPT_PID" ]; then
 			Logger "Rsync output:\n$(cat $RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$SCRIPT_PID)" "NOTICE"
 		fi
-		exit $retval
+		exit 1 #WIP: check why exit $retval was used
 	else
 		cat "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$SCRIPT_PID" | ( grep -Ev "^[^ ]*(c|s|t)[^ ]* " || :) | ( grep -E "^[^ ]*(p|o|g|a)[^ ]* " || :) | sed -e 's/^[^ ]* //' >> "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}-cleaned.$SCRIPT_PID"
 		if [ $? != 0 ]; then
@@ -2031,7 +2069,7 @@ function sync_attrs {
 		_get_file_ctime_mtime_remote "${TARGET[1]}" "${TARGET[0]}" "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}-cleaned.$SCRIPT_PID" &
 		pids="$pids;$!"
 	fi
-	WaitForTaskCompletion $pids 1800 0 ${FUNCNAME[0]} false true
+	WaitForTaskCompletion $pids 1800 0 ${FUNCNAME[0]} true $KEEP_LOGGING
 
 	# If target gets updated first, then sync_attr must update initiator's attrs first
 	# For join, remove leading replica paths
@@ -2079,7 +2117,8 @@ function sync_attrs {
 
 	Logger "RSYNC_CMD: $rsync_cmd" "DEBUG"
 	eval "$rsync_cmd"
-	WaitForTaskCompletion $! $SOFT_MAX_EXEC_TIME $HARD_MAX_EXEC_TIME ${FUNCNAME[0]} false false
+	WaitForTaskCompletion $! $SOFT_MAX_EXEC_TIME $HARD_MAX_EXEC_TIME ${FUNCNAME[0]} false $KEEP_LOGGING
+	#WIP: the same
 	retval=$?
 	if [ $_VERBOSE -eq 1 ] && [ -f "$RUN_DIR/$PROGRAM.attr-update.$dest_replica.$SCRIPT_PID" ]; then
 		Logger "List:\n$(cat $RUN_DIR/$PROGRAM.attr-update.$dest_replica.$SCRIPT_PID)" "NOTICE"
@@ -2090,7 +2129,7 @@ function sync_attrs {
 		if [ $_VERBOSE -eq 0 ] && [ -f "$RUN_DIR/$PROGRAM.attr-update.$dest_replica.$SCRIPT_PID" ]; then
 			Logger "Rsync output:\n$(cat $RUN_DIR/$PROGRAM.attr-update.$dest_replica.$SCRIPT_PID)" "NOTICE"
 		fi
-		exit $retval
+		exit 1 #WIP check why exit $retval was used
 	else
 		Logger "Successfully updated file attributes on $dest_replica replica." "NOTICE"
 	fi
@@ -2144,7 +2183,7 @@ function sync_update {
 		if [ $_VERBOSE -eq 0 ] && [ -f "$RUN_DIR/$PROGRAM.update.$destination_replica.$SCRIPT_PID" ]; then
 			Logger "Rsync output:\n$(cat $RUN_DIR/$PROGRAM.update.$destination_replica.$SCRIPT_PID)" "NOTICE"
 		fi
-		exit $retval
+		exit 1 #WIP exit $retval
 	else
 		Logger "Updating $destination_replica replica succeded." "NOTICE"
 		return 0
@@ -2340,7 +2379,7 @@ ENDSSH
 		if [ -f "$RUN_DIR/$PROGRAM.remote_failed_deletion_list_copy.$SCRIPT_PID" ]; then
 			Logger "Comand output: $(cat $RUN_DIR/$PROGRAM.remote_failed_deletion_list_copy.$SCRIPT_PID)" "NOTICE"
 		fi
-		exit $result
+		exit 1 #WIP exit $retval
 	fi
 	return 0
 }
@@ -2475,7 +2514,7 @@ function Sync {
 			targetPid="$!"
 		fi
 
-		WaitForTaskCompletion "$initiatorPid;$targetPid" $SOFT_MAX_EXEC_TIME $HARD_MAX_EXEC_TIME ${FUNCNAME[0]} false false
+		WaitForTaskCompletion "$initiatorPid;$targetPid" $SOFT_MAX_EXEC_TIME $HARD_MAX_EXEC_TIME ${FUNCNAME[0]} false $KEEP_LOGGING
 		if [ $? != 0 ]; then
 			IFS=';' read -r -a pidArray <<< "$WAIT_FOR_TASK_COMPLETION"
 			for pid in "${pidArray[@]}"; do
@@ -2507,7 +2546,7 @@ function Sync {
 			targetPid="$!"
 		fi
 
-		WaitForTaskCompletion "$initiatorPid;$targetPid" $SOFT_MAX_EXEC_TIME $HARD_MAX_EXEC_TIME ${FUNCNAME[0]} false false
+		WaitForTaskCompletion "$initiatorPid;$targetPid" $SOFT_MAX_EXEC_TIME $HARD_MAX_EXEC_TIME ${FUNCNAME[0]} false $KEEP_LOGGING
 		if [ $? != 0 ]; then
 			IFS=';' read -r -a pidArray <<< "$WAIT_FOR_TASK_COMPLETION"
 			for pid in "${pidArray[@]}"; do
@@ -2531,7 +2570,7 @@ function Sync {
 	if [ "$resumeInitiator" == "${SYNC_ACTION[2]}" ] || [ "$resumeTarget" == "${SYNC_ACTION[2]}" ]; then
 		if [ "$RSYNC_ATTR_ARGS" != "" ]; then
 			sync_attrs "${INITIATOR[1]}" "$TARGET_SYNC_DIR"
-			WaitForTaskCompletion $! $SOFT_MAX_EXEC_TIME $HARD_MAX_EXEC_TIME ${FUNCNAME[0]} false false
+			WaitForTaskCompletion $! $SOFT_MAX_EXEC_TIME $HARD_MAX_EXEC_TIME ${FUNCNAME[0]} false $KEEP_LOGGING
 			if [ $? != 0 ]; then
 				echo "${SYNC_ACTION[2]}" > "${INITIATOR[7]}"
 				echo "${SYNC_ACTION[2]}" > "${INITIATOR[8]}"
@@ -2563,7 +2602,7 @@ function Sync {
 			targetPid="$!"
 		fi
 
-		WaitForTaskCompletion "$initiatorPid;$targetPid" $SOFT_MAX_EXEC_TIME $HARD_MAX_EXEC_TIME ${FUNCNAME[0]} false false
+		WaitForTaskCompletion "$initiatorPid;$targetPid" $SOFT_MAX_EXEC_TIME $HARD_MAX_EXEC_TIME ${FUNCNAME[0]} false $KEEP_LOGGING
 		if [ $? != 0 ]; then
 			IFS=';' read -r -a pidArray <<< "$WAIT_FOR_TASK_COMPLETION"
 			for pid in "${pidArray[@]}"; do
@@ -2595,7 +2634,7 @@ function Sync {
 			targetPid="$!"
 		fi
 
-		WaitForTaskCompletion "$initiatorPid;$targetPid" $SOFT_MAX_EXEC_TIME $HARD_MAX_EXEC_TIME ${FUNCNAME[0]} false false
+		WaitForTaskCompletion "$initiatorPid;$targetPid" $SOFT_MAX_EXEC_TIME $HARD_MAX_EXEC_TIME ${FUNCNAME[0]} false $KEEP_LOGGING
 		if [ $? != 0 ]; then
 			IFS=';' read -r -a pidArray <<< "$WAIT_FOR_TASK_COMPLETION"
 			for pid in "${pidArray[@]}"; do
@@ -2628,7 +2667,7 @@ function Sync {
 			targetPid="$!"
 		fi
 
-		WaitForTaskCompletion "$initiatorPid;$targetPid" $SOFT_MAX_EXEC_TIME $HARD_MAX_EXEC_TIME ${FUNCNAME[0]} false false
+		WaitForTaskCompletion "$initiatorPid;$targetPid" $SOFT_MAX_EXEC_TIME $HARD_MAX_EXEC_TIME ${FUNCNAME[0]} false $KEEP_LOGGING
 		if [ $? != 0 ]; then
 			IFS=';' read -r -a pidArray <<< "$WAIT_FOR_TASK_COMPLETION"
 			for pid in "${pidArray[@]}"; do
@@ -2751,7 +2790,7 @@ function SoftDelete {
 			_SoftDeleteRemote "${TARGET[0]}" "${TARGET[1]}${TARGET[4]}" $CONFLICT_BACKUP_DAYS &
 			pids="$pids;$!"
 		fi
-		WaitForTaskCompletion $pids 720 1800 ${FUNCNAME[0]} false true
+		WaitForTaskCompletion $pids 720 1800 ${FUNCNAME[0]} true $KEEP_LOGGING
 	fi
 
 	if [ "$SOFT_DELETE" != "no" ] && [ $SOFT_DELETE_DAYS -ne 0 ]; then
@@ -2766,7 +2805,7 @@ function SoftDelete {
 			_SoftDeleteRemote "${TARGET[0]}" "${TARGET[1]}${TARGET[5]}" $SOFT_DELETE_DAYS &
 			pids="$pids;$!"
 		fi
-		WaitForTaskCompletion $pids 720 1800 ${FUNCNAME[0]} false true
+		WaitForTaskCompletion $pids 720 1800 ${FUNCNAME[0]} true $KEEP_LOGGING
 	fi
 }
 
@@ -2997,7 +3036,7 @@ function SyncOnChanges {
 		Logger "daemon cmd: $cmd" "DEBUG"
 		eval "$cmd"
 		retval=$?
-		if [ $retval != 0 ] && [ $retval != 240 ]; then
+		if [ $retval != 0 ] && [ $retval != 2 ]; then
 			Logger "osync child exited with error." "ERROR"
 		fi
 
@@ -3207,5 +3246,4 @@ opts="${opts# *}"
 		if [ $? == 0 ]; then
 			SoftDelete
 		fi
-		RunAfterHook
 	fi
