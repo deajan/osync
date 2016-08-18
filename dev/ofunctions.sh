@@ -1,6 +1,6 @@
 #### MINIMAL-FUNCTION-SET BEGIN ####
 
-## FUNC_BUILD=2016081201
+## FUNC_BUILD=2016081805
 ## BEGIN Generic functions for osync & obackup written in 2013-2016 by Orsiris de Jong - http://www.netpower.fr - ozy@netpower.fr
 
 ## type -p does not work on platforms other than linux (bash). If if does not work, always assume output is not a zero exitcode
@@ -8,9 +8,6 @@ if ! type "$BASH" > /dev/null; then
 	echo "Please run this script only with bash shell. Tested on bash >= 3.2"
 	exit 127
 fi
-
-## Log a state message every $KEEP_LOGGING seconds. Should not be equal to soft or hard execution time so your log will not be unnecessary big.
-KEEP_LOGGING=1801
 
 ## Correct output of sort command (language agnostic sorting)
 export LC_ALL=C
@@ -23,7 +20,9 @@ _DRYRUN=0
 _SILENT=0
 _LOGGER_PREFIX="date"
 _LOGGER_STDERR=0
-
+if [ "$KEEP_LOGGING" == "" ]; then
+        KEEP_LOGGING=1801
+fi
 
 # Initial error status, logging 'WARN', 'ERROR' or 'CRITICAL' will enable alerts flags
 ERROR_ALERT=0
@@ -171,8 +170,8 @@ function QuickLogger {
 
 # Portable child (and grandchild) kill function tester under Linux, BSD and MacOS X
 function KillChilds {
-	local pid="${1}" # Parent pid to kill
-	local self="${2:-false}"
+	local pid="${1}" # Parent pid to kill childs
+	local self="${2:-false}" # Should parent be killed too ?
 
 
 	if children="$(pgrep -P "$pid")"; then
@@ -203,6 +202,7 @@ function KillChilds {
 
 function KillAllChilds {
 	local pids="${1}" # List of parent pids to kill separated by semi-colon
+	local self="${2:-false}" # Should parent be killed too ?
 
 	__CheckArguments 1 $# ${FUNCNAME[0]} "$@"	#__WITH_PARANOIA_DEBUG
 
@@ -210,7 +210,7 @@ function KillAllChilds {
 
 	IFS=';' read -a pidsArray <<< "$pids"
 	for pid in "${pidsArray[@]}"; do
-		KillChilds $pid
+		KillChilds $pid $self
 		if [ $? != 0 ]; then
 			errorcount=$((errorcount+1))
 			fi
@@ -574,8 +574,8 @@ function WaitForTaskCompletion {
 	local soft_max_time="${2}" # If program with pid $pid takes longer than $soft_max_time seconds, will log a warning, unless $soft_max_time equals 0.
 	local hard_max_time="${3}" # If program with pid $pid takes longer than $hard_max_time seconds, will stop execution, unless $hard_max_time equals 0.
 	local caller_name="${4}" # Who called this function
-	local exit_on_error="${5:-false}" # Should the function exit on subprocess errors
-	local counting="${6:-true}" # Count time since function launch if true, script launch if false
+	local counting="${5:-true}" # Count time since function has been launched if true, since script has been launched if false
+	local keep_logging="${6:-0}" # Log a standby message every X seconds. Set to zero to disable logging
 
 	Logger "${FUNCNAME[0]} called by [$caller_name]." "PARANOIA_DEBUG"	#__WITH_PARANOIA_DEBUG
 	__CheckArguments 6 $# ${FUNCNAME[0]} "$@"				#__WITH_PARANOIA_DEBUG
@@ -590,6 +590,7 @@ function WaitForTaskCompletion {
 	local errorcount=0 # Number of pids that finished with errors
 
 	local pidCount # number of given pids
+	local pidState # State of the process
 
 	IFS=';' read -a pidsArray <<< "$pids"
 	pidCount=${#pidsArray[@]}
@@ -600,11 +601,17 @@ function WaitForTaskCompletion {
 		newPidsArray=()
 		for pid in "${pidsArray[@]}"; do
 			if kill -0 $pid > /dev/null 2>&1; then
-				newPidsArray+=($pid)
+				# Handle uninterruptible sleep state or zombies by ommiting them from running process array (How to kill that is already dead ? :)
+				#TODO(high): have this tested on *BSD, Mac & Win
+				pidState=$(ps -p$pid -o state= 2 > /dev/null)
+				if [ "$pidState" != "D" ] && [ "$pidState" != "Z" ]; then
+					newPidsArray+=($pid)
+				fi
 			else
+				# pid is dead, get it's exit code from wait command
 				wait $pid
-				result=$?
-				if [ $result -ne 0 ]; then
+				retval=$?
+				if [ $retval -ne 0 ]; then
 					errorcount=$((errorcount+1))
 					Logger "${FUNCNAME[0]} called by [$caller_name] finished monitoring [$pid] with exitcode [$result]." "DEBUG"
 					if [ "$WAIT_FOR_TASK_COMPLETION" == "" ]; then
@@ -623,10 +630,12 @@ function WaitForTaskCompletion {
 			exec_time=$SECONDS
 		fi
 
-		if [ $((($exec_time + 1) % $KEEP_LOGGING)) -eq 0 ]; then
-			if [ $log_ttime -ne $exec_time ]; then
-				log_ttime=$exec_time
-				Logger "Current tasks still running with pids [$(joinString , ${pidsArray[@]})]." "NOTICE"
+		if [ $keep_logging -ne 0 ]; then
+			if [ $((($exec_time + 1) % $keep_logging)) -eq 0 ]; then
+				if [ $log_ttime -ne $exec_time ]; then # Fix when sleep time lower than 1s
+					log_ttime=$exec_time
+					Logger "Current tasks still running with pids [$(joinString , ${pidsArray[@]})]." "NOTICE"
+				fi
 			fi
 		fi
 
@@ -639,12 +648,14 @@ function WaitForTaskCompletion {
 			fi
 			if [ $exec_time -gt $hard_max_time ] && [ $hard_max_time -ne 0 ]; then
 				Logger "Max hard execution time exceeded for task [$caller_name] with pids [$(joinString , ${pidsArray[@]})]. Stopping task execution." "ERROR"
-				KillChilds $pid
-				if [ $? == 0 ]; then
-					Logger "Task stopped successfully." "NOTICE"
-				else
-					Logger "Could not stop task." "ERROR"
-				fi
+				for pid in "${pidsArray[@]}"; do
+					KillChilds $pid true
+					if [ $? == 0 ]; then
+						Logger "Task with pid [$pid] stopped successfully." "NOTICE"
+					else
+						Logger "Could not stop task with pid [$pid]." "ERROR"
+					fi
+				done
 				SendAlert
 				errrorcount=$((errorcount+1))
 			fi
@@ -655,9 +666,10 @@ function WaitForTaskCompletion {
 	done
 
 	Logger "${FUNCNAME[0]} ended for [$caller_name] using [$pidCount] subprocesses with [$errorcount] errors." "PARANOIA_DEBUG"	#__WITH_PARANOIA_DEBUG
-	if [ $exit_on_error == true ] && [ $errorcount -gt 0 ]; then
-		Logger "Stopping execution." "CRITICAL"
-		exit 1337
+
+	# Return exit code if only one process was monitored, else return number of errors
+	if [ $pidCount -eq 1 ] && [ $errorcount -eq 0 ]; then
+		return $errorcount
 	else
 		return $errorcount
 	fi
@@ -707,7 +719,7 @@ function EscapeSpaces {
 }
 
 function IsNumeric {
-	eval "local value=\"${1}\"" # Needed so variable variables can be processed
+	eval "local value=\"${1}\"" # Needed eval so variable variables can be processed
 
 	local re="^-?[0-9]+([.][0-9]+)?$"
 	if [[ $value =~ $re ]]; then
@@ -736,9 +748,9 @@ function urlEncode {
 }
 
 function urlDecode {
-    local url_encoded="${1//+/ }"
+	local url_encoded="${1//+/ }"
 
-    printf '%b' "${url_encoded//%/\\x}"
+	printf '%b' "${url_encoded//%/\\x}"
 }
 
 function GetLocalOS {
@@ -792,19 +804,19 @@ function GetRemoteOS {
 		cmd=$SSH_CMD' "uname -spio" > "'$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$SCRIPT_PID'" 2>&1'
 		Logger "cmd: $cmd" "DEBUG"
 		eval "$cmd" &
-		WaitForTaskCompletion $! 120 240 ${FUNCNAME[0]}"-1" false true
+		WaitForTaskCompletion $! 120 240 ${FUNCNAME[0]}"-1" true $KEEP_LOGGING
 		retval=$?
 		if [ $retval != 0 ]; then
 			cmd=$SSH_CMD' "uname -v" > "'$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$SCRIPT_PID'" 2>&1'
 			Logger "cmd: $cmd" "DEBUG"
 			eval "$cmd" &
-			WaitForTaskCompletion $! 120 240 ${FUNCNAME[0]}"-2" false true
+			WaitForTaskCompletion $! 120 240 ${FUNCNAME[0]}"-2" true $KEEP_LOGGING
 			retval=$?
 			if [ $retval != 0 ]; then
 				cmd=$SSH_CMD' "uname" > "'$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$SCRIPT_PID'" 2>&1'
 				Logger "cmd: $cmd" "DEBUG"
 				eval "$cmd" &
-				WaitForTaskCompletion $! 120 240 ${FUNCNAME[0]}"-3" false true
+				WaitForTaskCompletion $! 120 240 ${FUNCNAME[0]}"-3" true $KEEP_LOGGING
 				retval=$?
 				if [ $retval != 0 ]; then
 					Logger "Cannot Get remote OS type." "ERROR"
@@ -857,7 +869,7 @@ function RunLocalCommand {
 
 	Logger "Running command [$command] on local host." "NOTICE"
 	eval "$command" > "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$SCRIPT_PID" 2>&1 &
-	WaitForTaskCompletion $! 0 $hard_max_time ${FUNCNAME[0]} false true
+	WaitForTaskCompletion $! 0 $hard_max_time ${FUNCNAME[0]} true $KEEP_LOGGING
 	retval=$?
 	if [ $retval -eq 0 ]; then
 		Logger "Command succeded." "NOTICE"
@@ -892,7 +904,7 @@ function RunRemoteCommand {
 	cmd=$SSH_CMD' "$command" > "'$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$SCRIPT_PID'" 2>&1'
 	Logger "cmd: $cmd" "DEBUG"
 	eval "$cmd" &
-	WaitForTaskCompletion $! 0 $hard_max_time ${FUNCNAME[0]} false true
+	WaitForTaskCompletion $! 0 $hard_max_time ${FUNCNAME[0]} true $KEEP_LOGGING
 	retval=$?
 	if [ $retval -eq 0 ]; then
 		Logger "Command succeded." "NOTICE"
@@ -926,7 +938,7 @@ function RunBeforeHook {
 		pids="$pids;$!"
 	fi
 	if [ "$pids" != "" ]; then
-		WaitForTaskCompletion $pids 0 0 ${FUNCNAME[0]} false true
+		WaitForTaskCompletion $pids 0 0 ${FUNCNAME[0]} true $KEEP_LOGGING
 	fi
 }
 
@@ -945,7 +957,7 @@ function RunAfterHook {
 		pids="$pids;$!"
 	fi
 	if [ "$pids" != "" ]; then
-		WaitForTaskCompletion $pids 0 0 ${FUNCNAME[0]} false true
+		WaitForTaskCompletion $pids 0 0 ${FUNCNAME[0]} true $KEEP_LOGGING
 	fi
 }
 
@@ -956,7 +968,7 @@ function CheckConnectivityRemoteHost {
 
 		if [ "$REMOTE_HOST_PING" != "no" ] && [ "$REMOTE_OPERATION" != "no" ]; then
 			eval "$PING_CMD $REMOTE_HOST > /dev/null 2>&1" &
-			WaitForTaskCompletion $! 10 180 ${FUNCNAME[0]} false true
+			WaitForTaskCompletion $! 10 180 ${FUNCNAME[0]} true $KEEP_LOGGING
 			if [ $? != 0 ]; then
 				Logger "Cannot ping $REMOTE_HOST" "ERROR"
 				return 1
@@ -978,7 +990,7 @@ function CheckConnectivity3rdPartyHosts {
 			for i in $REMOTE_3RD_PARTY_HOSTS
 			do
 				eval "$PING_CMD $i > /dev/null 2>&1" &
-				WaitForTaskCompletion $! 10 360 ${FUNCNAME[0]} false true
+				WaitForTaskCompletion $! 10 360 ${FUNCNAME[0]} true $KEEP_LOGGING
 				if [ $? != 0 ]; then
 					Logger "Cannot ping 3rd party host $i" "NOTICE"
 				else
@@ -1297,6 +1309,11 @@ function InitRemoteOSSettings {
 		REMOTE_STAT_CTIME_MTIME_CMD="stat -c \\\"%n;%Z;%Y\\\""
 	fi
 
+}
+
+## IFS debug function
+function PrintIFS {
+	printf "IFS is: %q" "$IFS"
 }
 
 ## END Generic functions
