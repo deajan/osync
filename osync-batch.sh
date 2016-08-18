@@ -3,10 +3,15 @@ SUBPROGRAM=osync
 PROGRAM="$SUBPROGRAM-batch" # Batch program to run osync / obackup instances sequentially and rerun failed ones
 AUTHOR="(L) 2013-2016 by Orsiris de Jong"
 CONTACT="http://www.netpower.fr - ozy@netpower.fr"
-PROGRAM_BUILD=2016052501
+PROGRAM_BUILD=2016081704
 
 ## Runs an osync /obackup instance for every conf file found
 ## If an instance fails, run it again if time permits
+
+if ! type "$BASH" > /dev/null; then
+        echo "Please run this script only with bash shell. Tested on bash >= 3.2"
+        exit 127
+fi
 
 ## Configuration file path. The path where all the osync / obackup conf files are, usually /etc/osync or /etc/obackup
 CONF_FILE_PATH=/etc/$SUBPROGRAM
@@ -14,8 +19,8 @@ CONF_FILE_PATH=/etc/$SUBPROGRAM
 ## If maximum execution time is not reached, failed instances will be rerun. Max exec time is in seconds. Example is set to 10 hours.
 MAX_EXECUTION_TIME=36000
 
-## Specifies the number of reruns an instance may get
-MAX_RERUNS=3
+## Specifies the number of total runs an instance may get
+MAX_RUNS=3
 
 ## Log file path
 if [ -w /var/log ]; then
@@ -69,47 +74,64 @@ function CheckEnvironment {
 	else
 		SUBPROGRAM_EXECUTABLE=$(type -p $SUBPROGRAM.sh)
 	fi
-
-	## Check for CONF_FILE_PATH
-	if [ ! -d "$CONF_FILE_PATH" ]; then
-		Logger "Cannot find conf file path $CONF_FILE_PATH" "CRITICAL"
-		Usage
-	fi
 }
 
 function Batch {
-	## Get list of .conf files
-	for i in $CONF_FILE_PATH/*.conf
-	do
-		if [ "$RUN" == "" ]; then
-			RUN="$i"
-		else
-			RUN=$RUN" $i"
-		fi
-	done
+	local runs=0 # Number of batch runs
+	local runList # Actual conf file list to run
+	local runAgainList # List of failed conf files sto run again
 
-	RERUNS=0
-	while ([ $MAX_EXECUTION_TIME -gt $SECONDS ] || [ $MAX_EXECUTION_TIME -eq 0 ]) && [ "$RUN" != "" ] && [ $MAX_RERUNS -gt $RERUNS ]
-	do
-		Logger "$SUBPROGRAM instances will be run for: $RUN" "NOTICE"
-		for i in $RUN
+	local confFile
+	local result
+
+	## Check for CONF_FILE_PATH
+	if [ -d "$CONF_FILE_PATH" ]; then
+		## Get list of .conf files
+		for confFile in $CONF_FILE_PATH/*.conf
 		do
-			$SUBPROGRAM_EXECUTABLE "$i" $opts &
-			wait $!
-			if [ $? != 0 ]; then
-				Logger "Run instance $(basename $i) failed" "ERROR"
-				if [ "$RUN_AGAIN" == "" ]; then
-					RUN_AGAIN="$i"
+			if [ -f "$confFile" ]; then
+				if [ "$runList" == "" ]; then
+					runList="$confFile"
 				else
-					RUN_AGAIN=$RUN_AGAIN" $i"
+					runList=$runList" $confFile"
 				fi
-			else
-				Logger "Run instance $(basename $i) succeed." "NOTICE"
 			fi
 		done
-		RUN="$RUN_AGAIN"
-		RUN_AGAIN=""
-		RERUNS=$(($RERUNS + 1))
+	elif [ -f "$CONF_FILE_PATH" ] && [ "${CONF_FILE_PATH##*.}" == "conf" ]; then
+		runList="$CONF_FILE_PATH"
+	fi
+
+	if [ "$runList" == "" ]; then
+		Logger "Cannot find conf file path [$CONF_FILE_PATH]." "CRITICAL"
+		Usage
+	fi
+
+	while ([ $MAX_EXECUTION_TIME -gt $SECONDS ] || [ $MAX_EXECUTION_TIME -eq 0 ]) && [ "$runList" != "" ] && [ $MAX_RUNS -gt $runs ]
+	do
+		Logger "$SUBPROGRAM instances will be run for: $runList" "NOTICE"
+		for confFile in $runList
+		do
+			$SUBPROGRAM_EXECUTABLE "$confFile" $opts &
+			wait $!
+			result=$?
+			if [ $result != 0 ]; then
+				if [ $result == 1 ] || [ $result == 128 ]; then # Do not handle exit code 127 because it is already handled here
+					Logger "Run instance $(basename $confFile) failed with exit code [$result]." "ERROR"
+					if [ "$runAgainList" == "" ]; then
+						runAgainList="$confFile"
+					else
+						runAgainList=$runAgainList" $confFile"
+					fi
+				elif [ $result == 2 ]; then
+					Logger "Run instance $(basename $confFile) finished with warnings." "WARN"
+				fi
+			else
+				Logger "Run instance $(basename $confFile) succeed." "NOTICE"
+			fi
+		done
+		runList="$runAgainList"
+		runAgainList=""
+		runs=$(($runs + 1))
 	done
 }
 
@@ -123,8 +145,8 @@ function Usage {
 	echo ""
 	echo "[OPTIONS]"
 	echo "--path=/path/to/conf      Path to osync / obackup conf files, defaults to /etc/osync or /etc/obackup"
-	echo "--max-reruns=X            Number of runs  max for failed instances, (defaults to 3)"
-	echo "--max-exec-time=X         Retry failed instances only if max execution time not reached (defaults to 36000 seconds). Set to 0 to bypass execution time check."
+	echo "--max-runs=X              Number of max runs per instance, (defaults to 3)"
+	echo "--max-exec-time=X         Retry failed instances only if max execution time not reached (defaults to 36000 seconds). Set to 0 to bypass execution time check"
 	echo "--no-maxtime		Run osync / obackup without honoring conf file defined timeouts"
 	echo "--dry                     Will run osync / obackup without actually doing anything; just testing"
 	echo "--silent                  Will run osync / obackup without any output to stdout, used for cron jobs"
@@ -151,8 +173,8 @@ do
 		--path=*)
 		CONF_FILE_PATH=${i##*=}
 		;;
-		--max-reruns=*)
-		MAX_RERUNS=${i##*=}
+		--max-runs=*)
+		MAX_RUNS=${i##*=}
 		;;
 		--max-exec-time=*)
 		MAX_EXECUTION_TIME=${i##*=}
