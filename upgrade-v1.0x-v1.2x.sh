@@ -392,7 +392,7 @@ function RewriteConfigFiles {
 	fi
 
 	# "onfig file rev" to deal with earlier variants of the file
-	sed -i'.tmp' '/onfig file rev/c\###### osync config file rev '$PROGRAM_BUILD "$config_file"
+	sed -i'.tmp' '/onfig file rev/c\###### '$SUBPROGRAM' config file rev '$PROGRAM_BUILD "$config_file"
 
 	rm -f "$config_file.tmp"
 }
