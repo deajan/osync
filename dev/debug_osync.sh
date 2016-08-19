@@ -1,16 +1,13 @@
 #!/usr/bin/env bash
 
 #TODO(critical): handle conflict prevalance, especially in sync_attrs function
-#TODO(high): test resume system
 #TODO(critical): test new WaitForTaskCompletion behavior with self=true
-#TODO(low): add keep logging & preserve attr conf entries to preflight check
-#TODO(low): test failed _CreateStateDirsRemote should stop osync
 
 PROGRAM="osync" # Rsync based two way sync engine with fault tolerance
 AUTHOR="(C) 2013-2016 by Orsiris de Jong"
 CONTACT="http://www.netpower.fr/osync - ozy@netpower.fr"
 PROGRAM_VERSION=1.2-dev-parallel
-PROGRAM_BUILD=2016081802
+PROGRAM_BUILD=2016081902
 IS_STABLE=no
 
 #	Function Name		Is parallel	#__WITH_PARANOIA_DEBUG
@@ -1475,7 +1472,7 @@ function CheckCurrentConfig {
 	done
 
 	# Check all variables that should contain a numerical value >= 0
-	declare -a num_vars=(MINIMUM_SPACE BANDWIDTH SOFT_MAX_EXEC_TIME HARD_MAX_EXEC_TIME MIN_WAIT MAX_WAIT CONFLICT_BACKUP_DAYS SOFT_DELETE_DAYS RESUME_TRY MAX_EXEC_TIME_PER_CMD_BEFORE MAX_EXEC_TIME_PER_CMD_AFTER)
+	declare -a num_vars=(MINIMUM_SPACE BANDWIDTH SOFT_MAX_EXEC_TIME HARD_MAX_EXEC_TIME KEEP_LOGGING MIN_WAIT MAX_WAIT CONFLICT_BACKUP_DAYS SOFT_DELETE_DAYS RESUME_TRY MAX_EXEC_TIME_PER_CMD_BEFORE MAX_EXEC_TIME_PER_CMD_AFTER)
 	for i in "${num_vars[@]}"; do
 		test="if [ $(IsNumeric \"\$$i\") -eq 0 ]; then Logger \"Bogus $i value defined in config file. Correct your config file or update it using the update script if using and old version.\" \"CRITICAL\"; exit 1; fi"
 		eval "$test"
@@ -1840,7 +1837,7 @@ function WriteLockFiles {
 		_WriteLockFilesRemote "${TARGET[2]}" &
 		pids="$pids;$!"
 	fi
-	WaitForTaskCompletion $pids 720 1800 ${FUNCNAME[0]} true $KEEP_LOGGINg
+	WaitForTaskCompletion $pids 720 1800 ${FUNCNAME[0]} true $KEEP_LOGGING
 	if [ $? -ne 0 ]; then
 		Logger "Cancelling task." "CRITICAL"
 		exit 1
@@ -1920,6 +1917,11 @@ function tree_list {
 	local rsync_cmd
 
 	__CheckArguments 3 $# ${FUNCNAME[0]} "$@"	#__WITH_PARANOIA_DEBUG
+
+	#WIP
+	#if [ "$replica_type" == "${INITIATOR[0]}" ]; then
+	#	exit 12
+	#fi
 
 	escaped_replica_path=$(EscapeSpaces "$replica_path")
 
@@ -2450,6 +2452,8 @@ function Sync {
 	local initiatorPid
 	local targetPid
 
+	local initiatorFail
+	local targetFail
 
 	Logger "Starting synchronization task." "NOTICE"
 	CheckConnectivity3rdPartyHosts
@@ -2517,14 +2521,27 @@ function Sync {
 		WaitForTaskCompletion "$initiatorPid;$targetPid" $SOFT_MAX_EXEC_TIME $HARD_MAX_EXEC_TIME ${FUNCNAME[0]} false $KEEP_LOGGING
 		if [ $? != 0 ]; then
 			IFS=';' read -r -a pidArray <<< "$WAIT_FOR_TASK_COMPLETION"
+			initiatorFail=false
+			targetFail=false
 			for pid in "${pidArray[@]}"; do
 				pid=${pid%:*}
 				if [ $pid == $initiatorPid ]; then
 					echo "${SYNC_ACTION[0]}" > "${INITIATOR[7]}"
+					initiatorFail=true
 				elif [ $pid == $targetPid ]; then
 					echo "${SYNC_ACTION[0]}" > "${INITIATOR[8]}"
+					targetFail=true
 				fi
 			done
+
+			if [ $initiatorFail == false ]; then
+				echo "${SYNC_ACTION[1]}" > "${INITIATOR[7]}"
+			fi
+
+			if [ $targetFail == false ]; then
+				echo "${SYNC_ACTION[1]}" > "${INITIATOR[8]}"
+			fi
+
 			exit 1
 		else
 			echo "${SYNC_ACTION[1]}" > "${INITIATOR[7]}"
@@ -2549,14 +2566,27 @@ function Sync {
 		WaitForTaskCompletion "$initiatorPid;$targetPid" $SOFT_MAX_EXEC_TIME $HARD_MAX_EXEC_TIME ${FUNCNAME[0]} false $KEEP_LOGGING
 		if [ $? != 0 ]; then
 			IFS=';' read -r -a pidArray <<< "$WAIT_FOR_TASK_COMPLETION"
+			initiatorFail=false
+			targetFail=false
 			for pid in "${pidArray[@]}"; do
 				pid=${pid%:*}
 				if [ $pid == $initiatorPid ]; then
 					echo "${SYNC_ACTION[1]}" > "${INITIATOR[7]}"
+					initiatorFail=true
 				elif [ $pid == $targetPid ]; then
 					echo "${SYNC_ACTION[1]}" > "${INITIATOR[8]}"
+					targetFail=true
 				fi
 			done
+
+			if [ $initiatorFail == false ]; then
+				echo "${SYNC_ACTION[2]}" > "${INITIATOR[7]}"
+			fi
+
+			if [ $targetFail == false ]; then
+				echo "${SYNC_ACTION[2]}" > "${INITIATOR[8]}"
+			fi
+
 			exit 1
 		else
 			echo "${SYNC_ACTION[2]}" > "${INITIATOR[7]}"
@@ -2605,14 +2635,27 @@ function Sync {
 		WaitForTaskCompletion "$initiatorPid;$targetPid" $SOFT_MAX_EXEC_TIME $HARD_MAX_EXEC_TIME ${FUNCNAME[0]} false $KEEP_LOGGING
 		if [ $? != 0 ]; then
 			IFS=';' read -r -a pidArray <<< "$WAIT_FOR_TASK_COMPLETION"
+			initiatorFail=false
+			targetFail=false
 			for pid in "${pidArray[@]}"; do
 				pid=${pid%:*}
 				if [ $pid == $initiatorPid ]; then
 					echo "${SYNC_ACTION[3]}" > "${INITIATOR[7]}"
+					initiatorFail=true
 				elif [ $pid == $targetPid ]; then
 					echo "${SYNC_ACTION[3]}" > "${INITIATOR[8]}"
+					targetFail=true
 				fi
 			done
+
+			if [ $initiatorFail == false ]; then
+				echo "${SYNC_ACTION[4]}" > "${INITIATOR[7]}"
+			fi
+
+			if [ $targetFail == false ]; then
+				echo "${SYNC_ACTION[4]}" > "${INITIATOR[8]}"
+			fi
+
 			exit 1
 		else
 			echo "${SYNC_ACTION[4]}" > "${INITIATOR[7]}"
@@ -2637,14 +2680,27 @@ function Sync {
 		WaitForTaskCompletion "$initiatorPid;$targetPid" $SOFT_MAX_EXEC_TIME $HARD_MAX_EXEC_TIME ${FUNCNAME[0]} false $KEEP_LOGGING
 		if [ $? != 0 ]; then
 			IFS=';' read -r -a pidArray <<< "$WAIT_FOR_TASK_COMPLETION"
+			initiatorFail=false
+			targetFail=false
 			for pid in "${pidArray[@]}"; do
 				pid=${pid%:*}
 				if [ $pid == $initiatorPid ]; then
 					echo "${SYNC_ACTION[4]}" > "${INITIATOR[7]}"
+					initiatorFail=true
 				elif [ $pid == $targetPid ]; then
 					echo "${SYNC_ACTION[4]}" > "${INITIATOR[8]}"
+					targetFail=true
 				fi
 			done
+
+			if [ $initiatorFail == false ]; then
+				echo "${SYNC_ACTION[5]}" > "${INITIATOR[7]}"
+			fi
+
+			if [ $targetFail == false ]; then
+				echo "${SYNC_ACTION[5]}" > "${INITIATOR[8]}"
+			fi
+
 			exit 1
 		else
 			echo "${SYNC_ACTION[5]}" > "${INITIATOR[7]}"
@@ -2670,14 +2726,27 @@ function Sync {
 		WaitForTaskCompletion "$initiatorPid;$targetPid" $SOFT_MAX_EXEC_TIME $HARD_MAX_EXEC_TIME ${FUNCNAME[0]} false $KEEP_LOGGING
 		if [ $? != 0 ]; then
 			IFS=';' read -r -a pidArray <<< "$WAIT_FOR_TASK_COMPLETION"
+			initiatorFail=false
+			targetFail=false
 			for pid in "${pidArray[@]}"; do
 				pid=${pid%:*}
 				if [ $pid == $initiatorPid ]; then
 					echo "${SYNC_ACTION[5]}" > "${INITIATOR[7]}"
+					initiatorFail=true
 				elif [ $pid == $targetPid ]; then
 					echo "${SYNC_ACTION[5]}" > "${INITIATOR[8]}"
+					targetFail=true
 				fi
 			done
+
+			if [ $initiatorFail == false ]; then
+				echo "${SYNC_ACTION[6]}" > "${INITIATOR[7]}"
+			fi
+
+			if [ $targetFail == false ]; then
+				echo "${SYNC_ACTION[6]}" > "${INITIATOR[8]}"
+			fi
+
 			exit 1
 		else
 			echo "${SYNC_ACTION[6]}" > "${INITIATOR[7]}"
