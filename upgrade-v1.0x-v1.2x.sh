@@ -6,7 +6,7 @@ AUTHOR="(C) 2016 by Orsiris de Jong"
 CONTACT="http://www.netpower.fr/osync - ozy@netpower.fr"
 OLD_PROGRAM_VERSION="v1.0x-v1.1x"
 NEW_PROGRAM_VERSION="v1.2x"
-PROGRAM_BUILD=2016080901
+PROGRAM_BUILD=2016081902 # Will go into config file rev
 
 ## type -p does not work on platforms other than linux (bash). If if does not work, always assume output is not a zero exitcode
 if ! type "$BASH" > /dev/null; then
@@ -371,6 +371,10 @@ function RewriteConfigFiles {
 		sed -i'.tmp' '/^PRESERVE_HARDLINKS=*/a\'$'\n''CHECKSUM=no\'$'\n''' "$config_file"
 	fi
 
+	if ! grep "^KEEP_LOGGING=" "$config_file" > /dev/null; then
+		sed -i'.tmp' '/^HARD_MAX_EXEC_TIME=*/a\'$'\n''KEEP_LOGGING=1801\'$'\n''' "$config_file"
+	fi
+
 	if ! grep "^MAX_WAIT=" "$config_file" > /dev/null; then
 		sed -i'.tmp' '/^MIN_WAIT=*/a\'$'\n''MAX_WAIT=300\'$'\n''' "$config_file"
 	fi
@@ -386,6 +390,9 @@ function RewriteConfigFiles {
 	if ! grep "^RUN_AFTER_CMD_ON_ERROR=" "$config_file" > /dev/null; then
 		sed -i'.tmp' '/^STOP_ON_CMD_ERROR=*/a\'$'\n''RUN_AFTER_CMD_ON_ERROR=no\'$'\n''' "$config_file"
 	fi
+
+	# "onfig file rev" to deal with earlier variants of the file
+	sed -i'.tmp' '/onfig file rev/c\###### osync config file rev '$PROGRAM_BUILD "$config_file"
 
 	rm -f "$config_file.tmp"
 }
