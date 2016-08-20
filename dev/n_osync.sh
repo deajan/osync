@@ -1,13 +1,12 @@
 #!/usr/bin/env bash
 
 #TODO(critical): handle conflict prevalance, especially in sync_attrs function
-#TODO(critical): test new WaitForTaskCompletion behavior with self=true
 
 PROGRAM="osync" # Rsync based two way sync engine with fault tolerance
 AUTHOR="(C) 2013-2016 by Orsiris de Jong"
 CONTACT="http://www.netpower.fr/osync - ozy@netpower.fr"
 PROGRAM_VERSION=1.2-dev-parallel
-PROGRAM_BUILD=2016081902
+PROGRAM_BUILD=2016082001
 IS_STABLE=no
 
 #	Function Name		Is parallel	#__WITH_PARANOIA_DEBUG
@@ -223,15 +222,16 @@ function CheckReplicaPaths {
 
 	local pids
 
+	# Use direct comparaison before having a portable realpath implementation
 	#INITIATOR_SYNC_DIR_CANN=$(realpath "${INITIATOR[1]}")	#TODO(verylow): investigate realpath & readlink issues on MSYS and busybox here
 	#TARGET_SYNC_DIR_CANN=$(realpath "${TARGET[1]})
 
-	#if [ "$REMOTE_OPERATION" != "yes" ]; then
-	#	if [ "$INITIATOR_SYNC_DIR_CANN" == "$TARGET_SYNC_DIR_CANN" ]; then
-	#		Logger "Master directory [${INITIATOR[1]}] cannot be the same as target directory." "CRITICAL"
-	#		exit 1
-	#	fi
-	#fi
+	if [ "$REMOTE_OPERATION" != "yes" ]; then
+		if [ "${INITIATOR[1]}" == "${TARGET[1]}" ]; then
+			Logger "Initiator and target path [${INITIATOR[1]}] cannot be the same." "CRITICAL"
+			exit 1
+		fi
+	fi
 
 	_CheckReplicaPathsLocal "${INITIATOR[1]}" &
 	pids="$!"
