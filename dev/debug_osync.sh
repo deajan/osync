@@ -1,13 +1,13 @@
 #!/usr/bin/env bash
 
 #TODO(critical): handle conflict prevalance, especially in sync_attrs function
-#TODO(critical): test new WaitForTaskCompletion behavior with self=true
+#TODO(critical): writelockfiles remote does not shut execution
 
 PROGRAM="osync" # Rsync based two way sync engine with fault tolerance
 AUTHOR="(C) 2013-2016 by Orsiris de Jong"
 CONTACT="http://www.netpower.fr/osync - ozy@netpower.fr"
 PROGRAM_VERSION=1.2-dev-parallel
-PROGRAM_BUILD=2016081902
+PROGRAM_BUILD=2016082201
 IS_STABLE=no
 
 #	Function Name		Is parallel	#__WITH_PARANOIA_DEBUG
@@ -47,7 +47,7 @@ IS_STABLE=no
 
 #### MINIMAL-FUNCTION-SET BEGIN ####
 
-## FUNC_BUILD=2016081805
+## FUNC_BUILD=2016082204
 ## BEGIN Generic functions for osync & obackup written in 2013-2016 by Orsiris de Jong - http://www.netpower.fr - ozy@netpower.fr
 
 ## type -p does not work on platforms other than linux (bash). If if does not work, always assume output is not a zero exitcode
@@ -230,7 +230,7 @@ function KillChilds {
 		# Try to kill nicely, if not, wait 15 seconds to let Trap actions happen before killing
 	if ( [ "$self" == true ] && kill -0 $pid > /dev/null 2>&1); then
 		Logger "Sending SIGTERM to process [$pid]." "DEBUG"
-		kill -s SIGTERM "$pid"
+		kill -s TERM "$pid"
 		if [ $? != 0 ]; then
 			sleep 15
 			Logger "Sending SIGTERM to process [$pid] failed." "DEBUG"
@@ -646,29 +646,6 @@ function WaitForTaskCompletion {
 
 	while [ ${#pidsArray[@]} -gt 0 ]; do
 		newPidsArray=()
-		for pid in "${pidsArray[@]}"; do
-			if kill -0 $pid > /dev/null 2>&1; then
-				# Handle uninterruptible sleep state or zombies by ommiting them from running process array (How to kill that is already dead ? :)
-				#TODO(high): have this tested on *BSD, Mac & Win
-				pidState=$(ps -p$pid -o state= 2 > /dev/null)
-				if [ "$pidState" != "D" ] && [ "$pidState" != "Z" ]; then
-					newPidsArray+=($pid)
-				fi
-			else
-				# pid is dead, get it's exit code from wait command
-				wait $pid
-				retval=$?
-				if [ $retval -ne 0 ]; then
-					errorcount=$((errorcount+1))
-					Logger "${FUNCNAME[0]} called by [$caller_name] finished monitoring [$pid] with exitcode [$result]." "DEBUG"
-					if [ "$WAIT_FOR_TASK_COMPLETION" == "" ]; then
-						WAIT_FOR_TASK_COMPLETION="$pid:$result"
-					else
-						WAIT_FOR_TASK_COMPLETION=";$pid:$result"
-					fi
-				fi
-			fi
-		done
 
 		Spinner
 		if [ $counting == true ]; then
@@ -707,6 +684,30 @@ function WaitForTaskCompletion {
 				errrorcount=$((errorcount+1))
 			fi
 		fi
+
+		for pid in "${pidsArray[@]}"; do
+			if kill -0 $pid > /dev/null 2>&1; then
+				# Handle uninterruptible sleep state or zombies by ommiting them from running process array (How to kill that is already dead ? :)
+				#TODO(high): have this tested on *BSD, Mac & Win
+				pidState=$(ps -p$pid -o state= 2 > /dev/null)
+				if [ "$pidState" != "D" ] && [ "$pidState" != "Z" ]; then
+					newPidsArray+=($pid)
+				fi
+			else
+				# pid is dead, get it's exit code from wait command
+				wait $pid
+				retval=$?
+				if [ $retval -ne 0 ]; then
+					errorcount=$((errorcount+1))
+					Logger "${FUNCNAME[0]} called by [$caller_name] finished monitoring [$pid] with exitcode [$result]." "DEBUG"
+					if [ "$WAIT_FOR_TASK_COMPLETION" == "" ]; then
+						WAIT_FOR_TASK_COMPLETION="$pid:$result"
+					else
+						WAIT_FOR_TASK_COMPLETION=";$pid:$result"
+					fi
+				fi
+			fi
+		done
 
 		pidsArray=("${newPidsArray[@]}")
 		sleep $SLEEP_TIME
@@ -1037,7 +1038,7 @@ function CheckConnectivity3rdPartyHosts {
 			for i in $REMOTE_3RD_PARTY_HOSTS
 			do
 				eval "$PING_CMD $i > /dev/null 2>&1" &
-				WaitForTaskCompletion $! 10 360 ${FUNCNAME[0]} true $KEEP_LOGGING
+				WaitForTaskCompletion $! 180 360 ${FUNCNAME[0]} true $KEEP_LOGGING
 				if [ $? != 0 ]; then
 					Logger "Cannot ping 3rd party host $i" "NOTICE"
 				else
@@ -1417,9 +1418,7 @@ function TrapQuit {
 		exitcode=2	# Warning exit code must not force daemon mode to quit
 	else
 		UnlockReplicas
-		if [ "$RUN_AFTER_CMD_ON_ERROR" == "yes" ]; then
-			RunAfterHook
-		fi
+		RunAfterHook
 		CleanUp
 		Logger "$PROGRAM finished." "NOTICE"
 		exitcode=0
@@ -1541,15 +1540,16 @@ function CheckReplicaPaths {
 
 	local pids
 
+	# Use direct comparaison before having a portable realpath implementation
 	#INITIATOR_SYNC_DIR_CANN=$(realpath "${INITIATOR[1]}")	#TODO(verylow): investigate realpath & readlink issues on MSYS and busybox here
 	#TARGET_SYNC_DIR_CANN=$(realpath "${TARGET[1]})
 
-	#if [ "$REMOTE_OPERATION" != "yes" ]; then
-	#	if [ "$INITIATOR_SYNC_DIR_CANN" == "$TARGET_SYNC_DIR_CANN" ]; then
-	#		Logger "Master directory [${INITIATOR[1]}] cannot be the same as target directory." "CRITICAL"
-	#		exit 1
-	#	fi
-	#fi
+	if [ "$REMOTE_OPERATION" != "yes" ]; then
+		if [ "${INITIATOR[1]}" == "${TARGET[1]}" ]; then
+			Logger "Initiator and target path [${INITIATOR[1]}] cannot be the same." "CRITICAL"
+			exit 1
+		fi
+	fi
 
 	_CheckReplicaPathsLocal "${INITIATOR[1]}" &
 	pids="$!"
@@ -2887,10 +2887,10 @@ function Init {
 
 	# Do not use exit and quit traps if osync runs in monitor mode
 	if [ $sync_on_changes -eq 0 ]; then
-		trap TrapStop SIGINT SIGHUP SIGTERM SIGQUIT
+		trap TrapStop INT HUP TERM QUIT
 		trap TrapQuit EXIT
 	else
-		trap TrapQuit SIGTERM EXIT SIGHUP SIGQUIT
+		trap TrapQuit TERM EXIT HUP QUIT
 	fi
 
 	local uri
