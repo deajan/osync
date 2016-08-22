@@ -6,12 +6,22 @@ KNOWN ISSUES
 
 RECENT CHANGES
 --------------
+
+- Made unix signals posix compliant
+- Config file upgrade script now updates header
+! test if waitfortaskcompletion kill self works okay with osync
+- Improved batch runner
+- Made keep logging value configurable and not mandatory
+- Fixed handling of processes in uninterruptible sleep state
 ! update doc on sudoers paths
 - Parallelized sync functions
-	#TODO: explain bandwidth parameter, and CONFLICT_PREVALANCE option
+	- Rewrite sync resume process
+	! Remove conflict prevalance
+	- !doc about bandwidth
 - Added options to ignore permissions, ownership and groups
 - Refactored WaitFor... functions into one
 - Improved execution speed
+	- Rewrite sync resume process
 	- Added parallel execution for most secondary fuctions
 	- Lowered sleep time in wait functions
 	- Removed trivial sleep and forking in remote deletion code, send the whole function to background instead
