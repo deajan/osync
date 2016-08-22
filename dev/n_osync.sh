@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 
 #TODO(critical): handle conflict prevalance, especially in sync_attrs function
+#TODO(critical): writelockfiles remote does not shut execution
 
 PROGRAM="osync" # Rsync based two way sync engine with fault tolerance
 AUTHOR="(C) 2013-2016 by Orsiris de Jong"
@@ -98,9 +99,7 @@ function TrapQuit {
 		exitcode=2	# Warning exit code must not force daemon mode to quit
 	else
 		UnlockReplicas
-		if [ "$RUN_AFTER_CMD_ON_ERROR" == "yes" ]; then
-			RunAfterHook
-		fi
+		RunAfterHook
 		CleanUp
 		Logger "$PROGRAM finished." "NOTICE"
 		exitcode=0
@@ -1569,10 +1568,10 @@ function Init {
 
 	# Do not use exit and quit traps if osync runs in monitor mode
 	if [ $sync_on_changes -eq 0 ]; then
-		trap TrapStop SIGINT SIGHUP SIGTERM SIGQUIT
+		trap TrapStop INT HUP TERM QUIT
 		trap TrapQuit EXIT
 	else
-		trap TrapQuit SIGTERM EXIT SIGHUP SIGQUIT
+		trap TrapQuit TERM EXIT HUP QUIT
 	fi
 
 	local uri
