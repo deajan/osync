@@ -8,6 +8,7 @@ RECENT CHANGES
 --------------
 
 XX xxx 2016: osync v1.1.2 released
+- Fixed RunAfterHook may be executed twice
 - Fixed soft deletion when SUDO_EXEC is enabled
 
 06 Aug 2016: osync v1.1.1 released
