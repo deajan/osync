@@ -4,7 +4,7 @@ PROGRAM="osync" # Rsync based two way sync engine with fault tolerance
 AUTHOR="(C) 2013-2016 by Orsiris de Jong"
 CONTACT="http://www.netpower.fr/osync - ozy@netpower.fr"
 PROGRAM_VERSION=1.1.2
-PROGRAM_BUILD=20160801301
+PROGRAM_BUILD=20160802201
 IS_STABLE=yes
 
 ## FUNC_BUILD=2016071902-b
@@ -1306,9 +1306,7 @@ function TrapQuit {
 		exitcode=240	# Special exit code for daemon mode not stopping on warnings
 	else
 		UnlockReplicas
-		if [ "$RUN_AFTER_CMD_ON_ERROR" == "yes" ]; then
-			RunAfterHook
-		fi
+		RunAfterHook
 		CleanUp
 		Logger "$PROGRAM finished." "NOTICE"
 		exitcode=0
@@ -3023,5 +3021,4 @@ opts="${opts# *}"
 		if [ $? == 0 ]; then
 			SoftDelete
 		fi
-		RunAfterHook
 	fi
