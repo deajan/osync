@@ -1,49 +1,49 @@
 #!/usr/bin/env bash
 
 #TODO(critical): handle conflict prevalance, especially in sync_attrs function
-#TODO(critical): writelockfiles remote does not shut execution
 
 PROGRAM="osync" # Rsync based two way sync engine with fault tolerance
 AUTHOR="(C) 2013-2016 by Orsiris de Jong"
 CONTACT="http://www.netpower.fr/osync - ozy@netpower.fr"
 PROGRAM_VERSION=1.2-dev-parallel
-PROGRAM_BUILD=2016082801
+PROGRAM_BUILD=2016082803
 IS_STABLE=no
 
-#	Function Name		Is parallel	#__WITH_PARANOIA_DEBUG
+# Execution order
+#	Function Name				Is parallel	#__WITH_PARANOIA_DEBUG
 
-#	GetLocalOS		no		#__WITH_PARANOIA_DEBUG
-#	InitLocalOSSettings	no		#__WITH_PARANOIA_DEBUG
-#	CheckEnvironment	no		#__WITH_PARANOIA_DEBUG
-#	PreInit			no		#__WITH_PARANOIA_DEBUG
-#	Init			no		#__WITH_PARANOIA_DEBUG
-#	PostInit		no		#__WITH_PARANOIA_DEBUG
-#	GetRemoteOS		no		#__WITH_PARANOIA_DEBUG
-#	InitRemoteOSSettings	no		#__WITH_PARANOIA_DEBUG
-#	CheckReplicaPaths	yes		#__WITH_PARANOIA_DEBUG
-#	CheckDiskSpace		yes		#__WITH_PARANOIA_DEBUG
-#	RunBeforeHook		yes		#__WITH_PARANOIA_DEBUG
-#	Main			no		#__WITH_PARANOIA_DEBUG
-#	CreateStateDirs		yes		#__WITH_PARANOIA_DEBUG
-#	CheckLocks		yes		#__WITH_PARANOIA_DEBUG
-#	WriteLockFiles		yes		#__WITH_PARANOIA_DEBUG
-#	Sync			no		#__WITH_PARANOIA_DEBUG
-#	tree_list		yes		#__WITH_PARANOIA_DEBUG
-#	tree_list		yes		#__WITH_PARANOIA_DEBUG
-#	delete_list		yes		#__WITH_PARANOIA_DEBUG
-#	delete_list		yes		#__WITH_PARANOIA_DEBUG
-#	sync_attrs		no		#__WITH_PARANOIA_DEBUG
-#	_get_file_ctime_mtime	yes		#__WITH_PARANOIA_DEBUG
-#	sync_update		yes		#__WITH_PARANOIA_DEBUG
-#	sync_update		yes		#__WITH_PARANOIA_DEBUG
-#	deletion_propagation	yes		#__WITH_PARANOIA_DEBUG
-#	deletion_propagation	yes		#__WITH_PARANOIA_DEBUG
-#	tree_list		yes		#__WITH_PARANOIA_DEBUG
-#	tree_list		yes		#__WITH_PARANOIA_DEBUG
-#	SoftDelete		yes		#__WITH_PARANOIA_DEBUG
-#	RunAfterHook		yes		#__WITH_PARANOIA_DEBUG
-#	UnlockReplicas		yes		#__WITH_PARANOIA_DEBUG
-#	CleanUp			no		#__WITH_PARANOIA_DEBUG
+#	GetLocalOS				no		#__WITH_PARANOIA_DEBUG
+#	InitLocalOSSettings			no		#__WITH_PARANOIA_DEBUG
+#	CheckEnvironment			no		#__WITH_PARANOIA_DEBUG
+#	PreInit					no		#__WITH_PARANOIA_DEBUG
+#	Init					no		#__WITH_PARANOIA_DEBUG
+#	PostInit				no		#__WITH_PARANOIA_DEBUG
+#	GetRemoteOS				no		#__WITH_PARANOIA_DEBUG
+#	InitRemoteOSSettings			no		#__WITH_PARANOIA_DEBUG
+#	CheckReplicaPaths			yes		#__WITH_PARANOIA_DEBUG
+#	CheckDiskSpace				yes		#__WITH_PARANOIA_DEBUG
+#	RunBeforeHook				yes		#__WITH_PARANOIA_DEBUG
+#	Main					no		#__WITH_PARANOIA_DEBUG
+#		CreateStateDirs			yes		#__WITH_PARANOIA_DEBUG
+#	 	CheckLocks			yes		#__WITH_PARANOIA_DEBUG
+#	 	WriteLockFiles			yes		#__WITH_PARANOIA_DEBUG
+#	 	Sync				no		#__WITH_PARANOIA_DEBUG
+#			tree_list		yes		#__WITH_PARANOIA_DEBUG
+#			tree_list		yes		#__WITH_PARANOIA_DEBUG
+#			delete_list		yes		#__WITH_PARANOIA_DEBUG
+#			delete_list		yes		#__WITH_PARANOIA_DEBUG
+#			sync_attrs		no		#__WITH_PARANOIA_DEBUG
+#			_get_file_ctime_mtime	yes		#__WITH_PARANOIA_DEBUG
+#			sync_update		yes		#__WITH_PARANOIA_DEBUG
+#			sync_update		yes		#__WITH_PARANOIA_DEBUG
+#			deletion_propagation	yes		#__WITH_PARANOIA_DEBUG
+#			deletion_propagation	yes		#__WITH_PARANOIA_DEBUG
+#			tree_list		yes		#__WITH_PARANOIA_DEBUG
+#			tree_list		yes		#__WITH_PARANOIA_DEBUG
+#		SoftDelete			yes		#__WITH_PARANOIA_DEBUG
+#	RunAfterHook				yes		#__WITH_PARANOIA_DEBUG
+#	UnlockReplicas				yes		#__WITH_PARANOIA_DEBUG
+#	CleanUp					no		#__WITH_PARANOIA_DEBUG
 
 source "./ofunctions.sh"
 _LOGGER_PREFIX="time"
@@ -129,6 +129,24 @@ function CheckEnvironment {
 function CheckCurrentConfig {
         __CheckArguments 0 $# ${FUNCNAME[0]} "$@"    #__WITH_PARANOIA_DEBUG
 
+        # Check all variables that should contain "yes" or "no"
+        declare -a yes_no_vars=(CREATE_DIRS SUDO_EXEC SSH_COMPRESSION SSH_IGNORE_KNOWN_HOSTS REMOTE_HOST_PING PRESERVE_PERMISSIONS PRESERVE_OWNER PRESERVE_GROUP PRESERVE_EXECUTABILITY PRESERVE_ACL PRESERVE_XATTR COPY_SYMLINKS KEEP_DIRLINKS PRESERVE_HARDLINKS CHECKSUM RSYNC_COMPRESS CONFLICT_BACKUP CONFLICT_BACKUP_MULTIPLE SOFT_DELETE RESUME_SYNC FORCE_STRANGER_LOCK_RESUME PARTIAL DELTA_COPIES STOP_ON_CMD_ERROR RUN_AFTER_CMD_ON_ERROR)
+        for i in "${yes_no_vars[@]}"; do
+                test="if [ \"\$$i\" != \"yes\" ] && [ \"\$$i\" != \"no\" ]; then Logger \"Bogus $i value defined in config file. Correct your config file or update it using the update script if using and old version.\" \"CRITICAL\"; exit 1; fi"
+                eval "$test"
+        done
+
+        # Check all variables that should contain a numerical value >= 0
+        declare -a num_vars=(MINIMUM_SPACE BANDWIDTH SOFT_MAX_EXEC_TIME HARD_MAX_EXEC_TIME KEEP_LOGGING MIN_WAIT MAX_WAIT CONFLICT_BACKUP_DAYS SOFT_DELETE_DAYS RESUME_TRY MAX_EXEC_TIME_PER_CMD_BEFORE MAX_EXEC_TIME_PER_CMD_AFTER)
+        for i in "${num_vars[@]}"; do
+		test="if [ $(IsNumeric \"\$$i\") -eq 0 ]; then Logger \"Bogus $i value defined in config file. Correct your config file or update it using the update script if using and old version.\" \"CRITICAL\"; exit 1; fi"
+                eval "$test"
+        done
+}
+
+function CheckCurrentConfigAll {
+        __CheckArguments 0 $# ${FUNCNAME[0]} "$@"    #__WITH_PARANOIA_DEBUG
+
         if [ "$INSTANCE_ID" == "" ]; then
                 Logger "No INSTANCE_ID defined in config file." "CRITICAL"
                 exit 1
@@ -144,21 +162,11 @@ function CheckCurrentConfig {
 		exit 1
 	fi
 
-        # Check all variables that should contain "yes" or "no"
-        declare -a yes_no_vars=(CREATE_DIRS SUDO_EXEC SSH_COMPRESSION SSH_IGNORE_KNOWN_HOSTS REMOTE_HOST_PING PRESERVE_PERMISSIONS PRESERVE_OWNER PRESERVE_GROUP PRESERVE_EXECUTABILITY PRESERVE_ACL PRESERVE_XATTR COPY_SYMLINKS KEEP_DIRLINKS PRESERVE_HARDLINKS CHECKSUM RSYNC_COMPRESS CONFLICT_BACKUP CONFLICT_BACKUP_MULTIPLE SOFT_DELETE RESUME_SYNC FORCE_STRANGER_LOCK_RESUME PARTIAL DELTA_COPIES STOP_ON_CMD_ERROR RUN_AFTER_CMD_ON_ERROR)
-        for i in "${yes_no_vars[@]}"; do
-                test="if [ \"\$$i\" != \"yes\" ] && [ \"\$$i\" != \"no\" ]; then Logger \"Bogus $i value defined in config file. Correct your config file or update it using the update script if using and old version.\" \"CRITICAL\"; exit 1; fi"
-                eval "$test"
-        done
-
-        # Check all variables that should contain a numerical value >= 0
-        declare -a num_vars=(MINIMUM_SPACE BANDWIDTH SOFT_MAX_EXEC_TIME HARD_MAX_EXEC_TIME KEEP_LOGGING MIN_WAIT MAX_WAIT CONFLICT_BACKUP_DAYS SOFT_DELETE_DAYS RESUME_TRY MAX_EXEC_TIME_PER_CMD_BEFORE MAX_EXEC_TIME_PER_CMD_AFTER)
-        for i in "${num_vars[@]}"; do
-		test="if [ $(IsNumeric \"\$$i\") -eq 0 ]; then Logger \"Bogus $i value defined in config file. Correct your config file or update it using the update script if using and old version.\" \"CRITICAL\"; exit 1; fi"
-                eval "$test"
-        done
-
         #TODO(low): Add runtime variable tests (RSYNC_ARGS etc)
+	if [ "$REMOTE_OPERATION" == "yes" ] && [ ! -f "$SSH_RSA_PRIVATE_KEY" ]; then
+		Logger "Cannot find rsa private key [$SSH_RSA_PRIVATE_KEY]. Cannot connect to remote system." "CRITICAL"
+		exit 1
+	fi
 }
 
 ###### Osync specific functions (non shared)
@@ -473,22 +481,24 @@ function CheckLocks {
 
 function _WriteLockFilesLocal {
 	local lockfile="${1}"
-	__CheckArguments 1 $# ${FUNCNAME[0]} "$@"	#__WITH_PARANOIA_DEBUG
+	local replica_type="${2}"
+	__CheckArguments 2 $# ${FUNCNAME[0]} "$@"	#__WITH_PARANOIA_DEBUG
 
 	$COMMAND_SUDO echo "$SCRIPT_PID@$INSTANCE_ID" > "$lockfile"
 	if [ $?	!= 0 ]; then
-		Logger "Could not create lock file [$lockfile]." "CRITICAL"
+		Logger "Could not create lock file on local $replica_type in [$lockfile]." "CRITICAL"
 		exit 1
 	else
-		Logger "Locked replica on [$lockfile]." "DEBUG"
+		Logger "Locked local $replica_type replica in [$lockfile]." "DEBUG"
 	fi
 }
 
 function _WriteLockFilesRemote {
 	local lockfile="${1}"
-	__CheckArguments 1 $# ${FUNCNAME[0]} "$@"	#__WITH_PARANOIA_DEBUG
+	local replica_type="${2}"
+	__CheckArguments 2 $# ${FUNCNAME[0]} "$@"	#__WITH_PARANOIA_DEBUG
 
-	local cmd=
+	local cmd
 
 	CheckConnectivity3rdPartyHosts
 	CheckConnectivityRemoteHost
@@ -497,33 +507,49 @@ function _WriteLockFilesRemote {
 	Logger "cmd: $cmd" "DEBUG"
 	eval "$cmd"
 	if [ $? != 0 ]; then
-		Logger "Could not set lock on remote $replica_type replica." "CRITICAL"
+		Logger "Could not create lock file on remote $replica_type in [$lockfile]." "CRITICAL"
 		exit 1
 	else
-		Logger "Locked remote $replica_type replica." "DEBUG"
+		Logger "Locked remote $replica_type replica in [$lockfile]." "DEBUG"
 	fi
 }
 
 function WriteLockFiles {
 	__CheckArguments 0 $# ${FUNCNAME[0]} "$@"	#__WITH_PARANOIA_DEBUG
 
-	local pids
+	local initiatorPid
+	local targetPid
+	local pidArray
+	local pid
 
-	_WriteLockFilesLocal "${INITIATOR[2]}" &
-	pids="$!"
+	_WriteLockFilesLocal "${INITIATOR[2]}" "${INITIATOR[0]}"&
+	initiatorPid="$!"
+
 	if [ "$REMOTE_OPERATION" != "yes" ]; then
-		_WriteLockFilesLocal "${TARGET[2]}" &
-		pids="$pids;$!"
+		_WriteLockFilesLocal "${TARGET[2]}" "${TARGET[0]}" &
+		targetPid="$!"
 	else
-		_WriteLockFilesRemote "${TARGET[2]}" &
-		pids="$pids;$!"
+		_WriteLockFilesRemote "${TARGET[2]}" "${TARGET[0]}" &
+		targetPid="$!"
 	fi
-	WaitForTaskCompletion $pids 720 1800 ${FUNCNAME[0]} true $KEEP_LOGGING
+
+	INITIATOR_LOCK_FILE_EXISTS=true
+	TARGET_LOCK_FILE_EXISTS=true
+	WaitForTaskCompletion "$initiatorPid;$targetPid" 720 1800 ${FUNCNAME[0]} true $KEEP_LOGGING
 	if [ $? -ne 0 ]; then
+		IFS=';' read -r -a pidArray <<< "$WAIT_FOR_TASK_COMPLETION"
+		for pid in "${pidArray[@]}"; do
+			pid=${pid%:*}
+			if [ $pid == $initiatorPid ]; then
+				INITIATOR_LOCK_FILE_EXISTS=false
+			elif [ $pid == $targetPid ]; then
+				TARGET_LOCK_FILE_EXISTS=false
+			fi
+		done
+
 		Logger "Cancelling task." "CRITICAL"
 		exit 1
 	fi
-	LOCK_FILES_EXIST=1
 }
 
 function _UnlockReplicasLocal {
@@ -565,21 +591,29 @@ function UnlockReplicas {
 
 	local pids
 
-	if [ $_NOLOCKS -eq 1 ] || [ $LOCK_FILES_EXIST -eq 0 ]; then
+	if [ $_NOLOCKS -eq 1 ]; then
 		return 0
 	fi
 
-	_UnlockReplicasLocal "${INITIATOR[2]}" &
-	pids="$!"
-
-	if [ "$REMOTE_OPERATION" != "yes" ]; then
-		_UnlockReplicasLocal "${TARGET[2]}" &
-		pids="$pids;$!"
-	else
-		_UnlockReplicasRemote "${TARGET[2]}" &
-		pids="$pids;$!"
+	if [ $INITIATOR_LOCK_FILE_EXISTS == true ]; then
+		_UnlockReplicasLocal "${INITIATOR[2]}" &
+		pids="$!"
 	fi
-	WaitForTaskCompletion $pids 720 1800 ${FUNCNAME[0]} true $KEEP_LOGGING
+
+	#WIP check if WaitForTaskCompletion can handle emppty pids like ";pid"
+	if [ $TARGET_LOCK_FILE_EXISTS == true ]; then
+		if [ "$REMOTE_OPERATION" != "yes" ]; then
+			_UnlockReplicasLocal "${TARGET[2]}" &
+			pids="$pids;$!"
+		else
+			_UnlockReplicasRemote "${TARGET[2]}" &
+			pids="$pids;$!"
+		fi
+	fi
+
+	if [ "$pids" != "" ]; then
+		WaitForTaskCompletion $pids 720 1800 ${FUNCNAME[0]} true $KEEP_LOGGING
+	fi
 }
 
 ###### Sync core functions
@@ -598,11 +632,6 @@ function tree_list {
 	local rsync_cmd
 
 	__CheckArguments 3 $# ${FUNCNAME[0]} "$@"	#__WITH_PARANOIA_DEBUG
-
-	#WIP
-	#if [ "$replica_type" == "${INITIATOR[0]}" ]; then
-	#	exit 12
-	#fi
 
 	escaped_replica_path=$(EscapeSpaces "$replica_path")
 
@@ -720,7 +749,6 @@ function sync_attrs {
 	Logger "RSYNC_CMD: $rsync_cmd" "DEBUG"
 	eval "$rsync_cmd"
 	WaitForTaskCompletion $! $SOFT_MAX_EXEC_TIME $HARD_MAX_EXEC_TIME ${FUNCNAME[0]} false $KEEP_LOGGING
-	#WIP: return retval from process instead of err count if only one pid is tested
 	retval=$?
 	if [ $_VERBOSE -eq 1 ] && [ -f "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$SCRIPT_PID" ]; then
 		Logger "List:\n$(cat $RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$SCRIPT_PID)" "NOTICE"
@@ -801,7 +829,6 @@ function sync_attrs {
 	Logger "RSYNC_CMD: $rsync_cmd" "DEBUG"
 	eval "$rsync_cmd"
 	WaitForTaskCompletion $! $SOFT_MAX_EXEC_TIME $HARD_MAX_EXEC_TIME ${FUNCNAME[0]} false $KEEP_LOGGING
-	#WIP: the same
 	retval=$?
 	if [ $_VERBOSE -eq 1 ] && [ -f "$RUN_DIR/$PROGRAM.attr-update.$dest_replica.$SCRIPT_PID" ]; then
 		Logger "List:\n$(cat $RUN_DIR/$PROGRAM.attr-update.$dest_replica.$SCRIPT_PID)" "NOTICE"
@@ -1814,7 +1841,9 @@ if [ "$CONFLICT_PREVALANCE" == "" ]; then
 	CONFLICT_PREVALANCE=initiator
 fi
 
-LOCK_FILES_EXIST=0
+INITIATOR_LOCK_FILE_EXISTS=false
+TARGET_LOCK_FILE_EXISTS=false
+
 FORCE_UNLOCK=0
 no_maxtime=0
 opts=""
@@ -1972,6 +2001,7 @@ opts="${opts# *}"
 	if [ $_QUICK_SYNC -lt 2 ]; then
 		CheckCurrentConfig
 	fi
+	CheckCurrentConfigAll
 
 	DATE=$(date)
 	Logger "-------------------------------------------------------------" "NOTICE"

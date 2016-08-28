@@ -1,6 +1,6 @@
 #### MINIMAL-FUNCTION-SET BEGIN ####
 
-## FUNC_BUILD=2016082801
+## FUNC_BUILD=2016082802
 ## BEGIN Generic bash functions written in 2013-2016 by Orsiris de Jong - http://www.netpower.fr - ozy@netpower.fr
 
 ## To use in a program, define the following variables:
@@ -592,7 +592,6 @@ function joinString {
 # Fills a global variable called WAIT_FOR_TASK_COMPLETION that contains list of failed pids in format pid1:result1;pid2:result2
 # Warning: Don't imbricate this function into another run if you plan to use the global variable output
 
-#TODO check missing local values used here
 function WaitForTaskCompletion {
 	local pids="${1}" # pids to wait for, separated by semi-colon
 	local soft_max_time="${2}" # If program with pid $pid takes longer than $soft_max_time seconds, will log a warning, unless $soft_max_time equals 0.
@@ -613,8 +612,12 @@ function WaitForTaskCompletion {
 	local retval=0 # return value of monitored pid process
 	local errorcount=0 # Number of pids that finished with errors
 
+	local pid	# Current pid working on
 	local pidCount # number of given pids
 	local pidState # State of the process
+
+	local pidsArray # Array of currently running pids
+	local newPidsArray # New array of currently running pids
 
 	IFS=';' read -a pidsArray <<< "$pids"
 	pidCount=${#pidsArray[@]}
