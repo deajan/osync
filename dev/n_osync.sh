@@ -481,20 +481,22 @@ function CheckLocks {
 
 function _WriteLockFilesLocal {
 	local lockfile="${1}"
-	__CheckArguments 1 $# ${FUNCNAME[0]} "$@"	#__WITH_PARANOIA_DEBUG
+	local replica_type="${2}"
+	__CheckArguments 2 $# ${FUNCNAME[0]} "$@"	#__WITH_PARANOIA_DEBUG
 
 	$COMMAND_SUDO echo "$SCRIPT_PID@$INSTANCE_ID" > "$lockfile"
 	if [ $?	!= 0 ]; then
-		Logger "Could not create lock file [$lockfile]." "CRITICAL"
+		Logger "Could not create lock file on local $replica_type in [$lockfile]." "CRITICAL"
 		exit 1
 	else
-		Logger "Locked replica on [$lockfile]." "DEBUG"
+		Logger "Locked local $replica_type replica in [$lockfile]." "DEBUG"
 	fi
 }
 
 function _WriteLockFilesRemote {
 	local lockfile="${1}"
-	__CheckArguments 1 $# ${FUNCNAME[0]} "$@"	#__WITH_PARANOIA_DEBUG
+	local replica_type="${2}"
+	__CheckArguments 2 $# ${FUNCNAME[0]} "$@"	#__WITH_PARANOIA_DEBUG
 
 	local cmd=
 
@@ -504,12 +506,11 @@ function _WriteLockFilesRemote {
 	cmd=$SSH_CMD' "echo '$SCRIPT_PID@$INSTANCE_ID' | '$COMMAND_SUDO' tee \"'$lockfile'\"" > /dev/null 2>&1'
 	Logger "cmd: $cmd" "DEBUG"
 	eval "$cmd"
-	eval "mongo"
 	if [ $? != 0 ]; then
-		Logger "Could not set lock on remote $replica_type replica." "CRITICAL"
+		Logger "Could not create lock file on remote $replica_type in [$lockfile]." "CRITICAL"
 		exit 1
 	else
-		Logger "Locked remote $replica_type replica." "DEBUG"
+		Logger "Locked remote $replica_type replica in [$lockfile]." "DEBUG"
 	fi
 }
 
@@ -521,14 +522,14 @@ function WriteLockFiles {
 	local pidArray
 	local pid
 
-	_WriteLockFilesLocal "${INITIATOR[2]}" &
+	_WriteLockFilesLocal "${INITIATOR[2]}" "${INITIATOR[0]}"&
 	initiatorPid="$!"
 
 	if [ "$REMOTE_OPERATION" != "yes" ]; then
-		_WriteLockFilesLocal "${TARGET[2]}" &
+		_WriteLockFilesLocal "${TARGET[2]}" "${TARGET[0]}" &
 		targetPid="$!"
 	else
-		_WriteLockFilesRemote "${TARGET[2]}" &
+		_WriteLockFilesRemote "${TARGET[2]}" "${TARGET[0]}" &
 		targetPid="$!"
 	fi
 
@@ -545,7 +546,6 @@ function WriteLockFiles {
 		done
 
 		Logger "Cancelling task." "CRITICAL"
-		local
 		exit 1
 	fi
 }
