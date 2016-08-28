@@ -9,40 +9,41 @@ PROGRAM_VERSION=1.2-dev-parallel
 PROGRAM_BUILD=2016082802
 IS_STABLE=no
 
-#	Function Name		Is parallel	#__WITH_PARANOIA_DEBUG
+# Execution order
+#	Function Name				Is parallel	#__WITH_PARANOIA_DEBUG
 
-#	GetLocalOS		no		#__WITH_PARANOIA_DEBUG
-#	InitLocalOSSettings	no		#__WITH_PARANOIA_DEBUG
-#	CheckEnvironment	no		#__WITH_PARANOIA_DEBUG
-#	PreInit			no		#__WITH_PARANOIA_DEBUG
-#	Init			no		#__WITH_PARANOIA_DEBUG
-#	PostInit		no		#__WITH_PARANOIA_DEBUG
-#	GetRemoteOS		no		#__WITH_PARANOIA_DEBUG
-#	InitRemoteOSSettings	no		#__WITH_PARANOIA_DEBUG
-#	CheckReplicaPaths	yes		#__WITH_PARANOIA_DEBUG
-#	CheckDiskSpace		yes		#__WITH_PARANOIA_DEBUG
-#	RunBeforeHook		yes		#__WITH_PARANOIA_DEBUG
-#	Main			no		#__WITH_PARANOIA_DEBUG
-#	CreateStateDirs		yes		#__WITH_PARANOIA_DEBUG
-#	CheckLocks		yes		#__WITH_PARANOIA_DEBUG
-#	WriteLockFiles		yes		#__WITH_PARANOIA_DEBUG
-#	Sync			no		#__WITH_PARANOIA_DEBUG
-#	tree_list		yes		#__WITH_PARANOIA_DEBUG
-#	tree_list		yes		#__WITH_PARANOIA_DEBUG
-#	delete_list		yes		#__WITH_PARANOIA_DEBUG
-#	delete_list		yes		#__WITH_PARANOIA_DEBUG
-#	sync_attrs		no		#__WITH_PARANOIA_DEBUG
-#	_get_file_ctime_mtime	yes		#__WITH_PARANOIA_DEBUG
-#	sync_update		yes		#__WITH_PARANOIA_DEBUG
-#	sync_update		yes		#__WITH_PARANOIA_DEBUG
-#	deletion_propagation	yes		#__WITH_PARANOIA_DEBUG
-#	deletion_propagation	yes		#__WITH_PARANOIA_DEBUG
-#	tree_list		yes		#__WITH_PARANOIA_DEBUG
-#	tree_list		yes		#__WITH_PARANOIA_DEBUG
-#	SoftDelete		yes		#__WITH_PARANOIA_DEBUG
-#	RunAfterHook		yes		#__WITH_PARANOIA_DEBUG
-#	UnlockReplicas		yes		#__WITH_PARANOIA_DEBUG
-#	CleanUp			no		#__WITH_PARANOIA_DEBUG
+#	GetLocalOS				no		#__WITH_PARANOIA_DEBUG
+#	InitLocalOSSettings			no		#__WITH_PARANOIA_DEBUG
+#	CheckEnvironment			no		#__WITH_PARANOIA_DEBUG
+#	PreInit					no		#__WITH_PARANOIA_DEBUG
+#	Init					no		#__WITH_PARANOIA_DEBUG
+#	PostInit				no		#__WITH_PARANOIA_DEBUG
+#	GetRemoteOS				no		#__WITH_PARANOIA_DEBUG
+#	InitRemoteOSSettings			no		#__WITH_PARANOIA_DEBUG
+#	CheckReplicaPaths			yes		#__WITH_PARANOIA_DEBUG
+#	CheckDiskSpace				yes		#__WITH_PARANOIA_DEBUG
+#	RunBeforeHook				yes		#__WITH_PARANOIA_DEBUG
+#	Main					no		#__WITH_PARANOIA_DEBUG
+#		CreateStateDirs			yes		#__WITH_PARANOIA_DEBUG
+#	 	CheckLocks			yes		#__WITH_PARANOIA_DEBUG
+#	 	WriteLockFiles			yes		#__WITH_PARANOIA_DEBUG
+#	 	Sync				no		#__WITH_PARANOIA_DEBUG
+#			tree_list		yes		#__WITH_PARANOIA_DEBUG
+#			tree_list		yes		#__WITH_PARANOIA_DEBUG
+#			delete_list		yes		#__WITH_PARANOIA_DEBUG
+#			delete_list		yes		#__WITH_PARANOIA_DEBUG
+#			sync_attrs		no		#__WITH_PARANOIA_DEBUG
+#			_get_file_ctime_mtime	yes		#__WITH_PARANOIA_DEBUG
+#			sync_update		yes		#__WITH_PARANOIA_DEBUG
+#			sync_update		yes		#__WITH_PARANOIA_DEBUG
+#			deletion_propagation	yes		#__WITH_PARANOIA_DEBUG
+#			deletion_propagation	yes		#__WITH_PARANOIA_DEBUG
+#			tree_list		yes		#__WITH_PARANOIA_DEBUG
+#			tree_list		yes		#__WITH_PARANOIA_DEBUG
+#		SoftDelete			yes		#__WITH_PARANOIA_DEBUG
+#	RunAfterHook				yes		#__WITH_PARANOIA_DEBUG
+#	UnlockReplicas				yes		#__WITH_PARANOIA_DEBUG
+#	CleanUp					no		#__WITH_PARANOIA_DEBUG
 
 source "./ofunctions.sh"
 _LOGGER_PREFIX="time"
