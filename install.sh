@@ -283,11 +283,7 @@ do
 done
 
 if [ "$FAKEROOT" != "" ]; then
-	mkdir -p $SERVICE_DIR_SYSTEMD_SYSTEM $SERVICE_DIR_SYSTEMD_USER
-fi
-
-if [ "$BIN_DIR" != "/usr/local/bin" ]; then
-	mkdir -p "$BIN_DIR"
+	mkdir -p "$SERVICE_DIR_SYSTEMD_SYSTEM" "$SERVICE_DIR_SYSTEMD_USER" "$BIN_DIR"
 fi
 
 SetOSSettings
