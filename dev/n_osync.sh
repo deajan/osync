@@ -1,13 +1,12 @@
 #!/usr/bin/env bash
 
 #TODO(critical): handle conflict prevalance, especially in sync_attrs function
-#TODO(critical): writelockfiles remote does not shut execution
 
 PROGRAM="osync" # Rsync based two way sync engine with fault tolerance
 AUTHOR="(C) 2013-2016 by Orsiris de Jong"
 CONTACT="http://www.netpower.fr/osync - ozy@netpower.fr"
 PROGRAM_VERSION=1.2-dev-parallel
-PROGRAM_BUILD=2016082201
+PROGRAM_BUILD=2016082801
 IS_STABLE=no
 
 #	Function Name		Is parallel	#__WITH_PARANOIA_DEBUG
@@ -159,6 +158,10 @@ function CheckCurrentConfig {
         done
 
         #TODO(low): Add runtime variable tests (RSYNC_ARGS etc)
+	if [ "$REMOTE_OPERATION" == "yes" ] && [ ! -f "$SSH_RSA_PRIVATE_KEY" ]; then
+		Logger "Cannot find rsa private key [$SSH_RSA_PRIVATE_KEY]. Cannot connect to remote system." "CRITICAL"
+		exit 1
+	fi
 }
 
 ###### Osync specific functions (non shared)
