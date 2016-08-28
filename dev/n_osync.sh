@@ -6,7 +6,7 @@ PROGRAM="osync" # Rsync based two way sync engine with fault tolerance
 AUTHOR="(C) 2013-2016 by Orsiris de Jong"
 CONTACT="http://www.netpower.fr/osync - ozy@netpower.fr"
 PROGRAM_VERSION=1.2-dev-parallel
-PROGRAM_BUILD=2016082801
+PROGRAM_BUILD=2016082802
 IS_STABLE=no
 
 #	Function Name		Is parallel	#__WITH_PARANOIA_DEBUG
@@ -128,6 +128,24 @@ function CheckEnvironment {
 function CheckCurrentConfig {
         __CheckArguments 0 $# ${FUNCNAME[0]} "$@"    #__WITH_PARANOIA_DEBUG
 
+        # Check all variables that should contain "yes" or "no"
+        declare -a yes_no_vars=(CREATE_DIRS SUDO_EXEC SSH_COMPRESSION SSH_IGNORE_KNOWN_HOSTS REMOTE_HOST_PING PRESERVE_PERMISSIONS PRESERVE_OWNER PRESERVE_GROUP PRESERVE_EXECUTABILITY PRESERVE_ACL PRESERVE_XATTR COPY_SYMLINKS KEEP_DIRLINKS PRESERVE_HARDLINKS CHECKSUM RSYNC_COMPRESS CONFLICT_BACKUP CONFLICT_BACKUP_MULTIPLE SOFT_DELETE RESUME_SYNC FORCE_STRANGER_LOCK_RESUME PARTIAL DELTA_COPIES STOP_ON_CMD_ERROR RUN_AFTER_CMD_ON_ERROR)
+        for i in "${yes_no_vars[@]}"; do
+                test="if [ \"\$$i\" != \"yes\" ] && [ \"\$$i\" != \"no\" ]; then Logger \"Bogus $i value defined in config file. Correct your config file or update it using the update script if using and old version.\" \"CRITICAL\"; exit 1; fi"
+                eval "$test"
+        done
+
+        # Check all variables that should contain a numerical value >= 0
+        declare -a num_vars=(MINIMUM_SPACE BANDWIDTH SOFT_MAX_EXEC_TIME HARD_MAX_EXEC_TIME KEEP_LOGGING MIN_WAIT MAX_WAIT CONFLICT_BACKUP_DAYS SOFT_DELETE_DAYS RESUME_TRY MAX_EXEC_TIME_PER_CMD_BEFORE MAX_EXEC_TIME_PER_CMD_AFTER)
+        for i in "${num_vars[@]}"; do
+		test="if [ $(IsNumeric \"\$$i\") -eq 0 ]; then Logger \"Bogus $i value defined in config file. Correct your config file or update it using the update script if using and old version.\" \"CRITICAL\"; exit 1; fi"
+                eval "$test"
+        done
+}
+
+function CheckCurrentConfigAll {
+        __CheckArguments 0 $# ${FUNCNAME[0]} "$@"    #__WITH_PARANOIA_DEBUG
+
         if [ "$INSTANCE_ID" == "" ]; then
                 Logger "No INSTANCE_ID defined in config file." "CRITICAL"
                 exit 1
@@ -142,20 +160,6 @@ function CheckCurrentConfig {
 		Logger "Not TARGET_SYNC_DIR set in config file." "CRITICAL"
 		exit 1
 	fi
-
-        # Check all variables that should contain "yes" or "no"
-        declare -a yes_no_vars=(CREATE_DIRS SUDO_EXEC SSH_COMPRESSION SSH_IGNORE_KNOWN_HOSTS REMOTE_HOST_PING PRESERVE_PERMISSIONS PRESERVE_OWNER PRESERVE_GROUP PRESERVE_EXECUTABILITY PRESERVE_ACL PRESERVE_XATTR COPY_SYMLINKS KEEP_DIRLINKS PRESERVE_HARDLINKS CHECKSUM RSYNC_COMPRESS CONFLICT_BACKUP CONFLICT_BACKUP_MULTIPLE SOFT_DELETE RESUME_SYNC FORCE_STRANGER_LOCK_RESUME PARTIAL DELTA_COPIES STOP_ON_CMD_ERROR RUN_AFTER_CMD_ON_ERROR)
-        for i in "${yes_no_vars[@]}"; do
-                test="if [ \"\$$i\" != \"yes\" ] && [ \"\$$i\" != \"no\" ]; then Logger \"Bogus $i value defined in config file. Correct your config file or update it using the update script if using and old version.\" \"CRITICAL\"; exit 1; fi"
-                eval "$test"
-        done
-
-        # Check all variables that should contain a numerical value >= 0
-        declare -a num_vars=(MINIMUM_SPACE BANDWIDTH SOFT_MAX_EXEC_TIME HARD_MAX_EXEC_TIME KEEP_LOGGING MIN_WAIT MAX_WAIT CONFLICT_BACKUP_DAYS SOFT_DELETE_DAYS RESUME_TRY MAX_EXEC_TIME_PER_CMD_BEFORE MAX_EXEC_TIME_PER_CMD_AFTER)
-        for i in "${num_vars[@]}"; do
-		test="if [ $(IsNumeric \"\$$i\") -eq 0 ]; then Logger \"Bogus $i value defined in config file. Correct your config file or update it using the update script if using and old version.\" \"CRITICAL\"; exit 1; fi"
-                eval "$test"
-        done
 
         #TODO(low): Add runtime variable tests (RSYNC_ARGS etc)
 	if [ "$REMOTE_OPERATION" == "yes" ] && [ ! -f "$SSH_RSA_PRIVATE_KEY" ]; then
@@ -499,6 +503,7 @@ function _WriteLockFilesRemote {
 	cmd=$SSH_CMD' "echo '$SCRIPT_PID@$INSTANCE_ID' | '$COMMAND_SUDO' tee \"'$lockfile'\"" > /dev/null 2>&1'
 	Logger "cmd: $cmd" "DEBUG"
 	eval "$cmd"
+	eval "mongo"
 	if [ $? != 0 ]; then
 		Logger "Could not set lock on remote $replica_type replica." "CRITICAL"
 		exit 1
@@ -510,23 +515,38 @@ function _WriteLockFilesRemote {
 function WriteLockFiles {
 	__CheckArguments 0 $# ${FUNCNAME[0]} "$@"	#__WITH_PARANOIA_DEBUG
 
-	local pids
+	local initiatorPid
+	local targetPid
+	local pidArray
+	local pid
 
 	_WriteLockFilesLocal "${INITIATOR[2]}" &
-	pids="$!"
+	initiatorPid="$!"
+
 	if [ "$REMOTE_OPERATION" != "yes" ]; then
 		_WriteLockFilesLocal "${TARGET[2]}" &
-		pids="$pids;$!"
+		targetPid="$!"
 	else
 		_WriteLockFilesRemote "${TARGET[2]}" &
-		pids="$pids;$!"
+		targetPid="$!"
 	fi
-	WaitForTaskCompletion $pids 720 1800 ${FUNCNAME[0]} true $KEEP_LOGGING
+
+	WaitForTaskCompletion "$initiatorPid;$targetPid" 720 1800 ${FUNCNAME[0]} true $KEEP_LOGGING
 	if [ $? -ne 0 ]; then
+		IFS=';' read -r -a pidArray <<< "$WAIT_FOR_TASK_COMPLETION"
+		for pid in "${pidArray[@]}"; do
+			pid=${pid%:*}
+			if [ $pid == $initiatorPid ]; then
+				INITIATOR_LOCK_FILE_EXISTS=false
+			elif [ $pid == $targetPid ]; then
+				TARGET_LOCK_FILE_EXISTS=false
+			fi
+		done
+
 		Logger "Cancelling task." "CRITICAL"
+		local
 		exit 1
 	fi
-	LOCK_FILES_EXIST=1
 }
 
 function _UnlockReplicasLocal {
@@ -568,21 +588,29 @@ function UnlockReplicas {
 
 	local pids
 
-	if [ $_NOLOCKS -eq 1 ] || [ $LOCK_FILES_EXIST -eq 0 ]; then
+	if [ $_NOLOCKS -eq 1 ]; then
 		return 0
 	fi
 
-	_UnlockReplicasLocal "${INITIATOR[2]}" &
-	pids="$!"
-
-	if [ "$REMOTE_OPERATION" != "yes" ]; then
-		_UnlockReplicasLocal "${TARGET[2]}" &
-		pids="$pids;$!"
-	else
-		_UnlockReplicasRemote "${TARGET[2]}" &
-		pids="$pids;$!"
+	if [ $INITIATOR_LOCK_FILE_EXISTS == true ]; then
+		_UnlockReplicasLocal "${INITIATOR[2]}" &
+		pids="$!"
 	fi
-	WaitForTaskCompletion $pids 720 1800 ${FUNCNAME[0]} true $KEEP_LOGGING
+
+	#WIP check if WaitForTaskCompletion can handle emppty pids like ";pid"
+	if [ $TARGET_LOCK_FILE_EXISTS == true ]; then
+		if [ "$REMOTE_OPERATION" != "yes" ]; then
+			_UnlockReplicasLocal "${TARGET[2]}" &
+			pids="$pids;$!"
+		else
+			_UnlockReplicasRemote "${TARGET[2]}" &
+			pids="$pids;$!"
+		fi
+	fi
+
+	if [ "$pids" != "" ]; then
+		WaitForTaskCompletion $pids 720 1800 ${FUNCNAME[0]} true $KEEP_LOGGING
+	fi
 }
 
 ###### Sync core functions
@@ -1817,7 +1845,10 @@ if [ "$CONFLICT_PREVALANCE" == "" ]; then
 	CONFLICT_PREVALANCE=initiator
 fi
 
-LOCK_FILES_EXIST=0
+# Always assume lock files exist and must be unlocked, unless WriteLockFiles says otherwise
+INITIATOR_LOCK_FILE_EXISTS=true
+TARGET_LOCK_FILE_EXISTS=true
+
 FORCE_UNLOCK=0
 no_maxtime=0
 opts=""
@@ -1975,6 +2006,7 @@ opts="${opts# *}"
 	if [ $_QUICK_SYNC -lt 2 ]; then
 		CheckCurrentConfig
 	fi
+	CheckCurrentConfigAll
 
 	DATE=$(date)
 	Logger "-------------------------------------------------------------" "NOTICE"
