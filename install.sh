@@ -13,7 +13,7 @@ SCRIPT_BUILD=2016052601
 #TODO: silent mode and no stats mode
 
 CONF_DIR=$FAKEROOT/etc/$PROGRAM
-BIN_DIR=${BIN_DIR:-/usr/local/bin}
+BIN_DIR="$FAKEROOT${BIN_DIR:-/usr/local/bin}"
 SERVICE_DIR_INIT=$FAKEROOT/etc/init.d
 # Should be /usr/lib/systemd/system, but /lib/systemd/system exists on debian & rhel / fedora
 SERVICE_DIR_SYSTEMD_SYSTEM=$FAKEROOT/lib/systemd/system
