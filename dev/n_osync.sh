@@ -6,7 +6,7 @@ PROGRAM="osync" # Rsync based two way sync engine with fault tolerance
 AUTHOR="(C) 2013-2016 by Orsiris de Jong"
 CONTACT="http://www.netpower.fr/osync - ozy@netpower.fr"
 PROGRAM_VERSION=1.2-dev-parallel
-PROGRAM_BUILD=2016082802
+PROGRAM_BUILD=2016082803
 IS_STABLE=no
 
 # Execution order
@@ -498,7 +498,7 @@ function _WriteLockFilesRemote {
 	local replica_type="${2}"
 	__CheckArguments 2 $# ${FUNCNAME[0]} "$@"	#__WITH_PARANOIA_DEBUG
 
-	local cmd=
+	local cmd
 
 	CheckConnectivity3rdPartyHosts
 	CheckConnectivityRemoteHost
@@ -533,6 +533,8 @@ function WriteLockFiles {
 		targetPid="$!"
 	fi
 
+	INITIATOR_LOCK_FILE_EXISTS=true
+	TARGET_LOCK_FILE_EXISTS=true
 	WaitForTaskCompletion "$initiatorPid;$targetPid" 720 1800 ${FUNCNAME[0]} true $KEEP_LOGGING
 	if [ $? -ne 0 ]; then
 		IFS=';' read -r -a pidArray <<< "$WAIT_FOR_TASK_COMPLETION"
@@ -1846,9 +1848,8 @@ if [ "$CONFLICT_PREVALANCE" == "" ]; then
 	CONFLICT_PREVALANCE=initiator
 fi
 
-# Always assume lock files exist and must be unlocked, unless WriteLockFiles says otherwise
-INITIATOR_LOCK_FILE_EXISTS=true
-TARGET_LOCK_FILE_EXISTS=true
+INITIATOR_LOCK_FILE_EXISTS=false
+TARGET_LOCK_FILE_EXISTS=false
 
 FORCE_UNLOCK=0
 no_maxtime=0
