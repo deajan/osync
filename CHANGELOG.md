@@ -7,6 +7,9 @@ KNOWN ISSUES
 RECENT CHANGES
 --------------
 
+- Logs sent by mail are easier to read
+        - Better subject (currently running or finished	run)
+        - Fixed	bogus double log sent in alert mails
 - Made unix signals posix compliant
 - Config file upgrade script now updates header
 ! test if waitfortaskcompletion kill self works okay with osync

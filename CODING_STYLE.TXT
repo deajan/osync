@@ -1,4 +1,4 @@
-Coding style used for my bash projects (v2.2 Aug 2016)
+Coding style used for my bash projects (v2.3 Sep 2016)
 
 ++++++ Header
 
@@ -62,7 +62,7 @@ Example: SomeFunctionThatRocks
 
 Bash does not provide any checks against missing function arguments. Also, missing quotes can lead to an inconsistent number of arguments.
 Most functions should have a first line that calls the special function __CheckArguments, which checks the number of given arguments for a function in order
-to find possible problems. Number of arguments are given as first argument to __CheckArguments.
+to find possible problems. Number of arguments are given as first argument to __CheckArguments. May be a number or a range, eg 0-2 if the function takes optional arguments.
 __CheckArguments will only trigger when the script is launched with _PARANOIA_DEBUG=yes. Also, it will only exist in the debug version.
 Use the following convention for function definition:
 
