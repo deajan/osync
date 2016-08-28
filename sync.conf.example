@@ -1,0 +1,169 @@
+#!/usr/bin/env bash
+
+###### osync - Rsync based two way sync engine with fault tolerance
+###### (C) 2013-2016 by Orsiris de Jong (www.netpower.fr)
+###### osync v1.1x config file rev 2016071801
+
+## ---------- GENERAL OPTIONS
+
+## Sync job identification
+INSTANCE_ID="sync_test"
+
+## Directories to synchronize.
+## Initiator is the system osync runs on. The initiator directory must be a local path.
+INITIATOR_SYNC_DIR="/home/git/osync/dir1"
+
+## Target is the system osync synchronizes to (can be the same system as the initiator in case of local sync tasks). The target directory can be a local or remote path.
+TARGET_SYNC_DIR="/home/git/osync/dir2"
+#TARGET_SYNC_DIR="ssh://backupuser@yourhost.old:22//home/git/osync/dir2"
+
+## If the target system is remote, you can specify a RSA key (please use full path). If not defined, the default ~/.ssh/id_rsa will be used. See documentation for further information.
+SSH_RSA_PRIVATE_KEY="/home/backupuser/.ssh/id_rsa"
+
+## Create sync directories if they do not exist
+CREATE_DIRS=no
+
+## Log file location. Leaving this empty will create a logfile at /var/log/osync_version_SYNC_ID.log (or current directory if /var/log doesn't exist)
+LOGFILE=""
+
+## Generate an alert if initiator or target replicas have less free space than given value in KB.
+MINIMUM_SPACE=10240
+
+## Bandwidth limit Kbytes / second. Leave 0 to disable limitation
+BANDWIDTH=0
+
+## If enabled, synchronization on remote system will be processed as superuser. See documentation for /etc/sudoers file configuration.
+SUDO_EXEC=no
+## Paranoia option. Don't change this unless you read the documentation.
+RSYNC_EXECUTABLE=rsync
+## Remote rsync executable path. Leave this empty in most cases
+RSYNC_REMOTE_PATH=""
+
+## Rsync exclude / include order (the option set here will be set first, eg: include will make include then exclude patterns)
+RSYNC_PATTERN_FIRST=include
+
+## List of files / directories to incldue / exclude from sync on both sides (see rsync patterns, wildcards work).
+## Paths are relative to sync dirs. List elements are separated by a semicolon.
+RSYNC_INCLUDE_PATTERN=""
+RSYNC_EXCLUDE_PATTERN=""
+#RSYNC_EXCLUDE_PATTERN="tmp;archives"
+
+## Files that contains lists of files / directories to include / exclude from sync on both sides. Leave this empty if you don't want to use an exclusion file.
+## This file has to be in the same directory as the config file
+## Paths are relative to sync dirs. One element per line.
+RSYNC_INCLUDE_FROM=""
+RSYNC_EXCLUDE_FROM=""
+#RSYNC_EXCLUDE_FROM="exclude.list"
+
+## List elements separator char.  You may set an alternative separator char for your directories lists above.
+PATH_SEPARATOR_CHAR=";"
+
+## ---------- REMOTE SYNC OPTIONS
+
+## ssh compression should be used unless your remote connection is good enough (LAN)
+SSH_COMPRESSION=yes
+
+## Ignore ssh known hosts. DANGER WILL ROBINSON DANGER ! This can lead to security issues. Only enable this if you know what you're doing.
+SSH_IGNORE_KNOWN_HOSTS=no
+
+## Check for connectivity to remote host before launching remote sync task. Be sure the hosts responds to ping. Failing to ping will stop sync.
+REMOTE_HOST_PING=no
+
+## Check for internet access by pinging one or more 3rd party hosts before remote sync task. Leave empty if you don't want this check to be be performed. Failing to ping will stop sync.
+## If you use this function, you should set more than one 3rd party host, and be sure you can ping them.
+## Be aware some DNS like opendns redirect false hostnames. Also, this adds an extra execution time of a bit less than a minute.
+REMOTE_3RD_PARTY_HOSTS="www.kernel.org www.google.com"
+
+## ---------- MISC OPTIONS
+
+## Preserve ACLS. Make sure source and target FS can manage same ACLs or you'll get loads of errors.
+PRESERVE_ACL=no
+## Preserve Xattr. Make sure source and target FS can manage same Xattrs or you'll get loads of errors.
+PRESERVE_XATTR=no
+## Transforms symlinks into referent files/dirs
+COPY_SYMLINKS=no
+## Treat symlinked dirs	as dirs. CAUTION: This also follows symlinks outside of the replica root.
+KEEP_DIRLINKS=no
+## Preserve hard links. Make sure source and target FS can manage hard links or you will lose them.
+PRESERVE_HARDLINKS=no
+## Do a full checksum on all files that have identical sizes, they are checksummed to see if they actually are identical. This can take a long time.
+CHECKSUM=no
+
+## Let RSYNC compress file transfers. Do not use this if both initator and target replicas are on local system. Also,  do not use this if you already enabled SSH compression.
+RSYNC_COMPRESS=yes
+
+## Maximum execution time (in seconds) for sync process. Set these values zero will disable max execution times.
+## Soft exec time only generates a warning. Hard exec time will generate a warning and stop sync process.
+SOFT_MAX_EXEC_TIME=7200
+HARD_MAX_EXEC_TIME=10600
+
+## Minimum time (in seconds) in file monitor /daemon mode between modification detection and sync task in order to let copy operations finish.
+MIN_WAIT=60
+
+## Maximum time (in seconds) waiting in file monitor / daemon mode. After this time, sync is run.
+## Use 0 to wait indefinitely.
+MAX_WAIT=7200
+
+## ---------- BACKUP AND DELETION OPTIONS
+
+## Enabling this option will keep a backup of a file on the target replica if it gets updated from the source replica. Backups will be made to .osync_workdir/backups
+CONFLICT_BACKUP=yes
+## Keep multiple backup versions of the same file. Warning, This can be very space consuming.
+CONFLICT_BACKUP_MULTIPLE=no
+## Osync will clean backup files after a given number of days. Setting this to 0 will disable cleaning and keep backups forever. Warning: This can be very space consuming.
+CONFLICT_BACKUP_DAYS=30
+## If the same file exists on both replicas, newer version will be synced. However, if both files have the same timestamp but differ, CONFILCT_PREVALANCE sets winner replica.
+CONFLICT_PREVALANCE=initiator
+
+## On deletion propagation to the target replica, a backup of the deleted files can be kept. Deletions will be kept in .osync_workdir/deleted
+SOFT_DELETE=yes
+## Osync will clean deleted files after a given number of days. Setting this to 0 will disable cleaning and keep deleted files forever. Warning: This can be very space consuming.
+SOFT_DELETE_DAYS=30
+
+## ---------- RESUME OPTIONS
+
+## Try to resume an aborted sync task
+RESUME_SYNC=yes
+## Number maximum resume tries before initiating a fresh sync.
+RESUME_TRY=2
+## When a pidlock exists on slave replica that does not correspond to the initiator's instance-id, force pidlock removal. Be careful with this option if you have multiple initiators.
+FORCE_STRANGER_LOCK_RESUME=no
+
+## Keep partial uploads that can be resumed on next run, experimental feature
+PARTIAL=no
+
+## Use delta copy algortithm (usefull when local paths are network drives), defaults to yes
+DELTA_COPIES=yes
+
+## ---------- ALERT OPTIONS
+
+## List of alert mails separated by spaces
+DESTINATION_MAILS="your@alert.tld"
+
+## Windows specific (msys / cygwin environment) only mail options (used with mailsend.exe from muquit, http://github.com/muquit/mailsend or from sendemail.exe from Brandon Zehm, http://caspian.dotconf.net/menu/Software/SendEmail/)
+SENDER_MAIL="alert@your.system.tld"
+SMTP_SERVER=smtp.your.isp.tld
+SMTP_PORT=25
+# encryption can be tls, ssl or none
+SMTP_ENCRYPTION=none
+SMTP_USER=
+SMTP_PASSWORD=
+
+## ---------- EXECUTION HOOKS
+
+## Commands can will be run before and / or after sync process (remote execution will only happen if REMOTE_OPERATION is set).
+LOCAL_RUN_BEFORE_CMD=""
+LOCAL_RUN_AFTER_CMD=""
+
+REMOTE_RUN_BEFORE_CMD=""
+REMOTE_RUN_AFTER_CMD=""
+
+## Max execution time of commands before they get force killed. Leave 0 if you don't wan't this to happen. Time is specified in seconds.
+MAX_EXEC_TIME_PER_CMD_BEFORE=0
+MAX_EXEC_TIME_PER_CMD_AFTER=0
+
+## Stops osync execution if one of the above commands fail
+STOP_ON_CMD_ERROR=yes
+
+## Run local and remote after sync commands even on failure
+RUN_AFTER_CMD_ON_ERROR=no
