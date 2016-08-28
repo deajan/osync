@@ -33,7 +33,9 @@ RECENT CHANGES
 - Added KillAllChilds function to accept multiple pids
 - Improved logging
 
-XX xxx 2016: osync v1.1.2 released
+28 Aug 2016: osync v1.1.2 released
+- Renamed sync.conf to sync.conf.example (thanks to https://github.com/hortimech)
+- Fixed RunAfterHook may be executed twice
 - Fixed soft deletion when SUDO_EXEC is enabled
 
 06 Aug 2016: osync v1.1.1 released
