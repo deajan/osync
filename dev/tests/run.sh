@@ -1,9 +1,18 @@
 #!/usr/bin/env bash
 
+# osync shunit2 tests
+
+# modify ctime on ext4
+debugfs -w -R 'set_inode_field /tmp/foo ctime 201001010101' /dev/sda1
+echo > /proc/sys/vm/drop_caches
+
 # Test dir
 TMP="/tmp/osync_tests"
 # SSH port used for remote tests
-SSH_PORT=49999
+SSH_PORT=22
+
+INITIATOR_DIR="init"
+TARGET_DIR="targ"
 
 # Get dir the tests are stored in
 TEST_DIR=$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )
@@ -11,8 +20,8 @@ cd "$TEST_DIR"
 
 OSYNC_EXECUTABLE="$(dirname $TEST_DIR)//osync.sh"
 declare -A sandbox_osync
-#sandbox_osync[quickLocal]="--master=master --slave=slave"
-#sandbox_osync[quickRemote]="--master=master --slave=ssh://localhost//tmp/osync_tests/quickRemote/slave"
+sandbox_osync[quickLocal]="--initiator=$INITIATOR_DIR --target=$TARGET_DIR"
+#sandbox_osync[quickRemote]="--initiator=$INITIATOR_DIR --slave=ssh://localhost:$SSH_PORT/$TMP/$TARGET_DIR"
 #sandbox_osync[local]="conf/local.conf"
 #sandbox_osync[remote]="conf/remote.conf"
 
@@ -34,8 +43,8 @@ prepareSandbox()
     rm -rf "$TMP/$1"
     mkdir -p "$TMP/$1"
     pushd "$TMP/$1" >/dev/null
-    mkdir master
-    mkdir slave
+    mkdir "$INITIATOR_DIR"
+    mkdir "$TARGET_DIR"
     mkdir expected
     popd >/dev/null
 }

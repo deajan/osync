@@ -19,6 +19,9 @@ Osync provides the following capabilities
 - Batch runner for multiple sync tasks with rerun option for failed sync tasks
 - ACL synchronization
 
+osync is a state synchronizer. This means that it doesn't have to monitor files for changes. Instead, it compares replica lists between runs.
+A full run takes about 2 seconds on a local-local replication and about 10 seconds on a local-remote replication.
+Disabling some features file like attributes preservation and disk space checks may speed up execution. 
 osync uses a initiator / target sync schema. It can sync local to local or local to remote directories. By definition, initiator replica is always a local directory on the system osync runs on.
 osync uses pidlocks to prevent multiple concurrent sync processes on/to the same initiator / target replica.
 You may launch concurrent sync processes on the same system but only for different initiator replicas.

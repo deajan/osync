@@ -1,9 +1,13 @@
 #### MINIMAL-FUNCTION-SET BEGIN ####
 
-## FUNC_BUILD=2016081806
-## BEGIN Generic functions for osync & obackup written in 2013-2016 by Orsiris de Jong - http://www.netpower.fr - ozy@netpower.fr
+## FUNC_BUILD=2016082801
+## BEGIN Generic bash functions written in 2013-2016 by Orsiris de Jong - http://www.netpower.fr - ozy@netpower.fr
 
-## type -p does not work on platforms other than linux (bash). If if does not work, always assume output is not a zero exitcode
+## To use in a program, define the following variables:
+## PROGRAM=program-name
+## INSTANCE_ID=program-instance-name
+## _DEBUG=yes/no
+
 if ! type "$BASH" > /dev/null; then
 	echo "Please run this script only with bash shell. Tested on bash >= 3.2"
 	exit 127
@@ -28,6 +32,9 @@ fi
 ERROR_ALERT=0
 WARN_ALERT=0
 
+# Current log
+CURRENT_LOG=
+
 ## allow function call checks			#__WITH_PARANOIA_DEBUG
 if [ "$_PARANOIA_DEBUG" == "yes" ];then		#__WITH_PARANOIA_DEBUG
 	_DEBUG=yes				#__WITH_PARANOIA_DEBUG
@@ -48,6 +55,10 @@ SCRIPT_PID=$$
 
 LOCAL_USER=$(whoami)
 LOCAL_HOST=$(hostname)
+
+if [ "$PROGRAM" == "" ]; then
+	PROGRAM="ofunctions"
+fi
 
 ## Default log file until config file is loaded
 if [ -w /var/log ]; then
@@ -89,6 +100,7 @@ function _Logger {
 	local evalue="${3}" # What to log to stderr
 
 	echo -e "$lvalue" >> "$LOG_FILE"
+	CURRENT_LOG="$CURRENT_LOG"$'\n'"$lvalue"
 
 	if [ "$_LOGGER_STDERR" -eq 1 ]; then
 		cat <<< "$evalue" 1>&2
@@ -183,7 +195,7 @@ function KillChilds {
 		# Try to kill nicely, if not, wait 15 seconds to let Trap actions happen before killing
 	if ( [ "$self" == true ] && kill -0 $pid > /dev/null 2>&1); then
 		Logger "Sending SIGTERM to process [$pid]." "DEBUG"
-		kill -s SIGTERM "$pid"
+		kill -s TERM "$pid"
 		if [ $? != 0 ]; then
 			sleep 15
 			Logger "Sending SIGTERM to process [$pid] failed." "DEBUG"
@@ -220,11 +232,14 @@ function KillAllChilds {
 
 # osync/obackup/pmocr script specific mail alert function, use SendEmail function for generic mail sending
 function SendAlert {
-	__CheckArguments 0 $# ${FUNCNAME[0]} "$@"	#__WITH_PARANOIA_DEBUG
+	local runAlert="${1:-false}" # Specifies if current message is sent while running or at the end of a run
+
+	__CheckArguments 0-1 $# ${FUNCNAME[0]} "$@"	#__WITH_PARANOIA_DEBUG
 
 	local mail_no_attachment=
 	local attachment_command=
 	local subject=
+	local body=
 
 	# Windows specific settings
 	local encryption_string=
@@ -253,7 +268,8 @@ function SendAlert {
 	else
 		mail_no_attachment=0
 	fi
-	MAIL_ALERT_MSG="$MAIL_ALERT_MSG"$'\n\n'$(tail -n 50 "$LOG_FILE")
+	body="$MAIL_ALERT_MSG"$'\n\n'"$CURRENT_LOG"
+
 	if [ $ERROR_ALERT -eq 1 ]; then
 		subject="Error alert for $INSTANCE_ID"
 	elif [ $WARN_ALERT -eq 1 ]; then
@@ -262,11 +278,17 @@ function SendAlert {
 		subject="Alert for $INSTANCE_ID"
 	fi
 
+	if [ $runAlert == true ]; then
+		subject="Currently runing - $subject"
+	else
+		subject="Fnished run - $subject"
+	fi
+
 	if [ "$mail_no_attachment" -eq 0 ]; then
 		attachment_command="-a $ALERT_LOG_FILE"
 	fi
 	if type mutt > /dev/null 2>&1 ; then
-		echo "$MAIL_ALERT_MSG" | $(type -p mutt) -x -s "$subject" $DESTINATION_MAILS $attachment_command
+		echo "$body" | $(type -p mutt) -x -s "$subject" $DESTINATION_MAILS $attachment_command
 		if [ $? != 0 ]; then
 			Logger "Cannot send alert mail via $(type -p mutt) !!!" "WARN"
 		else
@@ -283,10 +305,10 @@ function SendAlert {
 		else
 			attachment_command=""
 		fi
-		echo "$MAIL_ALERT_MSG" | $(type -p mail) $attachment_command -s "$subject" $DESTINATION_MAILS
+		echo "$body" | $(type -p mail) $attachment_command -s "$subject" $DESTINATION_MAILS
 		if [ $? != 0 ]; then
 			Logger "Cannot send alert mail via $(type -p mail) with attachments !!!" "WARN"
-			echo "$MAIL_ALERT_MSG" | $(type -p mail) -s "$subject" $DESTINATION_MAILS
+			echo "$body" | $(type -p mail) -s "$subject" $DESTINATION_MAILS
 			if [ $? != 0 ]; then
 				Logger "Cannot send alert mail via $(type -p mail) without attachments !!!" "WARN"
 			else
@@ -300,7 +322,7 @@ function SendAlert {
 	fi
 
 	if type sendmail > /dev/null 2>&1 ; then
-		echo -e "Subject:$subject\r\n$MAIL_ALERT_MSG" | $(type -p sendmail) $DESTINATION_MAILS
+		echo -e "Subject:$subject\r\n$body" | $(type -p sendmail) $DESTINATION_MAILS
 		if [ $? != 0 ]; then
 			Logger "Cannot send alert mail via $(type -p sendmail) !!!" "WARN"
 		else
@@ -323,7 +345,7 @@ function SendAlert {
 		if [ "$SMTP_USER" != "" ] && [ "$SMTP_USER" != "" ]; then
 			auth_string="-auth -user \"$SMTP_USER\" -pass \"$SMTP_PASSWORD\""
 		fi
-		$(type mailsend.exe) -f $SENDER_MAIL -t "$DESTINATION_MAILS" -sub "$subject" -M "$MAIL_ALERT_MSG" -attach "$attachment" -smtp "$SMTP_SERVER" -port "$SMTP_PORT" $encryption_string $auth_string
+		$(type mailsend.exe) -f $SENDER_MAIL -t "$DESTINATION_MAILS" -sub "$subject" -M "$body" -attach "$attachment" -smtp "$SMTP_SERVER" -port "$SMTP_PORT" $encryption_string $auth_string
 		if [ $? != 0 ]; then
 			Logger "Cannot send mail via $(type mailsend.exe) !!!" "WARN"
 		else
@@ -339,7 +361,7 @@ function SendAlert {
 		else
 			SMTP_OPTIONS=""
 		fi
-		$(type -p sendemail) -f $SENDER_MAIL -t "$DESTINATION_MAILS" -u "$subject" -m "$MAIL_ALERT_MSG" -s $SMTP_SERVER $SMTP_OPTIONS > /dev/null 2>&1
+		$(type -p sendemail) -f $SENDER_MAIL -t "$DESTINATION_MAILS" -u "$subject" -m "$body" -s $SMTP_SERVER $SMTP_OPTIONS > /dev/null 2>&1
 		if [ $? != 0 ]; then
 			Logger "Cannot send alert mail via $(type -p sendemail) !!!" "WARN"
 		else
@@ -350,7 +372,7 @@ function SendAlert {
 
 	# pfSense specific
 	if [ -f /usr/local/bin/mail.php ]; then
-		echo "$MAIL_ALERT_MSG" | /usr/local/bin/mail.php -s="$subject"
+		echo "$body" | /usr/local/bin/mail.php -s="$subject"
 		if [ $? != 0 ]; then
 			Logger "Cannot send alert mail via /usr/local/bin/mail.php (pfsense) !!!" "WARN"
 		else
@@ -569,6 +591,8 @@ function joinString {
 # Time control function for background processes, suitable for multiple synchronous processes
 # Fills a global variable called WAIT_FOR_TASK_COMPLETION that contains list of failed pids in format pid1:result1;pid2:result2
 # Warning: Don't imbricate this function into another run if you plan to use the global variable output
+
+#TODO check missing local values used here
 function WaitForTaskCompletion {
 	local pids="${1}" # pids to wait for, separated by semi-colon
 	local soft_max_time="${2}" # If program with pid $pid takes longer than $soft_max_time seconds, will log a warning, unless $soft_max_time equals 0.
@@ -599,29 +623,6 @@ function WaitForTaskCompletion {
 
 	while [ ${#pidsArray[@]} -gt 0 ]; do
 		newPidsArray=()
-		for pid in "${pidsArray[@]}"; do
-			if kill -0 $pid > /dev/null 2>&1; then
-				# Handle uninterruptible sleep state or zombies by ommiting them from running process array (How to kill that is already dead ? :)
-				#TODO(high): have this tested on *BSD, Mac & Win
-				pidState=$(ps -p$pid -o state= 2 > /dev/null)
-				if [ "$pidState" != "D" ] && [ "$pidState" != "Z" ]; then
-					newPidsArray+=($pid)
-				fi
-			else
-				# pid is dead, get it's exit code from wait command
-				wait $pid
-				retval=$?
-				if [ $retval -ne 0 ]; then
-					errorcount=$((errorcount+1))
-					Logger "${FUNCNAME[0]} called by [$caller_name] finished monitoring [$pid] with exitcode [$result]." "DEBUG"
-					if [ "$WAIT_FOR_TASK_COMPLETION" == "" ]; then
-						WAIT_FOR_TASK_COMPLETION="$pid:$result"
-					else
-						WAIT_FOR_TASK_COMPLETION=";$pid:$result"
-					fi
-				fi
-			fi
-		done
 
 		Spinner
 		if [ $counting == true ]; then
@@ -643,7 +644,7 @@ function WaitForTaskCompletion {
 			if [ $soft_alert -eq 0 ] && [ $soft_max_time -ne 0 ]; then
 				Logger "Max soft execution time exceeded for task [$caller_name] with pids [$(joinString , ${pidsArray[@]})]." "WARN"
 				soft_alert=1
-				SendAlert
+				SendAlert true
 
 			fi
 			if [ $exec_time -gt $hard_max_time ] && [ $hard_max_time -ne 0 ]; then
@@ -656,12 +657,37 @@ function WaitForTaskCompletion {
 						Logger "Could not stop task with pid [$pid]." "ERROR"
 					fi
 				done
-				SendAlert
+				SendAlert true
 				errrorcount=$((errorcount+1))
 			fi
 		fi
 
+		for pid in "${pidsArray[@]}"; do
+			if kill -0 $pid > /dev/null 2>&1; then
+				# Handle uninterruptible sleep state or zombies by ommiting them from running process array (How to kill that is already dead ? :)
+				#TODO(high): have this tested on *BSD, Mac & Win
+				pidState=$(ps -p$pid -o state= 2 > /dev/null)
+				if [ "$pidState" != "D" ] && [ "$pidState" != "Z" ]; then
+					newPidsArray+=($pid)
+				fi
+			else
+				# pid is dead, get it's exit code from wait command
+				wait $pid
+				retval=$?
+				if [ $retval -ne 0 ]; then
+					errorcount=$((errorcount+1))
+					Logger "${FUNCNAME[0]} called by [$caller_name] finished monitoring [$pid] with exitcode [$retval]." "DEBUG"
+					if [ "$WAIT_FOR_TASK_COMPLETION" == "" ]; then
+						WAIT_FOR_TASK_COMPLETION="$pid:$retval"
+					else
+						WAIT_FOR_TASK_COMPLETION=";$pid:$retval"
+					fi
+				fi
+			fi
+		done
+
 		pidsArray=("${newPidsArray[@]}")
+		# Trivial wait time for bash to not eat up all CPU
 		sleep $SLEEP_TIME
 	done
 
@@ -673,6 +699,66 @@ function WaitForTaskCompletion {
 	else
 		return $errorcount
 	fi
+}
+
+# Take a list of commands to run, runs them sequentially with numberOfProcesses commands simultaneously runs
+# Returns the number of non zero exit codes from commands
+function ParallelExec {
+	local numberOfProcesses="${1}" # Number of simultaneous commands to run
+	local commandsArg="${2}" # Semi-colon separated list of commands
+
+	local pid
+	local runningPids=0
+	local counter=0
+	local commandsArray
+	local pidsArray
+	local newPidsArray
+	local retval
+	local retvalAll=0
+	local pidState
+	local commandsArrayPid
+
+	IFS=';' read -r -a commandsArray <<< "$commandsArg"
+
+	Logger "Runnning ${#commandsArray[@]} commands in $numberOfProcesses simultaneous processes." "DEBUG"
+
+	while [ $counter -lt "${#commandsArray[@]}" ] || [ ${#pidsArray[@]} -gt 0 ]; do
+
+		while [ $counter -lt "${#commandsArray[@]}" ] && [ ${#pidsArray[@]} -lt $numberOfProcesses ]; do
+			Logger "Running command [${commandsArray[$counter]}]." "DEBUG"
+			eval "${commandsArray[$counter]}" &
+			pid=$!
+			pidsArray+=($pid)
+			commandsArrayPid[$pid]="${commandsArray[$counter]}"
+			counter=$((counter+1))
+		done
+
+
+		newPidsArray=()
+		for pid in "${pidsArray[@]}"; do
+			# Handle uninterruptible sleep state or zombies by ommiting them from running process array (How to kill that is already dead ? :)
+			if kill -0 $pid > /dev/null 2>&1; then
+				pidState=$(ps -p$pid -o state= 2 > /dev/null)
+				if [ "$pidState" != "D" ] && [ "$pidState" != "Z" ]; then
+					newPidsArray+=($pid)
+				fi
+			else
+				# pid is dead, get it's exit code from wait command
+				wait $pid
+				retval=$?
+				if [ $retval -ne 0 ]; then
+					Logger "Command [${commandsArrayPid[$pid]}] failed with exit code [$retval]." "ERROR"
+					retvalAll=$((retvalAll+1))
+				fi
+			fi
+		done
+		pidsArray=("${newPidsArray[@]}")
+
+		# Trivial wait time for bash to not eat up all CPU
+		sleep $SLEEP_TIME
+	done
+
+	return $retvalAll
 }
 
 function CleanUp {
@@ -968,7 +1054,7 @@ function CheckConnectivityRemoteHost {
 
 		if [ "$REMOTE_HOST_PING" != "no" ] && [ "$REMOTE_OPERATION" != "no" ]; then
 			eval "$PING_CMD $REMOTE_HOST > /dev/null 2>&1" &
-			WaitForTaskCompletion $! 10 180 ${FUNCNAME[0]} true $KEEP_LOGGING
+			WaitForTaskCompletion $! 60 180 ${FUNCNAME[0]} true $KEEP_LOGGING
 			if [ $? != 0 ]; then
 				Logger "Cannot ping $REMOTE_HOST" "ERROR"
 				return 1
@@ -1013,12 +1099,15 @@ function __CheckArguments {
 	# Checks the number of arguments of a function and raises an error if some are missing
 
 	if [ "$_DEBUG" == "yes" ]; then
-		local number_of_arguments="${1}" # Number of arguments the tested function should have
-		local number_of_given_arguments="${2}" # Number of arguments that have been passed
-		local function_name="${3}" # Function name that called __CheckArguments
+		local numberOfArguments="${1}" # Number of arguments the tested function should have, can be a number of a range, eg 0-2 for zero to two arguments
+		local numberOfGivenArguments="${2}" # Number of arguments that have been passed
+		local functionName="${3}" # Function name that called __CheckArguments
+
+		local minArgs
+		local maxArgs
 
 		if [ "$_PARANOIA_DEBUG" == "yes" ]; then
-			Logger "Entering function [$function_name]." "DEBUG"
+			Logger "Entering function [$functionName]." "DEBUG"
 		fi
 
 		# All arguments of the function to check are passed as array in ${4} (the function call waits for $@)
@@ -1026,23 +1115,31 @@ function __CheckArguments {
 		# In order to avoid this, we need to iterate over ${4} and count
 
 		local iterate=4
-		local fetch_arguments=1
-		local arg_list=""
-		while [ $fetch_arguments -eq 1 ]; do
+		local fetchArguments=1
+		local argList=""
+		local countedArguments
+		while [ $fetchArguments -eq 1 ]; do
 			cmd='argument=${'$iterate'}'
 			eval $cmd
 			if [ "$argument" = "" ]; then
-				fetch_arguments=0
+				fetchArguments=0
 			else
-				arg_list="$arg_list [Argument $(($iterate-3)): $argument]"
+				argList="$arg_list [Argument $(($iterate-3)): $argument]"
 				iterate=$(($iterate+1))
 			fi
 		done
-		local counted_arguments=$((iterate-4))
+		countedArguments=$((iterate-4))
 
-		if [ $counted_arguments -ne $number_of_arguments ]; then
-			Logger "Function $function_name may have inconsistent number of arguments. Expected: $number_of_arguments, count: $counted_arguments, bash seen: $number_of_given_arguments. see log file." "ERROR"
-			Logger "Arguments passed: $arg_list" "ERROR"
+		if [ $(IsNumeric "$numberOfArguments") -eq 1 ]; then
+			minArgs=$numberOfArguments
+			maxArgs=$numberOfArguments
+		else
+			IFS='-' read minArgs maxArgs <<< "$numberOfArguments"
+		fi
+
+		if ! ([ $countedArguments -ge $minArgs ] && [ $countedArguments -le $maxArgs ]); then
+			Logger "Function $functionName may have inconsistent number of arguments. Expected min: $minArgs, max: $maxArgs, count: $countedArguments, bash seen: $numberOfGivenArguments. see log file." "ERROR"
+			Logger "Arguments passed: $argList" "ERROR"
 		fi
 	fi
 }
@@ -1286,7 +1383,6 @@ function InitLocalOSSettings {
 function InitRemoteOSSettings {
 	__CheckArguments 0 $# ${FUNCNAME[0]} "$@"    #__WITH_PARANOIA_DEBUG
 
-	#TODO: fix add -E when both initiator and targets don't run MacOSX and PRESERVE_EXECUTABILITY=yes
 	## MacOSX does not use the -E parameter like Linux or BSD does (-E is mapped to extended attrs instead of preserve executability)
 	if [ "$PRESERVE_EXECUTABILITY" != "no" ];then
 		if [ "$LOCAL_OS" != "MacOSX" ] && [ "$REMOTE_OS" != "MacOSX" ]; then

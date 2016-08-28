@@ -1,13 +1,13 @@
 #!/usr/bin/env bash
 
 #TODO(critical): handle conflict prevalance, especially in sync_attrs function
-#TODO(critical): test new WaitForTaskCompletion behavior with self=true
+#TODO(critical): writelockfiles remote does not shut execution
 
 PROGRAM="osync" # Rsync based two way sync engine with fault tolerance
 AUTHOR="(C) 2013-2016 by Orsiris de Jong"
 CONTACT="http://www.netpower.fr/osync - ozy@netpower.fr"
 PROGRAM_VERSION=1.2-dev-parallel
-PROGRAM_BUILD=2016081902
+PROGRAM_BUILD=2016082201
 IS_STABLE=no
 
 #	Function Name		Is parallel	#__WITH_PARANOIA_DEBUG
@@ -99,9 +99,7 @@ function TrapQuit {
 		exitcode=2	# Warning exit code must not force daemon mode to quit
 	else
 		UnlockReplicas
-		if [ "$RUN_AFTER_CMD_ON_ERROR" == "yes" ]; then
-			RunAfterHook
-		fi
+		RunAfterHook
 		CleanUp
 		Logger "$PROGRAM finished." "NOTICE"
 		exitcode=0
@@ -223,15 +221,16 @@ function CheckReplicaPaths {
 
 	local pids
 
+	# Use direct comparaison before having a portable realpath implementation
 	#INITIATOR_SYNC_DIR_CANN=$(realpath "${INITIATOR[1]}")	#TODO(verylow): investigate realpath & readlink issues on MSYS and busybox here
 	#TARGET_SYNC_DIR_CANN=$(realpath "${TARGET[1]})
 
-	#if [ "$REMOTE_OPERATION" != "yes" ]; then
-	#	if [ "$INITIATOR_SYNC_DIR_CANN" == "$TARGET_SYNC_DIR_CANN" ]; then
-	#		Logger "Master directory [${INITIATOR[1]}] cannot be the same as target directory." "CRITICAL"
-	#		exit 1
-	#	fi
-	#fi
+	if [ "$REMOTE_OPERATION" != "yes" ]; then
+		if [ "${INITIATOR[1]}" == "${TARGET[1]}" ]; then
+			Logger "Initiator and target path [${INITIATOR[1]}] cannot be the same." "CRITICAL"
+			exit 1
+		fi
+	fi
 
 	_CheckReplicaPathsLocal "${INITIATOR[1]}" &
 	pids="$!"
@@ -1569,10 +1568,10 @@ function Init {
 
 	# Do not use exit and quit traps if osync runs in monitor mode
 	if [ $sync_on_changes -eq 0 ]; then
-		trap TrapStop SIGINT SIGHUP SIGTERM SIGQUIT
+		trap TrapStop INT HUP TERM QUIT
 		trap TrapQuit EXIT
 	else
-		trap TrapQuit SIGTERM EXIT SIGHUP SIGQUIT
+		trap TrapQuit TERM EXIT HUP QUIT
 	fi
 
 	local uri
