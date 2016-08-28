@@ -283,7 +283,7 @@ do
 done
 
 if [ "$FAKEROOT" != "" ]; then
-    mkdir -p $FAKEROOT/etc/systemd/user $FAKEROOT/lib/systemd
+    mkdir -p $SERVICE_DIR_SYSTEMD_SYSTEM $SERVICE_DIR_SYSTEMD_USER
 fi
 
 if [ "$BIN_DIR" != "/usr/local/bin" ]; then
