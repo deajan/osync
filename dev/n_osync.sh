@@ -1,12 +1,14 @@
 #!/usr/bin/env bash
 
 #TODO(critical): handle conflict prevalance, especially in sync_attrs function
+#TODO(ciritcal): deleted file has "deleted" name in target
+#TODO(high): verbose mode doesn't show files to be softdeleted
 
 PROGRAM="osync" # Rsync based two way sync engine with fault tolerance
 AUTHOR="(C) 2013-2016 by Orsiris de Jong"
 CONTACT="http://www.netpower.fr/osync - ozy@netpower.fr"
 PROGRAM_VERSION=1.2-dev-parallel
-PROGRAM_BUILD=2016082803
+PROGRAM_BUILD=2016082901
 IS_STABLE=no
 
 # Execution order
@@ -911,8 +913,12 @@ function _delete_local {
 	local parentdir
 	local previous_file=""
 
-	if [ -d "$replica_dir$deletion_dir" ] && [ $_DRYRUN -ne 1 ]; then
+	if [ ! -d "$replica_dir$deletion_dir" ] && [ $_DRYRUN -ne 1 ]; then
 		$COMMAND_SUDO mkdir -p "$replica_dir$deletion_dir"
+		if [ $? != 0 ]; then
+			Logger "Cannot create local replica deletion directory in [$replica_dir$deletion_dir]." "ERROR"
+			exit 1
+		fi
 	fi
 
 	while read -r files; do
@@ -926,6 +932,8 @@ function _delete_local {
 				if [ $_DRYRUN -ne 1 ]; then
 					if [ -e "$replica_dir$deletion_dir/$files" ]; then
 						rm -rf "${replica_dir:?}$deletion_dir/$files"
+						Logger "Deleting file [$replica_dir$files]." "DEBUG"
+
 					fi
 
 					if [ -e "$replica_dir$files" ]; then
@@ -933,12 +941,14 @@ function _delete_local {
 						parentdir="$(dirname "$files")"
 						if [ "$parentdir" != "." ]; then
 							mkdir -p "$replica_dir$deletion_dir/$parentdir"
+							Logger "Moving deleted file [$replica_dir$files] to [$replica_dir$deletion_dir/$parentdir]." "DEBUG"
 							mv -f "$replica_dir$files" "$replica_dir$deletion_dir/$parentdir"
 						else
 							mv -f "$replica_dir$files" "$replica_dir$deletion_dir"
+							Logger "Moving deleted file [$replica_dir$files] to [$replica_dir$deletion_dir]." "DEBUG"
 						fi
 						if [ $? != 0 ]; then
-							Logger "Cannot move $replica_dir$files to deletion directory." "ERROR"
+							Logger "Cannot move [$replica_dir$files] to deletion directory." "ERROR"
 							echo "$files" >> "${INITIATOR[1]}${INITIATOR[3]}/$deleted_failed_list_file"
 						fi
 					fi
@@ -1030,8 +1040,12 @@ $SSH_CMD ERROR_ALERT=0 sync_on_changes=$sync_on_changes _SILENT=$_SILENT _DEBUG=
 	parentdir=
 	previous_file=""
 
-	if [ -d "$replica_dir$deletion_dir" ] && [ $_DRYRUN -ne 1 ]; then
-		$COMMAND_SUDO mkdir -p "$replica_dir$deletion_dir"
+	if [ ! -d "$REPLICA_DIR$DELETE_DIR" ] && [ $_DRYRUN -ne 1 ]; then
+		$COMMAND_SUDO mkdir -p "$REPLICA_DIR$DELETE_DIR"
+		if [ $? != 0 ]; then
+			Logger "Cannot create remote replica deletion directory in [$REPLICA_DIR$DELETE_DIR]." "ERROR"
+			exit 1
+		fi
 	fi
 
 	while read -r files; do
@@ -1045,6 +1059,7 @@ $SSH_CMD ERROR_ALERT=0 sync_on_changes=$sync_on_changes _SILENT=$_SILENT _DEBUG=
 				if [ $_DRYRUN -ne 1 ]; then
 					if [ -e "$REPLICA_DIR$DELETE_DIR/$files" ]; then
 						$COMMAND_SUDO rm -rf "$REPLICA_DIR$DELETE_DIR/$files"
+						Logger "Deleting file [$REPLICA_DIR$files]." "DEBUG"
 					fi
 
 					if [ -e "$REPLICA_DIR$files" ]; then
@@ -1053,11 +1068,13 @@ $SSH_CMD ERROR_ALERT=0 sync_on_changes=$sync_on_changes _SILENT=$_SILENT _DEBUG=
 						if [ "$parentdir" != "." ]; then
 							$COMMAND_SUDO mkdir -p "$REPLICA_DIR$DELETE_DIR/$parentdir"
 							$COMMAND_SUDO mv -f "$REPLICA_DIR$files" "$REPLICA_DIR$DELETE_DIR/$parentdir"
+							Logger "Moving deleted file [$REPLICA_DIR$files] to [$REPLICA_DIR$DELETE_DIR/$parentdir]." "DEBUG"
 						else
 							$COMMAND_SUDO mv -f "$REPLICA_DIR$files" "$REPLICA_DIR$DELETE_DIR"
+							Logger "Moving deleted file [$REPLICA_DIR$files] to [$REPLICA_DIR$DELETE_DIR]." "DEBUG"
 						fi
 						if [ $? != 0 ]; then
-							Logger "Cannot move $REPLICA_DIR$files to deletion directory." "ERROR"
+							Logger "Cannot move [$REPLICA_DIR$files] to deletion directory." "ERROR"
 							echo "$files" >> "$FAILED_DELETE_LIST"
 						fi
 					fi
