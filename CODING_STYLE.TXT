@@ -1,4 +1,4 @@
-Coding style used for my bash projects (v2.3 Sep 2016)
+Coding style used for my bash projects (v2.4 Sep 2016)
 
 ++++++ Header
 
@@ -54,6 +54,8 @@ All global variables are full upercase, separated by _
 Example: EXEC_TIME
 All environment variables (verbose, silent, debug, etc) have prefix _ and are full upercase, separated by _
 Example: _PARANOIA_DEBUG
+
+Exec time variables that can take boolean values should use true and false instead of 1 and 0.
 
 ++++++ Functions
 
