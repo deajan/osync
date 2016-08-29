@@ -1722,6 +1722,29 @@ function Init {
 	"$INITIATOR_SYNC_DIR$OSYNC_DIR/$state_dir/$resume_count-$INSTANCE_ID$dry_suffix"
 	)
 
+	#WIP: change INITIATOR[1] with more relevant index
+	#INITIATOR[type]='initiator'
+	#INITIATOR[replicaDir]="$INITIATOR_SYNC_DIR"
+	#INITIATOR[lockFile]="$INITIATOR_SYNC_DIR$OSYNC_DIR/$lock_filename"
+	#INITIATOR[stateDir]="$OSYNC_DIR/$state_dir"
+	#INITIATOR[backupDir]="$OSYNC_DIR/$backup_dir"
+	#INITIATOR[deleteDir]="$OSYNC_DIR/$delete_dir"
+	#INITIATOR[partialDir]="$OSYNC_DIR/$partial_dir"
+	#INITIATOR[initiatorLastActionFile]="$INITIATOR_SYNC_DIR$OSYNC_DIR/$state_dir/initiator-$last_action-$INSTANCE_ID$dry_suffix"
+	#INITIATOR[targetLastActionFile]="$INITIATOR_SYNC_DIR$OSYNC_DIR/$state_dir/target-$last_action-$INSTANCE_ID$dry_suffix"
+	#INITIATOR[resumeCount]="$INITIATOR_SYNC_DIR$OSYNC_DIR/$state_dir/$resume_count-$INSTANCE_ID$dry_suffix"
+	#INITIATOR[treeCurrentFile]=
+	#INITIATOR[treeAfterFile]=
+	#INITIATOR[treeAfterFileNoSuffix]=
+	#INITIATOR[deletedListFile]=
+	#INITIATOR[failedDeletedListFile]=
+
+	#TREE_CURRENT_FILENAME="-tree-current-$INSTANCE_ID$dry_suffix"
+	#TREE_AFTER_FILENAME="-tree-after-$INSTANCE_ID$dry_suffix"
+	#TREE_AFTER_FILENAME_NO_SUFFIX="-tree-after-$INSTANCE_ID"
+	#DELETED_LIST_FILENAME="-deleted-list-$INSTANCE_ID$dry_suffix"
+	#FAILED_DELETE_LIST_FILENAME="-failed-delete-$INSTANCE_ID$dry_suffix"
+
 	TARGET=(
 	'target'
 	"$TARGET_SYNC_DIR"
