@@ -3,7 +3,7 @@ SUBPROGRAM=[prgname]
 PROGRAM="$SUBPROGRAM-batch" # Batch program to run osync / obackup instances sequentially and rerun failed ones
 AUTHOR="(L) 2013-2016 by Orsiris de Jong"
 CONTACT="http://www.netpower.fr - ozy@netpower.fr"
-PROGRAM_BUILD=2016081704
+PROGRAM_BUILD=2016082901
 
 ## Runs an osync /obackup instance for every conf file found
 ## If an instance fails, run it again if time permits
@@ -68,7 +68,7 @@ function CheckEnvironment {
 		then
 			SUBPROGRAM_EXECUTABLE=/usr/local/bin/$SUBPROGRAM.sh
 		else
-			Logger "Could not find $SUBPROGRAM.sh" "CRITICAL"
+			Logger "Could not find [/usr/local/bin/$SUBPROGRAM.sh]" "CRITICAL"
 			exit 1
 		fi
 	else
