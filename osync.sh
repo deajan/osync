@@ -1,12 +1,14 @@
 #!/usr/bin/env bash
 
 #TODO(critical): handle conflict prevalance, especially in sync_attrs function
+#TODO(high): verbose mode doesn't show files to be softdeleted
+#TODO(medium): No remote deletion dir when del dir is present
 
 PROGRAM="osync" # Rsync based two way sync engine with fault tolerance
 AUTHOR="(C) 2013-2016 by Orsiris de Jong"
 CONTACT="http://www.netpower.fr/osync - ozy@netpower.fr"
 PROGRAM_VERSION=1.2-dev-parallel
-PROGRAM_BUILD=2016082803
+PROGRAM_BUILD=2016082901
 IS_STABLE=no
 
 # Execution order
@@ -14,7 +16,7 @@ IS_STABLE=no
 
 #### MINIMAL-FUNCTION-SET BEGIN ####
 
-## FUNC_BUILD=2016082802
+## FUNC_BUILD=2016082901
 ## BEGIN Generic bash functions written in 2013-2016 by Orsiris de Jong - http://www.netpower.fr - ozy@netpower.fr
 
 ## To use in a program, define the following variables:
@@ -34,19 +36,20 @@ export LC_ALL=C
 MAIL_ALERT_MSG="Execution of $PROGRAM instance $INSTANCE_ID on $(date) has warnings/errors."
 
 # Environment variables that can be overriden by programs
-_DRYRUN=0
-_SILENT=0
+_DRYRUN=false
+_SILENT=false
+_VERBOSE=false
 _LOGGER_PREFIX="date"
-_LOGGER_STDERR=0
+_LOGGER_STDERR=false
 if [ "$KEEP_LOGGING" == "" ]; then
         KEEP_LOGGING=1801
 fi
 
 # Initial error status, logging 'WARN', 'ERROR' or 'CRITICAL' will enable alerts flags
-ERROR_ALERT=0
-WARN_ALERT=0
+ERROR_ALERT=false
+WARN_ALERT=false
 
-# Current log
+# Log from current run
 CURRENT_LOG=
 
 
@@ -54,11 +57,11 @@ CURRENT_LOG=
 if [ ! "$_DEBUG" == "yes" ]; then
 	_DEBUG=no
 	SLEEP_TIME=.05 # Tested under linux and FreeBSD bash, #TODO tests on cygwin / msys
-	_VERBOSE=0
+	_VERBOSE=false
 else
 	SLEEP_TIME=1
 	trap 'TrapError ${LINENO} $?' ERR
-	_VERBOSE=1
+	_VERBOSE=true
 fi
 
 SCRIPT_PID=$$
@@ -111,17 +114,21 @@ function _Logger {
 	echo -e "$lvalue" >> "$LOG_FILE"
 	CURRENT_LOG="$CURRENT_LOG"$'\n'"$lvalue"
 
-	if [ "$_LOGGER_STDERR" -eq 1 ]; then
+	if [ $_LOGGER_STDERR == true ]; then
 		cat <<< "$evalue" 1>&2
-	elif [ "$_SILENT" -eq 0 ]; then
+	elif [ "$_SILENT" == false ]; then
 		echo -e "$svalue"
 	fi
 }
 
-# General log function with log levels
+# General log function with log levels:
+# CRITICAL, ERROR, WARN are colored in stdout, prefixed in stderr
+# NOTICE is standard level
+# VERBOSE is only sent to stdout / stderr if _VERBOSE=true
+# DEBUG & PARANOIA_DEBUG are only sent if _DEBUG=yes
 function Logger {
 	local value="${1}" # Sentence to log (in double quotes)
-	local level="${2}" # Log level: PARANOIA_DEBUG, DEBUG, NOTICE, WARN, ERROR, CRITIAL
+	local level="${2}" # Log level: PARANOIA_DEBUG, DEBUG, VERBOSE, NOTICE, WARN, ERROR, CRITIAL
 
 	if [ "$_LOGGER_PREFIX" == "time" ]; then
 		prefix="TIME: $SECONDS - "
@@ -133,17 +140,20 @@ function Logger {
 
 	if [ "$level" == "CRITICAL" ]; then
 		_Logger "$prefix\e[41m$value\e[0m" "$prefix$level:$value" "$level:$value"
-		ERROR_ALERT=1
+		ERROR_ALERT=true
 		return
 	elif [ "$level" == "ERROR" ]; then
 		_Logger "$prefix\e[91m$value\e[0m" "$prefix$level:$value" "$level:$value"
-		ERROR_ALERT=1
+		ERROR_ALERT=true
 		return
 	elif [ "$level" == "WARN" ]; then
 		_Logger "$prefix\e[93m$value\e[0m" "$prefix$level:$value" "$level:$value"
-		WARN_ALERT=1
+		WARN_ALERT=true
 		return
 	elif [ "$level" == "NOTICE" ]; then
+		_Logger "$prefix$value"
+		return
+	elif [ "$level" == "VERBOSE" ] && [ $_VERBOSE == true ]; then
 		_Logger "$prefix$value"
 		return
 	elif [ "$level" == "DEBUG" ]; then
@@ -175,7 +185,7 @@ function QuickLogger {
 	local value="${1}"
 
 
-	if [ "$_SILENT" -eq 1 ]; then
+	if [ $_SILENT == true ]; then
 		_QuickLogger "$value" "log"
 	else
 		_QuickLogger "$value" "stdout"
@@ -269,9 +279,9 @@ function SendAlert {
 	fi
 	body="$MAIL_ALERT_MSG"$'\n\n'"$CURRENT_LOG"
 
-	if [ $ERROR_ALERT -eq 1 ]; then
+	if [ $ERROR_ALERT == true ]; then
 		subject="Error alert for $INSTANCE_ID"
-	elif [ $WARN_ALERT -eq 1 ]; then
+	elif [ $WARN_ALERT == true ]; then
 		subject="Warning alert for $INSTANCE_ID"
 	else
 		subject="Alert for $INSTANCE_ID"
@@ -522,7 +532,7 @@ function TrapError {
 	local job="$0"
 	local line="$1"
 	local code="${2:-1}"
-	if [ $_SILENT -eq 0 ]; then
+	if [ $_SILENT == false ]; then
 		echo -e " /!\ ERROR in ${job}: Near line ${line}, exit code ${code}"
 	fi
 }
@@ -547,7 +557,7 @@ function LoadConfigFile {
 }
 
 function Spinner {
-	if [ $_SILENT -eq 1 ]; then
+	if [ $_SILENT == true ]; then
 		return 0
 	fi
 
@@ -941,7 +951,7 @@ function RunLocalCommand {
 	local command="${1}" # Command to run
 	local hard_max_time="${2}" # Max time to wait for command to compleet
 
-	if [ $_DRYRUN -ne 0 ]; then
+	if [ $_DRYRUN == true ]; then
 		Logger "Dryrun: Local command [$command] not run." "NOTICE"
 		return 0
 	fi
@@ -956,7 +966,7 @@ function RunLocalCommand {
 		Logger "Command failed." "ERROR"
 	fi
 
-	if [ $_VERBOSE -eq 1 ] || [ $retval -ne 0 ]; then
+	if [ $_VERBOSE == true ] || [ $retval -ne 0 ]; then
 		Logger "Command output:\n$(cat $RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$SCRIPT_PID)" "NOTICE"
 	fi
 
@@ -973,7 +983,7 @@ function RunRemoteCommand {
 
 	CheckConnectivity3rdPartyHosts
 	CheckConnectivityRemoteHost
-	if [ $_DRYRUN -ne 0 ]; then
+	if [ $_DRYRUN == true ]; then
 		Logger "Dryrun: Local command [$command] not run." "NOTICE"
 		return 0
 	fi
@@ -990,7 +1000,7 @@ function RunRemoteCommand {
 		Logger "Command failed." "ERROR"
 	fi
 
-	if [ -f "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$SCRIPT_PID" ] && ([ $_VERBOSE -eq 1 ] || [ $retval -ne 0 ])
+	if [ -f "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$SCRIPT_PID" ] && ([ $_VERBOSE == true ] || [ $retval -ne 0 ])
 	then
 		Logger "Command output:\n$(cat $RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$SCRIPT_PID)" "NOTICE"
 	fi
@@ -1060,7 +1070,7 @@ function CheckConnectivity3rdPartyHosts {
 	if [ "$_PARANOIA_DEBUG" != "yes" ]; then # Do not loose time in paranoia debug
 
 		if [ "$REMOTE_3RD_PARTY_HOSTS" != "" ]; then
-			remote_3rd_party_success=0
+			remote_3rd_party_success=false
 			for i in $REMOTE_3RD_PARTY_HOSTS
 			do
 				eval "$PING_CMD $i > /dev/null 2>&1" &
@@ -1068,11 +1078,11 @@ function CheckConnectivity3rdPartyHosts {
 				if [ $? != 0 ]; then
 					Logger "Cannot ping 3rd party host $i" "NOTICE"
 				else
-					remote_3rd_party_success=1
+					remote_3rd_party_success=true
 				fi
 			done
 
-			if [ $remote_3rd_party_success -ne 1 ]; then
+			if [ $remote_3rd_party_success == false ]; then
 				Logger "No remote 3rd party host responded to ping. No internet ?" "ERROR"
 				return 1
 			else
@@ -1199,7 +1209,7 @@ function PreInit {
 
 	 ## Set rsync default arguments
 	RSYNC_ARGS="-rltD"
-	if [ "$_DRYRUN" -eq 1 ]; then
+	if [ "$_DRYRUN" == true ]; then
 		RSYNC_DRY_ARG="-n"
 		DRY_WARNING="/!\ DRY RUN"
 	else
@@ -1368,7 +1378,7 @@ function TrapStop {
 function TrapQuit {
 	local exitcode
 
-	if [ $ERROR_ALERT -ne 0 ]; then
+	if [ $ERROR_ALERT == true ]; then
 		UnlockReplicas
 		if [ "$_DEBUG" != "yes" ]
 		then
@@ -1382,7 +1392,7 @@ function TrapQuit {
 		CleanUp
 		Logger "$PROGRAM finished with errors." "ERROR"
 		exitcode=1
-	elif [ $WARN_ALERT -ne 0 ]; then
+	elif [ $WARN_ALERT == true ]; then
 		UnlockReplicas
 		if [ "$_DEBUG" != "yes" ]
 		then
@@ -1734,12 +1744,12 @@ function CheckLocks {
 
 	local pids
 
-	if [ $_NOLOCKS -eq 1 ]; then
+	if [ $_NOLOCKS == true ]; then
 		return 0
 	fi
 
 	# Do not bother checking for locks when FORCE_UNLOCK is set
-	if [ $FORCE_UNLOCK -eq 1 ]; then
+	if [ $FORCE_UNLOCK == true ]; then
 		WriteLockFiles
 		if [ $? != 0 ]; then
 			exit 1
@@ -1869,7 +1879,7 @@ function UnlockReplicas {
 
 	local pids
 
-	if [ $_NOLOCKS -eq 1 ]; then
+	if [ $_NOLOCKS == true ]; then
 		return 0
 	fi
 
@@ -1979,6 +1989,14 @@ function _get_file_ctime_mtime_local {
 
 	echo -n "" > "$RUN_DIR/$PROGRAM.ctime_mtime.$replica_type.$SCRIPT_PID"
 	while read -r file; do $STAT_CTIME_MTIME_CMD "$replica_path$file" | sort >> "$RUN_DIR/$PROGRAM.ctime_mtime.$replica_type.$SCRIPT_PID"; done < "$file_list"
+	if [ $? != 0 ]; then
+		Logger "Getting file attributes failed [$retval] on $replica_type. Stopping execution." "CRITICAL"
+		if [ $_VERBOSE == true ] && [ -f "$RUN_DIR/$PROGRAM.ctime_mtime.$replica_type.$SCRIPT_PID" ]; then
+			Logger "Command output:\n$(cat $RUN_DIR/$PROGRAM.ctime_mtime.$replica_type.$SCRIPT_PID)" "NOTICE"
+		fi
+		exit 1
+	fi
+
 }
 
 function _get_file_ctime_mtime_remote {
@@ -1993,7 +2011,7 @@ function _get_file_ctime_mtime_remote {
 	eval "$cmd"
 	if [ $? != 0 ]; then
 		Logger "Getting file attributes failed [$retval] on $replica_type. Stopping execution." "CRITICAL"
-		if [ $_VERBOSE -eq 0 ] && [ -f "$RUN_DIR/$PROGRAM.ctime_mtime.$replica_type.$SCRIPT_PID" ]; then
+		if [ $_VERBOSE == true ] && [ -f "$RUN_DIR/$PROGRAM.ctime_mtime.$replica_type.$SCRIPT_PID" ]; then
 			Logger "Command output:\n$(cat $RUN_DIR/$PROGRAM.ctime_mtime.$replica_type.$SCRIPT_PID)" "NOTICE"
 		fi
 		exit 1
@@ -2023,13 +2041,13 @@ function sync_attrs {
 	eval "$rsync_cmd"
 	WaitForTaskCompletion $! $SOFT_MAX_EXEC_TIME $HARD_MAX_EXEC_TIME ${FUNCNAME[0]} false $KEEP_LOGGING
 	retval=$?
-	if [ $_VERBOSE -eq 1 ] && [ -f "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$SCRIPT_PID" ]; then
+	if [ $_VERBOSE == true ] && [ -f "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$SCRIPT_PID" ]; then
 		Logger "List:\n$(cat $RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$SCRIPT_PID)" "NOTICE"
 	fi
 
 	if [ $retval != 0 ] && [ $retval != 24 ]; then
 		Logger "Getting list of files that need updates failed [$retval]. Stopping execution." "CRITICAL"
-		if [ $_VERBOSE -eq 0 ] && [ -f "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$SCRIPT_PID" ]; then
+		if [ $_VERBOSE == false ] && [ -f "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$SCRIPT_PID" ]; then
 			Logger "Rsync output:\n$(cat $RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$SCRIPT_PID)" "NOTICE"
 		fi
 		exit 1 #WIP: check why exit $retval was used
@@ -2103,13 +2121,13 @@ function sync_attrs {
 	eval "$rsync_cmd"
 	WaitForTaskCompletion $! $SOFT_MAX_EXEC_TIME $HARD_MAX_EXEC_TIME ${FUNCNAME[0]} false $KEEP_LOGGING
 	retval=$?
-	if [ $_VERBOSE -eq 1 ] && [ -f "$RUN_DIR/$PROGRAM.attr-update.$dest_replica.$SCRIPT_PID" ]; then
+	if [ $_VERBOSE == true ] && [ -f "$RUN_DIR/$PROGRAM.attr-update.$dest_replica.$SCRIPT_PID" ]; then
 		Logger "List:\n$(cat $RUN_DIR/$PROGRAM.attr-update.$dest_replica.$SCRIPT_PID)" "NOTICE"
 	fi
 
 	if [ $retval != 0 ] && [ $retval != 24 ]; then
 		Logger "Updating file attributes on $dest_replica [$retval]. Stopping execution." "CRITICAL"
-		if [ $_VERBOSE -eq 0 ] && [ -f "$RUN_DIR/$PROGRAM.attr-update.$dest_replica.$SCRIPT_PID" ]; then
+		if [ $_VERBOSE == false ] && [ -f "$RUN_DIR/$PROGRAM.attr-update.$dest_replica.$SCRIPT_PID" ]; then
 			Logger "Rsync output:\n$(cat $RUN_DIR/$PROGRAM.attr-update.$dest_replica.$SCRIPT_PID)" "NOTICE"
 		fi
 		exit 1 #WIP check why exit $retval was used
@@ -2156,13 +2174,13 @@ function sync_update {
 	Logger "RSYNC_CMD: $rsync_cmd" "DEBUG"
 	eval "$rsync_cmd"
 	retval=$?
-	if [ $_VERBOSE -eq 1 ] && [ -f "$RUN_DIR/$PROGRAM.update.$destination_replica.$SCRIPT_PID" ]; then
+	if [ $_VERBOSE == true ] && [ -f "$RUN_DIR/$PROGRAM.update.$destination_replica.$SCRIPT_PID" ]; then
 		Logger "List:\n$(cat $RUN_DIR/$PROGRAM.update.$destination_replica.$SCRIPT_PID)" "NOTICE"
 	fi
 
 	if [ $retval != 0 ] && [ $retval != 24 ]; then
 		Logger "Updating $destination_replica replica failed. Stopping execution." "CRITICAL"
-		if [ $_VERBOSE -eq 0 ] && [ -f "$RUN_DIR/$PROGRAM.update.$destination_replica.$SCRIPT_PID" ]; then
+		if [ $_VERBOSE == false ] && [ -f "$RUN_DIR/$PROGRAM.update.$destination_replica.$SCRIPT_PID" ]; then
 			Logger "Rsync output:\n$(cat $RUN_DIR/$PROGRAM.update.$destination_replica.$SCRIPT_PID)" "NOTICE"
 		fi
 		exit 1 #WIP exit $retval
@@ -2182,21 +2200,24 @@ function _delete_local {
 	local parentdir
 	local previous_file=""
 
-	if [ -d "$replica_dir$deletion_dir" ] && [ $_DRYRUN -ne 1 ]; then
+	if [ ! -d "$replica_dir$deletion_dir" ] && [ $_DRYRUN == false ]; then
 		$COMMAND_SUDO mkdir -p "$replica_dir$deletion_dir"
+		if [ $? != 0 ]; then
+			Logger "Cannot create local replica deletion directory in [$replica_dir$deletion_dir]." "ERROR"
+			exit 1
+		fi
 	fi
 
 	while read -r files; do
 		## On every run, check wheter the next item is already deleted because it is included in a directory already deleted
 		if [[ "$files" != "$previous_file/"* ]] && [ "$files" != "" ]; then
-			if [ $_VERBOSE -eq 1 ]; then
-				Logger "Soft deleting $replica_dir$files" "NOTICE"
-			fi
 
 			if [ "$SOFT_DELETE" != "no" ]; then
-				if [ $_DRYRUN -ne 1 ]; then
+				if [ $_DRYRUN == false ]; then
 					if [ -e "$replica_dir$deletion_dir/$files" ]; then
 						rm -rf "${replica_dir:?}$deletion_dir/$files"
+						Logger "Deleting file [$replica_dir$files]." "VERBOSE"
+
 					fi
 
 					if [ -e "$replica_dir$files" ]; then
@@ -2204,18 +2225,20 @@ function _delete_local {
 						parentdir="$(dirname "$files")"
 						if [ "$parentdir" != "." ]; then
 							mkdir -p "$replica_dir$deletion_dir/$parentdir"
+							Logger "Moving deleted file [$replica_dir$files] to [$replica_dir$deletion_dir/$parentdir]." "VERBOSE"
 							mv -f "$replica_dir$files" "$replica_dir$deletion_dir/$parentdir"
 						else
+							Logger "Moving deleted file [$replica_dir$files] to [$replica_dir$deletion_dir]." "VERBOSE"
 							mv -f "$replica_dir$files" "$replica_dir$deletion_dir"
 						fi
 						if [ $? != 0 ]; then
-							Logger "Cannot move $replica_dir$files to deletion directory." "ERROR"
+							Logger "Cannot move [$replica_dir$files] to deletion directory." "ERROR"
 							echo "$files" >> "${INITIATOR[1]}${INITIATOR[3]}/$deleted_failed_list_file"
 						fi
 					fi
 				fi
 			else
-				if [ $_DRYRUN -ne 1 ]; then
+				if [ $_DRYRUN == false ]; then
 					if [ -e "$replica_dir$files" ]; then
 						rm -rf "$replica_dir$files"
 						if [ $? != 0 ]; then
@@ -2263,7 +2286,7 @@ $SSH_CMD ERROR_ALERT=0 sync_on_changes=$sync_on_changes _SILENT=$_SILENT _DEBUG=
 		local value="${1}" # What to log
 		echo -e "$value" >&2 #TODO(high): logfile output missing
 
-		if [ $_SILENT -eq 0 ]; then
+		if [ $_SILENT == false ]; then
 		echo -e "$value"
 		fi
 	}
@@ -2300,21 +2323,23 @@ $SSH_CMD ERROR_ALERT=0 sync_on_changes=$sync_on_changes _SILENT=$_SILENT _DEBUG=
 	parentdir=
 	previous_file=""
 
-	if [ -d "$replica_dir$deletion_dir" ] && [ $_DRYRUN -ne 1 ]; then
-		$COMMAND_SUDO mkdir -p "$replica_dir$deletion_dir"
+	if [ ! -d "$REPLICA_DIR$DELETE_DIR" ] && [ $_DRYRUN == false ]; then
+		$COMMAND_SUDO mkdir -p "$REPLICA_DIR$DELETE_DIR"
+		if [ $? != 0 ]; then
+			Logger "Cannot create remote replica deletion directory in [$REPLICA_DIR$DELETE_DIR]." "ERROR"
+			exit 1
+		fi
 	fi
 
 	while read -r files; do
 		## On every run, check wheter the next item is already deleted because it is included in a directory already deleted
 		if [[ "$files" != "$previous_file/"* ]] && [ "$files" != "" ]; then
-			if [ $_VERBOSE -eq 1 ]; then
-				Logger "Soft deleting $REPLICA_DIR$files" "NOTICE"
-			fi
 
 			if [ "$SOFT_DELETE" != "no" ]; then
-				if [ $_DRYRUN -ne 1 ]; then
+				if [ $_DRYRUN == false ]; then
 					if [ -e "$REPLICA_DIR$DELETE_DIR/$files" ]; then
 						$COMMAND_SUDO rm -rf "$REPLICA_DIR$DELETE_DIR/$files"
+						Logger "Deleting file [$REPLICA_DIR$files]." "VERBOSE"
 					fi
 
 					if [ -e "$REPLICA_DIR$files" ]; then
@@ -2323,17 +2348,19 @@ $SSH_CMD ERROR_ALERT=0 sync_on_changes=$sync_on_changes _SILENT=$_SILENT _DEBUG=
 						if [ "$parentdir" != "." ]; then
 							$COMMAND_SUDO mkdir -p "$REPLICA_DIR$DELETE_DIR/$parentdir"
 							$COMMAND_SUDO mv -f "$REPLICA_DIR$files" "$REPLICA_DIR$DELETE_DIR/$parentdir"
+							Logger "Moving deleted file [$REPLICA_DIR$files] to [$REPLICA_DIR$DELETE_DIR/$parentdir]." "VERBOSE"
 						else
 							$COMMAND_SUDO mv -f "$REPLICA_DIR$files" "$REPLICA_DIR$DELETE_DIR"
+							Logger "Moving deleted file [$REPLICA_DIR$files] to [$REPLICA_DIR$DELETE_DIR]." "VERBOSE"
 						fi
 						if [ $? != 0 ]; then
-							Logger "Cannot move $REPLICA_DIR$files to deletion directory." "ERROR"
+							Logger "Cannot move [$REPLICA_DIR$files] to deletion directory." "ERROR"
 							echo "$files" >> "$FAILED_DELETE_LIST"
 						fi
 					fi
 				fi
 			else
-				if [ $_DRYRUN -ne 1 ]; then
+				if [ $_DRYRUN == false ]; then
 					if [ -e "$REPLICA_DIR$files" ]; then
 						$COMMAND_SUDO rm -rf "$REPLICA_DIR$files"
 						if [ $? != 0 ]; then
@@ -2396,7 +2423,7 @@ function deletion_propagation {
 		fi
 		retval=$?
 		if [ $retval == 0 ]; then
-			if [ -f "$RUN_DIR/$PROGRAM._delete_remote.$SCRIPT_PID" ] && [ $_VERBOSE -eq 1 ]; then
+			if [ -f "$RUN_DIR/$PROGRAM._delete_remote.$SCRIPT_PID" ] && [ $_VERBOSE == true ]; then
 				Logger "Remote:\n$(cat $RUN_DIR/$PROGRAM._delete_remote.$SCRIPT_PID)" "DEBUG"
 			fi
 			return $retval
@@ -2744,13 +2771,13 @@ function _SoftDeleteLocal {
 	local retval
 
 	if [ -d "$replica_deletion_path" ]; then
-		if [ $_DRYRUN -eq 1 ]; then
+		if [ $_DRYRUN == true ]; then
 			Logger "Listing files older than $change_time days on $replica_type replica. Does not remove anything." "NOTICE"
 		else
 			Logger "Removing files older than $change_time days on $replica_type replica." "NOTICE"
 		fi
 
-		if [ $_VERBOSE -eq 1 ]; then
+		if [ $_VERBOSE == true ]; then
 			# Cannot launch log function from xargs, ugly hack
 			$COMMAND_SUDO $FIND_CMD "$replica_deletion_path/" -type f -ctime +$change_time -print0 | xargs -0 -I {} echo "Will delete file {}" >> "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$SCRIPT_PID"
 			Logger "Command output:\n$(cat $RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$SCRIPT_PID)" "NOTICE"
@@ -2758,7 +2785,7 @@ function _SoftDeleteLocal {
 			Logger "Command output:\n$(cat $RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$SCRIPT_PID)" "NOTICE"
 		fi
 
-		if [ $_DRYRUN -ne 1 ]; then
+		if [ $_DRYRUN == false ]; then
 			$COMMAND_SUDO $FIND_CMD "$replica_deletion_path/" -type f -ctime +$change_time -print0 | xargs -0 -I {} $COMMAND_SUDO rm -f "{}" && $COMMAND_SUDO $FIND_CMD "$replica_deletion_path/" -type d -empty -ctime +$change_time -print0 | xargs -0 -I {} $COMMAND_SUDO rm -rf "{}" >> "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$SCRIPT_PID" 2>&1
 		else
 			Dummy
@@ -2785,13 +2812,13 @@ function _SoftDeleteRemote {
 	CheckConnectivity3rdPartyHosts
 	CheckConnectivityRemoteHost
 
-	if [ $_DRYRUN -eq 1 ]; then
+	if [ $_DRYRUN == true ]; then
 		Logger "Listing files older than $change_time days on $replica_type replica. Does not remove anything." "NOTICE"
 	else
 		Logger "Removing files older than $change_time days on $replica_type replica." "NOTICE"
 	fi
 
-	if [ $_VERBOSE -eq 1 ]; then
+	if [ $_VERBOSE == true ]; then
 		# Cannot launch log function from xargs, ugly hack
 		cmd=$SSH_CMD' "if [ -d \"'$replica_deletion_path'\" ]; then '$COMMAND_SUDO' '$REMOTE_FIND_CMD' \"'$replica_deletion_path'/\" -type f -ctime +'$change_time' -print0 | xargs -0 -I {} echo Will delete file {} && '$COMMAND_SUDO' '$REMOTE_FIND_CMD' \"'$replica_deletion_path'/\" -type d -empty -ctime '$change_time' -print0 | xargs -0 -I {} echo Will delete directory {}; else echo \"No remote backup/deletion directory.\"; fi" > "'$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$SCRIPT_PID'" 2>&1'
 		Logger "cmd: $cmd" "DEBUG"
@@ -2799,7 +2826,7 @@ function _SoftDeleteRemote {
 		Logger "Command output:\n$(cat $RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$SCRIPT_PID)" "NOTICE"
 	fi
 
-	if [ $_DRYRUN -ne 1 ]; then
+	if [ $_DRYRUN == false ]; then
 		cmd=$SSH_CMD' "if [ -d \"'$replica_deletion_path'\" ]; then '$COMMAND_SUDO' '$REMOTE_FIND_CMD' \"'$replica_deletion_path'/\" -type f -ctime +'$change_time' -print0 | xargs -0 -I {} '$COMMAND_SUDO' rm -f \"{}\" && '$COMMAND_SUDO' '$REMOTE_FIND_CMD' \"'$replica_deletion_path'/\" -type d -empty -ctime '$change_time' -print0 | xargs -0 -I {} '$COMMAND_SUDO' rm -rf \"{}\"; else echo \"No remote backup/deletion directory.\"; fi" > "'$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$SCRIPT_PID'" 2>&1'
 
 		Logger "cmd: $cmd" "DEBUG"
@@ -2858,7 +2885,7 @@ function Init {
 	set -o errtrace
 
 	# Do not use exit and quit traps if osync runs in monitor mode
-	if [ $sync_on_changes -eq 0 ]; then
+	if [ $sync_on_changes == false ]; then
 		trap TrapStop INT HUP TERM QUIT
 		trap TrapQuit EXIT
 	else
@@ -2928,7 +2955,7 @@ function Init {
 	local partial_dir="_partial"
 	local last_action="last-action"
 	local resume_count="resume-count"
-	if [ "$_DRYRUN" -eq 1 ]; then
+	if [ "$_DRYRUN" == true ]; then
 		local dry_suffix="-dry"
 	else
 		local dry_suffix=
@@ -2972,11 +2999,11 @@ function Init {
 	## Set sync only function arguments for rsync
 	SYNC_OPTS="-u"
 
-	if [ $_VERBOSE -eq 1 ]; then
+	if [ $_VERBOSE == true ]; then
 		SYNC_OPTS=$SYNC_OPTS" -i"
 	fi
 
-	if [ $STATS -eq 1 ]; then
+	if [ $STATS == true ]; then
 		SYNC_OPTS=$SYNC_OPTS" --stats"
 	fi
 
@@ -3096,8 +3123,8 @@ function SyncOnChanges {
 }
 
 # quicksync mode settings, overriden by config file
-STATS=0
-PARTIAL=0
+STATS=false
+PARTIAL=no
 if [ "$CONFLICT_PREVALANCE" == "" ]; then
 	CONFLICT_PREVALANCE=initiator
 fi
@@ -3105,14 +3132,17 @@ fi
 INITIATOR_LOCK_FILE_EXISTS=false
 TARGET_LOCK_FILE_EXISTS=false
 
-FORCE_UNLOCK=0
-no_maxtime=0
+FORCE_UNLOCK=false
+no_maxtime=false
 opts=""
-ERROR_ALERT=0
+ERROR_ALERT=false
+WARN_ALERT=false
+# Number of CTRL+C
 SOFT_STOP=0
+# Number of given replicas in command line
 _QUICK_SYNC=0
-sync_on_changes=0
-_NOLOCKS=0
+sync_on_changes=false
+_NOLOCKS=false
 osync_cmd=$0
 
 if [ $# -eq 0 ]
@@ -3124,7 +3154,7 @@ first=1
 for i in "$@"; do
 	case $i in
 		--dry)
-		_DRYRUN=1
+		_DRYRUN=true
 		opts=$opts" --dry"
 		;;
 		--silent)
@@ -3132,11 +3162,11 @@ for i in "$@"; do
 		opts=$opts" --silent"
 		;;
 		--verbose)
-		_VERBOSE=1
+		_VERBOSE=true
 		opts=$opts" --verbose"
 		;;
 		--stats)
-		STATS=1
+		STATS=true
 		opts=$opts" --stats"
 		;;
 		--partial)
@@ -3144,11 +3174,11 @@ for i in "$@"; do
 		opts=$opts" --partial"
 		;;
 		--force-unlock)
-		FORCE_UNLOCK=1
+		FORCE_UNLOCK=true
 		opts=$opts" --force-unlock"
 		;;
 		--no-maxtime)
-		no_maxtime=1
+		no_maxtime=true
 		opts=$opts" --no-maxtime"
 		;;
 		--help|-h|--version|-v)
@@ -3156,15 +3186,15 @@ for i in "$@"; do
 		;;
 		--initiator=*)
 		_QUICK_SYNC=$(($_QUICK_SYNC + 1))
-		no_maxtime=1
 		INITIATOR_SYNC_DIR=${i##*=}
 		opts=$opts" --initiator=\"$INITIATOR_SYNC_DIR\""
+		no_maxtime=true
 		;;
 		--target=*)
 		_QUICK_SYNC=$(($_QUICK_SYNC + 1))
 		TARGET_SYNC_DIR=${i##*=}
 		opts=$opts" --target=\"$TARGET_SYNC_DIR\""
-		no_maxtime=1
+		no_maxtime=true
 		;;
 		--rsakey=*)
 		SSH_RSA_PRIVATE_KEY=${i##*=}
@@ -3175,13 +3205,13 @@ for i in "$@"; do
 		opts=$opts" --instance-id=\"$INSTANCE_ID\""
 		;;
 		--on-changes)
-		sync_on_changes=1
-		_NOLOCKS=1
+		sync_on_changes=true
+		_NOLOCKS=true
 		_LOGGER_PREFIX="date"
-		_LOGGER_STDERR=1
+		_LOGGER_STDERR=true
 		;;
 		--no-locks)
-		_NOLOCKS=1
+		_NOLOCKS=true
 		;;
 		*)
 		if [ $first == "0" ]; then
@@ -3270,13 +3300,13 @@ opts="${opts# *}"
 	Logger "-------------------------------------------------------------" "NOTICE"
 	Logger "Sync task [$INSTANCE_ID] launched as $LOCAL_USER@$LOCAL_HOST (PID $SCRIPT_PID)" "NOTICE"
 
-	if [ $sync_on_changes -eq 1 ]; then
+	if [ $sync_on_changes == true ]; then
 		SyncOnChanges
 	else
 		GetRemoteOS
 		InitRemoteOSSettings
 
-		if [ $no_maxtime -eq 1 ]; then
+		if [ $no_maxtime == true ]; then
 			SOFT_MAX_EXEC_TIME=0
 			HARD_MAX_EXEC_TIME=0
 		fi
