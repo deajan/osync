@@ -1,14 +1,13 @@
 #!/usr/bin/env bash
 
 #TODO(critical): handle conflict prevalance, especially in sync_attrs function
-#TODO(high): verbose mode doesn't show files to be softdeleted
-#TODO(medium): No remote deletion dir when del dir is present
+#TODO(medium): No remote deletion dir message  when del dir is present in verbose mode
 
 PROGRAM="osync" # Rsync based two way sync engine with fault tolerance
 AUTHOR="(C) 2013-2016 by Orsiris de Jong"
 CONTACT="http://www.netpower.fr/osync - ozy@netpower.fr"
 PROGRAM_VERSION=1.2-dev-parallel
-PROGRAM_BUILD=2016082902
+PROGRAM_BUILD=2016082904
 IS_STABLE=no
 
 # Execution order
@@ -840,8 +839,6 @@ function sync_attrs {
 	eval "$rsync_cmd"
 	WaitForTaskCompletion $! $SOFT_MAX_EXEC_TIME $HARD_MAX_EXEC_TIME ${FUNCNAME[0]} false $KEEP_LOGGING
 	retval=$?
-	if [ -f "$RUN_DIR/$PROGRAM.attr-update.$dest_replica.$SCRIPT_PID" ]; then
-	fi
 
 	if [ $retval != 0 ] && [ $retval != 24 ]; then
 		Logger "Updating file attributes on $dest_replica [$retval]. Stopping execution." "CRITICAL"
@@ -922,6 +919,7 @@ function _delete_local {
 
 	local parentdir
 	local previous_file=""
+	local result
 
 	if [ ! -d "$replica_dir$deletion_dir" ] && [ $_DRYRUN == false ]; then
 		$COMMAND_SUDO mkdir -p "$replica_dir$deletion_dir"
@@ -939,8 +937,6 @@ function _delete_local {
 				if [ $_DRYRUN == false ]; then
 					if [ -e "$replica_dir$deletion_dir/$files" ]; then
 						rm -rf "${replica_dir:?}$deletion_dir/$files"
-						Logger "Deleting file [$replica_dir$files]." "VERBOSE"
-
 					fi
 
 					if [ -e "$replica_dir$files" ]; then
@@ -964,8 +960,10 @@ function _delete_local {
 				if [ $_DRYRUN == false ]; then
 					if [ -e "$replica_dir$files" ]; then
 						rm -rf "$replica_dir$files"
-						if [ $? != 0 ]; then
-							Logger "Cannot delete $replica_dir$files" "ERROR"
+						result=$?
+						Logger "Deleting [$replica_dir$files]." "VERBOSE"
+						if [ $result != 0 ]; then
+							Logger "Cannot delete [$replica_dir$files]." "ERROR"
 							echo "$files" >> "${INITIATOR[1]}${INITIATOR[3]}/$deleted_failed_list_file"
 						fi
 					fi
@@ -1003,16 +1001,12 @@ function _delete_remote {
 	fi
 
 #TODO(critical): check output file without & and sleep 5
-$SSH_CMD ERROR_ALERT=0 sync_on_changes=$sync_on_changes _SILENT=$_SILENT _DEBUG=$_DEBUG _DRYRUN=$_DRYRUN _VERBOSE=$_VERBOSE COMMAND_SUDO=$COMMAND_SUDO FILE_LIST="$(EscapeSpaces "${TARGET[1]}${TARGET[3]}/$deleted_list_file")" REPLICA_DIR="$(EscapeSpaces "$replica_dir")" SOFT_DELETE=$SOFT_DELETE DELETE_DIR="$(EscapeSpaces "$deletion_dir")" FAILED_DELETE_LIST="$(EscapeSpaces "${TARGET[1]}${TARGET[3]}/$deleted_failed_list_file")" 'bash -s' << 'ENDSSH' >> "$RUN_DIR/$PROGRAM.remote_deletion.$SCRIPT_PID" 2>&1
+$SSH_CMD ERROR_ALERT=0 sync_on_changes=$sync_on_changes _DEBUG=$_DEBUG _DRYRUN=$_DRYRUN _VERBOSE=$_VERBOSE COMMAND_SUDO=$COMMAND_SUDO FILE_LIST="$(EscapeSpaces "${TARGET[1]}${TARGET[3]}/$deleted_list_file")" REPLICA_DIR="$(EscapeSpaces "$replica_dir")" SOFT_DELETE=$SOFT_DELETE DELETE_DIR="$(EscapeSpaces "$deletion_dir")" FAILED_DELETE_LIST="$(EscapeSpaces "${TARGET[1]}${TARGET[3]}/$deleted_failed_list_file")" 'bash -s' << 'ENDSSH' >> "$RUN_DIR/$PROGRAM.remote_deletion.$SCRIPT_PID" 2>&1
 
 	## The following lines are executed remotely
 	function _logger {
 		local value="${1}" # What to log
-		echo -e "$value" >&2 #TODO(high): logfile output missing
-
-		if [ $_SILENT == false ]; then
 		echo -e "$value"
-		fi
 	}
 
 	function Logger {
@@ -1023,20 +1017,28 @@ $SSH_CMD ERROR_ALERT=0 sync_on_changes=$sync_on_changes _SILENT=$_SILENT _DEBUG=
 
 		if [ "$level" == "CRITICAL" ]; then
 			_logger "$prefix\e[41m$value\e[0m"
-			ERROR_ALERT=1
+			return
 		elif [ "$level" == "ERROR" ]; then
 			_logger "$prefix\e[91m$value\e[0m"
-			ERROR_ALERT=1
+			return
 		elif [ "$level" == "WARN" ]; then
 			_logger "$prefix\e[93m$value\e[0m"
+			return
 		elif [ "$level" == "NOTICE" ]; then
 			_logger "$prefix$value"
+			return
+		elif [ "$level" == "VERBOSE" ]; then
+			if [ $_VERBOSE == true ]; then
+				_logger "$prefix$value"
+			fi
+			return
 		elif [ "$level" == "DEBUG" ]; then
 			if [ "$_DEBUG" == "yes" ]; then
 				_logger "$prefix$value"
 			fi
+			return
 		else
-			_logger "\e[41mLogger function called without proper loglevel.\e[0m"
+			_logger "\e[41mLogger function called without proper loglevel [$level].\e[0m"
 			_logger "$prefix$value"
 		fi
 	}
@@ -1063,7 +1065,7 @@ $SSH_CMD ERROR_ALERT=0 sync_on_changes=$sync_on_changes _SILENT=$_SILENT _DEBUG=
 				if [ $_DRYRUN == false ]; then
 					if [ -e "$REPLICA_DIR$DELETE_DIR/$files" ]; then
 						$COMMAND_SUDO rm -rf "$REPLICA_DIR$DELETE_DIR/$files"
-						Logger "Deleting file [$REPLICA_DIR$files]." "VERBOSE"
+						Logger "mongo." "NOTICE"
 					fi
 
 					if [ -e "$REPLICA_DIR$files" ]; then
@@ -1087,8 +1089,10 @@ $SSH_CMD ERROR_ALERT=0 sync_on_changes=$sync_on_changes _SILENT=$_SILENT _DEBUG=
 				if [ $_DRYRUN == false ]; then
 					if [ -e "$REPLICA_DIR$files" ]; then
 						$COMMAND_SUDO rm -rf "$REPLICA_DIR$files"
-						if [ $? != 0 ]; then
-							Logger "Cannot delete $REPLICA_DIR$files" "ERROR"
+						$result=$?
+						Logger "Deleting [$REPLICA_DIR$files]." "VERBOSE"
+						if [ $result != 0 ]; then
+							Logger "Cannot delete [$REPLICA_DIR$files]." "ERROR"
 							echo "$files" >> "$FAILED_DELETE_LIST"
 						fi
 					fi
@@ -1098,6 +1102,11 @@ $SSH_CMD ERROR_ALERT=0 sync_on_changes=$sync_on_changes _SILENT=$_SILENT _DEBUG=
 		fi
 	done < "$FILE_LIST"
 ENDSSH
+
+	#sleep 5
+	if [ -f "$RUN_DIR/$PROGRAM.remote_deletion.$SCRIPT_PID" ]; then
+		Logger "Remote Deletion:\n$(cat $RUN_DIR/$PROGRAM.remote_deletion.$SCRIPT_PID)" "VERBOSE"
+	fi
 
 	## Copy back the deleted failed file list
 	esc_source_file="$(EscapeSpaces "${TARGET[1]}${TARGET[3]}/$deleted_failed_list_file")"
@@ -1548,14 +1557,14 @@ function _SoftDeleteRemote {
 
 	if [ $_VERBOSE == true ]; then
 		# Cannot launch log function from xargs, ugly hack
-		cmd=$SSH_CMD' "if [ -d \"'$replica_deletion_path'\" ]; then '$COMMAND_SUDO' '$REMOTE_FIND_CMD' \"'$replica_deletion_path'/\" -type f -ctime +'$change_time' -print0 | xargs -0 -I {} echo Will delete file {} && '$COMMAND_SUDO' '$REMOTE_FIND_CMD' \"'$replica_deletion_path'/\" -type d -empty -ctime '$change_time' -print0 | xargs -0 -I {} echo Will delete directory {}; else echo \"No remote backup/deletion directory.\"; fi" > "'$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$SCRIPT_PID'" 2>&1'
+		cmd=$SSH_CMD' "if [ -d \"'$replica_deletion_path'\" ]; then '$COMMAND_SUDO' '$REMOTE_FIND_CMD' \"'$replica_deletion_path'/\" -type f -ctime +'$change_time' -print0 | xargs -0 -I {} echo Will delete file {} && '$COMMAND_SUDO' '$REMOTE_FIND_CMD' \"'$replica_deletion_path'/\" -type d -empty -ctime '$change_time' -print0 | xargs -0 -I {} echo Will delete directory {}; else echo \"No remote backup/deletion directory a.\"; fi" > "'$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$SCRIPT_PID'" 2>&1'
 		Logger "cmd: $cmd" "DEBUG"
 		eval "$cmd"
 		Logger "Command output:\n$(cat $RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$SCRIPT_PID)" "VERBOSE"
 	fi
 
 	if [ $_DRYRUN == false ]; then
-		cmd=$SSH_CMD' "if [ -d \"'$replica_deletion_path'\" ]; then '$COMMAND_SUDO' '$REMOTE_FIND_CMD' \"'$replica_deletion_path'/\" -type f -ctime +'$change_time' -print0 | xargs -0 -I {} '$COMMAND_SUDO' rm -f \"{}\" && '$COMMAND_SUDO' '$REMOTE_FIND_CMD' \"'$replica_deletion_path'/\" -type d -empty -ctime '$change_time' -print0 | xargs -0 -I {} '$COMMAND_SUDO' rm -rf \"{}\"; else echo \"No remote backup/deletion directory.\"; fi" > "'$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$SCRIPT_PID'" 2>&1'
+		cmd=$SSH_CMD' "if [ -d \"'$replica_deletion_path'\" ]; then '$COMMAND_SUDO' '$REMOTE_FIND_CMD' \"'$replica_deletion_path'/\" -type f -ctime +'$change_time' -print0 | xargs -0 -I {} '$COMMAND_SUDO' rm -f \"{}\" && '$COMMAND_SUDO' '$REMOTE_FIND_CMD' \"'$replica_deletion_path'/\" -type d -empty -ctime '$change_time' -print0 | xargs -0 -I {} '$COMMAND_SUDO' rm -rf \"{}\"; else echo \"No remote backup/deletion directory b.\"; fi" > "'$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$SCRIPT_PID'" 2>&1'
 
 		Logger "cmd: $cmd" "DEBUG"
 		eval "$cmd"
