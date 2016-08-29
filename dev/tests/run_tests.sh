@@ -51,4 +51,18 @@ function test_osync_quicksync_local () {
 	assertEquals "Target state dir exists" "0" $?
 }
 
+
+function test_osync_quicksync_remote () {
+	CreateReplicas
+	cd "$DEV_DIR"
+	./n_osync.sh --initiator="$INITIATOR_DIR" --target="ssh://localhost:49999/$TARGET_DIR" --rsakey=/root/.ssh/id_rsa_local > /dev/null
+	assertEquals "Return code" "0" $?
+
+	[ -d "$INITIATOR_DIR/$OSYNC_STATE_DIR" ]
+	assertEquals "Initiator state dir exists" "0" $?
+
+	[ -d "$TARGET_DIR/$OSYNC_STATE_DIR" ]
+	assertEquals "Target state dir exists" "0" $?
+}
+
 . ./shunit2/shunit2
