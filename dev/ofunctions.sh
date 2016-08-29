@@ -1,6 +1,6 @@
 #### MINIMAL-FUNCTION-SET BEGIN ####
 
-## FUNC_BUILD=2016082901
+## FUNC_BUILD=2016082902
 ## BEGIN Generic bash functions written in 2013-2016 by Orsiris de Jong - http://www.netpower.fr - ozy@netpower.fr
 
 ## To use in a program, define the following variables:
@@ -142,8 +142,10 @@ function Logger {
 	elif [ "$level" == "NOTICE" ]; then
 		_Logger "$prefix$value"
 		return
-	elif [ "$level" == "VERBOSE" ] && [ $_VERBOSE == true ]; then
-		_Logger "$prefix$value"
+	elif [ "$level" == "VERBOSE" ]; then
+		if [ $_VERBOSE == true ]; then
+			_Logger "$prefix$value"
+		fi
 		return
 	elif [ "$level" == "DEBUG" ]; then
 		if [ "$_DEBUG" == "yes" ]; then
@@ -156,7 +158,7 @@ function Logger {
 			return					#__WITH_PARANOIA_DEBUG
 		fi						#__WITH_PARANOIA_DEBUG
 	else
-		_Logger "\e[41mLogger function called without proper loglevel.\e[0m"
+		_Logger "\e[41mLogger function called without proper loglevel [$level].\e[0m"
 		_Logger "$prefix$value"
 	fi
 }
