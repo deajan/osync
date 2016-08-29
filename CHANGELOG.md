@@ -7,6 +7,8 @@ KNOWN ISSUES
 RECENT CHANGES
 --------------
 
+- Some more code compliance
+- Added more preflight checks
 - Logs sent by mail are easier to read
         - Better subject (currently running or finished	run)
         - Fixed	bogus double log sent in alert mails
