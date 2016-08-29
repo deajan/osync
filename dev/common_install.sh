@@ -4,7 +4,7 @@ PROGRAM=[prgname]
 PROGRAM_VERSION=[version]
 PROGRAM_BINARY=$PROGRAM".sh"
 PROGRAM_BATCH=$PROGRAM"-batch.sh"
-SCRIPT_BUILD=2016082901
+SCRIPT_BUILD=2016052601
 
 ## osync / obackup / pmocr / zsnap install script
 ## Tested on RHEL / CentOS 6 & 7, Fedora 23, Debian 7 & 8, Mint 17 and FreeBSD 8 & 10
@@ -12,12 +12,12 @@ SCRIPT_BUILD=2016082901
 
 #TODO: silent mode and no stats mode
 
-CONF_DIR=/etc/$PROGRAM
-BIN_DIR=/usr/local/bin
-SERVICE_DIR_INIT=/etc/init.d
+CONF_DIR=$FAKEROOT/etc/$PROGRAM
+BIN_DIR="$FAKEROOT/usr/local/bin"
+SERVICE_DIR_INIT=$FAKEROOT/etc/init.d
 # Should be /usr/lib/systemd/system, but /lib/systemd/system exists on debian & rhel / fedora
-SERVICE_DIR_SYSTEMD_SYSTEM=/lib/systemd/system
-SERVICE_DIR_SYSTEMD_USER=/etc/systemd/user
+SERVICE_DIR_SYSTEMD_SYSTEM=$FAKEROOT/lib/systemd/system
+SERVICE_DIR_SYSTEMD_USER=$FAKEROOT/etc/systemd/user
 
 ## osync specific code
 OSYNC_SERVICE_FILE_INIT="osync-srv"
@@ -31,8 +31,8 @@ PMOCR_SERVICE_FILE_SYSTEMD_SYSTEM="pmocr-srv.service"
 ## Generic code
 
 ## Default log file
-if [ -w /var/log ]; then
-        LOG_FILE="/var/log/$PROGRAM-install.log"
+if [ -w $FAKEROOT/var/log ]; then
+        LOG_FILE="$FAKEROOT/var/log/$PROGRAM-install.log"
 elif ([ "$HOME" != "" ] && [ -w "$HOME" ]); then
         LOG_FILE="$HOME/$PROGRAM-install.log"
 else
@@ -95,16 +95,16 @@ function SetOSSettings {
 		*"Darwin"*)
 		GROUP=admin
 		;;
+		*)
+		GROUP=root
+		;;
 		*"MINGW32"*|*"CYGWIN"*)
 		USER=""
 		GROUP=""
 		;;
-		*)
-		GROUP=root
-		;;
 	esac
 
-	if ([ "$USER" != "" ] && [ "$(whoami)" != "$USER" ]); then
+	if ([ "$USER" != "" ] && [ "$(whoami)" != "$USER" ] && [ "$FAKEROOT" == "" ]); then
 	  	QuickLogger "Must be run as $USER."
 		exit 1
 	fi
@@ -141,19 +141,19 @@ function CreateConfDir {
 
 function CopyExampleFiles {
 	if [ -f "./sync.conf.example" ]; then
-		cp "./sync.conf.example" "/etc/$PROGRAM/sync.conf.example"
+		cp "./sync.conf.example" "$FAKEROOT/etc/$PROGRAM/sync.conf.example"
 	fi
 
 	if [ -f "./host_backup.conf.example" ]; then
-		cp "./host_backup.conf.example" "/etc/$PROGRAM/host_backup.conf.example"
+		cp "./host_backup.conf.example" "$FAKEROOT/etc/$PROGRAM/host_backup.conf.example"
 	fi
 
 	if [ -f "./exlude.list.example" ]; then
-		cp "./exclude.list.example" "/etc/$PROGRAM"
+		cp "./exclude.list.example" "$FAKEROOT/etc/$PROGRAM"
 	fi
 
 	if [ -f "./snapshot.conf.example" ]; then
-		cp "./snapshot.conf.example" "/etc/$PROGRAM/snapshot.conf.example"
+		cp "./snapshot.conf.example" "$FAKEROOT/etc/$PROGRAM/snapshot.conf.example"
 	fi
 }
 
@@ -184,7 +184,7 @@ function CopyProgram {
 			QuickLogger "Cannot copy ssh_filter.sh to [$BIN_DIR]."
 		else
 			chmod 755 "$BIN_DIR/ssh_filter.sh"
-			if ([ "$USER" != "" ] && [ "$GROUP" != "" ]); then
+			if ([ "$USER" != "" ] && [ "$GROUP" != "" ] && [ "$FAKEROOT" == "" ]); then
 				chown $USER:$GROUP "$BIN_DIR/ssh_filter.sh"
 			fi
 			QuickLogger "Copied ssh_filter.sh to [$BIN_DIR]."
@@ -281,6 +281,10 @@ do
 		Usage
 	esac
 done
+
+if [ "$FAKEROOT" != "" ]; then
+	mkdir -p "$SERVICE_DIR_SYSTEMD_SYSTEM" "$SERVICE_DIR_SYSTEMD_USER" "$BIN_DIR"
+fi
 
 SetOSSettings
 CreateConfDir
