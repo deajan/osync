@@ -6,7 +6,7 @@ PROGRAM="osync" # Rsync based two way sync engine with fault tolerance
 AUTHOR="(C) 2013-2016 by Orsiris de Jong"
 CONTACT="http://www.netpower.fr/osync - ozy@netpower.fr"
 PROGRAM_VERSION=1.2-dev-parallel
-PROGRAM_BUILD=2016082904
+PROGRAM_BUILD=2016082905
 IS_STABLE=no
 
 # Execution order
@@ -745,6 +745,9 @@ function sync_attrs {
 	local rsync_cmd
 	local retval
 
+	local esc_source_dir
+	local esc_dest_dir
+
 	Logger "Getting list of files that need updates." "NOTICE"
 
 	if [ "$REMOTE_OPERATION" == "yes" ]; then
@@ -798,16 +801,16 @@ function sync_attrs {
 
 	if [ "$CONFLICT_PREVALANCE" == "${TARGET[0]}" ]; then
 		local source_dir="${INITIATOR[1]}"
-		local esc_source_dir=$(EscapeSpaces "${INITIATOR[1]}")
+		esc_source_dir=$(EscapeSpaces "${INITIATOR[1]}")
 		local dest_dir="${TARGET[1]}"
-		local esc_dest_dir=$(EscapeSpaces "${TARGET[1]}")
+		esc_dest_dir=$(EscapeSpaces "${TARGET[1]}")
 		local dest_replica="${TARGET[0]}"
 		join -j 1 -t ';' -o 1.1,1.2,2.2 "$RUN_DIR/$PROGRAM.ctime_mtime.${INITIATOR[0]}.$SCRIPT_PID" "$RUN_DIR/$PROGRAM.ctime_mtime.${TARGET[0]}.$SCRIPT_PID" | awk -F';' '{if ($2 > $3) print $1}' > "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}-ctime_files.$SCRIPT_PID"
 	else
 		local source_dir="${TARGET[1]}"
-		local esc_source_dir=$(EscapeSpaces "${TARGET[1]}")
+		esc_source_dir=$(EscapeSpaces "${TARGET[1]}")
 		local dest_dir="${INITIATOR[1]}"
-		local esc_dest_dir=$(EscapeSpaces "${INITIATOR[1]}")
+		esc_dest_dir=$(EscapeSpaces "${INITIATOR[1]}")
 		local dest_replica="${INITIATOR[0]}"
 		join -j 1 -t ';' -o 1.1,1.2,2.2 "$RUN_DIR/$PROGRAM.ctime_mtime.${TARGET[0]}.$SCRIPT_PID" "$RUN_DIR/$PROGRAM.ctime_mtime.${INITIATOR[0]}.$SCRIPT_PID" | awk -F';' '{if ($2 > $3) print $1}' > "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}-ctime_files.$SCRIPT_PID"
 	fi
@@ -863,19 +866,24 @@ function sync_update {
 	local rsync_cmd
 	local retval
 
+	local esc_source_dir
+	local esc_dest_dir
+
 	Logger "Updating $destination_replica replica." "NOTICE"
 	if [ "$source_replica" == "${INITIATOR[0]}" ]; then
 		local source_dir="${INITIATOR[1]}"
-		local esc_source_dir=$(EscapeSpaces "${INITIATOR[1]}")
 		local dest_dir="${TARGET[1]}"
-		local esc_dest_dir=$(EscapeSpaces "${TARGET[1]}")
 		local backup_args="$TARGET_BACKUP"
+
+		esc_source_dir=$(EscapeSpaces "${INITIATOR[1]}")
+		esc_dest_dir=$(EscapeSpaces "${TARGET[1]}")
 	else
 		local source_dir="${TARGET[1]}"
-		local esc_source_dir=$(EscapeSpaces "${TARGET[1]}")
 		local dest_dir="${INITIATOR[1]}"
-		local esc_dest_dir=$(EscapeSpaces "${INITIATOR[1]}")
 		local backup_args="$INITIATOR_BACKUP"
+
+		esc_source_dir=$(EscapeSpaces "${TARGET[1]}")
+		esc_dest_dir=$(EscapeSpaces "${INITIATOR[1]}")
 	fi
 
 	if [ "$REMOTE_OPERATION" == "yes" ]; then
@@ -1357,48 +1365,37 @@ function Sync {
 	fi
 
 	## Step 3a & 3b
-
 	if [ "$resumeInitiator" == "${SYNC_ACTION[3]}" ] || [ "$resumeTarget" == "${SYNC_ACTION[3]}" ]; then
-		if [ "$resumeInitiator" == "${SYNC_ACTION[3]}" ]; then
-			sync_update "${TARGET[0]}" "${INITIATOR[0]}" "$DELETED_LIST_FILENAME" &
-			initiatorPid="$!"
-		fi
-
-		if [ "$resumeTarget" == "${SYNC_ACTION[3]}" ]; then
-			sync_update "${INITIATOR[0]}" "${TARGET[0]}" "$DELETED_LIST_FILENAME" &
-			targetPid="$!"
-		fi
-
-		WaitForTaskCompletion "$initiatorPid;$targetPid" $SOFT_MAX_EXEC_TIME $HARD_MAX_EXEC_TIME ${FUNCNAME[0]} false $KEEP_LOGGING
-		if [ $? != 0 ]; then
-			IFS=';' read -r -a pidArray <<< "$WAIT_FOR_TASK_COMPLETION"
-			initiatorFail=false
-			targetFail=false
-			for pid in "${pidArray[@]}"; do
-				pid=${pid%:*}
-				if [ $pid == $initiatorPid ]; then
-					echo "${SYNC_ACTION[3]}" > "${INITIATOR[7]}"
-					initiatorFail=true
-				elif [ $pid == $targetPid ]; then
-					echo "${SYNC_ACTION[3]}" > "${INITIATOR[8]}"
-					targetFail=true
+		if [ "$CONFLICT_PREVALANCE" == "${TARGET[0]}" ]; then
+			if [ "$resumeTarget" == "${SYNC_ACTION[3]}" ]; then
+				sync_update "${TARGET[0]}" "${INITIATOR[0]}" "$DELETED_LIST_FILENAME"
+				if [ $? == 0 ]; then
+					echo "${SYNC_ACTION[4]}" > "${INITIATOR[8]}"
+					resumeTarget="${SYNC_ACTION[4]}"
 				fi
-			done
-
-			if [ $initiatorFail == false ]; then
-				echo "${SYNC_ACTION[4]}" > "${INITIATOR[7]}"
 			fi
-
-			if [ $targetFail == false ]; then
-				echo "${SYNC_ACTION[4]}" > "${INITIATOR[8]}"
+			if [ "$resumeInitiator" == "${SYNC_ACTION[3]}" ]; then
+				sync_update "${INITIATOR[0]}" "${TARGET[0]}" "$DELETED_LIST_FILENAME"
+				if [ $? == 0 ]; then
+					echo "${SYNC_ACTION[4]}" > "${INITIATOR[7]}"
+					resumeTarget="${SYNC_ACTION[4]}"
+				fi
 			fi
-
-		 	exit 1
 		else
-			echo "${SYNC_ACTION[4]}" > "${INITIATOR[7]}"
-			echo "${SYNC_ACTION[4]}" > "${INITIATOR[8]}"
-			resumeInitiator="${SYNC_ACTION[4]}"
-			resumeTarget="${SYNC_ACTION[4]}"
+			if [ "$resumeInitiator" == "${SYNC_ACTION[3]}" ]; then
+				sync_update "${INITIATOR[0]}" "${TARGET[0]}" "$DELETED_LIST_FILENAME"
+				if [ $? == 0 ]; then
+					echo "${SYNC_ACTION[4]}" > "${INITIATOR[7]}"
+					resumeTarget="${SYNC_ACTION[4]}"
+				fi
+			fi
+			if [ "$resumeTarget" == "${SYNC_ACTION[3]}" ]; then
+				sync_update "${TARGET[0]}" "${INITIATOR[0]}" "$DELETED_LIST_FILENAME"
+				if [ $? == 0 ]; then
+					echo "${SYNC_ACTION[4]}" > "${INITIATOR[8]}"
+					resumeTarget="${SYNC_ACTION[4]}"
+				fi
+			fi
 		fi
 	fi
 
