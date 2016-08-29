@@ -7,6 +7,9 @@ KNOWN ISSUES
 RECENT CHANGES
 --------------
 
+XX Xxx 2016:
+- Fixed installer for CYGWIN / MSYS environment
+
 28 Aug 2016: osync v1.1.2 released
 - Renamed sync.conf to sync.conf.example (thanks to https://github.com/hortimech)
 - Fixed RunAfterHook may be executed twice
