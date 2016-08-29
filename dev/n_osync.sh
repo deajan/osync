@@ -999,7 +999,6 @@ function _delete_remote {
 		exit 1
 	fi
 
-#TODO(critical): check output file without & and sleep 5
 $SSH_CMD ERROR_ALERT=0 sync_on_changes=$sync_on_changes _DEBUG=$_DEBUG _DRYRUN=$_DRYRUN _VERBOSE=$_VERBOSE COMMAND_SUDO=$COMMAND_SUDO FILE_LIST="$(EscapeSpaces "${TARGET[1]}${TARGET[3]}/$deleted_list_file")" REPLICA_DIR="$(EscapeSpaces "$replica_dir")" SOFT_DELETE=$SOFT_DELETE DELETE_DIR="$(EscapeSpaces "$deletion_dir")" FAILED_DELETE_LIST="$(EscapeSpaces "${TARGET[1]}${TARGET[3]}/$deleted_failed_list_file")" 'bash -s' << 'ENDSSH' >> "$RUN_DIR/$PROGRAM.remote_deletion.$SCRIPT_PID" 2>&1
 
 	## The following lines are executed remotely
@@ -1358,6 +1357,7 @@ function Sync {
 	fi
 
 	## Step 3a & 3b
+
 	if [ "$resumeInitiator" == "${SYNC_ACTION[3]}" ] || [ "$resumeTarget" == "${SYNC_ACTION[3]}" ]; then
 		if [ "$resumeInitiator" == "${SYNC_ACTION[3]}" ]; then
 			sync_update "${TARGET[0]}" "${INITIATOR[0]}" "$DELETED_LIST_FILENAME" &
