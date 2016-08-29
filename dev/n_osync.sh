@@ -6,7 +6,7 @@ PROGRAM="osync" # Rsync based two way sync engine with fault tolerance
 AUTHOR="(C) 2013-2016 by Orsiris de Jong"
 CONTACT="http://www.netpower.fr/osync - ozy@netpower.fr"
 PROGRAM_VERSION=1.2-dev-parallel
-PROGRAM_BUILD=2016082905
+PROGRAM_BUILD=2016082906
 IS_STABLE=no
 
 # Execution order
@@ -1378,7 +1378,7 @@ function Sync {
 				sync_update "${INITIATOR[0]}" "${TARGET[0]}" "$DELETED_LIST_FILENAME"
 				if [ $? == 0 ]; then
 					echo "${SYNC_ACTION[4]}" > "${INITIATOR[7]}"
-					resumeTarget="${SYNC_ACTION[4]}"
+					resumeInitiator="${SYNC_ACTION[4]}"
 				fi
 			fi
 		else
@@ -1386,7 +1386,7 @@ function Sync {
 				sync_update "${INITIATOR[0]}" "${TARGET[0]}" "$DELETED_LIST_FILENAME"
 				if [ $? == 0 ]; then
 					echo "${SYNC_ACTION[4]}" > "${INITIATOR[7]}"
-					resumeTarget="${SYNC_ACTION[4]}"
+					resumeInitiator="${SYNC_ACTION[4]}"
 				fi
 			fi
 			if [ "$resumeTarget" == "${SYNC_ACTION[3]}" ]; then
