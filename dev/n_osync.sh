@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 
 #TODO(critical): handle conflict prevalance, especially in sync_attrs function
-#TODO(ciritcal): deleted file has "deleted" name in target
 #TODO(high): verbose mode doesn't show files to be softdeleted
+#TODO(medium): No remote deletion dir when del dir is present
 
 PROGRAM="osync" # Rsync based two way sync engine with fault tolerance
 AUTHOR="(C) 2013-2016 by Orsiris de Jong"
@@ -932,15 +932,12 @@ function _delete_local {
 	while read -r files; do
 		## On every run, check wheter the next item is already deleted because it is included in a directory already deleted
 		if [[ "$files" != "$previous_file/"* ]] && [ "$files" != "" ]; then
-			if [ $_VERBOSE == true ]; then
-				Logger "Soft deleting $replica_dir$files" "NOTICE"
-			fi
 
 			if [ "$SOFT_DELETE" != "no" ]; then
 				if [ $_DRYRUN == false ]; then
 					if [ -e "$replica_dir$deletion_dir/$files" ]; then
 						rm -rf "${replica_dir:?}$deletion_dir/$files"
-						Logger "Deleting file [$replica_dir$files]." "DEBUG"
+						Logger "Deleting file [$replica_dir$files]." "VERBOSE"
 
 					fi
 
@@ -949,11 +946,11 @@ function _delete_local {
 						parentdir="$(dirname "$files")"
 						if [ "$parentdir" != "." ]; then
 							mkdir -p "$replica_dir$deletion_dir/$parentdir"
-							Logger "Moving deleted file [$replica_dir$files] to [$replica_dir$deletion_dir/$parentdir]." "DEBUG"
+							Logger "Moving deleted file [$replica_dir$files] to [$replica_dir$deletion_dir/$parentdir]." "VERBOSE"
 							mv -f "$replica_dir$files" "$replica_dir$deletion_dir/$parentdir"
 						else
+							Logger "Moving deleted file [$replica_dir$files] to [$replica_dir$deletion_dir]." "VERBOSE"
 							mv -f "$replica_dir$files" "$replica_dir$deletion_dir"
-							Logger "Moving deleted file [$replica_dir$files] to [$replica_dir$deletion_dir]." "DEBUG"
 						fi
 						if [ $? != 0 ]; then
 							Logger "Cannot move [$replica_dir$files] to deletion directory." "ERROR"
@@ -1059,15 +1056,12 @@ $SSH_CMD ERROR_ALERT=0 sync_on_changes=$sync_on_changes _SILENT=$_SILENT _DEBUG=
 	while read -r files; do
 		## On every run, check wheter the next item is already deleted because it is included in a directory already deleted
 		if [[ "$files" != "$previous_file/"* ]] && [ "$files" != "" ]; then
-			if [ $_VERBOSE == true ]; then
-				Logger "Soft deleting $REPLICA_DIR$files" "NOTICE"
-			fi
 
 			if [ "$SOFT_DELETE" != "no" ]; then
 				if [ $_DRYRUN == false ]; then
 					if [ -e "$REPLICA_DIR$DELETE_DIR/$files" ]; then
 						$COMMAND_SUDO rm -rf "$REPLICA_DIR$DELETE_DIR/$files"
-						Logger "Deleting file [$REPLICA_DIR$files]." "DEBUG"
+						Logger "Deleting file [$REPLICA_DIR$files]." "VERBOSE"
 					fi
 
 					if [ -e "$REPLICA_DIR$files" ]; then
@@ -1076,10 +1070,10 @@ $SSH_CMD ERROR_ALERT=0 sync_on_changes=$sync_on_changes _SILENT=$_SILENT _DEBUG=
 						if [ "$parentdir" != "." ]; then
 							$COMMAND_SUDO mkdir -p "$REPLICA_DIR$DELETE_DIR/$parentdir"
 							$COMMAND_SUDO mv -f "$REPLICA_DIR$files" "$REPLICA_DIR$DELETE_DIR/$parentdir"
-							Logger "Moving deleted file [$REPLICA_DIR$files] to [$REPLICA_DIR$DELETE_DIR/$parentdir]." "DEBUG"
+							Logger "Moving deleted file [$REPLICA_DIR$files] to [$REPLICA_DIR$DELETE_DIR/$parentdir]." "VERBOSE"
 						else
 							$COMMAND_SUDO mv -f "$REPLICA_DIR$files" "$REPLICA_DIR$DELETE_DIR"
-							Logger "Moving deleted file [$REPLICA_DIR$files] to [$REPLICA_DIR$DELETE_DIR]." "DEBUG"
+							Logger "Moving deleted file [$REPLICA_DIR$files] to [$REPLICA_DIR$DELETE_DIR]." "VERBOSE"
 						fi
 						if [ $? != 0 ]; then
 							Logger "Cannot move [$REPLICA_DIR$files] to deletion directory." "ERROR"

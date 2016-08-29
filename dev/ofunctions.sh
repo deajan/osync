@@ -110,7 +110,11 @@ function _Logger {
 	fi
 }
 
-# General log function with log levels
+# General log function with log levels:
+# CRITICAL, ERROR, WARN are colored in stdout, prefixed in stderr
+# NOTICE is standard level
+# VERBOSE is only sent to stdout / stderr if _VERBOSE=true
+# DEBUG & PARANOIA_DEBUG are only sent if _DEBUG=yes
 function Logger {
 	local value="${1}" # Sentence to log (in double quotes)
 	local level="${2}" # Log level: PARANOIA_DEBUG, DEBUG, VERBOSE, NOTICE, WARN, ERROR, CRITIAL
