@@ -4,7 +4,7 @@ PROGRAM=[prgname]
 PROGRAM_VERSION=[version]
 PROGRAM_BINARY=$PROGRAM".sh"
 PROGRAM_BATCH=$PROGRAM"-batch.sh"
-SCRIPT_BUILD=2016052601
+SCRIPT_BUILD=2016082902
 
 ## osync / obackup / pmocr / zsnap install script
 ## Tested on RHEL / CentOS 6 & 7, Fedora 23, Debian 7 & 8, Mint 17 and FreeBSD 8 & 10
@@ -95,12 +95,12 @@ function SetOSSettings {
 		*"Darwin"*)
 		GROUP=admin
 		;;
-		*)
-		GROUP=root
-		;;
 		*"MINGW32"*|*"CYGWIN"*)
 		USER=""
 		GROUP=""
+		;;
+		*)
+		GROUP=root
 		;;
 	esac
 
