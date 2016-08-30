@@ -1,15 +1,15 @@
 #!/usr/bin/env bash
 
-#TODO(critical): handle conflict prevalance, especially in sync_attrs function
+#TODO(critical): handle conflict prevalance, especially in sync_attrs function. Should work now.
 
 PROGRAM="osync" # Rsync based two way sync engine with fault tolerance
 AUTHOR="(C) 2013-2016 by Orsiris de Jong"
 CONTACT="http://www.netpower.fr/osync - ozy@netpower.fr"
 PROGRAM_VERSION=1.2-dev-parallel
-PROGRAM_BUILD=2016082906
+PROGRAM_BUILD=2016083001
 IS_STABLE=no
 
-# Execution order
+# Execution order						#__WITH_PARANOIA_DEBUG
 #	Function Name				Is parallel	#__WITH_PARANOIA_DEBUG
 
 #	GetLocalOS				no		#__WITH_PARANOIA_DEBUG
@@ -34,8 +34,8 @@ IS_STABLE=no
 #			delete_list		yes		#__WITH_PARANOIA_DEBUG
 #			sync_attrs		no		#__WITH_PARANOIA_DEBUG
 #			_get_file_ctime_mtime	yes		#__WITH_PARANOIA_DEBUG
-#			sync_update		yes		#__WITH_PARANOIA_DEBUG
-#			sync_update		yes		#__WITH_PARANOIA_DEBUG
+#			sync_update		no		#__WITH_PARANOIA_DEBUG
+#			sync_update		no		#__WITH_PARANOIA_DEBUG
 #			deletion_propagation	yes		#__WITH_PARANOIA_DEBUG
 #			deletion_propagation	yes		#__WITH_PARANOIA_DEBUG
 #			tree_list		yes		#__WITH_PARANOIA_DEBUG
@@ -230,23 +230,23 @@ function CheckReplicaPaths {
 	local pids
 
 	# Use direct comparaison before having a portable realpath implementation
-	#INITIATOR_SYNC_DIR_CANN=$(realpath "${INITIATOR[1]}")	#TODO(verylow): investigate realpath & readlink issues on MSYS and busybox here
-	#TARGET_SYNC_DIR_CANN=$(realpath "${TARGET[1]})
+	#INITIATOR_SYNC_DIR_CANN=$(realpath "${INITIATOR[replicaDir]}")	#TODO(verylow): investigate realpath & readlink issues on MSYS and busybox here
+	#TARGET_SYNC_DIR_CANN=$(realpath "${TARGET[replicaDir]})
 
 	if [ "$REMOTE_OPERATION" != "yes" ]; then
-		if [ "${INITIATOR[1]}" == "${TARGET[1]}" ]; then
-			Logger "Initiator and target path [${INITIATOR[1]}] cannot be the same." "CRITICAL"
+		if [ "${INITIATOR[replicaDir]}" == "${TARGET[replicaDir]}" ]; then
+			Logger "Initiator and target path [${INITIATOR[replicaDir]}] cannot be the same." "CRITICAL"
 			exit 1
 		fi
 	fi
 
-	_CheckReplicaPathsLocal "${INITIATOR[1]}" &
+	_CheckReplicaPathsLocal "${INITIATOR[replicaDir]}" &
 	pids="$!"
 	if [ "$REMOTE_OPERATION" != "yes" ]; then
-		_CheckReplicaPathsLocal "${TARGET[1]}" &
+		_CheckReplicaPathsLocal "${TARGET[replicaDir]}" &
 		pids="$pids;$!"
 	else
-		_CheckReplicaPathsRemote "${TARGET[1]}" &
+		_CheckReplicaPathsRemote "${TARGET[replicaDir]}" &
 		pids="$pids;$!"
 	fi
 	WaitForTaskCompletion $pids 720 1800 ${FUNCNAME[0]} false $KEEP_LOGGING
@@ -306,13 +306,13 @@ function CheckDiskSpace {
 		return 0
 	fi
 
-	_CheckDiskSpaceLocal "${INITIATOR[1]}" &
+	_CheckDiskSpaceLocal "${INITIATOR[replicaDir]}" &
 	pids="$!"
 	if [ "$REMOTE_OPERATION" != "yes" ]; then
-		_CheckDiskSpaceLocal "${TARGET[1]}" &
+		_CheckDiskSpaceLocal "${TARGET[replicaDir]}" &
 		pids="$pids;$!"
 	else
-		_CheckDiskSpaceRemote "${TARGET[1]}" &
+		_CheckDiskSpaceRemote "${TARGET[replicaDir]}" &
 		pids="$pids;$!"
 	fi
 	WaitForTaskCompletion $pids 720 1800 ${FUNCNAME[0]} true $KEEP_LOGGING
@@ -357,13 +357,13 @@ function CreateStateDirs {
 
 	local pids
 
-	_CreateStateDirsLocal "${INITIATOR[1]}${INITIATOR[3]}" &
+	_CreateStateDirsLocal "${INITIATOR[replicaDir]}${INITIATOR[stateDir]}" &
 	pids="$!"
 	if [ "$REMOTE_OPERATION" != "yes" ]; then
-		_CreateStateDirsLocal "${TARGET[1]}${TARGET[3]}" &
+		_CreateStateDirsLocal "${TARGET[replicaDir]}${TARGET[stateDir]}" &
 		pids="$pids;$!"
 	else
-		_CreateStateDirsRemote "${TARGET[1]}${TARGET[3]}" &
+		_CreateStateDirsRemote "${TARGET[replicaDir]}${TARGET[stateDir]}" &
 		pids="$pids;$!"
 	fi
 	WaitForTaskCompletion $pids 720 1800 ${FUNCNAME[0]} true $KEEP_LOGGING
@@ -462,13 +462,13 @@ function CheckLocks {
 		fi
 	fi
 
-	_CheckLocksLocal "${INITIATOR[2]}" &
+	_CheckLocksLocal "${INITIATOR[lockFile]}" &
 	pids="$!"
 	if [ "$REMOTE_OPERATION" != "yes" ]; then
-		_CheckLocksLocal "${TARGET[2]}" &
+		_CheckLocksLocal "${TARGET[lockFile]}" &
 		pids="$pids;$!"
 	else
-		_CheckLocksRemote "${TARGET[2]}" &
+		_CheckLocksRemote "${TARGET[lockFile]}" &
 		pids="$pids;$!"
 	fi
 	WaitForTaskCompletion $pids 720 1800 ${FUNCNAME[0]} true $KEEP_LOGGING
@@ -522,14 +522,14 @@ function WriteLockFiles {
 	local pidArray
 	local pid
 
-	_WriteLockFilesLocal "${INITIATOR[2]}" "${INITIATOR[0]}"&
+	_WriteLockFilesLocal "${INITIATOR[lockFile]}" "${INITIATOR[type]}"&
 	initiatorPid="$!"
 
 	if [ "$REMOTE_OPERATION" != "yes" ]; then
-		_WriteLockFilesLocal "${TARGET[2]}" "${TARGET[0]}" &
+		_WriteLockFilesLocal "${TARGET[lockFile]}" "${TARGET[type]}" &
 		targetPid="$!"
 	else
-		_WriteLockFilesRemote "${TARGET[2]}" "${TARGET[0]}" &
+		_WriteLockFilesRemote "${TARGET[lockFile]}" "${TARGET[type]}" &
 		targetPid="$!"
 	fi
 
@@ -596,17 +596,17 @@ function UnlockReplicas {
 	fi
 
 	if [ $INITIATOR_LOCK_FILE_EXISTS == true ]; then
-		_UnlockReplicasLocal "${INITIATOR[2]}" &
+		_UnlockReplicasLocal "${INITIATOR[lockFile]}" &
 		pids="$!"
 	fi
 
 	#WIP check if WaitForTaskCompletion can handle emppty pids like ";pid"
 	if [ $TARGET_LOCK_FILE_EXISTS == true ]; then
 		if [ "$REMOTE_OPERATION" != "yes" ]; then
-			_UnlockReplicasLocal "${TARGET[2]}" &
+			_UnlockReplicasLocal "${TARGET[lockFile]}" &
 			pids="$pids;$!"
 		else
-			_UnlockReplicasRemote "${TARGET[2]}" &
+			_UnlockReplicasRemote "${TARGET[lockFile]}" &
 			pids="$pids;$!"
 		fi
 	fi
@@ -636,7 +636,7 @@ function tree_list {
 	escaped_replica_path=$(EscapeSpaces "$replica_path")
 
 	Logger "Creating $replica_type replica file list [$replica_path]." "NOTICE"
-	if [ "$REMOTE_OPERATION" == "yes" ] && [ "$replica_type" == "${TARGET[0]}" ]; then
+	if [ "$REMOTE_OPERATION" == "yes" ] && [ "$replica_type" == "${TARGET[type]}" ]; then
 		CheckConnectivity3rdPartyHosts
 		CheckConnectivityRemoteHost
 		rsync_cmd="$(type -p $RSYNC_EXECUTABLE) --rsync-path=\"$RSYNC_PATH\" $RSYNC_ARGS $RSYNC_ATTR_ARGS $RSYNC_TYPE_ARGS -8 --exclude \"$OSYNC_DIR\" $RSYNC_PATTERNS $RSYNC_PARTIAL_EXCLUDE -e \"$RSYNC_SSH_CMD\" --list-only $REMOTE_USER@$REMOTE_HOST:\"$escaped_replica_path/\" | grep \"^-\|^d\" | awk '{\$1=\$2=\$3=\$4=\"\" ;print}' | awk '{\$1=\$1 ;print}' | (grep -v \"^\.$\" || :) | sort > \"$RUN_DIR/$PROGRAM.$replica_type.$SCRIPT_PID\""
@@ -650,7 +650,7 @@ function tree_list {
 	retval=$?
 	## Retval 24 = some files vanished while creating list
 	if ([ $retval == 0 ] || [ $retval == 24 ]) && [ -f "$RUN_DIR/$PROGRAM.$replica_type.$SCRIPT_PID" ]; then
-		mv -f "$RUN_DIR/$PROGRAM.$replica_type.$SCRIPT_PID" "${INITIATOR[1]}${INITIATOR[3]}/$replica_type$tree_filename"
+		mv -f "$RUN_DIR/$PROGRAM.$replica_type.$SCRIPT_PID" "${INITIATOR[replicaDir]}${INITIATOR[stateDir]}/$replica_type$tree_filename"
 		return $?
 	else
 		Logger "Cannot create replica file list in [$replica_path]." "CRITICAL"
@@ -670,13 +670,13 @@ function delete_list {
 	local cmd
 
 	Logger "Creating $replica_type replica deleted file list." "NOTICE"
-	if [ -f "${INITIATOR[1]}${INITIATOR[3]}/$replica_type$TREE_AFTER_FILENAME_NO_SUFFIX" ]; then
+	if [ -f "${INITIATOR[replicaDir]}${INITIATOR[stateDir]}/$replica_type${INITIATOR[treeAfterFile]}_NO_SUFFIX" ]; then
 		## Same functionnality, comm is much faster than grep but is not available on every platform
 		if type comm > /dev/null 2>&1 ; then
-			cmd="comm -23 \"${INITIATOR[1]}${INITIATOR[3]}/$replica_type$TREE_AFTER_FILENAME_NO_SUFFIX\" \"${INITIATOR[1]}${INITIATOR[3]}/$replica_type$tree_file_current\" > \"${INITIATOR[1]}${INITIATOR[3]}/$replica_type$deleted_list_file\""
+			cmd="comm -23 \"${INITIATOR[replicaDir]}${INITIATOR[stateDir]}/$replica_type${INITIATOR[treeAfterFile]}_NO_SUFFIX\" \"${INITIATOR[replicaDir]}${INITIATOR[stateDir]}/$replica_type$tree_file_current\" > \"${INITIATOR[replicaDir]}${INITIATOR[stateDir]}/$replica_type$deleted_list_file\""
 		else
 			## The || : forces the command to have a good result
-			cmd="(grep -F -x -v -f \"${INITIATOR[1]}${INITIATOR[3]}/$replica_type$tree_file_current\" \"${INITIATOR[1]}${INITIATOR[3]}/$replica_type$TREE_AFTER_FILENAME_NO_SUFFIX\" || :) > \"${INITIATOR[1]}${INITIATOR[3]}/$replica_type$deleted_list_file\""
+			cmd="(grep -F -x -v -f \"${INITIATOR[replicaDir]}${INITIATOR[stateDir]}/$replica_type$tree_file_current\" \"${INITIATOR[replicaDir]}${INITIATOR[stateDir]}/$replica_type${INITIATOR[treeAfterFile]}_NO_SUFFIX\" || :) > \"${INITIATOR[replicaDir]}${INITIATOR[stateDir]}/$replica_type$deleted_list_file\""
 		fi
 
 		Logger "CMD: $cmd" "DEBUG"
@@ -684,14 +684,14 @@ function delete_list {
 		retval=$?
 
 		# Add delete failed file list to current delete list and then empty it
-		if [ -f "${INITIATOR[1]}${INITIATOR[3]}/$replica_type$deleted_failed_list_file" ]; then
-			cat "${INITIATOR[1]}${INITIATOR[3]}/$replica_type$deleted_failed_list_file" >> "${INITIATOR[1]}${INITIATOR[3]}/$replica_type$deleted_list_file"
-			rm -f "${INITIATOR[1]}${INITIATOR[3]}/$replica_type$deleted_failed_list_file"
+		if [ -f "${INITIATOR[replicaDir]}${INITIATOR[stateDir]}/$replica_type$deleted_failed_list_file" ]; then
+			cat "${INITIATOR[replicaDir]}${INITIATOR[stateDir]}/$replica_type$deleted_failed_list_file" >> "${INITIATOR[replicaDir]}${INITIATOR[stateDir]}/$replica_type$deleted_list_file"
+			rm -f "${INITIATOR[replicaDir]}${INITIATOR[stateDir]}/$replica_type$deleted_failed_list_file"
 		fi
 
 		return $retval
 	else
-		touch "${INITIATOR[1]}${INITIATOR[3]}/$replica_type$deleted_list_file"
+		touch "${INITIATOR[replicaDir]}${INITIATOR[stateDir]}/$replica_type$deleted_list_file"
 		return $retval
 	fi
 }
@@ -739,7 +739,7 @@ function _get_file_ctime_mtime_remote {
 function sync_attrs {
 	local initiator_replica="${1}"
 	local target_replica="${2}"
-	local delete_list_filename="$DELETED_LIST_FILENAME" # Contains deleted list filename, will be prefixed with replica type
+	local delete_list_filename="${INITIATOR[deletedListFile]}" # Contains deleted list filename, will be prefixed with replica type
 	__CheckArguments 2 $# ${FUNCNAME[0]} "$@"	#__WITH_PARANOIA_DEBUG
 
 	local rsync_cmd
@@ -780,15 +780,15 @@ function sync_attrs {
 	fi
 
 	Logger "Getting ctimes for pending files on initiator." "NOTICE"
-	_get_file_ctime_mtime_local "${INITIATOR[1]}" "${INITIATOR[0]}" "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}-cleaned.$SCRIPT_PID" &
+	_get_file_ctime_mtime_local "${INITIATOR[replicaDir]}" "${INITIATOR[type]}" "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}-cleaned.$SCRIPT_PID" &
 	pids="$!"
 
 	Logger "Getting ctimes for pending files on target." "NOTICE"
 	if [ "$REMOTE_OPERATION" != "yes" ]; then
-		_get_file_ctime_mtime_local "${TARGET[1]}" "${TARGET[0]}" "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}-cleaned.$SCRIPT_PID" &
+		_get_file_ctime_mtime_local "${TARGET[replicaDir]}" "${TARGET[type]}" "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}-cleaned.$SCRIPT_PID" &
 		pids="$pids;$!"
 	else
-		_get_file_ctime_mtime_remote "${TARGET[1]}" "${TARGET[0]}" "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}-cleaned.$SCRIPT_PID" &
+		_get_file_ctime_mtime_remote "${TARGET[replicaDir]}" "${TARGET[type]}" "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}-cleaned.$SCRIPT_PID" &
 		pids="$pids;$!"
 	fi
 	WaitForTaskCompletion $pids 1800 0 ${FUNCNAME[0]} true $KEEP_LOGGING
@@ -796,23 +796,23 @@ function sync_attrs {
 	# If target gets updated first, then sync_attr must update initiator's attrs first
 	# For join, remove leading replica paths
 
-	sed -i'.tmp' "s;^${INITIATOR[1]};;g" "$RUN_DIR/$PROGRAM.ctime_mtime.${INITIATOR[0]}.$SCRIPT_PID"
-	sed -i'.tmp' "s;^${TARGET[1]};;g" "$RUN_DIR/$PROGRAM.ctime_mtime.${TARGET[0]}.$SCRIPT_PID"
+	sed -i'.tmp' "s;^${INITIATOR[replicaDir]};;g" "$RUN_DIR/$PROGRAM.ctime_mtime.${INITIATOR[type]}.$SCRIPT_PID"
+	sed -i'.tmp' "s;^${TARGET[replicaDir]};;g" "$RUN_DIR/$PROGRAM.ctime_mtime.${TARGET[type]}.$SCRIPT_PID"
 
-	if [ "$CONFLICT_PREVALANCE" == "${TARGET[0]}" ]; then
-		local source_dir="${INITIATOR[1]}"
-		esc_source_dir=$(EscapeSpaces "${INITIATOR[1]}")
-		local dest_dir="${TARGET[1]}"
-		esc_dest_dir=$(EscapeSpaces "${TARGET[1]}")
-		local dest_replica="${TARGET[0]}"
-		join -j 1 -t ';' -o 1.1,1.2,2.2 "$RUN_DIR/$PROGRAM.ctime_mtime.${INITIATOR[0]}.$SCRIPT_PID" "$RUN_DIR/$PROGRAM.ctime_mtime.${TARGET[0]}.$SCRIPT_PID" | awk -F';' '{if ($2 > $3) print $1}' > "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}-ctime_files.$SCRIPT_PID"
+	if [ "$CONFLICT_PREVALANCE" == "${TARGET[type]}" ]; then
+		local source_dir="${INITIATOR[replicaDir]}"
+		esc_source_dir=$(EscapeSpaces "${INITIATOR[replicaDir]}")
+		local dest_dir="${TARGET[replicaDir]}"
+		esc_dest_dir=$(EscapeSpaces "${TARGET[replicaDir]}")
+		local dest_replica="${TARGET[type]}"
+		join -j 1 -t ';' -o 1.1,1.2,2.2 "$RUN_DIR/$PROGRAM.ctime_mtime.${INITIATOR[type]}.$SCRIPT_PID" "$RUN_DIR/$PROGRAM.ctime_mtime.${TARGET[type]}.$SCRIPT_PID" | awk -F';' '{if ($2 > $3) print $1}' > "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}-ctime_files.$SCRIPT_PID"
 	else
-		local source_dir="${TARGET[1]}"
-		esc_source_dir=$(EscapeSpaces "${TARGET[1]}")
-		local dest_dir="${INITIATOR[1]}"
-		esc_dest_dir=$(EscapeSpaces "${INITIATOR[1]}")
-		local dest_replica="${INITIATOR[0]}"
-		join -j 1 -t ';' -o 1.1,1.2,2.2 "$RUN_DIR/$PROGRAM.ctime_mtime.${TARGET[0]}.$SCRIPT_PID" "$RUN_DIR/$PROGRAM.ctime_mtime.${INITIATOR[0]}.$SCRIPT_PID" | awk -F';' '{if ($2 > $3) print $1}' > "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}-ctime_files.$SCRIPT_PID"
+		local source_dir="${TARGET[replicaDir]}"
+		esc_source_dir=$(EscapeSpaces "${TARGET[replicaDir]}")
+		local dest_dir="${INITIATOR[replicaDir]}"
+		esc_dest_dir=$(EscapeSpaces "${INITIATOR[replicaDir]}")
+		local dest_replica="${INITIATOR[type]}"
+		join -j 1 -t ';' -o 1.1,1.2,2.2 "$RUN_DIR/$PROGRAM.ctime_mtime.${TARGET[type]}.$SCRIPT_PID" "$RUN_DIR/$PROGRAM.ctime_mtime.${INITIATOR[type]}.$SCRIPT_PID" | awk -F';' '{if ($2 > $3) print $1}' > "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}-ctime_files.$SCRIPT_PID"
 	fi
 
 	if [ $(wc -l < "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}-ctime_files.$SCRIPT_PID") -eq 0 ]; then
@@ -827,13 +827,13 @@ function sync_attrs {
 		CheckConnectivityRemoteHost
 
 		# No rsync args (hence no -r) because files are selected with --from-file
-		if [ "$dest_replica" == "${INITIATOR[0]}" ]; then
-			rsync_cmd="$(type -p $RSYNC_EXECUTABLE) --rsync-path=\"$RSYNC_PATH\" $RSYNC_DRY_ARG $RSYNC_ATTR_ARGS $SYNC_OPTS -e \"$RSYNC_SSH_CMD\" --exclude \"$OSYNC_DIR\" $RSYNC_PATTERNS $RSYNC_PARTIAL_EXCLUDE --exclude-from=\"${INITIATOR[1]}${INITIATOR[3]}/${INITIATOR[0]}$delete_list_filename\" --exclude-from=\"${INITIATOR[1]}${INITIATOR[3]}/${TARGET[0]}$delete_list_filename\" --files-from=\"$RUN_DIR/$PROGRAM.${FUNCNAME[0]}-ctime_files.$SCRIPT_PID\" $REMOTE_USER@$REMOTE_HOST:\"$esc_source_dir\" \"$dest_dir\" >> $RUN_DIR/$PROGRAM.attr-update.$dest_replica.$SCRIPT_PID 2>&1 &"
+		if [ "$dest_replica" == "${INITIATOR[type]}" ]; then
+			rsync_cmd="$(type -p $RSYNC_EXECUTABLE) --rsync-path=\"$RSYNC_PATH\" $RSYNC_DRY_ARG $RSYNC_ATTR_ARGS $SYNC_OPTS -e \"$RSYNC_SSH_CMD\" --exclude \"$OSYNC_DIR\" $RSYNC_PATTERNS $RSYNC_PARTIAL_EXCLUDE --exclude-from=\"${INITIATOR[replicaDir]}${INITIATOR[stateDir]}/${INITIATOR[type]}$delete_list_filename\" --exclude-from=\"${INITIATOR[replicaDir]}${INITIATOR[stateDir]}/${TARGET[type]}$delete_list_filename\" --files-from=\"$RUN_DIR/$PROGRAM.${FUNCNAME[0]}-ctime_files.$SCRIPT_PID\" $REMOTE_USER@$REMOTE_HOST:\"$esc_source_dir\" \"$dest_dir\" >> $RUN_DIR/$PROGRAM.attr-update.$dest_replica.$SCRIPT_PID 2>&1 &"
 		else
-			rsync_cmd="$(type -p $RSYNC_EXECUTABLE) --rsync-path=\"$RSYNC_PATH\" $RSYNC_DRY_ARG $RSYNC_ATTR_ARGS $SYNC_OPTS -e \"$RSYNC_SSH_CMD\" --exclude \"$OSYNC_DIR\" $RSYNC_PATTERNS $RSYNC_PARTIAL_EXCLUDE --exclude-from=\"${INITIATOR[1]}${INITIATOR[3]}/${INITIATOR[0]}$delete_list_filename\" --exclude-from=\"${INITIATOR[1]}${INITIATOR[3]}/${TARGET[0]}$delete_list_filename\" --files-from=\"$RUN_DIR/$PROGRAM.${FUNCNAME[0]}-ctime_files.$SCRIPT_PID\" \"$source_dir\" $REMOTE_USER@$REMOTE_HOST:\"$esc_dest_dir\" >> $RUN_DIR/$PROGRAM.attr-update.$dest_replica.$SCRIPT_PID 2>&1 &"
+			rsync_cmd="$(type -p $RSYNC_EXECUTABLE) --rsync-path=\"$RSYNC_PATH\" $RSYNC_DRY_ARG $RSYNC_ATTR_ARGS $SYNC_OPTS -e \"$RSYNC_SSH_CMD\" --exclude \"$OSYNC_DIR\" $RSYNC_PATTERNS $RSYNC_PARTIAL_EXCLUDE --exclude-from=\"${INITIATOR[replicaDir]}${INITIATOR[stateDir]}/${INITIATOR[type]}$delete_list_filename\" --exclude-from=\"${INITIATOR[replicaDir]}${INITIATOR[stateDir]}/${TARGET[type]}$delete_list_filename\" --files-from=\"$RUN_DIR/$PROGRAM.${FUNCNAME[0]}-ctime_files.$SCRIPT_PID\" \"$source_dir\" $REMOTE_USER@$REMOTE_HOST:\"$esc_dest_dir\" >> $RUN_DIR/$PROGRAM.attr-update.$dest_replica.$SCRIPT_PID 2>&1 &"
 		fi
 	else
-		rsync_cmd="$(type -p $RSYNC_EXECUTABLE) --rsync-path=\"$RSYNC_PATH\" $RSYNC_DRY_ARG $RSYNC_ATTR_ARGS $SYNC_OPTS --exclude \"$OSYNC_DIR\" $RSYNC_PATTERNS $RSYNC_PARTIAL_EXCLUDE --exclude-from=\"${INITIATOR[1]}${INITIATOR[3]}/${INITIATOR[0]}$delete_list_filename\" --exclude-from=\"${INITIATOR[1]}${INITIATOR[3]}/${TARGET[0]}$delete_list_filename\" --files-from=\"$RUN_DIR/$PROGRAM.${FUNCNAME[0]}-ctime_files.$SCRIPT_PID\" \"$source_dir\" \"$dest_dir\" >> $RUN_DIR/$PROGRAM.attr-update.$dest_replica.$SCRIPT_PID 2>&1 &"
+		rsync_cmd="$(type -p $RSYNC_EXECUTABLE) --rsync-path=\"$RSYNC_PATH\" $RSYNC_DRY_ARG $RSYNC_ATTR_ARGS $SYNC_OPTS --exclude \"$OSYNC_DIR\" $RSYNC_PATTERNS $RSYNC_PARTIAL_EXCLUDE --exclude-from=\"${INITIATOR[replicaDir]}${INITIATOR[stateDir]}/${INITIATOR[type]}$delete_list_filename\" --exclude-from=\"${INITIATOR[replicaDir]}${INITIATOR[stateDir]}/${TARGET[type]}$delete_list_filename\" --files-from=\"$RUN_DIR/$PROGRAM.${FUNCNAME[0]}-ctime_files.$SCRIPT_PID\" \"$source_dir\" \"$dest_dir\" >> $RUN_DIR/$PROGRAM.attr-update.$dest_replica.$SCRIPT_PID 2>&1 &"
 
 	fi
 
@@ -870,32 +870,32 @@ function sync_update {
 	local esc_dest_dir
 
 	Logger "Updating $destination_replica replica." "NOTICE"
-	if [ "$source_replica" == "${INITIATOR[0]}" ]; then
-		local source_dir="${INITIATOR[1]}"
-		local dest_dir="${TARGET[1]}"
+	if [ "$source_replica" == "${INITIATOR[type]}" ]; then
+		local source_dir="${INITIATOR[replicaDir]}"
+		local dest_dir="${TARGET[replicaDir]}"
 		local backup_args="$TARGET_BACKUP"
 
-		esc_source_dir=$(EscapeSpaces "${INITIATOR[1]}")
-		esc_dest_dir=$(EscapeSpaces "${TARGET[1]}")
+		esc_source_dir=$(EscapeSpaces "${INITIATOR[replicaDir]}")
+		esc_dest_dir=$(EscapeSpaces "${TARGET[replicaDir]}")
 	else
-		local source_dir="${TARGET[1]}"
-		local dest_dir="${INITIATOR[1]}"
+		local source_dir="${TARGET[replicaDir]}"
+		local dest_dir="${INITIATOR[replicaDir]}"
 		local backup_args="$INITIATOR_BACKUP"
 
-		esc_source_dir=$(EscapeSpaces "${TARGET[1]}")
-		esc_dest_dir=$(EscapeSpaces "${INITIATOR[1]}")
+		esc_source_dir=$(EscapeSpaces "${TARGET[replicaDir]}")
+		esc_dest_dir=$(EscapeSpaces "${INITIATOR[replicaDir]}")
 	fi
 
 	if [ "$REMOTE_OPERATION" == "yes" ]; then
 		CheckConnectivity3rdPartyHosts
 		CheckConnectivityRemoteHost
-		if [ "$source_replica" == "${INITIATOR[0]}" ]; then
-			rsync_cmd="$(type -p $RSYNC_EXECUTABLE) --rsync-path=\"$RSYNC_PATH\" $RSYNC_ARGS $RSYNC_DRY_ARG $RSYNC_ATTR_ARGS $RSYNC_TYPE_ARGS $SYNC_OPTS -e \"$RSYNC_SSH_CMD\" $backup_args --exclude \"$OSYNC_DIR\" $RSYNC_PATTERNS $RSYNC_PARTIAL_EXCLUDE --exclude-from=\"${INITIATOR[1]}${INITIATOR[3]}/$source_replica$delete_list_filename\" --exclude-from=\"${INITIATOR[1]}${INITIATOR[3]}/$destination_replica$delete_list_filename\" \"$source_dir\" $REMOTE_USER@$REMOTE_HOST:\"$esc_dest_dir\" >> $RUN_DIR/$PROGRAM.update.$destination_replica.$SCRIPT_PID 2>&1"
+		if [ "$source_replica" == "${INITIATOR[type]}" ]; then
+			rsync_cmd="$(type -p $RSYNC_EXECUTABLE) --rsync-path=\"$RSYNC_PATH\" $RSYNC_ARGS $RSYNC_DRY_ARG $RSYNC_ATTR_ARGS $RSYNC_TYPE_ARGS $SYNC_OPTS -e \"$RSYNC_SSH_CMD\" $backup_args --exclude \"$OSYNC_DIR\" $RSYNC_PATTERNS $RSYNC_PARTIAL_EXCLUDE --exclude-from=\"${INITIATOR[replicaDir]}${INITIATOR[stateDir]}/$source_replica$delete_list_filename\" --exclude-from=\"${INITIATOR[replicaDir]}${INITIATOR[stateDir]}/$destination_replica$delete_list_filename\" \"$source_dir\" $REMOTE_USER@$REMOTE_HOST:\"$esc_dest_dir\" >> $RUN_DIR/$PROGRAM.update.$destination_replica.$SCRIPT_PID 2>&1"
 		else
-			rsync_cmd="$(type -p $RSYNC_EXECUTABLE) --rsync-path=\"$RSYNC_PATH\" $RSYNC_ARGS $RSYNC_DRY_ARG $RSYNC_ATTR_ARGS $RSYNC_TYPE_ARGS $SYNC_OPTS -e \"$RSYNC_SSH_CMD\" $backup_args --exclude \"$OSYNC_DIR\" $RSYNC_PATTERNS $RSYNC_PARTIAL_EXCLUDE --exclude-from=\"${INITIATOR[1]}${INITIATOR[3]}/$destination_replica$delete_list_filename\" --exclude-from=\"${INITIATOR[1]}${INITIATOR[3]}/$source_replica$delete_list_filename\" $REMOTE_USER@$REMOTE_HOST:\"$esc_source_dir\" \"$dest_dir\" >> $RUN_DIR/$PROGRAM.update.$destination_replica.$SCRIPT_PID 2>&1"
+			rsync_cmd="$(type -p $RSYNC_EXECUTABLE) --rsync-path=\"$RSYNC_PATH\" $RSYNC_ARGS $RSYNC_DRY_ARG $RSYNC_ATTR_ARGS $RSYNC_TYPE_ARGS $SYNC_OPTS -e \"$RSYNC_SSH_CMD\" $backup_args --exclude \"$OSYNC_DIR\" $RSYNC_PATTERNS $RSYNC_PARTIAL_EXCLUDE --exclude-from=\"${INITIATOR[replicaDir]}${INITIATOR[stateDir]}/$destination_replica$delete_list_filename\" --exclude-from=\"${INITIATOR[replicaDir]}${INITIATOR[stateDir]}/$source_replica$delete_list_filename\" $REMOTE_USER@$REMOTE_HOST:\"$esc_source_dir\" \"$dest_dir\" >> $RUN_DIR/$PROGRAM.update.$destination_replica.$SCRIPT_PID 2>&1"
 		fi
 	else
-		rsync_cmd="$(type -p $RSYNC_EXECUTABLE) --rsync-path=\"$RSYNC_PATH\" $RSYNC_ARGS $RSYNC_DRY_ARG $RSYNC_ATTR_ARGS $RSYNC_TYPE_ARGS $SYNC_OPTS $backup_args --exclude \"$OSYNC_DIR\" $RSYNC_PATTERNS $RSYNC_PARTIAL_EXCLUDE --exclude-from=\"${INITIATOR[1]}${INITIATOR[3]}/$source_replica$delete_list_filename\" --exclude-from=\"${INITIATOR[1]}${INITIATOR[3]}/$destination_replica$delete_list_filename\" \"$source_dir\" \"$dest_dir\" >> $RUN_DIR/$PROGRAM.update.$destination_replica.$SCRIPT_PID 2>&1"
+		rsync_cmd="$(type -p $RSYNC_EXECUTABLE) --rsync-path=\"$RSYNC_PATH\" $RSYNC_ARGS $RSYNC_DRY_ARG $RSYNC_ATTR_ARGS $RSYNC_TYPE_ARGS $SYNC_OPTS $backup_args --exclude \"$OSYNC_DIR\" $RSYNC_PATTERNS $RSYNC_PARTIAL_EXCLUDE --exclude-from=\"${INITIATOR[replicaDir]}${INITIATOR[stateDir]}/$source_replica$delete_list_filename\" --exclude-from=\"${INITIATOR[replicaDir]}${INITIATOR[stateDir]}/$destination_replica$delete_list_filename\" \"$source_dir\" \"$dest_dir\" >> $RUN_DIR/$PROGRAM.update.$destination_replica.$SCRIPT_PID 2>&1"
 	fi
 	Logger "RSYNC_CMD: $rsync_cmd" "DEBUG"
 	eval "$rsync_cmd"
@@ -959,7 +959,7 @@ function _delete_local {
 						fi
 						if [ $? != 0 ]; then
 							Logger "Cannot move [$replica_dir$files] to deletion directory." "ERROR"
-							echo "$files" >> "${INITIATOR[1]}${INITIATOR[3]}/$deleted_failed_list_file"
+							echo "$files" >> "${INITIATOR[replicaDir]}${INITIATOR[stateDir]}/$deleted_failed_list_file"
 						fi
 					fi
 				fi
@@ -971,14 +971,14 @@ function _delete_local {
 						Logger "Deleting [$replica_dir$files]." "VERBOSE"
 						if [ $result != 0 ]; then
 							Logger "Cannot delete [$replica_dir$files]." "ERROR"
-							echo "$files" >> "${INITIATOR[1]}${INITIATOR[3]}/$deleted_failed_list_file"
+							echo "$files" >> "${INITIATOR[replicaDir]}${INITIATOR[stateDir]}/$deleted_failed_list_file"
 						fi
 					fi
 				fi
 			fi
 			previous_file="$files"
 		fi
-	done < "${INITIATOR[1]}${INITIATOR[3]}/$deleted_list_file"
+	done < "${INITIATOR[replicaDir]}${INITIATOR[stateDir]}/$deleted_list_file"
 }
 
 function _delete_remote {
@@ -995,8 +995,8 @@ function _delete_remote {
 	## Anything beetween << ENDSSH and ENDSSH will be executed remotely
 
 	# Additionnaly, we need to copy the deletetion list to the remote state folder
-	esc_dest_dir="$(EscapeSpaces "${TARGET[1]}${TARGET[3]}")"
-	rsync_cmd="$(type -p $RSYNC_EXECUTABLE) --rsync-path=\"$RSYNC_PATH\" -e \"$RSYNC_SSH_CMD\" \"${INITIATOR[1]}${INITIATOR[3]}/$deleted_list_file\" $REMOTE_USER@$REMOTE_HOST:\"$esc_dest_dir/\" >> $RUN_DIR/$PROGRAM.${FUNCNAME[0]}.precopy.$SCRIPT_PID 2>&1"
+	esc_dest_dir="$(EscapeSpaces "${TARGET[replicaDir]}${TARGET[stateDir]}")"
+	rsync_cmd="$(type -p $RSYNC_EXECUTABLE) --rsync-path=\"$RSYNC_PATH\" -e \"$RSYNC_SSH_CMD\" \"${INITIATOR[replicaDir]}${INITIATOR[stateDir]}/$deleted_list_file\" $REMOTE_USER@$REMOTE_HOST:\"$esc_dest_dir/\" >> $RUN_DIR/$PROGRAM.${FUNCNAME[0]}.precopy.$SCRIPT_PID 2>&1"
 	Logger "RSYNC_CMD: $rsync_cmd" "DEBUG"
 	eval "$rsync_cmd" 2>> "$LOG_FILE"
 	if [ $? != 0 ]; then
@@ -1007,7 +1007,7 @@ function _delete_remote {
 		exit 1
 	fi
 
-$SSH_CMD ERROR_ALERT=0 sync_on_changes=$sync_on_changes _DEBUG=$_DEBUG _DRYRUN=$_DRYRUN _VERBOSE=$_VERBOSE COMMAND_SUDO=$COMMAND_SUDO FILE_LIST="$(EscapeSpaces "${TARGET[1]}${TARGET[3]}/$deleted_list_file")" REPLICA_DIR="$(EscapeSpaces "$replica_dir")" SOFT_DELETE=$SOFT_DELETE DELETE_DIR="$(EscapeSpaces "$deletion_dir")" FAILED_DELETE_LIST="$(EscapeSpaces "${TARGET[1]}${TARGET[3]}/$deleted_failed_list_file")" 'bash -s' << 'ENDSSH' >> "$RUN_DIR/$PROGRAM.remote_deletion.$SCRIPT_PID" 2>&1
+$SSH_CMD ERROR_ALERT=0 sync_on_changes=$sync_on_changes _DEBUG=$_DEBUG _DRYRUN=$_DRYRUN _VERBOSE=$_VERBOSE COMMAND_SUDO=$COMMAND_SUDO FILE_LIST="$(EscapeSpaces "${TARGET[replicaDir]}${TARGET[stateDir]}/$deleted_list_file")" REPLICA_DIR="$(EscapeSpaces "$replica_dir")" SOFT_DELETE=$SOFT_DELETE DELETE_DIR="$(EscapeSpaces "$deletion_dir")" FAILED_DELETE_LIST="$(EscapeSpaces "${TARGET[replicaDir]}${TARGET[stateDir]}/$deleted_failed_list_file")" 'bash -s' << 'ENDSSH' >> "$RUN_DIR/$PROGRAM.remote_deletion.$SCRIPT_PID" 2>&1
 
 	## The following lines are executed remotely
 	function _logger {
@@ -1115,8 +1115,8 @@ ENDSSH
 	fi
 
 	## Copy back the deleted failed file list
-	esc_source_file="$(EscapeSpaces "${TARGET[1]}${TARGET[3]}/$deleted_failed_list_file")"
-	rsync_cmd="$(type -p $RSYNC_EXECUTABLE) --rsync-path=\"$RSYNC_PATH\" -e \"$RSYNC_SSH_CMD\" $REMOTE_USER@$REMOTE_HOST:\"$esc_source_file\" \"${INITIATOR[1]}${INITIATOR[3]}\" > \"$RUN_DIR/$PROGRAM.remote_failed_deletion_list_copy.$SCRIPT_PID\""
+	esc_source_file="$(EscapeSpaces "${TARGET[replicaDir]}${TARGET[stateDir]}/$deleted_failed_list_file")"
+	rsync_cmd="$(type -p $RSYNC_EXECUTABLE) --rsync-path=\"$RSYNC_PATH\" -e \"$RSYNC_SSH_CMD\" $REMOTE_USER@$REMOTE_HOST:\"$esc_source_file\" \"${INITIATOR[replicaDir]}${INITIATOR[stateDir]}\" > \"$RUN_DIR/$PROGRAM.remote_failed_deletion_list_copy.$SCRIPT_PID\""
 	Logger "RSYNC_CMD: $rsync_cmd" "DEBUG"
 	eval "$rsync_cmd" 2>> "$LOG_FILE"
 	result=$?
@@ -1142,24 +1142,24 @@ function deletion_propagation {
 
 	Logger "Propagating deletions to $replica_type replica." "NOTICE"
 
-	if [ "$replica_type" == "${INITIATOR[0]}" ]; then
-		replica_dir="${INITIATOR[1]}"
-		delete_dir="${INITIATOR[5]}"
+	if [ "$replica_type" == "${INITIATOR[type]}" ]; then
+		replica_dir="${INITIATOR[replicaDir]}"
+		delete_dir="${INITIATOR[deleteDir]}"
 
-		_delete_local "$replica_dir" "${TARGET[0]}$deleted_list_file" "$delete_dir" "${TARGET[0]}$deleted_failed_list_file"
+		_delete_local "$replica_dir" "${TARGET[type]}$deleted_list_file" "$delete_dir" "${TARGET[type]}$deleted_failed_list_file"
 		retval=$?
 		if [ $retval != 0 ]; then
 			Logger "Deletion on replica $replica_type failed." "CRITICAL"
 			exit 1
 		fi
 	else
-		replica_dir="${TARGET[1]}"
-		delete_dir="${TARGET[5]}"
+		replica_dir="${TARGET[replicaDir]}"
+		delete_dir="${TARGET[deleteDir]}"
 
 		if [ "$REMOTE_OPERATION" == "yes" ]; then
-			_delete_remote "$replica_dir" "${INITIATOR[0]}$deleted_list_file" "$delete_dir" "${INITIATOR[0]}$deleted_failed_list_file"
+			_delete_remote "$replica_dir" "${INITIATOR[type]}$deleted_list_file" "$delete_dir" "${INITIATOR[type]}$deleted_failed_list_file"
 		else
-			_delete_local "$replica_dir" "${INITIATOR[0]}$deleted_list_file" "$delete_dir" "${INITIATOR[0]}$deleted_failed_list_file"
+			_delete_local "$replica_dir" "${INITIATOR[type]}$deleted_list_file" "$delete_dir" "${INITIATOR[type]}$deleted_failed_list_file"
 		fi
 		retval=$?
 		if [ $retval == 0 ]; then
@@ -1204,41 +1204,41 @@ function Sync {
 	CheckConnectivityRemoteHost
 
 	if [ "$RESUME_SYNC" != "no" ]; then
-		if [ -f "${INITIATOR[9]}" ]; then
-			resumeCount=$(cat "${INITIATOR[9]}")
+		if [ -f "${INITIATOR[resumeCount]}" ]; then
+			resumeCount=$(cat "${INITIATOR[resumeCount]}")
 		else
 			resumeCount=0
 		fi
 
 		if [ $resumeCount -lt $RESUME_TRY ]; then
-			if [ -f "${INITIATOR[7]}" ]; then
-				resumeInitiator=$(cat "${INITIATOR[7]}")
+			if [ -f "${INITIATOR[initiatorLastActionFile]}" ]; then
+				resumeInitiator=$(cat "${INITIATOR[initiatorLastActionFile]}")
 			else
 				resumeInitiator="synced"
 			fi
 
-			if [ -f "${INITIATOR[8]}" ]; then
-				resumeTarget=$(cat "${INITIATOR[8]}")
+			if [ -f "${INITIATOR[targetLastActionFile]}" ]; then
+				resumeTarget=$(cat "${INITIATOR[targetLastActionFile]}")
 			else
 				resumeTarget="synced"
 			fi
 
 			if [ "$resumeInitiator" != "synced" ]; then
-				Logger "WARNING: Trying to resume aborted execution on $($STAT_CMD "${INITIATOR[7]}") at task [$resumeInitiator] for initiator. [$resumeCount] previous tries." "WARN"
-				echo $(($resumeCount+1)) > "${INITIATOR[9]}"
+				Logger "WARNING: Trying to resume aborted execution on $($STAT_CMD "${INITIATOR[initiatorLastActionFile]}") at task [$resumeInitiator] for initiator. [$resumeCount] previous tries." "WARN"
+				echo $(($resumeCount+1)) > "${INITIATOR[resumeCount]}"
 			else
 				resumeInitiator="none"
 			fi
 
 			if [ "$resumeTarget" != "synced" ]; then
-				Logger "WARNING: Trying to resume aborted execution on $($STAT_CMD "${INITIATOR[8]}") as task [$resumeTarget] for target. [$resumeCount] previous tries." "WARN"
-				echo $(($resumeCount+1)) > "${INITIATOR[9]}"
+				Logger "WARNING: Trying to resume aborted execution on $($STAT_CMD "${INITIATOR[targetLastActionFile]}") as task [$resumeTarget] for target. [$resumeCount] previous tries." "WARN"
+				echo $(($resumeCount+1)) > "${INITIATOR[resumeCount]}"
 			else
 				resumeTarget="none"
 			fi
 		else
 			Logger "Will not resume aborted execution. Too many resume tries [$resumeCount]." "WARN"
-			echo "0" > "${INITIATOR[9]}"
+			echo "0" > "${INITIATOR[resumeCount]}"
 			resumeInitiator="none"
 			resumeTarget="none"
 		fi
@@ -1253,12 +1253,12 @@ function Sync {
 	## Step 0a & 0b
 	if [ "$resumeInitiator" == "none" ] || [ "$resumeTarget" == "none" ] || [ "$resumeInitiator" == "${SYNC_ACTION[0]}" ] || [ "$resumeTarget" == "${SYNC_ACTION[0]}" ]; then
 		if [ "$resumeInitiator" == "none" ] || [ "$resumeInitiator" == "${SYNC_ACTION[0]}" ]; then
-			tree_list "${INITIATOR[1]}" "${INITIATOR[0]}" "$TREE_CURRENT_FILENAME" &
+			tree_list "${INITIATOR[replicaDir]}" "${INITIATOR[type]}" "${INITIATOR[treeCurrentFile]}" &
 			initiatorPid="$!"
 		fi
 
 		if [ "$resumeTarget" == "none" ] || [ "$resumeTarget" == "${SYNC_ACTION[0]}" ]; then
-			tree_list "${TARGET[1]}" "${TARGET[0]}" "$TREE_CURRENT_FILENAME" &
+			tree_list "${TARGET[replicaDir]}" "${TARGET[type]}" "${INITIATOR[treeCurrentFile]}" &
 			targetPid="$!"
 		fi
 
@@ -1270,26 +1270,26 @@ function Sync {
 			for pid in "${pidArray[@]}"; do
 				pid=${pid%:*}
 				if [ $pid == $initiatorPid ]; then
-					echo "${SYNC_ACTION[0]}" > "${INITIATOR[7]}"
+					echo "${SYNC_ACTION[0]}" > "${INITIATOR[initiatorLastActionFile]}"
 					initiatorFail=true
 				elif [ $pid == $targetPid ]; then
-					echo "${SYNC_ACTION[0]}" > "${INITIATOR[8]}"
+					echo "${SYNC_ACTION[0]}" > "${INITIATOR[targetLastActionFile]}"
 					targetFail=true
 				fi
 			done
 
 			if [ $initiatorFail == false ]; then
-				echo "${SYNC_ACTION[1]}" > "${INITIATOR[7]}"
+				echo "${SYNC_ACTION[1]}" > "${INITIATOR[initiatorLastActionFile]}"
 			fi
 
 			if [ $targetFail == false ]; then
-				echo "${SYNC_ACTION[1]}" > "${INITIATOR[8]}"
+				echo "${SYNC_ACTION[1]}" > "${INITIATOR[targetLastActionFile]}"
 			fi
 
 		 	exit 1
 		else
-			echo "${SYNC_ACTION[1]}" > "${INITIATOR[7]}"
-			echo "${SYNC_ACTION[1]}" > "${INITIATOR[8]}"
+			echo "${SYNC_ACTION[1]}" > "${INITIATOR[initiatorLastActionFile]}"
+			echo "${SYNC_ACTION[1]}" > "${INITIATOR[targetLastActionFile]}"
 			resumeInitiator="${SYNC_ACTION[1]}"
 			resumeTarget="${SYNC_ACTION[1]}"
 		fi
@@ -1298,12 +1298,12 @@ function Sync {
 	## Step 1a & 1b
 	if [ "$resumeInitiator" == "${SYNC_ACTION[1]}" ] || [ "$resumeTarget" == "${SYNC_ACTION[1]}" ]; then
 		if [ "$resumeInitiator" == "${SYNC_ACTION[1]}" ]; then
-			delete_list "${INITIATOR[0]}" "$TREE_AFTER_FILENAME" "$TREE_CURRENT_FILENAME" "$DELETED_LIST_FILENAME" "$FAILED_DELETE_LIST_FILENAME" &
+			delete_list "${INITIATOR[type]}" "${INITIATOR[treeAfterFile]}" "${INITIATOR[treeCurrentFile]}" "${INITIATOR[deletedListFile]}" "${INITIATOR[failedDeletedListFile]}" &
 			initiatorPid="$!"
 		fi
 
 		if [ "$resumeTarget" == "${SYNC_ACTION[1]}" ]; then
-			delete_list "${TARGET[0]}" "$TREE_AFTER_FILENAME" "$TREE_CURRENT_FILENAME" "$DELETED_LIST_FILENAME" "$FAILED_DELETE_LIST_FILENAME" &
+			delete_list "${TARGET[type]}" "${INITIATOR[treeAfterFile]}" "${INITIATOR[treeCurrentFile]}" "${INITIATOR[deletedListFile]}" "${INITIATOR[failedDeletedListFile]}" &
 			targetPid="$!"
 		fi
 
@@ -1315,26 +1315,26 @@ function Sync {
 			for pid in "${pidArray[@]}"; do
 				pid=${pid%:*}
 				if [ $pid == $initiatorPid ]; then
-					echo "${SYNC_ACTION[1]}" > "${INITIATOR[7]}"
+					echo "${SYNC_ACTION[1]}" > "${INITIATOR[initiatorLastActionFile]}"
 					initiatorFail=true
 				elif [ $pid == $targetPid ]; then
-					echo "${SYNC_ACTION[1]}" > "${INITIATOR[8]}"
+					echo "${SYNC_ACTION[1]}" > "${INITIATOR[targetLastActionFile]}"
 					targetFail=true
 				fi
 			done
 
 			if [ $initiatorFail == false ]; then
-				echo "${SYNC_ACTION[2]}" > "${INITIATOR[7]}"
+				echo "${SYNC_ACTION[2]}" > "${INITIATOR[initiatorLastActionFile]}"
 			fi
 
 			if [ $targetFail == false ]; then
-				echo "${SYNC_ACTION[2]}" > "${INITIATOR[8]}"
+				echo "${SYNC_ACTION[2]}" > "${INITIATOR[targetLastActionFile]}"
 			fi
 
 		 	exit 1
 		else
-			echo "${SYNC_ACTION[2]}" > "${INITIATOR[7]}"
-			echo "${SYNC_ACTION[2]}" > "${INITIATOR[8]}"
+			echo "${SYNC_ACTION[2]}" > "${INITIATOR[initiatorLastActionFile]}"
+			echo "${SYNC_ACTION[2]}" > "${INITIATOR[targetLastActionFile]}"
 			resumeInitiator="${SYNC_ACTION[2]}"
 			resumeTarget="${SYNC_ACTION[2]}"
 		fi
@@ -1343,22 +1343,22 @@ function Sync {
 	## Step 2
 	if [ "$resumeInitiator" == "${SYNC_ACTION[2]}" ] || [ "$resumeTarget" == "${SYNC_ACTION[2]}" ]; then
 		if [ "$RSYNC_ATTR_ARGS" != "" ]; then
-			sync_attrs "${INITIATOR[1]}" "$TARGET_SYNC_DIR"
+			sync_attrs "${INITIATOR[replicaDir]}" "$TARGET_SYNC_DIR"
 			WaitForTaskCompletion $! $SOFT_MAX_EXEC_TIME $HARD_MAX_EXEC_TIME ${FUNCNAME[0]} false $KEEP_LOGGING
 			if [ $? != 0 ]; then
-				echo "${SYNC_ACTION[2]}" > "${INITIATOR[7]}"
-				echo "${SYNC_ACTION[2]}" > "${INITIATOR[8]}"
+				echo "${SYNC_ACTION[2]}" > "${INITIATOR[initiatorLastActionFile]}"
+				echo "${SYNC_ACTION[2]}" > "${INITIATOR[targetLastActionFile]}"
 				exit 1
 			else
-				echo "${SYNC_ACTION[3]}" > "${INITIATOR[7]}"
-				echo "${SYNC_ACTION[3]}" > "${INITIATOR[8]}"
+				echo "${SYNC_ACTION[3]}" > "${INITIATOR[initiatorLastActionFile]}"
+				echo "${SYNC_ACTION[3]}" > "${INITIATOR[targetLastActionFile]}"
 				resumeInitiator="${SYNC_ACTION[3]}"
 				resumeTarget="${SYNC_ACTION[3]}"
 
 			fi
 		else
-			echo "${SYNC_ACTION[3]}" > "${INITIATOR[7]}"
-			echo "${SYNC_ACTION[3]}" > "${INITIATOR[8]}"
+			echo "${SYNC_ACTION[3]}" > "${INITIATOR[initiatorLastActionFile]}"
+			echo "${SYNC_ACTION[3]}" > "${INITIATOR[targetLastActionFile]}"
 			resumeInitiator="${SYNC_ACTION[3]}"
 			resumeTarget="${SYNC_ACTION[3]}"
 		fi
@@ -1366,33 +1366,33 @@ function Sync {
 
 	## Step 3a & 3b
 	if [ "$resumeInitiator" == "${SYNC_ACTION[3]}" ] || [ "$resumeTarget" == "${SYNC_ACTION[3]}" ]; then
-		if [ "$CONFLICT_PREVALANCE" == "${TARGET[0]}" ]; then
+		if [ "$CONFLICT_PREVALANCE" == "${TARGET[type]}" ]; then
 			if [ "$resumeTarget" == "${SYNC_ACTION[3]}" ]; then
-				sync_update "${TARGET[0]}" "${INITIATOR[0]}" "$DELETED_LIST_FILENAME"
+				sync_update "${TARGET[type]}" "${INITIATOR[type]}" "${INITIATOR[deletedListFile]}"
 				if [ $? == 0 ]; then
-					echo "${SYNC_ACTION[4]}" > "${INITIATOR[8]}"
+					echo "${SYNC_ACTION[4]}" > "${INITIATOR[targetLastActionFile]}"
 					resumeTarget="${SYNC_ACTION[4]}"
 				fi
 			fi
 			if [ "$resumeInitiator" == "${SYNC_ACTION[3]}" ]; then
-				sync_update "${INITIATOR[0]}" "${TARGET[0]}" "$DELETED_LIST_FILENAME"
+				sync_update "${INITIATOR[type]}" "${TARGET[type]}" "${INITIATOR[deletedListFile]}"
 				if [ $? == 0 ]; then
-					echo "${SYNC_ACTION[4]}" > "${INITIATOR[7]}"
+					echo "${SYNC_ACTION[4]}" > "${INITIATOR[initiatorLastActionFile]}"
 					resumeInitiator="${SYNC_ACTION[4]}"
 				fi
 			fi
 		else
 			if [ "$resumeInitiator" == "${SYNC_ACTION[3]}" ]; then
-				sync_update "${INITIATOR[0]}" "${TARGET[0]}" "$DELETED_LIST_FILENAME"
+				sync_update "${INITIATOR[type]}" "${TARGET[type]}" "${INITIATOR[deletedListFile]}"
 				if [ $? == 0 ]; then
-					echo "${SYNC_ACTION[4]}" > "${INITIATOR[7]}"
+					echo "${SYNC_ACTION[4]}" > "${INITIATOR[initiatorLastActionFile]}"
 					resumeInitiator="${SYNC_ACTION[4]}"
 				fi
 			fi
 			if [ "$resumeTarget" == "${SYNC_ACTION[3]}" ]; then
-				sync_update "${TARGET[0]}" "${INITIATOR[0]}" "$DELETED_LIST_FILENAME"
+				sync_update "${TARGET[type]}" "${INITIATOR[type]}" "${INITIATOR[deletedListFile]}"
 				if [ $? == 0 ]; then
-					echo "${SYNC_ACTION[4]}" > "${INITIATOR[8]}"
+					echo "${SYNC_ACTION[4]}" > "${INITIATOR[targetLastActionFile]}"
 					resumeTarget="${SYNC_ACTION[4]}"
 				fi
 			fi
@@ -1402,12 +1402,12 @@ function Sync {
 	## Step 4a & 4b
 	if [ "$resumeInitiator" == "${SYNC_ACTION[4]}" ] || [ "$resumeTarget" == "${SYNC_ACTION[4]}" ]; then
 		if [ "$resumeInitiator" == "${SYNC_ACTION[4]}" ]; then
-			deletion_propagation "${TARGET[0]}" "$DELETED_LIST_FILENAME" "$FAILED_DELETE_LIST_FILENAME" &
+			deletion_propagation "${TARGET[type]}" "${INITIATOR[deletedListFile]}" "${INITIATOR[failedDeletedListFile]}" &
 			initiatorPid="$!"
 		fi
 
 		if [ "$resumeTarget" == "${SYNC_ACTION[4]}" ]; then
-			deletion_propagation "${INITIATOR[0]}" "$DELETED_LIST_FILENAME" "$FAILED_DELETE_LIST_FILENAME" &
+			deletion_propagation "${INITIATOR[type]}" "${INITIATOR[deletedListFile]}" "${INITIATOR[failedDeletedListFile]}" &
 			targetPid="$!"
 		fi
 
@@ -1419,26 +1419,26 @@ function Sync {
 			for pid in "${pidArray[@]}"; do
 				pid=${pid%:*}
 				if [ $pid == $initiatorPid ]; then
-					echo "${SYNC_ACTION[4]}" > "${INITIATOR[7]}"
+					echo "${SYNC_ACTION[4]}" > "${INITIATOR[initiatorLastActionFile]}"
 					initiatorFail=true
 				elif [ $pid == $targetPid ]; then
-					echo "${SYNC_ACTION[4]}" > "${INITIATOR[8]}"
+					echo "${SYNC_ACTION[4]}" > "${INITIATOR[targetLastActionFile]}"
 					targetFail=true
 				fi
 			done
 
 			if [ $initiatorFail == false ]; then
-				echo "${SYNC_ACTION[5]}" > "${INITIATOR[7]}"
+				echo "${SYNC_ACTION[5]}" > "${INITIATOR[initiatorLastActionFile]}"
 			fi
 
 			if [ $targetFail == false ]; then
-				echo "${SYNC_ACTION[5]}" > "${INITIATOR[8]}"
+				echo "${SYNC_ACTION[5]}" > "${INITIATOR[targetLastActionFile]}"
 			fi
 
 		 	exit 1
 		else
-			echo "${SYNC_ACTION[5]}" > "${INITIATOR[7]}"
-			echo "${SYNC_ACTION[5]}" > "${INITIATOR[8]}"
+			echo "${SYNC_ACTION[5]}" > "${INITIATOR[initiatorLastActionFile]}"
+			echo "${SYNC_ACTION[5]}" > "${INITIATOR[targetLastActionFile]}"
 			resumeInitiator="${SYNC_ACTION[5]}"
 			resumeTarget="${SYNC_ACTION[5]}"
 
@@ -1448,12 +1448,12 @@ function Sync {
 	## Step 5a & 5b
 	if [ "$resumeInitiator" == "${SYNC_ACTION[5]}" ] || [ "$resumeTarget" == "${SYNC_ACTION[5]}" ]; then
 		if [ "$resumeInitiator" == "${SYNC_ACTION[5]}" ]; then
-			tree_list "${INITIATOR[1]}" "${INITIATOR[0]}" "$TREE_AFTER_FILENAME" &
+			tree_list "${INITIATOR[replicaDir]}" "${INITIATOR[type]}" "${INITIATOR[treeAfterFile]}" &
 			initiatorPid="$!"
 		fi
 
 		if [ "$resumeTarget" == "${SYNC_ACTION[5]}" ]; then
-			tree_list "${TARGET[1]}" "${TARGET[0]}" "$TREE_AFTER_FILENAME" &
+			tree_list "${TARGET[replicaDir]}" "${TARGET[type]}" "${INITIATOR[treeAfterFile]}" &
 			targetPid="$!"
 		fi
 
@@ -1465,33 +1465,33 @@ function Sync {
 			for pid in "${pidArray[@]}"; do
 				pid=${pid%:*}
 				if [ $pid == $initiatorPid ]; then
-					echo "${SYNC_ACTION[5]}" > "${INITIATOR[7]}"
+					echo "${SYNC_ACTION[5]}" > "${INITIATOR[initiatorLastActionFile]}"
 					initiatorFail=true
 				elif [ $pid == $targetPid ]; then
-					echo "${SYNC_ACTION[5]}" > "${INITIATOR[8]}"
+					echo "${SYNC_ACTION[5]}" > "${INITIATOR[targetLastActionFile]}"
 					targetFail=true
 				fi
 			done
 
 			if [ $initiatorFail == false ]; then
-				echo "${SYNC_ACTION[6]}" > "${INITIATOR[7]}"
+				echo "${SYNC_ACTION[6]}" > "${INITIATOR[initiatorLastActionFile]}"
 			fi
 
 			if [ $targetFail == false ]; then
-				echo "${SYNC_ACTION[6]}" > "${INITIATOR[8]}"
+				echo "${SYNC_ACTION[6]}" > "${INITIATOR[targetLastActionFile]}"
 			fi
 
 		 	exit 1
 		else
-			echo "${SYNC_ACTION[6]}" > "${INITIATOR[7]}"
-			echo "${SYNC_ACTION[6]}" > "${INITIATOR[8]}"
+			echo "${SYNC_ACTION[6]}" > "${INITIATOR[initiatorLastActionFile]}"
+			echo "${SYNC_ACTION[6]}" > "${INITIATOR[targetLastActionFile]}"
 			resumeInitiator="${SYNC_ACTION[6]}"
 			resumeTarget="${SYNC_ACTION[6]}"
 		fi
 	fi
 
 	Logger "Finished synchronization task." "NOTICE"
-	echo "0" > "${INITIATOR[9]}"
+	echo "0" > "${INITIATOR[resumeCount]}"
 }
 
 function _SoftDeleteLocal {
@@ -1586,13 +1586,13 @@ function SoftDelete {
 	if [ "$CONFLICT_BACKUP" != "no" ] && [ $CONFLICT_BACKUP_DAYS -ne 0 ]; then
 		Logger "Running conflict backup cleanup." "NOTICE"
 
-		_SoftDeleteLocal "${INITIATOR[0]}" "${INITIATOR[1]}${INITIATOR[4]}" $CONFLICT_BACKUP_DAYS &
+		_SoftDeleteLocal "${INITIATOR[type]}" "${INITIATOR[replicaDir]}${INITIATOR[backupDir]}" $CONFLICT_BACKUP_DAYS &
 		pids="$!"
 		if [ "$REMOTE_OPERATION" != "yes" ]; then
-			_SoftDeleteLocal "${TARGET[0]}" "${TARGET[1]}${TARGET[4]}" $CONFLICT_BACKUP_DAYS &
+			_SoftDeleteLocal "${TARGET[type]}" "${TARGET[replicaDir]}${TARGET[backupDir]}" $CONFLICT_BACKUP_DAYS &
 			pids="$pids;$!"
 		else
-			_SoftDeleteRemote "${TARGET[0]}" "${TARGET[1]}${TARGET[4]}" $CONFLICT_BACKUP_DAYS &
+			_SoftDeleteRemote "${TARGET[type]}" "${TARGET[replicaDir]}${TARGET[backupDir]}" $CONFLICT_BACKUP_DAYS &
 			pids="$pids;$!"
 		fi
 		WaitForTaskCompletion $pids 720 1800 ${FUNCNAME[0]} true $KEEP_LOGGING
@@ -1601,13 +1601,13 @@ function SoftDelete {
 	if [ "$SOFT_DELETE" != "no" ] && [ $SOFT_DELETE_DAYS -ne 0 ]; then
 		Logger "Running soft deletion cleanup." "NOTICE"
 
-		_SoftDeleteLocal "${INITIATOR[0]}" "${INITIATOR[1]}${INITIATOR[5]}" $SOFT_DELETE_DAYS &
+		_SoftDeleteLocal "${INITIATOR[type]}" "${INITIATOR[replicaDir]}${INITIATOR[deleteDir]}" $SOFT_DELETE_DAYS &
 		pids="$!"
 		if [ "$REMOTE_OPERATION" != "yes" ]; then
-			_SoftDeleteLocal "${TARGET[0]}" "${TARGET[1]}${TARGET[5]}" $SOFT_DELETE_DAYS &
+			_SoftDeleteLocal "${TARGET[type]}" "${TARGET[replicaDir]}${TARGET[deleteDir]}" $SOFT_DELETE_DAYS &
 			pids="$pids;$!"
 		else
-			_SoftDeleteRemote "${TARGET[0]}" "${TARGET[1]}${TARGET[5]}" $SOFT_DELETE_DAYS &
+			_SoftDeleteRemote "${TARGET[type]}" "${TARGET[replicaDir]}${TARGET[deleteDir]}" $SOFT_DELETE_DAYS &
 			pids="$pids;$!"
 		fi
 		WaitForTaskCompletion $pids 720 1800 ${FUNCNAME[0]} true $KEEP_LOGGING
@@ -1672,18 +1672,6 @@ function Init {
 
 	## Replica format
 	## Why the f*** does bash not have simple objects ?
-
-	#${REPLICA[0]}	contains replica type (initiator / target)
-	#${REPLICA[1]}	contains full replica path (can be absolute or relative) with ending slash
-	#${REPLICA[2]}	contains full lock file path
-	#${REPLICA[3]}	contains state dir path, relative to replica path
-	#${REPLICA[4]}	contains backup dir path, relative to replica path
-	#${REPLICA[5]}	contains deletion dir path, relative to replica path
-	#${REPLICA[6]}	contains partial dir path, relative to replica path
-	#${REPLICA[7]}  contains full initiator last action file path
-	#${REPLICA[8]}  contains full target last action file path
-	#${REPLICA[9]}  contains full resume count file path
-
 	# Local variables used for state filenames
 	local lock_filename="lock"
 	local state_dir="state"
@@ -1698,63 +1686,36 @@ function Init {
 		local dry_suffix=
 	fi
 
-	#TODO(low): integrate this into ${REPLICA[x]}
-	TREE_CURRENT_FILENAME="-tree-current-$INSTANCE_ID$dry_suffix"
-	TREE_AFTER_FILENAME="-tree-after-$INSTANCE_ID$dry_suffix"
+	#TODO: use _NO_SUFFIX dynamically
 	TREE_AFTER_FILENAME_NO_SUFFIX="-tree-after-$INSTANCE_ID"
-	DELETED_LIST_FILENAME="-deleted-list-$INSTANCE_ID$dry_suffix"
-	FAILED_DELETE_LIST_FILENAME="-failed-delete-$INSTANCE_ID$dry_suffix"
 
-
-	INITIATOR=(
-	'initiator'
-	"$INITIATOR_SYNC_DIR"
-	"$INITIATOR_SYNC_DIR$OSYNC_DIR/$lock_filename"
-	"$OSYNC_DIR/$state_dir"
-	"$OSYNC_DIR/$backup_dir"
-	"$OSYNC_DIR/$delete_dir"
-	"$OSYNC_DIR/$partial_dir"
-	"$INITIATOR_SYNC_DIR$OSYNC_DIR/$state_dir/initiator-$last_action-$INSTANCE_ID$dry_suffix"
-	"$INITIATOR_SYNC_DIR$OSYNC_DIR/$state_dir/target-$last_action-$INSTANCE_ID$dry_suffix"
-	"$INITIATOR_SYNC_DIR$OSYNC_DIR/$state_dir/$resume_count-$INSTANCE_ID$dry_suffix"
-	)
-
+	declare -a INITIATOR
 	#WIP: change INITIATOR[1] with more relevant index
-	#INITIATOR[type]='initiator'
-	#INITIATOR[replicaDir]="$INITIATOR_SYNC_DIR"
-	#INITIATOR[lockFile]="$INITIATOR_SYNC_DIR$OSYNC_DIR/$lock_filename"
-	#INITIATOR[stateDir]="$OSYNC_DIR/$state_dir"
-	#INITIATOR[backupDir]="$OSYNC_DIR/$backup_dir"
-	#INITIATOR[deleteDir]="$OSYNC_DIR/$delete_dir"
-	#INITIATOR[partialDir]="$OSYNC_DIR/$partial_dir"
-	#INITIATOR[initiatorLastActionFile]="$INITIATOR_SYNC_DIR$OSYNC_DIR/$state_dir/initiator-$last_action-$INSTANCE_ID$dry_suffix"
-	#INITIATOR[targetLastActionFile]="$INITIATOR_SYNC_DIR$OSYNC_DIR/$state_dir/target-$last_action-$INSTANCE_ID$dry_suffix"
-	#INITIATOR[resumeCount]="$INITIATOR_SYNC_DIR$OSYNC_DIR/$state_dir/$resume_count-$INSTANCE_ID$dry_suffix"
-	#INITIATOR[treeCurrentFile]=
-	#INITIATOR[treeAfterFile]=
-	#INITIATOR[treeAfterFileNoSuffix]=
-	#INITIATOR[deletedListFile]=
-	#INITIATOR[failedDeletedListFile]=
+	INITIATOR[type]='initiator'
+	INITIATOR[replicaDir]="$INITIATOR_SYNC_DIR"
+	INITIATOR[lockFile]="$INITIATOR_SYNC_DIR$OSYNC_DIR/$lock_filename"
+	INITIATOR[stateDir]="$OSYNC_DIR/$state_dir"
+	INITIATOR[backupDir]="$OSYNC_DIR/$backup_dir"
+	INITIATOR[deleteDir]="$OSYNC_DIR/$delete_dir"
+	INITIATOR[partialDir]="$OSYNC_DIR/$partial_dir"
+	INITIATOR[initiatorLastActionFile]="$INITIATOR_SYNC_DIR$OSYNC_DIR/$state_dir/initiator-$last_action-$INSTANCE_ID$dry_suffix"
+	INITIATOR[targetLastActionFile]="$INITIATOR_SYNC_DIR$OSYNC_DIR/$state_dir/target-$last_action-$INSTANCE_ID$dry_suffix"
+	INITIATOR[resumeCount]="$INITIATOR_SYNC_DIR$OSYNC_DIR/$state_dir/$resume_count-$INSTANCE_ID$dry_suffix"
+	INITIATOR[treeCurrentFile]="-tree-current-$INSTANCE_ID$dry_suffix"
+	INITIATOR[treeAfterFile]="-tree-after-$INSTANCE_ID$dry_suffix"
+	INITIATOR[treeAfterFileNoSuffix]="-tree-after-$INSTANCE_ID"
+	INITIATOR[deletedListFile]="-deleted-list-$INSTANCE_ID$dry_suffix"
+	INITIATOR[failedDeletedListFile]="-failed-delete-$INSTANCE_ID$dry_suffix"
 
-	#TREE_CURRENT_FILENAME="-tree-current-$INSTANCE_ID$dry_suffix"
-	#TREE_AFTER_FILENAME="-tree-after-$INSTANCE_ID$dry_suffix"
-	#TREE_AFTER_FILENAME_NO_SUFFIX="-tree-after-$INSTANCE_ID"
-	#DELETED_LIST_FILENAME="-deleted-list-$INSTANCE_ID$dry_suffix"
-	#FAILED_DELETE_LIST_FILENAME="-failed-delete-$INSTANCE_ID$dry_suffix"
+	declare -a TARGET
+	TARGET[type]='target'
+	TARGET[replicaDir]="$TARGET_SYNC_DIR"
+	TARGET[lockFile]="$TARGET_SYNC_DIR$OSYNC_DIR/$lock_filename"
+	TARGET[stateDir]="$OSYNC_DIR/$state_dir"
+	TARGET[backupDir]="$OSYNC_DIR/$backup_dir"
+	TARGET[deleteDir]="$OSYNC_DIR/$delete_dir"
 
-	TARGET=(
-	'target'
-	"$TARGET_SYNC_DIR"
-	"$TARGET_SYNC_DIR$OSYNC_DIR/$lock_filename"
-	"$OSYNC_DIR/$state_dir"
-	"$OSYNC_DIR/$backup_dir"
-	"$OSYNC_DIR/$delete_dir"
-	"$OSYNC_DIR/$partial_dir"
-	"$TARGET_SYNC_DIR$OSYNC_DIR/$state_dir/$last_action-$INSTANCE_ID$dry_suffix"
-	"$TARGET_SYNC_DIR$OSYNC_DIR/$state_dir/$resume_count-$INSTANCE_ID$dry_suffix"
-	)
-
-	PARTIAL_DIR=$OSYNC_DIR"_partial"
+	PARTIAL_DIR="${INITIATOR[partialDir]}"
 
 	## Set sync only function arguments for rsync
 	SYNC_OPTS="-u"
@@ -1774,8 +1735,8 @@ function Init {
 
 	## Conflict options
 	if [ "$CONFLICT_BACKUP" != "no" ]; then
-		INITIATOR_BACKUP="--backup --backup-dir=\"${INITIATOR[1]}${INITIATOR[4]}\""
-		TARGET_BACKUP="--backup --backup-dir=\"${TARGET[1]}${TARGET[4]}\""
+		INITIATOR_BACKUP="--backup --backup-dir=\"${INITIATOR[replicaDir]}${INITIATOR[backupDir]}\""
+		TARGET_BACKUP="--backup --backup-dir=\"${TARGET[replicaDir]}${TARGET[backupDir]}\""
 		if [ "$CONFLICT_BACKUP_MULTIPLE" == "yes" ]; then
 			INITIATOR_BACKUP="$INITIATOR_BACKUP --suffix .$(date +%Y.%m.%d-%H.%M.%S)"
 			TARGET_BACKUP="$TARGET_BACKUP --suffix .$(date +%Y.%m.%d-%H.%M.%S)"
