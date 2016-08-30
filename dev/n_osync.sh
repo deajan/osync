@@ -600,7 +600,6 @@ function UnlockReplicas {
 		pids="$!"
 	fi
 
-	#WIP check if WaitForTaskCompletion can handle emppty pids like ";pid"
 	if [ $TARGET_LOCK_FILE_EXISTS == true ]; then
 		if [ "$REMOTE_OPERATION" != "yes" ]; then
 			_UnlockReplicasLocal "${TARGET[lockFile]}" &
@@ -673,10 +672,10 @@ function delete_list {
 	if [ -f "${INITIATOR[replicaDir]}${INITIATOR[stateDir]}/$replica_type${INITIATOR[treeAfterFile]}_NO_SUFFIX" ]; then
 		## Same functionnality, comm is much faster than grep but is not available on every platform
 		if type comm > /dev/null 2>&1 ; then
-			cmd="comm -23 \"${INITIATOR[replicaDir]}${INITIATOR[stateDir]}/$replica_type${INITIATOR[treeAfterFile]}_NO_SUFFIX\" \"${INITIATOR[replicaDir]}${INITIATOR[stateDir]}/$replica_type$tree_file_current\" > \"${INITIATOR[replicaDir]}${INITIATOR[stateDir]}/$replica_type$deleted_list_file\""
+			cmd="comm -23 \"${INITIATOR[replicaDir]}${INITIATOR[stateDir]}/$replica_type${INITIATOR[treeAfterFileNoSuffix]}\" \"${INITIATOR[replicaDir]}${INITIATOR[stateDir]}/$replica_type$tree_file_current\" > \"${INITIATOR[replicaDir]}${INITIATOR[stateDir]}/$replica_type$deleted_list_file\""
 		else
 			## The || : forces the command to have a good result
-			cmd="(grep -F -x -v -f \"${INITIATOR[replicaDir]}${INITIATOR[stateDir]}/$replica_type$tree_file_current\" \"${INITIATOR[replicaDir]}${INITIATOR[stateDir]}/$replica_type${INITIATOR[treeAfterFile]}_NO_SUFFIX\" || :) > \"${INITIATOR[replicaDir]}${INITIATOR[stateDir]}/$replica_type$deleted_list_file\""
+			cmd="(grep -F -x -v -f \"${INITIATOR[replicaDir]}${INITIATOR[stateDir]}/$replica_type$tree_file_current\" \"${INITIATOR[replicaDir]}${INITIATOR[stateDir]}/$replica_type${INITIATOR[treeAfterFileNoSuffix]}\" || :) > \"${INITIATOR[replicaDir]}${INITIATOR[stateDir]}/$replica_type$deleted_list_file\""
 		fi
 
 		Logger "CMD: $cmd" "DEBUG"
@@ -1690,11 +1689,7 @@ function Init {
 		local dry_suffix=
 	fi
 
-	#TODO: use _NO_SUFFIX dynamically
-	TREE_AFTER_FILENAME_NO_SUFFIX="-tree-after-$INSTANCE_ID"
-
 	declare -gA INITIATOR
-	#WIP: change INITIATOR[1] with more relevant index
 	INITIATOR[type]='initiator'
 	INITIATOR[replicaDir]="$INITIATOR_SYNC_DIR"
 	INITIATOR[lockFile]="$INITIATOR_SYNC_DIR$OSYNC_DIR/$lock_filename"
