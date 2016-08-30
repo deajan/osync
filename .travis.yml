@@ -1,5 +1,10 @@
 language:
     bash
 
+os:
+    linux
+    osx
+
 script:
     dev/tests/run_travis_tests.sh
+
