@@ -7,7 +7,8 @@ KNOWN ISSUES
 RECENT CHANGES
 --------------
 
-- Some more code compliance
+- Added a PKGBUILD file for ArchLinux thanks to Shadowigor (https://github.com/shaodwigor). Builds available at https://aur.archlinux.org/packages/osync/
+- Some more code compliance & more paranoia checks
 - Added more preflight checks
 - Logs sent by mail are easier to read
         - Better subject (currently running or finished	run)
@@ -34,6 +35,9 @@ RECENT CHANGES
 - Improved WaitFor... functions to accept multiple pids
 - Added KillAllChilds function to accept multiple pids
 - Improved logging
+
+XX xxx 2016: osync v1.1.3 released
+- Fixed installer for CYGWIN / MSYS environment
 
 28 Aug 2016: osync v1.1.2 released
 - Renamed sync.conf to sync.conf.example (thanks to https://github.com/hortimech)
