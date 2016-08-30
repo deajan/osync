@@ -1,6 +1,6 @@
 #### MINIMAL-FUNCTION-SET BEGIN ####
 
-## FUNC_BUILD=2016082902
+## FUNC_BUILD=2016083001
 ## BEGIN Generic bash functions written in 2013-2016 by Orsiris de Jong - http://www.netpower.fr - ozy@netpower.fr
 
 ## To use in a program, define the following variables:
@@ -676,24 +676,26 @@ function WaitForTaskCompletion {
 		fi
 
 		for pid in "${pidsArray[@]}"; do
-			if kill -0 $pid > /dev/null 2>&1; then
-				# Handle uninterruptible sleep state or zombies by ommiting them from running process array (How to kill that is already dead ? :)
-				#TODO(high): have this tested on *BSD, Mac & Win
-				pidState=$(ps -p$pid -o state= 2 > /dev/null)
-				if [ "$pidState" != "D" ] && [ "$pidState" != "Z" ]; then
-					newPidsArray+=($pid)
-				fi
-			else
-				# pid is dead, get it's exit code from wait command
-				wait $pid
-				retval=$?
-				if [ $retval -ne 0 ]; then
-					errorcount=$((errorcount+1))
-					Logger "${FUNCNAME[0]} called by [$caller_name] finished monitoring [$pid] with exitcode [$retval]." "DEBUG"
-					if [ "$WAIT_FOR_TASK_COMPLETION" == "" ]; then
-						WAIT_FOR_TASK_COMPLETION="$pid:$retval"
-					else
-						WAIT_FOR_TASK_COMPLETION=";$pid:$retval"
+			if [ "$pid" != "" ]; then
+				if kill -0 $pid > /dev/null 2>&1; then
+					# Handle uninterruptible sleep state or zombies by ommiting them from running process array (How to kill that is already dead ? :)
+					#TODO(high): have this tested on *BSD, Mac & Win
+					pidState=$(ps -p$pid -o state= 2 > /dev/null)
+					if [ "$pidState" != "D" ] && [ "$pidState" != "Z" ]; then
+						newPidsArray+=($pid)
+					fi
+				else
+					# pid is dead, get it's exit code from wait command
+					wait $pid
+					retval=$?
+					if [ $retval -ne 0 ]; then
+						errorcount=$((errorcount+1))
+						Logger "${FUNCNAME[0]} called by [$caller_name] finished monitoring [$pid] with exitcode [$retval]." "DEBUG"
+						if [ "$WAIT_FOR_TASK_COMPLETION" == "" ]; then
+							WAIT_FOR_TASK_COMPLETION="$pid:$retval"
+						else
+							WAIT_FOR_TASK_COMPLETION=";$pid:$retval"
+						fi
 					fi
 				fi
 			fi
@@ -749,19 +751,21 @@ function ParallelExec {
 
 		newPidsArray=()
 		for pid in "${pidsArray[@]}"; do
-			# Handle uninterruptible sleep state or zombies by ommiting them from running process array (How to kill that is already dead ? :)
-			if kill -0 $pid > /dev/null 2>&1; then
-				pidState=$(ps -p$pid -o state= 2 > /dev/null)
-				if [ "$pidState" != "D" ] && [ "$pidState" != "Z" ]; then
-					newPidsArray+=($pid)
-				fi
-			else
-				# pid is dead, get it's exit code from wait command
-				wait $pid
-				retval=$?
-				if [ $retval -ne 0 ]; then
-					Logger "Command [${commandsArrayPid[$pid]}] failed with exit code [$retval]." "ERROR"
-					retvalAll=$((retvalAll+1))
+			if [ "$pid" != "" ]; then
+				# Handle uninterruptible sleep state or zombies by ommiting them from running process array (How to kill that is already dead ? :)
+				if kill -0 $pid > /dev/null 2>&1; then
+					pidState=$(ps -p$pid -o state= 2 > /dev/null)
+					if [ "$pidState" != "D" ] && [ "$pidState" != "Z" ]; then
+						newPidsArray+=($pid)
+					fi
+				else
+					# pid is dead, get it's exit code from wait command
+					wait $pid
+					retval=$?
+					if [ $retval -ne 0 ]; then
+						Logger "Command [${commandsArrayPid[$pid]}] failed with exit code [$retval]." "ERROR"
+						retvalAll=$((retvalAll+1))
+					fi
 				fi
 			fi
 		done
