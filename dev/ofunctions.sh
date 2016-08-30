@@ -1,6 +1,6 @@
 #### MINIMAL-FUNCTION-SET BEGIN ####
 
-## FUNC_BUILD=2016083001
+## FUNC_BUILD=2016083002
 ## BEGIN Generic bash functions written in 2013-2016 by Orsiris de Jong - http://www.netpower.fr - ozy@netpower.fr
 
 ## To use in a program, define the following variables:
@@ -613,7 +613,7 @@ function WaitForTaskCompletion {
 	Logger "${FUNCNAME[0]} called by [$caller_name]." "PARANOIA_DEBUG"	#__WITH_PARANOIA_DEBUG
 	__CheckArguments 6 $# ${FUNCNAME[0]} "$@"				#__WITH_PARANOIA_DEBUG
 
-	local soft_alert=0 # Does a soft alert need to be triggered, if yes, send an alert once
+	local soft_alert=false # Does a soft alert need to be triggered, if yes, send an alert once
 	local log_ttime=0 # local time instance for comparaison
 
 	local seconds_begin=$SECONDS # Seconds since the beginning of the script
@@ -628,6 +628,8 @@ function WaitForTaskCompletion {
 
 	local pidsArray # Array of currently running pids
 	local newPidsArray # New array of currently running pids
+
+	local hasPids=false # Are any valable pids given to function ?		#__WITH_PARANOIA_DEBUG
 
 	IFS=';' read -a pidsArray <<< "$pids"
 	pidCount=${#pidsArray[@]}
@@ -654,9 +656,9 @@ function WaitForTaskCompletion {
 		fi
 
 		if [ $exec_time -gt $soft_max_time ]; then
-			if [ $soft_alert -eq 0 ] && [ $soft_max_time -ne 0 ]; then
+			if [ $soft_alert == true ] && [ $soft_max_time -ne 0 ]; then
 				Logger "Max soft execution time exceeded for task [$caller_name] with pids [$(joinString , ${pidsArray[@]})]." "WARN"
-				soft_alert=1
+				soft_alert=true
 				SendAlert true
 
 			fi
@@ -676,7 +678,7 @@ function WaitForTaskCompletion {
 		fi
 
 		for pid in "${pidsArray[@]}"; do
-			if [ "$pid" != "" ]; then
+			if [ $(IsNumeric $pid) -eq 1 ]; then
 				if kill -0 $pid > /dev/null 2>&1; then
 					# Handle uninterruptible sleep state or zombies by ommiting them from running process array (How to kill that is already dead ? :)
 					#TODO(high): have this tested on *BSD, Mac & Win
@@ -698,8 +700,13 @@ function WaitForTaskCompletion {
 						fi
 					fi
 				fi
+				hasPids=true					##__WITH_PARANOIA_DEBUG
 			fi
 		done
+
+		if [ $hasPids == false ]; then					##__WITH_PARANOIA_DEBUG
+			Logger "No valable pids given." "ERROR" 		##__WITH_PARANOIA_DEBUG
+		fi								##__WITH_PARANOIA_DEBUG
 
 		pidsArray=("${newPidsArray[@]}")
 		# Trivial wait time for bash to not eat up all CPU
@@ -733,6 +740,8 @@ function ParallelExec {
 	local pidState
 	local commandsArrayPid
 
+	local hasPids=false # Are any valable pids given to function ?		#__WITH_PARANOIA_DEBUG
+
 	IFS=';' read -r -a commandsArray <<< "$commandsArg"
 
 	Logger "Runnning ${#commandsArray[@]} commands in $numberOfProcesses simultaneous processes." "DEBUG"
@@ -751,7 +760,7 @@ function ParallelExec {
 
 		newPidsArray=()
 		for pid in "${pidsArray[@]}"; do
-			if [ "$pid" != "" ]; then
+			if [ $(IsNumeric $pid) -eq 1 ]; then
 				# Handle uninterruptible sleep state or zombies by ommiting them from running process array (How to kill that is already dead ? :)
 				if kill -0 $pid > /dev/null 2>&1; then
 					pidState=$(ps -p$pid -o state= 2 > /dev/null)
@@ -767,8 +776,13 @@ function ParallelExec {
 						retvalAll=$((retvalAll+1))
 					fi
 				fi
+				hasPids=true					##__WITH_PARANOIA_DEBUG
 			fi
 		done
+
+		if [ $hasPids == false ]; then					##__WITH_PARANOIA_DEBUG
+			Logger "No valable pids given." "ERROR"			##__WITH_PARANOIA_DEBUG
+		fi								##__WITH_PARANOIA_DEBUG
 		pidsArray=("${newPidsArray[@]}")
 
 		# Trivial wait time for bash to not eat up all CPU
