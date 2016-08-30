@@ -1071,7 +1071,6 @@ $SSH_CMD ERROR_ALERT=0 sync_on_changes=$sync_on_changes _DEBUG=$_DEBUG _DRYRUN=$
 				if [ $_DRYRUN == false ]; then
 					if [ -e "$REPLICA_DIR$DELETE_DIR/$files" ]; then
 						$COMMAND_SUDO rm -rf "$REPLICA_DIR$DELETE_DIR/$files"
-						Logger "mongo." "NOTICE"
 					fi
 
 					if [ -e "$REPLICA_DIR$files" ]; then
@@ -1666,6 +1665,11 @@ function Init {
 		TARGET_SYNC_DIR=${hosturiandpath#*/}
 	fi
 
+	if [ "$INITIATOR_SYNC_DIR" == "" ] || [ "$TARGET_SYNC_DIR" == "" ]; then
+		Logger "Initiator or target path empty." "CRITICAL"
+		exit 1
+	fi
+
 	## Make sure there is only one trailing slash on path
 	INITIATOR_SYNC_DIR="${INITIATOR_SYNC_DIR%/}/"
 	TARGET_SYNC_DIR="${TARGET_SYNC_DIR%/}/"
@@ -1689,7 +1693,7 @@ function Init {
 	#TODO: use _NO_SUFFIX dynamically
 	TREE_AFTER_FILENAME_NO_SUFFIX="-tree-after-$INSTANCE_ID"
 
-	declare -a INITIATOR
+	declare -gA INITIATOR
 	#WIP: change INITIATOR[1] with more relevant index
 	INITIATOR[type]='initiator'
 	INITIATOR[replicaDir]="$INITIATOR_SYNC_DIR"
@@ -1707,7 +1711,7 @@ function Init {
 	INITIATOR[deletedListFile]="-deleted-list-$INSTANCE_ID$dry_suffix"
 	INITIATOR[failedDeletedListFile]="-failed-delete-$INSTANCE_ID$dry_suffix"
 
-	declare -a TARGET
+	declare -gA TARGET
 	TARGET[type]='target'
 	TARGET[replicaDir]="$TARGET_SYNC_DIR"
 	TARGET[lockFile]="$TARGET_SYNC_DIR$OSYNC_DIR/$lock_filename"
