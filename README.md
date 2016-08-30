@@ -75,6 +75,15 @@ QuickSync example
 	# osync.sh --initiator="/path/to/dir1" --target="/path/to/remote dir2"
 	# osync.sh --initiator="/path/to/another dir" --target="ssh://user@host.com:22//path/to/dir2" --rsakey=/home/user/.ssh/id_rsa_private_key_example.com
 
+QuickSync with minimal options
+------------------------------
+
+In order to run osync the quickest (without transferring file attributes, without softdeletion, without prior space checks and without remote connectivity checks, you may use the following:
+
+	# MINIMUM_SPACE=0 PRESERVE_PERMISSIONS=no PRESERVE_OWNER=no PRESERVE_GROUP=no PRESERVE_EXECUTABILITY=no SOFT_DELETE_DAYS=0 CONFLICT_BACKUP_DAYS=0 REMOTE_PING=no osync.sh --initiator="/path/to/another dir" --target="ssh://user@host.com:22//path/to/dir2" --rsakey=/home/user/.ssh/id_rsa_private_key_example.com
+
+All the settings described here may also be configured in the conf file.
+
 Running osync with a Configuration file
 ---------------------------------------
 You'll have to customize the sync.conf file according to your needs.
