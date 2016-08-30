@@ -1,0 +1,6 @@
+language: bash
+
+before_script:
+
+script:
+dev/tests/run_tests.sh
