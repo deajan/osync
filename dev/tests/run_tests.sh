@@ -10,8 +10,8 @@ TESTS_DIR="$DEV_DIR/tests"
 
 OSYNC_EXECUTABLE="n_osync.sh"
 
-INITIATOR_DIR="/opt/osync/initiator"
-TARGET_DIR="/opt/osync/target"
+INITIATOR_DIR="$TEST_DIR/opt/osync/initiator"
+TARGET_DIR="$TEST_DIR/opt/osync/target"
 OSYNC_STATE_DIR=".osync_workdir/state"
 
 function CreateReplicas () {
