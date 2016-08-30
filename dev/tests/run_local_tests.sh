@@ -1,14 +1,15 @@
 #!/usr/bin/env bash
 
-# osync test suite 2016083001
+# osync test suite 2016083002
 # Add big fileset tests (eg: drupal 8 ?)
 
 
 OSYNC_DIR="$(pwd)"
+OSYNC_DIR=${OSYNC_DIR%%/dev*}
 DEV_DIR="$OSYNC_DIR/dev"
 TESTS_DIR="$DEV_DIR/tests"
 
-OSYNC_EXECUTABLE="n_osync.sh"
+OSYNC_EXECUTABLE="osync.sh"
 
 INITIATOR_DIR="$TESTS_DIR/opt/osync/initiator"
 TARGET_DIR="$TESTS_DIR/opt/osync/target"
@@ -43,10 +44,16 @@ function oneTimeTearDown () {
 	fi
 }
 
+function test_Merge () {
+        cd "$DEV_DIR"
+        ./merge.sh
+        assertEquals "Merging code" "0" $?
+}
+
 function test_osync_quicksync_local () {
 	CreateReplicas
 	cd "$DEV_DIR"
-	./n_osync.sh --initiator="$INITIATOR_DIR" --target="$TARGET_DIR" > /dev/null
+	./$OSYNC_EXECUTABLE --initiator="$INITIATOR_DIR" --target="$TARGET_DIR" > /dev/null
 	assertEquals "Return code" "0" $?
 
 	[ -d "$INITIATOR_DIR/$OSYNC_STATE_DIR" ]
@@ -60,7 +67,7 @@ function test_osync_quicksync_local () {
 function test_osync_quicksync_remote () {
 	CreateReplicas
 	cd "$DEV_DIR"
-	./n_osync.sh --initiator="$INITIATOR_DIR" --target="ssh://localhost:49999/$TARGET_DIR" --rsakey=/root/.ssh/id_rsa_local > /dev/null
+	./$OSYNC_EXECUTABLE --initiator="$INITIATOR_DIR" --target="ssh://localhost:49999/$TARGET_DIR" --rsakey=/root/.ssh/id_rsa_local > /dev/null
 	assertEquals "Return code" "0" $?
 
 	[ -d "$INITIATOR_DIR/$OSYNC_STATE_DIR" ]
