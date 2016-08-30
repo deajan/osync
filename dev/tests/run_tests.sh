@@ -4,8 +4,9 @@
 # Add big fileset tests (eg: drupal 8 ?)
 
 
-DEV_DIR="/home/git/osync/dev"
-TESTS_DIR="/home/git/osync/dev/tests"
+OSYNC_DIR="$(pwd)"
+DEV_DIR="$OSYNC_DIR/dev"
+TESTS_DIR="$DEV_DIR/tests"
 
 OSYNC_EXECUTABLE="n_osync.sh"
 
