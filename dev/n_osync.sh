@@ -4,7 +4,7 @@ PROGRAM="osync" # Rsync based two way sync engine with fault tolerance
 AUTHOR="(C) 2013-2016 by Orsiris de Jong"
 CONTACT="http://www.netpower.fr/osync - ozy@netpower.fr"
 PROGRAM_VERSION=1.2-beta
-PROGRAM_BUILD=2016083002
+PROGRAM_BUILD=2016083003
 IS_STABLE=no
 
 # Execution order						#__WITH_PARANOIA_DEBUG
@@ -69,31 +69,31 @@ function TrapQuit {
 
 	if [ $ERROR_ALERT == true ]; then
 		UnlockReplicas
-		if [ "$_DEBUG" != "yes" ]
-		then
-			SendAlert
-		else
-			Logger "Debug mode, no alert mail will be sent." "NOTICE"
-		fi
 		if [ "$RUN_AFTER_CMD_ON_ERROR" == "yes" ]; then
 			RunAfterHook
 		fi
 		CleanUp
 		Logger "$PROGRAM finished with errors." "ERROR"
-		exitcode=1
-	elif [ $WARN_ALERT == true ]; then
-		UnlockReplicas
 		if [ "$_DEBUG" != "yes" ]
 		then
 			SendAlert
 		else
 			Logger "Debug mode, no alert mail will be sent." "NOTICE"
 		fi
+		exitcode=1
+	elif [ $WARN_ALERT == true ]; then
+		UnlockReplicas
 		if [ "$RUN_AFTER_CMD_ON_ERROR" == "yes" ]; then
 			RunAfterHook
 		fi
 		CleanUp
 		Logger "$PROGRAM finished with warnings." "WARN"
+		if [ "$_DEBUG" != "yes" ]
+		then
+			SendAlert
+		else
+			Logger "Debug mode, no alert mail will be sent." "NOTICE"
+		fi
 		exitcode=2	# Warning exit code must not force daemon mode to quit
 	else
 		UnlockReplicas
