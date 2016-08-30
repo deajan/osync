@@ -1,8 +1,12 @@
 #!/usr/bin/env bash
 
-# osync test suite 2016081901
+# osync test suite 2016083001
+# Add big fileset tests (eg: drupal 8 ?)
+
 
 DEV_DIR="/home/git/osync/dev"
+TESTS_DIR="/home/git/osync/dev/tests"
+
 OSYNC_EXECUTABLE="n_osync.sh"
 
 INITIATOR_DIR="/opt/osync/initiator"
@@ -65,4 +69,4 @@ function test_osync_quicksync_remote () {
 	assertEquals "Target state dir exists" "0" $?
 }
 
-. ./shunit2/shunit2
+. "$TESTS_DIR/shunit2/shunit2"
