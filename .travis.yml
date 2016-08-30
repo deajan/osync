@@ -2,4 +2,4 @@ language:
     bash
 
 script:
-    dev/tests/run_tests.sh
+    dev/tests/run_travis_tests.sh
