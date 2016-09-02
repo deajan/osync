@@ -4,7 +4,7 @@ PROGRAM="osync" # Rsync based two way sync engine with fault tolerance
 AUTHOR="(C) 2013-2016 by Orsiris de Jong"
 CONTACT="http://www.netpower.fr/osync - ozy@netpower.fr"
 PROGRAM_VERSION=1.2-beta
-PROGRAM_BUILD=2016083003
+PROGRAM_BUILD=2016083004
 IS_STABLE=no
 
 # Execution order						#__WITH_PARANOIA_DEBUG
@@ -45,7 +45,7 @@ IS_STABLE=no
 
 #### MINIMAL-FUNCTION-SET BEGIN ####
 
-## FUNC_BUILD=2016083002
+## FUNC_BUILD=2016083003
 ## BEGIN Generic bash functions written in 2013-2016 by Orsiris de Jong - http://www.netpower.fr - ozy@netpower.fr
 
 ## To use in a program, define the following variables:
@@ -79,7 +79,7 @@ ERROR_ALERT=false
 WARN_ALERT=false
 
 # Log from current run
-CURRENT_LOG=
+CURRENT_LOG=""
 
 ## allow function call checks			#__WITH_PARANOIA_DEBUG
 if [ "$_PARANOIA_DEBUG" == "yes" ];then		#__WITH_PARANOIA_DEBUG
@@ -3115,6 +3115,12 @@ function Init {
 	## Make sure there is only one trailing slash on path
 	INITIATOR_SYNC_DIR="${INITIATOR_SYNC_DIR%/}/"
 	TARGET_SYNC_DIR="${TARGET_SYNC_DIR%/}/"
+
+	# Expand ~ if exists
+	INITIATOR_SYNC_DIR="${INITIATOR_SYNC_DIR/#\~/$HOME}"
+	TARGET_SYNC_DIR="${TARGET_SYNC_DIR/#\~/$HOME}"
+	SSH_RSA_PRIVATE_KEY="${SSH_RSA_PRIVATE_KEY/#\~/$HOME}"
+
 
 	## Replica format
 	## Why the f*** does bash not have simple objects ?

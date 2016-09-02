@@ -1,6 +1,6 @@
 #### MINIMAL-FUNCTION-SET BEGIN ####
 
-## FUNC_BUILD=2016083002
+## FUNC_BUILD=2016083003
 ## BEGIN Generic bash functions written in 2013-2016 by Orsiris de Jong - http://www.netpower.fr - ozy@netpower.fr
 
 ## To use in a program, define the following variables:
@@ -34,7 +34,7 @@ ERROR_ALERT=false
 WARN_ALERT=false
 
 # Log from current run
-CURRENT_LOG=
+CURRENT_LOG=""
 
 ## allow function call checks			#__WITH_PARANOIA_DEBUG
 if [ "$_PARANOIA_DEBUG" == "yes" ];then		#__WITH_PARANOIA_DEBUG

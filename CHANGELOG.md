@@ -7,6 +7,11 @@ KNOWN ISSUES
 RECENT CHANGES
 --------------
 
+XX Xxx 2016: osync v1.2-RC1 released
+- Improved unit tests
+
+30 Aug 2016: osync v1.2-beta released
+- Rendered more recent code compatible with bash 3.2+
 - Added a PKGBUILD file for ArchLinux thanks to Shadowigor (https://github.com/shaodwigor). Builds available at https://aur.archlinux.org/packages/osync/
 - Some more code compliance & more paranoia checks
 - Added more preflight checks
@@ -15,14 +20,12 @@ RECENT CHANGES
         - Fixed	bogus double log sent in alert mails
 - Made unix signals posix compliant
 - Config file upgrade script now updates header
-! test if waitfortaskcompletion kill self works okay with osync
 - Improved batch runner
 - Made keep logging value configurable and not mandatory
 - Fixed handling of processes in uninterruptible sleep state
 ! update doc on sudoers paths
 - Parallelized sync functions
 	- Rewrite sync resume process
-	! Remove conflict prevalance
 	- !doc about bandwidth
 - Added options to ignore permissions, ownership and groups
 - Refactored WaitFor... functions into one
