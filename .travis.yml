@@ -6,4 +6,4 @@ os:
     osx
 
 script:
-    dev/n_osync.sh
+    dev/tests/run_tests.sh
