@@ -7,7 +7,8 @@ KNOWN ISSUES
 RECENT CHANGES
 --------------
 
-XX Xxx 2016:
+02 Sep 2016:
+- Fixed directories containing spaces with bash >= 4.3
 - Fixed installer for CYGWIN / MSYS environment
 
 28 Aug 2016: osync v1.1.2 released
