@@ -1,0 +1,9 @@
+language:
+    bash
+
+os:
+    linux
+    osx
+
+script:
+    dev/n_osync.sh
