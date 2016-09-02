@@ -1,4 +1,4 @@
-## FUNC_BUILD=2016071902-b
+## FUNC_BUILD=2016071902-c
 ## BEGIN Generic functions for osync & obackup written in 2013-2016 by Orsiris de Jong - http://www.netpower.fr - ozy@netpower.fr
 
 ## type -p does not work on platforms other than linux (bash). If if does not work, always assume output is not a zero exitcode
@@ -568,7 +568,7 @@ function StripQuotes {
 
 function EscapeSpaces {
 	local string="${1}" # String on which spaces will be escaped
-	echo "${string// /\ }"
+	echo "${string// /\\ }"
 }
 
 function IsNumeric {

@@ -3,8 +3,8 @@
 PROGRAM="osync" # Rsync based two way sync engine with fault tolerance
 AUTHOR="(C) 2013-2016 by Orsiris de Jong"
 CONTACT="http://www.netpower.fr/osync - ozy@netpower.fr"
-PROGRAM_VERSION=1.1.2
-PROGRAM_BUILD=20160802201
+PROGRAM_VERSION=1.1.3
+PROGRAM_BUILD=2016090201
 IS_STABLE=yes
 
 source "./ofunctions.sh"
