@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-# osync test suite 2016090502
+# osync test suite 2016090503
 # TODO: Add big fileset tests (eg: drupal 8 ?), add soft deletion tests, add deletion propagation test, add file attrib test
 
 
@@ -96,7 +96,8 @@ function test_osync_quicksync_local () {
 
 function test_osync_quicksync_remote () {
 	cd "$OSYNC_DIR"
-	./$OSYNC_EXECUTABLE --initiator="$INITIATOR_DIR" --target="ssh://localhost:$SSH_PORT/$TARGET_DIR" --rsakey="${HOME}/.ssh/id_rsa_local"
+	# Disable remote host ping because Travis can't ping
+	REMOTE_HOST_PING=no ./$OSYNC_EXECUTABLE --initiator="$INITIATOR_DIR" --target="ssh://localhost:$SSH_PORT/$TARGET_DIR" --rsakey="${HOME}/.ssh/id_rsa_local"
 	assertEquals "Return code" "0" $?
 
 	[ -d "$INITIATOR_DIR/$OSYNC_STATE_DIR" ]
