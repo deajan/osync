@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-# osync test suite 2016090501
+# osync test suite 2016090502
 # TODO: Add big fileset tests (eg: drupal 8 ?), add soft deletion tests, add deletion propagation test, add file attrib test
 
 
@@ -53,16 +53,7 @@ function SetupSSH {
 	fi
 }
 
-function oneTimeSetUp () {
-	source "$DEV_DIR/ofunctions.sh"
-	SetupSSH
-}
-
-function oneTimeTearDown () {
-	SetStableToOrigin
-}
-
-function SetUp () {
+function setUp () {
 	if [ -d "$INITIATOR_DIR" ]; then
 		rm -rf "$INITIATOR_DIR"
 	fi
@@ -72,6 +63,15 @@ function SetUp () {
 		rm -rf "$TARGET_DIR"
 	fi
 	mkdir -p "$TARGET_DIR"
+}
+
+function oneTimeSetUp () {
+	source "$DEV_DIR/ofunctions.sh"
+	SetupSSH
+}
+
+function oneTimeTearDown () {
+	SetStableToOrigin
 }
 
 function test_Merge () {
@@ -96,7 +96,7 @@ function test_osync_quicksync_local () {
 
 function test_osync_quicksync_remote () {
 	cd "$OSYNC_DIR"
-	./$OSYNC_EXECUTABLE --initiator="$INITIATOR_DIR" --target="ssh://localhost:$SSH_PORT/$TARGET_DIR" --rsakey=/root/.ssh/id_rsa_local
+	./$OSYNC_EXECUTABLE --initiator="$INITIATOR_DIR" --target="ssh://localhost:$SSH_PORT/$TARGET_DIR" --rsakey="${HOME}/.ssh/id_rsa_local"
 	assertEquals "Return code" "0" $?
 
 	[ -d "$INITIATOR_DIR/$OSYNC_STATE_DIR" ]
