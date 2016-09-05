@@ -1,12 +1,14 @@
 #### MINIMAL-FUNCTION-SET BEGIN ####
 
-## FUNC_BUILD=2016083003
+## FUNC_BUILD=2016090401
 ## BEGIN Generic bash functions written in 2013-2016 by Orsiris de Jong - http://www.netpower.fr - ozy@netpower.fr
 
 ## To use in a program, define the following variables:
 ## PROGRAM=program-name
 ## INSTANCE_ID=program-instance-name
 ## _DEBUG=yes/no
+
+#TODO: Windows checks, check sendmail & mailsend
 
 if ! type "$BASH" > /dev/null; then
 	echo "Please run this script only with bash shell. Tested on bash >= 3.2"
@@ -159,7 +161,7 @@ function Logger {
 		fi						#__WITH_PARANOIA_DEBUG
 	else
 		_Logger "\e[41mLogger function called without proper loglevel [$level].\e[0m"
-		_Logger "$prefix$value"
+		_Logger "Value was: $prefix$value"
 	fi
 }
 
@@ -673,12 +675,11 @@ function WaitForTaskCompletion {
 					fi
 				done
 				SendAlert true
-				errrorcount=$((errorcount+1))
 			fi
 		fi
 
 		for pid in "${pidsArray[@]}"; do
-			if [ $(IsNumeric $pid) -eq 1 ]; then
+			if [ $(IsInteger $pid) -eq 1 ]; then
 				if kill -0 $pid > /dev/null 2>&1; then
 					# Handle uninterruptible sleep state or zombies by ommiting them from running process array (How to kill that is already dead ? :)
 					#TODO(high): have this tested on *BSD, Mac & Win
@@ -730,13 +731,12 @@ function ParallelExec {
 	local commandsArg="${2}" # Semi-colon separated list of commands
 
 	local pid
-	local runningPids=0
 	local counter=0
 	local commandsArray
 	local pidsArray
 	local newPidsArray
 	local retval
-	local retvalAll=0
+	local errorCount=0
 	local pidState
 	local commandsArrayPid
 
@@ -760,7 +760,7 @@ function ParallelExec {
 
 		newPidsArray=()
 		for pid in "${pidsArray[@]}"; do
-			if [ $(IsNumeric $pid) -eq 1 ]; then
+			if [ $(IsInteger $pid) -eq 1 ]; then
 				# Handle uninterruptible sleep state or zombies by ommiting them from running process array (How to kill that is already dead ? :)
 				if kill -0 $pid > /dev/null 2>&1; then
 					pidState=$(ps -p$pid -o state= 2 > /dev/null)
@@ -773,7 +773,7 @@ function ParallelExec {
 					retval=$?
 					if [ $retval -ne 0 ]; then
 						Logger "Command [${commandsArrayPid[$pid]}] failed with exit code [$retval]." "ERROR"
-						retvalAll=$((retvalAll+1))
+						errorCount=$((errorCount+1))
 					fi
 				fi
 				hasPids=true					##__WITH_PARANOIA_DEBUG
@@ -789,7 +789,7 @@ function ParallelExec {
 		sleep $SLEEP_TIME
 	done
 
-	return $retvalAll
+	return $errorCount
 }
 
 function CleanUp {
@@ -830,16 +830,37 @@ function StripQuotes {
 	echo "$(StripSingleQuotes $(StripDoubleQuotes $string))"
 }
 
+# Usage var=$(EscapeSpaces "$var") or var="$(EscapeSpaces "$var")"
 function EscapeSpaces {
 	local string="${1}" # String on which spaces will be escaped
-	echo "${string// /\ }"
+	echo "${string// /\\ }"
 }
 
-function IsNumeric {
+function IsNumericExpand {
 	eval "local value=\"${1}\"" # Needed eval so variable variables can be processed
 
 	local re="^-?[0-9]+([.][0-9]+)?$"
 	if [[ $value =~ $re ]]; then
+		echo 1
+	else
+		echo 0
+	fi
+}
+
+function IsNumeric {
+	local value="${1}"
+
+	if [[ $value =~ ^[0-9]+([.][0-9]+)?$ ]]; then
+		echo 1
+	else
+		echo 0
+	fi
+}
+
+function IsInteger {
+	local value="${1}"
+
+	if [[ $value =~ ^[0-9]+$ ]]; then
 		echo 1
 	else
 		echo 0
@@ -1081,14 +1102,17 @@ function RunAfterHook {
 function CheckConnectivityRemoteHost {
 	__CheckArguments 0 $# ${FUNCNAME[0]} "$@"	#__WITH_PARANOIA_DEBUG
 
+	local retval
+
 	if [ "$_PARANOIA_DEBUG" != "yes" ]; then # Do not loose time in paranoia debug
 
 		if [ "$REMOTE_HOST_PING" != "no" ] && [ "$REMOTE_OPERATION" != "no" ]; then
 			eval "$PING_CMD $REMOTE_HOST > /dev/null 2>&1" &
 			WaitForTaskCompletion $! 60 180 ${FUNCNAME[0]} true $KEEP_LOGGING
-			if [ $? != 0 ]; then
-				Logger "Cannot ping $REMOTE_HOST" "ERROR"
-				return 1
+			retval=$?
+			if [ $retval != 0 ]; then
+				Logger "Cannot ping [$REMOTE_HOST]. Return code [$retval]." "ERROR"
+				return $retval
 			fi
 		fi
 	fi
@@ -1098,7 +1122,7 @@ function CheckConnectivity3rdPartyHosts {
 	__CheckArguments 0 $# ${FUNCNAME[0]} "$@"	#__WITH_PARANOIA_DEBUG
 
 	local remote_3rd_party_success
-	local pids
+	local retval
 
 	if [ "$_PARANOIA_DEBUG" != "yes" ]; then # Do not loose time in paranoia debug
 
@@ -1108,8 +1132,9 @@ function CheckConnectivity3rdPartyHosts {
 			do
 				eval "$PING_CMD $i > /dev/null 2>&1" &
 				WaitForTaskCompletion $! 180 360 ${FUNCNAME[0]} true $KEEP_LOGGING
-				if [ $? != 0 ]; then
-					Logger "Cannot ping 3rd party host $i" "NOTICE"
+				retval=$?
+				if [ $retval != 0 ]; then
+					Logger "Cannot ping 3rd party host [$i]. Return code [$retval]." "NOTICE"
 				else
 					remote_3rd_party_success=true
 				fi
