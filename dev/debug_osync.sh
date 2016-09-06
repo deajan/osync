@@ -45,13 +45,15 @@ IS_STABLE=no
 
 #### MINIMAL-FUNCTION-SET BEGIN ####
 
-## FUNC_BUILD=2016083003
+## FUNC_BUILD=2016090602
 ## BEGIN Generic bash functions written in 2013-2016 by Orsiris de Jong - http://www.netpower.fr - ozy@netpower.fr
 
 ## To use in a program, define the following variables:
 ## PROGRAM=program-name
 ## INSTANCE_ID=program-instance-name
 ## _DEBUG=yes/no
+
+#TODO: Windows checks, check sendmail & mailsend
 
 if ! type "$BASH" > /dev/null; then
 	echo "Please run this script only with bash shell. Tested on bash >= 3.2"
@@ -204,7 +206,7 @@ function Logger {
 		fi						#__WITH_PARANOIA_DEBUG
 	else
 		_Logger "\e[41mLogger function called without proper loglevel [$level].\e[0m"
-		_Logger "$prefix$value"
+		_Logger "Value was: $prefix$value"
 	fi
 }
 
@@ -585,23 +587,23 @@ function TrapError {
 }
 
 function LoadConfigFile {
-	local config_file="${1}"
+	local configFile="${1}"
 	__CheckArguments 1 $# ${FUNCNAME[0]} "$@"	#__WITH_PARANOIA_DEBUG
 
 
-	if [ ! -f "$config_file" ]; then
-		Logger "Cannot load configuration file [$config_file]. Cannot start." "CRITICAL"
+	if [ ! -f "$configFile" ]; then
+		Logger "Cannot load configuration file [$configFile]. Cannot start." "CRITICAL"
 		exit 1
-	elif [[ "$1" != *".conf" ]]; then
-		Logger "Wrong configuration file supplied [$config_file]. Cannot start." "CRITICAL"
+	elif [[ "$configFile" != *".conf" ]]; then
+		Logger "Wrong configuration file supplied [$configFile]. Cannot start." "CRITICAL"
 		exit 1
 	else
-		grep '^[^ ]*=[^;&]*' "$config_file" > "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$SCRIPT_PID" # WITHOUT COMMENTS
-		# Shellcheck source=./sync.conf
+		# Remove everything that is not a variable assignation
+		grep '^[^ ]*=[^;&]*' "$configFile" > "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$SCRIPT_PID"
 		source "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$SCRIPT_PID"
 	fi
 
-	CONFIG_FILE="$config_file"
+	CONFIG_FILE="$configFile"
 }
 
 function Spinner {
@@ -718,12 +720,11 @@ function WaitForTaskCompletion {
 					fi
 				done
 				SendAlert true
-				errrorcount=$((errorcount+1))
 			fi
 		fi
 
 		for pid in "${pidsArray[@]}"; do
-			if [ $(IsNumeric $pid) -eq 1 ]; then
+			if [ $(IsInteger $pid) -eq 1 ]; then
 				if kill -0 $pid > /dev/null 2>&1; then
 					# Handle uninterruptible sleep state or zombies by ommiting them from running process array (How to kill that is already dead ? :)
 					#TODO(high): have this tested on *BSD, Mac & Win
@@ -772,40 +773,53 @@ function WaitForTaskCompletion {
 # Returns the number of non zero exit codes from commands
 function ParallelExec {
 	local numberOfProcesses="${1}" # Number of simultaneous commands to run
-	local commandsArg="${2}" # Semi-colon separated list of commands
+	local commandsArg="${2}" # Semi-colon separated list of commands, or file containing one command per line
 
+	local commandCount
+	local command
+	local readFromFile=false
 	local pid
-	local runningPids=0
 	local counter=0
 	local commandsArray
 	local pidsArray
 	local newPidsArray
 	local retval
-	local retvalAll=0
+	local errorCount=0
 	local pidState
 	local commandsArrayPid
 
 	local hasPids=false # Are any valable pids given to function ?		#__WITH_PARANOIA_DEBUG
 
-	IFS=';' read -r -a commandsArray <<< "$commandsArg"
+	if [ -f "$commandsArg" ]; then
+		commandCount=$(wc -l < "$commandsArg")
+		readFromFile=true
+	else
+		IFS=';' read -r -a commandsArray <<< "$commandsArg"
+		commandCount=${#commandsArray[@]}
+	fi
 
-	Logger "Runnning ${#commandsArray[@]} commands in $numberOfProcesses simultaneous processes." "DEBUG"
+	Logger "Runnning $commandCount commands in $numberOfProcesses simultaneous processes." "DEBUG"
 
-	while [ $counter -lt "${#commandsArray[@]}" ] || [ ${#pidsArray[@]} -gt 0 ]; do
+	while [ $counter -lt "$commandCount" ] || [ ${#pidsArray[@]} -gt 0 ]; do
 
-		while [ $counter -lt "${#commandsArray[@]}" ] && [ ${#pidsArray[@]} -lt $numberOfProcesses ]; do
-			Logger "Running command [${commandsArray[$counter]}]." "DEBUG"
-			eval "${commandsArray[$counter]}" &
+		while [ $counter -lt "$commandCount" ] && [ ${#pidsArray[@]} -lt $numberOfProcesses ]; do
+			if [ $readFromFile == true ]; then
+				command=$(awk 'NR == num_line {print; exit}' num_line=$((counter+1)) "$commandsArg")
+			else
+				command="${commandsArray[$counter]}"
+			fi
+			Logger "Running command [$command]." "DEBUG"
+			eval "$command" &
 			pid=$!
 			pidsArray+=($pid)
-			commandsArrayPid[$pid]="${commandsArray[$counter]}"
+			commandsArrayPid[$pid]="$command"
 			counter=$((counter+1))
 		done
 
 
 		newPidsArray=()
 		for pid in "${pidsArray[@]}"; do
-			if [ $(IsNumeric $pid) -eq 1 ]; then
+			if [ $(IsInteger $pid) -eq 1 ]; then
 				# Handle uninterruptible sleep state or zombies by ommiting them from running process array (How to kill that is already dead ? :)
 				if kill -0 $pid > /dev/null 2>&1; then
 					pidState=$(ps -p$pid -o state= 2 > /dev/null)
@@ -818,7 +832,7 @@ function ParallelExec {
 					retval=$?
 					if [ $retval -ne 0 ]; then
 						Logger "Command [${commandsArrayPid[$pid]}] failed with exit code [$retval]." "ERROR"
-						retvalAll=$((retvalAll+1))
+						errorCount=$((errorCount+1))
 					fi
 				fi
 				hasPids=true					##__WITH_PARANOIA_DEBUG
@@ -834,7 +848,7 @@ function ParallelExec {
 		sleep $SLEEP_TIME
 	done
 
-	return $retvalAll
+	return $errorCount
 }
 
 function CleanUp {
@@ -875,16 +889,37 @@ function StripQuotes {
 	echo "$(StripSingleQuotes $(StripDoubleQuotes $string))"
 }
 
+# Usage var=$(EscapeSpaces "$var") or var="$(EscapeSpaces "$var")"
 function EscapeSpaces {
 	local string="${1}" # String on which spaces will be escaped
-	echo "${string// /\ }"
+	echo "${string// /\\ }"
 }
 
-function IsNumeric {
+function IsNumericExpand {
 	eval "local value=\"${1}\"" # Needed eval so variable variables can be processed
 
 	local re="^-?[0-9]+([.][0-9]+)?$"
 	if [[ $value =~ $re ]]; then
+		echo 1
+	else
+		echo 0
+	fi
+}
+
+function IsNumeric {
+	local value="${1}"
+
+	if [[ $value =~ ^[0-9]+([.][0-9]+)?$ ]]; then
+		echo 1
+	else
+		echo 0
+	fi
+}
+
+function IsInteger {
+	local value="${1}"
+
+	if [[ $value =~ ^[0-9]+$ ]]; then
 		echo 1
 	else
 		echo 0
@@ -1126,14 +1161,17 @@ function RunAfterHook {
 function CheckConnectivityRemoteHost {
 	__CheckArguments 0 $# ${FUNCNAME[0]} "$@"	#__WITH_PARANOIA_DEBUG
 
+	local retval
+
 	if [ "$_PARANOIA_DEBUG" != "yes" ]; then # Do not loose time in paranoia debug
 
 		if [ "$REMOTE_HOST_PING" != "no" ] && [ "$REMOTE_OPERATION" != "no" ]; then
 			eval "$PING_CMD $REMOTE_HOST > /dev/null 2>&1" &
 			WaitForTaskCompletion $! 60 180 ${FUNCNAME[0]} true $KEEP_LOGGING
-			if [ $? != 0 ]; then
-				Logger "Cannot ping $REMOTE_HOST" "ERROR"
-				return 1
+			retval=$?
+			if [ $retval != 0 ]; then
+				Logger "Cannot ping [$REMOTE_HOST]. Return code [$retval]." "ERROR"
+				return $retval
 			fi
 		fi
 	fi
@@ -1143,7 +1181,7 @@ function CheckConnectivity3rdPartyHosts {
 	__CheckArguments 0 $# ${FUNCNAME[0]} "$@"	#__WITH_PARANOIA_DEBUG
 
 	local remote_3rd_party_success
-	local pids
+	local retval
 
 	if [ "$_PARANOIA_DEBUG" != "yes" ]; then # Do not loose time in paranoia debug
 
@@ -1153,8 +1191,9 @@ function CheckConnectivity3rdPartyHosts {
 			do
 				eval "$PING_CMD $i > /dev/null 2>&1" &
 				WaitForTaskCompletion $! 180 360 ${FUNCNAME[0]} true $KEEP_LOGGING
-				if [ $? != 0 ]; then
-					Logger "Cannot ping 3rd party host $i" "NOTICE"
+				retval=$?
+				if [ $retval != 0 ]; then
+					Logger "Cannot ping 3rd party host [$i]. Return code [$retval]." "NOTICE"
 				else
 					remote_3rd_party_success=true
 				fi
