@@ -1,8 +1,25 @@
 #!/usr/bin/env bash
 
-# osync test suite 2016090503
+# osync test suite 2016090601
 # TODO: Add big fileset tests (eg: drupal 8 ?), add soft deletion tests, add deletion propagation test, add file attrib test
 
+
+# 4 tests:
+# quicklocal
+# quickremote
+# conflocal
+# confremote
+
+# for each test:
+# files with spaces, subdirs
+# largefileset
+# exclusions
+# conflict resolution master, file attributes master
+# conflict resolution slave, file attributes slave
+# deletion propagation
+# softdelete deleted
+# softdelete backup
+# lock checks
 
 OSYNC_DIR="$(pwd)"
 OSYNC_DIR=${OSYNC_DIR%%/dev*}
@@ -10,6 +27,8 @@ DEV_DIR="$OSYNC_DIR/dev"
 TESTS_DIR="$DEV_DIR/tests"
 
 OSYNC_EXECUTABLE="osync.sh"
+TMP_FILE="$DEV_DIR/tmp"
+
 
 if [ "$TRAVIS_RUN" == true ]; then
 	echo "Running with travis settings"
@@ -24,6 +43,16 @@ fi
 INITIATOR_DIR="${HOME}/osync/initiator"
 TARGET_DIR="${HOME}/osync/target"
 OSYNC_STATE_DIR=".osync_workdir/state"
+
+# Setup an array with all function modes
+declare -Ag osync_params
+
+osyncParameters[quicklocal]="--initiator=\"$INITIATOR_DIR\" --target=\"$TARGET_DIR\""
+osyncParameters[quickRemote]="--initiator=\"$INITIATOR_DIR\" --target=\"ssh://localhost:$SSH_PORT/$TARGET_DIR\" --rsakey=\"${HOME}/.ssh/id_rsa_local\""
+osyncParameters[confLocal]="$CONF_DIR/local.conf"
+osyncParameters[confRemote]="$CONF_DIR/remote.conf"
+osyncParameters[daemonlocal]="$CONF_DIR/local.conf --on-changes"
+osyncParameters[daemonlocal]="$CONF_DIR/remote.conf --on-changes"
 
 function SetStableToYes () {
 	if grep "^IS_STABLE=YES" "$OSYNC_DIR/$OSYNC_EXECUTABLE" > /dev/null; then
@@ -108,6 +137,8 @@ function test_osync_quicksync_remote () {
 }
 
 function test_WaitForTaskCompletion () {
+	local pids
+
 	# Tests if wait for task completion works correctly
 
 	# Standard wait
@@ -156,7 +187,9 @@ function test_WaitForTaskCompletion () {
 }
 
 function test_ParallelExec () {
-	# Test if parallelExec works correctly
+	local cmd
+
+	# Test if parallelExec works correctly in array mode
 
 	cmd="sleep 2;sleep 2;sleep 2;sleep 2"
 	ParallelExec 4 "$cmd"
@@ -169,6 +202,30 @@ function test_ParallelExec () {
 	cmd="sleep 4;du /none;sleep 3;du /none;sleep 2"
 	ParallelExec 3 "$cmd"
 	assertEquals "ParallelExec test 3" "2" $?
+
+	# Test if parallelExec works correctly in file mode
+
+	echo "sleep 2" > "$TMP_FILE"
+	echo "sleep 2" >> "$TMP_FILE"
+	echo "sleep 2" >> "$TMP_FILE"
+	echo "sleep 2" >> "$TMP_FILE"
+	ParallelExec 4 "$TMP_FILE"
+	assertEquals "ParallelExec test 4" "0" $?
+
+	echo "sleep 2" > "$TMP_FILE"
+	echo "du /nome" >> "$TMP_FILE"
+	echo "sleep 2" >> "$TMP_FILE"
+	ParallelExec 2 "$TMP_FILE"
+	assertEquals "ParallelExec test 5" "1" $?
+
+	echo "sleep 4" > "$TMP_FILE"
+	echo "du /none" >> "$TMP_FILE"
+	echo "sleep 3" >> "$TMP_FILE"
+	echo "du /none" >> "$TMP_FILE"
+	echo "sleep 2" >> "$TMP_FILE"
+	ParallelExec 3 "$TMP_FILE"
+	assertEquals "ParallelExec test 6" "2" $?
+
 }
 
 . "$TESTS_DIR/shunit2/shunit2"
