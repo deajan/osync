@@ -726,6 +726,7 @@ function WaitForTaskCompletion {
 
 # Take a list of commands to run, runs them sequentially with numberOfProcesses commands simultaneously runs
 # Returns the number of non zero exit codes from commands
+# Use cmd1;cmd2;cmd3 syntax for small sets, use file for large command sets
 function ParallelExec {
 	local numberOfProcesses="${1}" # Number of simultaneous commands to run
 	local commandsArg="${2}" # Semi-colon separated list of commands, or file containing one command per line
