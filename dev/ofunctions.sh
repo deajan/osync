@@ -1,6 +1,6 @@
 #### MINIMAL-FUNCTION-SET BEGIN ####
 
-## FUNC_BUILD=2016090401
+## FUNC_BUILD=2016090602
 ## BEGIN Generic bash functions written in 2013-2016 by Orsiris de Jong - http://www.netpower.fr - ozy@netpower.fr
 
 ## To use in a program, define the following variables:
@@ -542,23 +542,23 @@ function TrapError {
 }
 
 function LoadConfigFile {
-	local config_file="${1}"
+	local configFile="${1}"
 	__CheckArguments 1 $# ${FUNCNAME[0]} "$@"	#__WITH_PARANOIA_DEBUG
 
 
-	if [ ! -f "$config_file" ]; then
-		Logger "Cannot load configuration file [$config_file]. Cannot start." "CRITICAL"
+	if [ ! -f "$configFile" ]; then
+		Logger "Cannot load configuration file [$configFile]. Cannot start." "CRITICAL"
 		exit 1
-	elif [[ "$1" != *".conf" ]]; then
-		Logger "Wrong configuration file supplied [$config_file]. Cannot start." "CRITICAL"
+	elif [[ "$configFile" != *".conf" ]]; then
+		Logger "Wrong configuration file supplied [$configFile]. Cannot start." "CRITICAL"
 		exit 1
 	else
-		grep '^[^ ]*=[^;&]*' "$config_file" > "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$SCRIPT_PID" # WITHOUT COMMENTS
-		# Shellcheck source=./sync.conf
+		# Remove everything that is not a variable assignation
+		grep '^[^ ]*=[^;&]*' "$configFile" > "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$SCRIPT_PID"
 		source "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$SCRIPT_PID"
 	fi
 
-	CONFIG_FILE="$config_file"
+	CONFIG_FILE="$configFile"
 }
 
 function Spinner {
@@ -728,8 +728,11 @@ function WaitForTaskCompletion {
 # Returns the number of non zero exit codes from commands
 function ParallelExec {
 	local numberOfProcesses="${1}" # Number of simultaneous commands to run
-	local commandsArg="${2}" # Semi-colon separated list of commands
+	local commandsArg="${2}" # Semi-colon separated list of commands, or file containing one command per line
 
+	local commandCount
+	local command
+	local readFromFile=false
 	local pid
 	local counter=0
 	local commandsArray
@@ -742,18 +745,29 @@ function ParallelExec {
 
 	local hasPids=false # Are any valable pids given to function ?		#__WITH_PARANOIA_DEBUG
 
-	IFS=';' read -r -a commandsArray <<< "$commandsArg"
+	if [ -f "$commandsArg" ]; then
+		commandCount=$(wc -l < "$commandsArg")
+		readFromFile=true
+	else
+		IFS=';' read -r -a commandsArray <<< "$commandsArg"
+		commandCount=${#commandsArray[@]}
+	fi
 
-	Logger "Runnning ${#commandsArray[@]} commands in $numberOfProcesses simultaneous processes." "DEBUG"
+	Logger "Runnning $commandCount commands in $numberOfProcesses simultaneous processes." "DEBUG"
 
-	while [ $counter -lt "${#commandsArray[@]}" ] || [ ${#pidsArray[@]} -gt 0 ]; do
+	while [ $counter -lt "$commandCount" ] || [ ${#pidsArray[@]} -gt 0 ]; do
 
-		while [ $counter -lt "${#commandsArray[@]}" ] && [ ${#pidsArray[@]} -lt $numberOfProcesses ]; do
-			Logger "Running command [${commandsArray[$counter]}]." "DEBUG"
-			eval "${commandsArray[$counter]}" &
+		while [ $counter -lt "$commandCount" ] && [ ${#pidsArray[@]} -lt $numberOfProcesses ]; do
+			if [ $readFromFile == true ]; then
+				command=$(awk 'NR == num_line {print; exit}' num_line=$((counter+1)) "$commandsArg")
+			else
+				command="${commandsArray[$counter]}"
+			fi
+			Logger "Running command [$command]." "DEBUG"
+			eval "$command" &
 			pid=$!
 			pidsArray+=($pid)
-			commandsArrayPid[$pid]="${commandsArray[$counter]}"
+			commandsArrayPid[$pid]="$command"
 			counter=$((counter+1))
 		done
 
