@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-## MERGE 2016083001
+## MERGE 2016090601
 
 ## Merges ofunctions.sh and n_program.sh into program.sh
 ## Adds installer
@@ -107,15 +107,15 @@ function CopyCommons {
 			QuickLogger "Cannot assemble batch runner." "stdout"
 			exit 1
 		fi
+		chmod +x ../$PROGRAM-batch.sh
+		if [ $? != 0 ]; then
+			QuickLogger "Cannot chmod $PROGRAM-batch.sh" "stdout"
+			exit 1
+		fi
 	fi
 	chmod +x ../install.sh
 	if [ $? != 0 ]; then
 		QuickLogger "Cannot chmod install.sh" "stdout"
-		exit 1
-	fi
-	chmod +x ../$PROGRAM-batch.sh
-	if [ $? != 0 ]; then
-		QuickLogger "Cannot chmod $PROGRAM-batch.sh" "stdout"
 		exit 1
 	fi
 	rm -f ../tmp_install.sh

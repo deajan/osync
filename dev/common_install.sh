@@ -4,7 +4,7 @@ PROGRAM=[prgname]
 PROGRAM_VERSION=[version]
 PROGRAM_BINARY=$PROGRAM".sh"
 PROGRAM_BATCH=$PROGRAM"-batch.sh"
-SCRIPT_BUILD=2016082901
+SCRIPT_BUILD=2016090605
 
 ## osync / obackup / pmocr / zsnap install script
 ## Tested on RHEL / CentOS 6 & 7, Fedora 23, Debian 7 & 8, Mint 17 and FreeBSD 8 & 10
@@ -26,7 +26,7 @@ OSYNC_SERVICE_FILE_SYSTEMD_USER="osync-srv@.service.user"
 
 ## pmocr specfic code
 PMOCR_SERVICE_FILE_INIT="pmocr-srv"
-PMOCR_SERVICE_FILE_SYSTEMD_SYSTEM="pmocr-srv.service"
+PMOCR_SERVICE_FILE_SYSTEMD_SYSTEM="pmocr-srv@.service"
 
 ## Generic code
 
@@ -141,19 +141,28 @@ function CreateConfDir {
 
 function CopyExampleFiles {
 	if [ -f "./sync.conf.example" ]; then
-		cp "./sync.conf.example" "$FAKEROOT/etc/$PROGRAM/sync.conf.example"
+		cp "./sync.conf.example" "$CONF_DIR/sync.conf.example"
 	fi
 
 	if [ -f "./host_backup.conf.example" ]; then
-		cp "./host_backup.conf.example" "$FAKEROOT/etc/$PROGRAM/host_backup.conf.example"
+		cp "./host_backup.conf.example" "$CONF_DIR/host_backup.conf.example"
 	fi
 
 	if [ -f "./exlude.list.example" ]; then
-		cp "./exclude.list.example" "$FAKEROOT/etc/$PROGRAM"
+		cp "./exclude.list.example" "$CONF_DIR/exclude.list.example"
 	fi
 
 	if [ -f "./snapshot.conf.example" ]; then
-		cp "./snapshot.conf.example" "$FAKEROOT/etc/$PROGRAM/snapshot.conf.example"
+		cp "./snapshot.conf.example" "$CONF_DIR/snapshot.conf.example"
+	fi
+
+	if [ -f "./default.conf" ]; then
+		if [ -f "$CONF_DIR/default.conf" ]; then
+			cp "./default.conf" "$CONF_DIR/default.conf.new"
+			QuickLogger "Copied default.conf to [$CONF_DIR/default.conf.new]."
+		else
+			cp "./default.conf" "$CONF_DIR/default.conf"
+		fi
 	fi
 }
 
@@ -200,7 +209,7 @@ function CopyServiceFiles {
 			QuickLogger "Cannot copy the systemd file to [$SERVICE_DIR_SYSTEMD_SYSTEM] or [$SERVICE_DIR_SYSTEMD_USER]."
 		else
 			QuickLogger "Created osync-srv service in [$SERVICE_DIR_SYSTEMD_SYSTEM] and [$SERVICE_DIR_SYSTEMD_USER]."
-			QuickLogger "Can be activated with [systemctl start osync-srv@instance.conf] where instance.conf is the name of the config file in /etc/osync."
+			QuickLogger "Can be activated with [systemctl start osync-srv@instance.conf] where instance.conf is the name of the config file in $CONF_DIR."
 			QuickLogger "Can be enabled on boot with [systemctl enable osync-srv@instance.conf]."
 			QuickLogger "In userland, active with [systemctl --user start osync-srv@instance.conf]."
 		fi
@@ -223,8 +232,8 @@ function CopyServiceFiles {
 			QuickLogger "Cannot copy the systemd file to [$SERVICE_DIR_SYSTEMD_SYSTEM] or [$SERVICE_DIR_SYSTEMD_USER]."
 		else
 			QuickLogger "Created pmocr-srv service in [$SERVICE_DIR_SYSTEMD_SYSTEM] and [$SERVICE_DIR_SYSTEMD_USER]."
-			QuickLogger "Can be activated with [systemctl start pmocr-srv] after configuring file options in [$BIN_DIR/$PROGRAM]."
-			QuickLogger "Can be enabled on boot with [systemctl enable pmocr-srv]."
+			QuickLogger "Can be activated with [systemctl start pmocr-srv@default.conf] where default.conf is the name of the config file in $CONF_DIR."
+			QuickLogger "Can be enabled on boot with [systemctl enable pmocr-srv@default.conf]."
 		fi
 	elif ([ "$init" == "initV" ] && [ -f "./$PMOCR_SERVICE_FILE_INIT" ]); then
 		cp "./$PMOCR_SERVICE_FILE_INIT" "$SERVICE_DIR_INIT"
