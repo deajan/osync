@@ -45,7 +45,7 @@ IS_STABLE=no
 
 #### MINIMAL-FUNCTION-SET BEGIN ####
 
-## FUNC_BUILD=2016090602
+## FUNC_BUILD=2016090701
 ## BEGIN Generic bash functions written in 2013-2016 by Orsiris de Jong - http://www.netpower.fr - ozy@netpower.fr
 
 ## To use in a program, define the following variables:
@@ -771,13 +771,16 @@ function WaitForTaskCompletion {
 
 # Take a list of commands to run, runs them sequentially with numberOfProcesses commands simultaneously runs
 # Returns the number of non zero exit codes from commands
+# Use cmd1;cmd2;cmd3 syntax for small sets, use file for large command sets
 function ParallelExec {
 	local numberOfProcesses="${1}" # Number of simultaneous commands to run
 	local commandsArg="${2}" # Semi-colon separated list of commands, or file containing one command per line
+	local readFromFile="${3:-false}" # Is commandsArg a file or a string ?
+
+	__CheckArguments 3 $# ${FUNCNAME[0]} "$@"				#__WITH_PARANOIA_DEBUG
 
 	local commandCount
 	local command
-	local readFromFile=false
 	local pid
 	local counter=0
 	local commandsArray
@@ -790,9 +793,12 @@ function ParallelExec {
 
 	local hasPids=false # Are any valable pids given to function ?		#__WITH_PARANOIA_DEBUG
 
-	if [ -f "$commandsArg" ]; then
-		commandCount=$(wc -l < "$commandsArg")
-		readFromFile=true
+	if [ $readFromFile == true ];then
+		if [ -f "$commandsArg" ]; then
+			commandCount=$(wc -l < "$commandsArg")
+		else
+			commandCount=0
+		fi
 	else
 		IFS=';' read -r -a commandsArray <<< "$commandsArg"
 		commandCount=${#commandsArray[@]}
@@ -804,6 +810,7 @@ function ParallelExec {
 
 		while [ $counter -lt "$commandCount" ] && [ ${#pidsArray[@]} -lt $numberOfProcesses ]; do
 			if [ $readFromFile == true ]; then
+				#TODO: Checked on FreeBSD 10, also check on Win
 				command=$(awk 'NR == num_line {print; exit}' num_line=$((counter+1)) "$commandsArg")
 			else
 				command="${commandsArray[$counter]}"
