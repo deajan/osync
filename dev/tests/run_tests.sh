@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-# osync test suite 2016090601
+# osync test suite 2016090801
 # TODO: Add big fileset tests (eg: drupal 8 ?), add soft deletion tests, add deletion propagation test, add file attrib test
 
 
@@ -209,13 +209,13 @@ function test_ParallelExec () {
 	echo "sleep 2" >> "$TMP_FILE"
 	echo "sleep 2" >> "$TMP_FILE"
 	echo "sleep 2" >> "$TMP_FILE"
-	ParallelExec 4 "$TMP_FILE"
+	ParallelExec 4 "$TMP_FILE" true
 	assertEquals "ParallelExec test 4" "0" $?
 
 	echo "sleep 2" > "$TMP_FILE"
 	echo "du /nome" >> "$TMP_FILE"
 	echo "sleep 2" >> "$TMP_FILE"
-	ParallelExec 2 "$TMP_FILE"
+	ParallelExec 2 "$TMP_FILE" true
 	assertEquals "ParallelExec test 5" "1" $?
 
 	echo "sleep 4" > "$TMP_FILE"
@@ -223,7 +223,7 @@ function test_ParallelExec () {
 	echo "sleep 3" >> "$TMP_FILE"
 	echo "du /none" >> "$TMP_FILE"
 	echo "sleep 2" >> "$TMP_FILE"
-	ParallelExec 3 "$TMP_FILE"
+	ParallelExec 3 "$TMP_FILE" true
 	assertEquals "ParallelExec test 6" "2" $?
 
 }
