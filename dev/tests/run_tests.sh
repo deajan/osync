@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-# osync test suite 2016091602
+# osync test suite 2016091603
 # TODO: Add big fileset tests (eg: drupal 8 ?), add soft deletion tests, add deletion propagation test, add file attrib test
 
 
@@ -45,7 +45,8 @@ fi
 
 INITIATOR_DIR="${HOME}/osync/initiator"
 TARGET_DIR="${HOME}/osync/target"
-OSYNC_STATE_DIR=".osync_workdir/state"
+OSYNC_WORKDIR=".osync_workdir"
+OSYNC_STATE_DIR="$OSYNC_WORKDIR/state"
 
 # Setup an array with all function modes
 declare -Ag osyncParameters
@@ -159,14 +160,14 @@ function test_Exclusions () {
 		PrepareLocalDirs
 		DownloadLargeFileSet "$INITIATOR_DIR"
 
-		numberOfPHPFiles=$(find "$INITIATOR_DIR" -name "*.php" | wc -l)
+		numberOfPHPFiles=$(find "$INITIATOR_DIR" ! -wholename "$INITIATOR_DIR/$OSYNC_WORKDIR*" -name "*.php" | wc -l)
 
 		RSYNC_EXCLUDE_PATTERN="*.php" ./$OSYNC_EXECUTABLE $i
 		assertEquals "Exclusions with parameters [$i]." "0" $?
 
 		#WIP Add real exclusion tests here
-		numberOfInitiatorFiles=$(find "$INITIATOR_DIR" ! -name "*OSYNC_STATE_DIR*" | wc -l)
-		numberOfTargetFiles=$(find "$TARGET_DIR" ! -name "*OSYNC_STATE_DIR*" | wc -l)
+		numberOfInitiatorFiles=$(find "$INITIATOR_DIR" ! -wholename "$INITIATOR_DIR/$OSYNC_WORKDIR*" | wc -l)
+		numberOfTargetFiles=$(find "$TARGET_DIR" ! -wholename "$TARGET_DIR/$OSYNC_WORKDIR*" | wc -l)
 		numberOfExcludedFiles=$((numberOfInitiatorFiles-numberOfTargetFiles))
 
 		assertEquals "Number of php files: $numberOfPHPFiles - Number of excluded files: $numberOfExcludedFiles" $numberOfPHPFiles $numberOfExcludedFiles
