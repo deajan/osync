@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-# osync test suite 2016091601
+# osync test suite 2016091602
 # TODO: Add big fileset tests (eg: drupal 8 ?), add soft deletion tests, add deletion propagation test, add file attrib test
 
 
@@ -150,6 +150,8 @@ function test_LargeFileSet () {
 function test_Exclusions () {
 	local numberOfPHPFiles
 	local numberOfExcludedFiles
+	local numberOfInitiatorFiles
+	local numberOfTargetFiles
 
 	for i in "${osyncParameters[@]}"; do
 		cd "$OSYNC_DIR"
@@ -163,7 +165,9 @@ function test_Exclusions () {
 		assertEquals "Exclusions with parameters [$i]." "0" $?
 
 		#WIP Add real exclusion tests here
-		numberOfExcludedFiles=$(diff -qr "$INITIATOR_DIR" "$TARGET_DIR" | wc -l)
+		numberOfInitiatorFiles=$(find "$INITIATOR_DIR" ! -name "*OSYNC_STATE_DIR*" | wc -l)
+		numberOfTargetFiles=$(find "$TARGET_DIR" ! -name "*OSYNC_STATE_DIR*" | wc -l)
+		numberOfExcludedFiles=$((numberOfInitiatorFiles-numberOfTargetFiles))
 
 		assertEquals "Number of php files: $numberOfPHPFiles - Number of excluded files: $numberOfExcludedFiles" $numberOfPHPFiles $numberOfExcludedFiles
 	done
