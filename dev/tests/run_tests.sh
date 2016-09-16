@@ -162,7 +162,7 @@ function test_Exclusions () {
 
 		numberOfPHPFiles=$(find "$INITIATOR_DIR" ! -wholename "$INITIATOR_DIR/$OSYNC_WORKDIR*" -name "*.php" | wc -l)
 
-		RSYNC_EXCLUDE_PATTERN="*.php" ./$OSYNC_EXECUTABLE $i
+		REMOTE_HOST_PING=no RSYNC_EXCLUDE_PATTERN="*.php" ./$OSYNC_EXECUTABLE $i
 		assertEquals "Exclusions with parameters [$i]." "0" $?
 
 		#WIP Add real exclusion tests here
