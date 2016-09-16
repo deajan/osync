@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-# osync test suite 2016090801
+# osync test suite 2016091601
 # TODO: Add big fileset tests (eg: drupal 8 ?), add soft deletion tests, add deletion propagation test, add file attrib test
 
 
@@ -20,6 +20,9 @@
 # softdelete deleted
 # softdelete backup
 # lock checks
+
+TEST_DISK=/dev/vda1
+LARGE_FILESET_URL="http://ftp.drupal.org/files/projects/drupal-8.1.9.tar.gz"
 
 OSYNC_DIR="$(pwd)"
 OSYNC_DIR=${OSYNC_DIR%%/dev*}
@@ -45,14 +48,14 @@ TARGET_DIR="${HOME}/osync/target"
 OSYNC_STATE_DIR=".osync_workdir/state"
 
 # Setup an array with all function modes
-declare -Ag osync_params
+declare -Ag osyncParameters
 
-osyncParameters[quicklocal]="--initiator=\"$INITIATOR_DIR\" --target=\"$TARGET_DIR\""
-osyncParameters[quickRemote]="--initiator=\"$INITIATOR_DIR\" --target=\"ssh://localhost:$SSH_PORT/$TARGET_DIR\" --rsakey=\"${HOME}/.ssh/id_rsa_local\""
-osyncParameters[confLocal]="$CONF_DIR/local.conf"
-osyncParameters[confRemote]="$CONF_DIR/remote.conf"
-osyncParameters[daemonlocal]="$CONF_DIR/local.conf --on-changes"
-osyncParameters[daemonlocal]="$CONF_DIR/remote.conf --on-changes"
+osyncParameters[quicklocal]="--initiator=$INITIATOR_DIR --target=$TARGET_DIR"
+osyncParameters[quickRemote]="--initiator=$INITIATOR_DIR --target=ssh://localhost:$SSH_PORT/$TARGET_DIR --rsakey=${HOME}/.ssh/id_rsa_local"
+#osyncParameters[confLocal]="$CONF_DIR/local.conf"
+#osyncParameters[confRemote]="$CONF_DIR/remote.conf"
+#osyncParameters[daemonlocal]="$CONF_DIR/local.conf --on-changes"
+#osyncParameters[daemonlocal]="$CONF_DIR/remote.conf --on-changes"
 
 function SetStableToYes () {
 	if grep "^IS_STABLE=YES" "$OSYNC_DIR/$OSYNC_EXECUTABLE" > /dev/null; then
@@ -82,7 +85,29 @@ function SetupSSH {
 	fi
 }
 
-function setUp () {
+function DownloadLargeFileSet() {
+	local destinationPath="${1}"
+
+	cd "$OSYNC_DIR"
+	wget -q "$LARGE_FILESET_URL" > /dev/null
+	assertEquals "Download [$LARGE_FILESET_URL]." "0" $?
+
+	tar xvf $(basename "$LARGE_FILESET_URL") -C "$destinationPath" > /dev/null
+	assertEquals "Extract $(basename $LARGE_FILESET_URL)" "0" $?
+}
+
+function CreateOldFile () {
+	local filePath="${1}"
+
+	debugfs -w -R 'set_inode_field "$filePath" ctime 201001010101' "$TEST_DISK"
+	assertEquals "CreateOldFile [$filePath]" "0" $?
+
+	echo > /proc/sys/vm/drop_caches
+	assertEquals "Drop caches" "0" $?
+}
+
+function PrepareLocalDirs () {
+	# Remote dirs are the same as local dirs, so no problem here
 	if [ -d "$INITIATOR_DIR" ]; then
 		rm -rf "$INITIATOR_DIR"
 	fi
@@ -108,6 +133,40 @@ function test_Merge () {
 	./merge.sh
 	assertEquals "Merging code" "0" $?
 	SetStableToYes
+}
+
+function test_LargeFileSet () {
+	for i in "${osyncParameters[@]}"; do
+		cd "$OSYNC_DIR"
+
+		PrepareLocalDirs
+		DownloadLargeFileSet "$INITIATOR_DIR"
+
+		REMOTE_HOST_PING=no ./$OSYNC_EXECUTABLE $i
+		assertEquals "LargeFileSet test with parameters [$i]." "0" $?
+	done
+}
+
+function test_Exclusions () {
+	local numberOfPHPFiles
+	local numberOfExcludedFiles
+
+	for i in "${osyncParameters[@]}"; do
+		cd "$OSYNC_DIR"
+
+		PrepareLocalDirs
+		DownloadLargeFileSet "$INITIATOR_DIR"
+
+		numberOfPHPFiles=$(find "$INITIATOR_DIR" -name "*.php" | wc -l)
+
+		RSYNC_EXCLUDE_PATTERN="*.php" ./$OSYNC_EXECUTABLE $i
+		assertEquals "Exclusions with parameters [$i]." "0" $?
+
+		#WIP Add real exclusion tests here
+		numberOfExcludedFiles=$(diff -qr "$INITIATOR_DIR" "$TARGET_DIR" | wc -l)
+
+		assertEquals "Number of php files: $numberOfPHPFiles - Number of excluded files: $numberOfExcludedFiles" $numberOfPHPFiles $numberOfExcludedFiles
+	done
 }
 
 function test_osync_quicksync_local () {
