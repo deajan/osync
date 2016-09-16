@@ -1,6 +1,6 @@
 #### MINIMAL-FUNCTION-SET BEGIN ####
 
-## FUNC_BUILD=2016090701
+## FUNC_BUILD=2016091601
 ## BEGIN Generic bash functions written in 2013-2016 by Orsiris de Jong - http://www.netpower.fr - ozy@netpower.fr
 
 ## To use in a program, define the following variables:
@@ -103,9 +103,9 @@ function _Logger {
 	local evalue="${3}" # What to log to stderr
 
 	echo -e "$lvalue" >> "$LOG_FILE"
-	CURRENT_LOG="$CURRENT_LOG"$'\n'"$lvalue"
+	CURRENT_LOG="$CURRENT_LOG"$'\n'"$lvalue" #WIP
 
-	if [ $_LOGGER_STDERR == true ]; then
+	if [ $_LOGGER_STDERR == true ] && [ "$evalue" != "" ]; then
 		cat <<< "$evalue" 1>&2
 	elif [ "$_SILENT" == false ]; then
 		echo -e "$svalue"
@@ -267,7 +267,7 @@ function SendAlert {
 	fi
 
 	# <OSYNC SPECIFIC>
-	if [ "$_QUICK_SYNC" == "2" ]; then
+	if [ "$_QUICK_SYNC" -eq 2 ]; then
 		Logger "Current task is a quicksync task. Will not send any alert." "NOTICE"
 		return 0
 	fi
@@ -823,8 +823,6 @@ function CleanUp {
 	fi
 }
 
-#### MINIMAL-FUNCTION-SET END ####
-
 # obsolete, use StripQuotes
 function SedStripQuotes {
 	echo $(echo $1 | sed "s/^\([\"']\)\(.*\)\1\$/\2/g")
@@ -949,6 +947,8 @@ function GetLocalOS {
 	esac
 	Logger "Local OS: [$local_os_var]." "DEBUG"
 }
+
+#### MINIMAL-FUNCTION-SET END ####
 
 function GetRemoteOS {
 	__CheckArguments 0 $# ${FUNCNAME[0]} "$@"	#__WITH_PARANOIA_DEBUG
@@ -1132,7 +1132,7 @@ function CheckConnectivityRemoteHost {
 			WaitForTaskCompletion $! 60 180 ${FUNCNAME[0]} true $KEEP_LOGGING
 			retval=$?
 			if [ $retval != 0 ]; then
-				Logger "Cannot ping [$REMOTE_HOST]. Return code [$retval]." "ERROR"
+				Logger "Cannot ping [$REMOTE_HOST]. Return code [$retval]." "WARN"
 				return $retval
 			fi
 		fi
@@ -1162,7 +1162,7 @@ function CheckConnectivity3rdPartyHosts {
 			done
 
 			if [ $remote_3rd_party_success == false ]; then
-				Logger "No remote 3rd party host responded to ping. No internet ?" "ERROR"
+				Logger "No remote 3rd party host responded to ping. No internet ?" "WARN"
 				return 1
 			else
 				return 0
@@ -1284,7 +1284,8 @@ function RsyncPatterns {
 		if [ "$RSYNC_INCLUDE_FROM" != "" ]; then
 			RsyncPatternsFromAdd "include" "$RSYNC_INCLUDE_FROM"
 		fi
-	elif [ "$RSYNC_PATTERN_FIRST" == "include" ]; then
+	# Use default include first for quicksync runs
+	elif [ "$RSYNC_PATTERN_FIRST" == "include" ] || [ $_QUICK_SYNC -eq 2 ]; then
 		if [ "$RSYNC_INCLUDE_PATTERN" != "" ]; then
 			RsyncPatternsAdd "include" "$RSYNC_INCLUDE_PATTERN"
 		fi
@@ -1487,6 +1488,19 @@ function InitRemoteOSSettings {
 ## IFS debug function
 function PrintIFS {
 	printf "IFS is: %q" "$IFS"
+}
+
+# Process debugging
+# Recursive function to get all parents from a pid
+function ParentPid {
+	local pid="${1}" # Pid to analyse
+	local parent
+
+	parent=$(ps -p $pid -o ppid=)
+	echo "$pid is a child of $parent"
+	if [ $parent -gt 0 ]; then
+		ParentPid $parent
+	fi
 }
 
 ## END Generic functions
