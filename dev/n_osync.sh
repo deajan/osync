@@ -4,7 +4,7 @@ PROGRAM="osync" # Rsync based two way sync engine with fault tolerance
 AUTHOR="(C) 2013-2016 by Orsiris de Jong"
 CONTACT="http://www.netpower.fr/osync - ozy@netpower.fr"
 PROGRAM_VERSION=1.2-beta
-PROGRAM_BUILD=2016091602
+PROGRAM_BUILD=2016091603
 IS_STABLE=no
 
 # Execution order						#__WITH_PARANOIA_DEBUG
@@ -272,7 +272,7 @@ function _CheckDiskSpaceRemote {
 	local replica_path="${1}"
 	__CheckArguments 1 $# ${FUNCNAME[0]} "$@"	#__WITH_PARANOIA_DEBUG
 
-	Logger "Checking minimum disk space on target [$replica_path]." "NOTICE"
+	Logger "Checking remote minimum disk space in [$replica_path]." "NOTICE"
 
 	local cmd
 	local disk_space
