@@ -4,7 +4,7 @@ PROGRAM="osync" # Rsync based two way sync engine with fault tolerance
 AUTHOR="(C) 2013-2016 by Orsiris de Jong"
 CONTACT="http://www.netpower.fr/osync - ozy@netpower.fr"
 PROGRAM_VERSION=1.2-beta
-PROGRAM_BUILD=2016083004
+PROGRAM_BUILD=2016091601
 IS_STABLE=no
 
 # Execution order						#__WITH_PARANOIA_DEBUG
@@ -479,21 +479,21 @@ function CheckLocks {
 
 function _WriteLockFilesLocal {
 	local lockfile="${1}"
-	local replica_type="${2}"
+	local replicaType="${2}"
 	__CheckArguments 2 $# ${FUNCNAME[0]} "$@"	#__WITH_PARANOIA_DEBUG
 
 	$COMMAND_SUDO echo "$SCRIPT_PID@$INSTANCE_ID" > "$lockfile"
 	if [ $?	!= 0 ]; then
-		Logger "Could not create lock file on local $replica_type in [$lockfile]." "CRITICAL"
+		Logger "Could not create lock file on local $replicaType in [$lockfile]." "CRITICAL"
 		exit 1
 	else
-		Logger "Locked local $replica_type replica in [$lockfile]." "DEBUG"
+		Logger "Locked local $replicaType replica in [$lockfile]." "DEBUG"
 	fi
 }
 
 function _WriteLockFilesRemote {
 	local lockfile="${1}"
-	local replica_type="${2}"
+	local replicaType="${2}"
 	__CheckArguments 2 $# ${FUNCNAME[0]} "$@"	#__WITH_PARANOIA_DEBUG
 
 	local cmd
@@ -505,10 +505,10 @@ function _WriteLockFilesRemote {
 	Logger "cmd: $cmd" "DEBUG"
 	eval "$cmd"
 	if [ $? != 0 ]; then
-		Logger "Could not create lock file on remote $replica_type in [$lockfile]." "CRITICAL"
+		Logger "Could not create lock file on remote $replicaType in [$lockfile]." "CRITICAL"
 		exit 1
 	else
-		Logger "Locked remote $replica_type replica in [$lockfile]." "DEBUG"
+		Logger "Locked remote $replicaType replica in [$lockfile]." "DEBUG"
 	fi
 }
 
@@ -622,8 +622,8 @@ function UnlockReplicas {
 
 function tree_list {
 	local replica_path="${1}" # path to the replica for which a tree needs to be constructed
-	local replica_type="${2}" # replica type: initiator, target
-	local tree_filename="${3}" # filename to output tree (will be prefixed with $replica_type)
+	local replicaType="${2}" # replica type: initiator, target
+	local tree_filename="${3}" # filename to output tree (will be prefixed with $replicaType)
 
 	local escaped_replica_path
 	local rsync_cmd
@@ -632,13 +632,13 @@ function tree_list {
 
 	escaped_replica_path=$(EscapeSpaces "$replica_path")
 
-	Logger "Creating $replica_type replica file list [$replica_path]." "NOTICE"
-	if [ "$REMOTE_OPERATION" == "yes" ] && [ "$replica_type" == "${TARGET[$__type]}" ]; then
+	Logger "Creating $replicaType replica file list [$replica_path]." "NOTICE"
+	if [ "$REMOTE_OPERATION" == "yes" ] && [ "$replicaType" == "${TARGET[$__type]}" ]; then
 		CheckConnectivity3rdPartyHosts
 		CheckConnectivityRemoteHost
-		rsync_cmd="$(type -p $RSYNC_EXECUTABLE) --rsync-path=\"$RSYNC_PATH\" $RSYNC_ARGS $RSYNC_ATTR_ARGS $RSYNC_TYPE_ARGS -8 --exclude \"$OSYNC_DIR\" $RSYNC_PATTERNS $RSYNC_PARTIAL_EXCLUDE -e \"$RSYNC_SSH_CMD\" --list-only $REMOTE_USER@$REMOTE_HOST:\"$escaped_replica_path/\" | grep \"^-\|^d\" | awk '{\$1=\$2=\$3=\$4=\"\" ;print}' | awk '{\$1=\$1 ;print}' | (grep -v \"^\.$\" || :) | sort > \"$RUN_DIR/$PROGRAM.$replica_type.$SCRIPT_PID\""
+		rsync_cmd="$(type -p $RSYNC_EXECUTABLE) --rsync-path=\"$RSYNC_PATH\" $RSYNC_ARGS $RSYNC_ATTR_ARGS $RSYNC_TYPE_ARGS -8 --exclude \"$OSYNC_DIR\" $RSYNC_PATTERNS $RSYNC_PARTIAL_EXCLUDE -e \"$RSYNC_SSH_CMD\" --list-only $REMOTE_USER@$REMOTE_HOST:\"$escaped_replica_path/\" | grep \"^-\|^d\" | awk '{\$1=\$2=\$3=\$4=\"\" ;print}' | awk '{\$1=\$1 ;print}' | (grep -v \"^\.$\" || :) | sort > \"$RUN_DIR/$PROGRAM.$replicaType.$SCRIPT_PID\""
 	else
-		rsync_cmd="$(type -p $RSYNC_EXECUTABLE) --rsync-path=\"$RSYNC_PATH\" $RSYNC_ARGS $RSYNC_ATTR_ARGS $RSYNC_TYPE_ARGS -8 --exclude \"$OSYNC_DIR\" $RSYNC_PATTERNS $RSYNC_PARTIAL_EXCLUDE --list-only \"$replica_path/\" | grep \"^-\|^d\" | awk '{\$1=\$2=\$3=\$4=\"\" ;print}' | awk '{\$1=\$1 ;print}' | (grep -v \"^\.$\" || :) | sort > \"$RUN_DIR/$PROGRAM.$replica_type.$SCRIPT_PID\""
+		rsync_cmd="$(type -p $RSYNC_EXECUTABLE) --rsync-path=\"$RSYNC_PATH\" $RSYNC_ARGS $RSYNC_ATTR_ARGS $RSYNC_TYPE_ARGS -8 --exclude \"$OSYNC_DIR\" $RSYNC_PATTERNS $RSYNC_PARTIAL_EXCLUDE --list-only \"$replica_path/\" | grep \"^-\|^d\" | awk '{\$1=\$2=\$3=\$4=\"\" ;print}' | awk '{\$1=\$1 ;print}' | (grep -v \"^\.$\" || :) | sort > \"$RUN_DIR/$PROGRAM.$replicaType.$SCRIPT_PID\""
 	fi
 	Logger "RSYNC_CMD: $rsync_cmd" "DEBUG"
 	## Redirect commands stderr here to get rsync stderr output in logfile with eval "$rsync_cmd" 2>> "$LOG_FILE"
@@ -646,8 +646,8 @@ function tree_list {
 	eval "$rsync_cmd"
 	retval=$?
 	## Retval 24 = some files vanished while creating list
-	if ([ $retval == 0 ] || [ $retval == 24 ]) && [ -f "$RUN_DIR/$PROGRAM.$replica_type.$SCRIPT_PID" ]; then
-		mv -f "$RUN_DIR/$PROGRAM.$replica_type.$SCRIPT_PID" "${INITIATOR[$__replicaDir]}${INITIATOR[$__stateDir]}/$replica_type$tree_filename"
+	if ([ $retval == 0 ] || [ $retval == 24 ]) && [ -f "$RUN_DIR/$PROGRAM.$replicaType.$SCRIPT_PID" ]; then
+		mv -f "$RUN_DIR/$PROGRAM.$replicaType.$SCRIPT_PID" "${INITIATOR[$__replicaDir]}${INITIATOR[$__stateDir]}/$replicaType$tree_filename"
 		return $?
 	else
 		Logger "Cannot create replica file list in [$replica_path]." "CRITICAL"
@@ -657,7 +657,7 @@ function tree_list {
 
 # delete_list(replica, tree-file-after, tree-file-current, deleted-list-file, deleted-failed-list-file): Creates a list of files vanished from last run on replica $1 (initiator/target)
 function delete_list {
-	local replica_type="${1}" # replica type: initiator, target
+	local replicaType="${1}" # replica type: initiator, target
 	local tree_file_after="${2}" # tree-file-after, will be prefixed with replica type
 	local tree_file_current="${3}" # tree-file-current, will be prefixed with replica type
 	local deleted_list_file="${4}" # file containing deleted file list, will be prefixed with replica type
@@ -666,14 +666,14 @@ function delete_list {
 
 	local cmd
 
-	Logger "Creating $replica_type replica deleted file list." "NOTICE"
-	if [ -f "${INITIATOR[$__replicaDir]}${INITIATOR[$__stateDir]}/$replica_type${INITIATOR[$__treeAfterFile]}_NO_SUFFIX" ]; then
+	Logger "Creating $replicaType replica deleted file list." "NOTICE"
+	if [ -f "${INITIATOR[$__replicaDir]}${INITIATOR[$__stateDir]}/$replicaType${INITIATOR[$__treeAfterFile]}_NO_SUFFIX" ]; then
 		## Same functionnality, comm is much faster than grep but is not available on every platform
 		if type comm > /dev/null 2>&1 ; then
-			cmd="comm -23 \"${INITIATOR[$__replicaDir]}${INITIATOR[$__stateDir]}/$replica_type${INITIATOR[$__treeAfterFileNoSuffix]}\" \"${INITIATOR[$__replicaDir]}${INITIATOR[$__stateDir]}/$replica_type$tree_file_current\" > \"${INITIATOR[$__replicaDir]}${INITIATOR[$__stateDir]}/$replica_type$deleted_list_file\""
+			cmd="comm -23 \"${INITIATOR[$__replicaDir]}${INITIATOR[$__stateDir]}/$replicaType${INITIATOR[$__treeAfterFileNoSuffix]}\" \"${INITIATOR[$__replicaDir]}${INITIATOR[$__stateDir]}/$replicaType$tree_file_current\" > \"${INITIATOR[$__replicaDir]}${INITIATOR[$__stateDir]}/$replicaType$deleted_list_file\""
 		else
 			## The || : forces the command to have a good result
-			cmd="(grep -F -x -v -f \"${INITIATOR[$__replicaDir]}${INITIATOR[$__stateDir]}/$replica_type$tree_file_current\" \"${INITIATOR[$__replicaDir]}${INITIATOR[$__stateDir]}/$replica_type${INITIATOR[$__treeAfterFileNoSuffix]}\" || :) > \"${INITIATOR[$__replicaDir]}${INITIATOR[$__stateDir]}/$replica_type$deleted_list_file\""
+			cmd="(grep -F -x -v -f \"${INITIATOR[$__replicaDir]}${INITIATOR[$__stateDir]}/$replicaType$tree_file_current\" \"${INITIATOR[$__replicaDir]}${INITIATOR[$__stateDir]}/$replicaType${INITIATOR[$__treeAfterFileNoSuffix]}\" || :) > \"${INITIATOR[$__replicaDir]}${INITIATOR[$__stateDir]}/$replicaType$deleted_list_file\""
 		fi
 
 		Logger "CMD: $cmd" "DEBUG"
@@ -681,30 +681,30 @@ function delete_list {
 		retval=$?
 
 		# Add delete failed file list to current delete list and then empty it
-		if [ -f "${INITIATOR[$__replicaDir]}${INITIATOR[$__stateDir]}/$replica_type$deleted_failed_list_file" ]; then
-			cat "${INITIATOR[$__replicaDir]}${INITIATOR[$__stateDir]}/$replica_type$deleted_failed_list_file" >> "${INITIATOR[$__replicaDir]}${INITIATOR[$__stateDir]}/$replica_type$deleted_list_file"
-			rm -f "${INITIATOR[$__replicaDir]}${INITIATOR[$__stateDir]}/$replica_type$deleted_failed_list_file"
+		if [ -f "${INITIATOR[$__replicaDir]}${INITIATOR[$__stateDir]}/$replicaType$deleted_failed_list_file" ]; then
+			cat "${INITIATOR[$__replicaDir]}${INITIATOR[$__stateDir]}/$replicaType$deleted_failed_list_file" >> "${INITIATOR[$__replicaDir]}${INITIATOR[$__stateDir]}/$replicaType$deleted_list_file"
+			rm -f "${INITIATOR[$__replicaDir]}${INITIATOR[$__stateDir]}/$replicaType$deleted_failed_list_file"
 		fi
 
 		return $retval
 	else
-		touch "${INITIATOR[$__replicaDir]}${INITIATOR[$__stateDir]}/$replica_type$deleted_list_file"
+		touch "${INITIATOR[$__replicaDir]}${INITIATOR[$__stateDir]}/$replicaType$deleted_list_file"
 		return $retval
 	fi
 }
 
 function _get_file_ctime_mtime_local {
 	local replica_path="${1}" # Contains replica path
-	local replica_type="${2}" # Initiator / Target
+	local replicaType="${2}" # Initiator / Target
 	local file_list="${3}" # Contains list of files to get time attrs
 	__CheckArguments 3 $# ${FUNCNAME[0]} "$@"	#__WITH_PARANOIA_DEBUG
 
-	echo -n "" > "$RUN_DIR/$PROGRAM.ctime_mtime.$replica_type.$SCRIPT_PID"
-	while read -r file; do $STAT_CTIME_MTIME_CMD "$replica_path$file" | sort >> "$RUN_DIR/$PROGRAM.ctime_mtime.$replica_type.$SCRIPT_PID"; done < "$file_list"
+	echo -n "" > "$RUN_DIR/$PROGRAM.ctime_mtime.$replicaType.$SCRIPT_PID"
+	while read -r file; do $STAT_CTIME_MTIME_CMD "$replica_path$file" | sort >> "$RUN_DIR/$PROGRAM.ctime_mtime.$replicaType.$SCRIPT_PID"; done < "$file_list"
 	if [ $? != 0 ]; then
-		Logger "Getting file attributes failed [$retval] on $replica_type. Stopping execution." "CRITICAL"
-		if [ -f "$RUN_DIR/$PROGRAM.ctime_mtime.$replica_type.$SCRIPT_PID" ]; then
-			Logger "Command output:\n$(cat $RUN_DIR/$PROGRAM.ctime_mtime.$replica_type.$SCRIPT_PID)" "VERBOSE"
+		Logger "Getting file attributes failed [$retval] on $replicaType. Stopping execution." "CRITICAL"
+		if [ -f "$RUN_DIR/$PROGRAM.ctime_mtime.$replicaType.$SCRIPT_PID" ]; then
+			Logger "Command output:\n$(cat $RUN_DIR/$PROGRAM.ctime_mtime.$replicaType.$SCRIPT_PID)" "VERBOSE"
 		fi
 		exit 1
 	fi
@@ -713,19 +713,19 @@ function _get_file_ctime_mtime_local {
 
 function _get_file_ctime_mtime_remote {
 	local replica_path="${1}" # Contains replica path
-	local replica_type="${2}"
+	local replicaType="${2}"
 	local file_list="${3}"
 	__CheckArguments 3 $# ${FUNCNAME[0]} "$@"	#__WITH_PARANOIA_DEBUG
 
 	local cmd
 
-	cmd='cat "'$file_list'" | '$SSH_CMD' "while read -r file; do '$REMOTE_STAT_CTIME_MTIME_CMD' \"'$replica_path'\$file\"; done | sort" > "'$RUN_DIR/$PROGRAM.ctime_mtime.$replica_type.$SCRIPT_PID'"'
+	cmd='cat "'$file_list'" | '$SSH_CMD' "while read -r file; do '$REMOTE_STAT_CTIME_MTIME_CMD' \"'$replica_path'\$file\"; done | sort" > "'$RUN_DIR/$PROGRAM.ctime_mtime.$replicaType.$SCRIPT_PID'"'
 	Logger "CMD: $cmd" "DEBUG"
 	eval "$cmd"
 	if [ $? != 0 ]; then
-		Logger "Getting file attributes failed [$retval] on $replica_type. Stopping execution." "CRITICAL"
-		if [ -f "$RUN_DIR/$PROGRAM.ctime_mtime.$replica_type.$SCRIPT_PID" ]; then
-			Logger "Command output:\n$(cat $RUN_DIR/$PROGRAM.ctime_mtime.$replica_type.$SCRIPT_PID)" "VERBOSE"
+		Logger "Getting file attributes failed [$retval] on $replicaType. Stopping execution." "CRITICAL"
+		if [ -f "$RUN_DIR/$PROGRAM.ctime_mtime.$replicaType.$SCRIPT_PID" ]; then
+			Logger "Command output:\n$(cat $RUN_DIR/$PROGRAM.ctime_mtime.$replicaType.$SCRIPT_PID)" "VERBOSE"
 		fi
 		exit 1
 	fi
@@ -1128,7 +1128,7 @@ ENDSSH
 
 # delete_propagation(replica name, deleted_list_filename, deleted_failed_file_list)
 function deletion_propagation {
-	local replica_type="${1}" # Contains replica type: initiator, target
+	local replicaType="${1}" # Contains replica type: initiator, target
 	local deleted_list_file="${2}" # file containing deleted file list, will be prefixed with replica type
 	local deleted_failed_list_file="${3}" # file containing files that could not be deleted on last run, will be prefixed with replica type
 	__CheckArguments 3 $# ${FUNCNAME[0]} "$@"	#__WITH_PARANOIA_DEBUG
@@ -1136,16 +1136,16 @@ function deletion_propagation {
 	local replica_dir
 	local delete_dir
 
-	Logger "Propagating deletions to $replica_type replica." "NOTICE"
+	Logger "Propagating deletions to $replicaType replica." "NOTICE"
 
-	if [ "$replica_type" == "${INITIATOR[$__type]}" ]; then
+	if [ "$replicaType" == "${INITIATOR[$__type]}" ]; then
 		replica_dir="${INITIATOR[$__replicaDir]}"
 		delete_dir="${INITIATOR[$__deleteDir]}"
 
 		_delete_local "$replica_dir" "${TARGET[$__type]}$deleted_list_file" "$delete_dir" "${TARGET[$__type]}$deleted_failed_list_file"
 		retval=$?
 		if [ $retval != 0 ]; then
-			Logger "Deletion on replica $replica_type failed." "CRITICAL"
+			Logger "Deletion on replica $replicaType failed." "CRITICAL"
 			exit 1
 		fi
 	else
@@ -1491,51 +1491,52 @@ function Sync {
 }
 
 function _SoftDeleteLocal {
-	local replica_type="${1}" # replica type (initiator, target)
+	local replicaType="${1}" # replica type (initiator, target)
 	local replica_deletion_path="${2}" # Contains the full path to softdelete / backup directory without ending slash
-	local change_time="${3}"
+	local changeTime="${3}"
+
 	__CheckArguments 3 $# ${FUNCNAME[0]} "$@"	#__WITH_PARANOIA_DEBUG
 
 	local retval
 
 	if [ -d "$replica_deletion_path" ]; then
 		if [ $_DRYRUN == true ]; then
-			Logger "Listing files older than $change_time days on $replica_type replica. Does not remove anything." "NOTICE"
+			Logger "Listing files older than $changeTime days on $replicaType replica. Does not remove anything." "NOTICE"
 		else
-			Logger "Removing files older than $change_time days on $replica_type replica." "NOTICE"
+			Logger "Removing files older than $changeTime days on $replicaType replica." "NOTICE"
 		fi
 
 		if [ $_VERBOSE == true ]; then
 			# Cannot launch log function from xargs, ugly hack
-			$COMMAND_SUDO $FIND_CMD "$replica_deletion_path/" -type f -ctime +$change_time -print0 | xargs -0 -I {} echo "Will delete file {}" >> "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$SCRIPT_PID"
+			$COMMAND_SUDO $FIND_CMD "$replica_deletion_path/" -type f -ctime +$changeTime -print0 | xargs -0 -I {} echo "Will delete file {}" >> "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$SCRIPT_PID"
 			Logger "Command output:\n$(cat $RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$SCRIPT_PID)" "VERBOSE"
-			$COMMAND_SUDO $FIND_CMD "$replica_deletion_path/" -type d -empty -ctime +$change_time -print0 | xargs -0 -I {} echo "Will delete directory {}" >> "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$SCRIPT_PID"
+			$COMMAND_SUDO $FIND_CMD "$replica_deletion_path/" -type d -empty -ctime +$changeTime -print0 | xargs -0 -I {} echo "Will delete directory {}" >> "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$SCRIPT_PID"
 			Logger "Command output:\n$(cat $RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$SCRIPT_PID)" "VERBOSE"
 		fi
 
 		if [ $_DRYRUN == false ]; then
-			$COMMAND_SUDO $FIND_CMD "$replica_deletion_path/" -type f -ctime +$change_time -print0 | xargs -0 -I {} $COMMAND_SUDO rm -f "{}" && $COMMAND_SUDO $FIND_CMD "$replica_deletion_path/" -type d -empty -ctime +$change_time -print0 | xargs -0 -I {} $COMMAND_SUDO rm -rf "{}" >> "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$SCRIPT_PID" 2>&1
+			$COMMAND_SUDO $FIND_CMD "$replica_deletion_path/" -type f -ctime +$changeTime -print0 | xargs -0 -I {} $COMMAND_SUDO rm -f "{}" && $COMMAND_SUDO $FIND_CMD "$replica_deletion_path/" -type d -empty -ctime +$changeTime -print0 | xargs -0 -I {} $COMMAND_SUDO rm -rf "{}" >> "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$SCRIPT_PID" 2>&1
 		else
 			Dummy
 		fi
 		retval=$?
 		if [ $retval -ne 0 ]; then
-			Logger "Error while executing cleanup on $replica_type replica." "ERROR"
+			Logger "Error while executing cleanup on $replicaType replica." "ERROR"
 			Logger "Command output:\n$(cat $RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$SCRIPT_PID)" "NOTICE"
 		else
-			Logger "Cleanup complete on $replica_type replica." "NOTICE"
+			Logger "Cleanup complete on $replicaType replica." "NOTICE"
 		fi
 	elif [ -d "$replica_deletion_path" ] && ! [ -w "$replica_deletion_path" ]; then
-		Logger "The $replica_type replica dir [$replica_deletion_path] is not writable. Cannot clean old files." "ERROR"
+		Logger "The $replicaType replica dir [$replica_deletion_path] is not writable. Cannot clean old files." "ERROR"
 	else
-		Logger "The $replica_type replica dir [$replica_deletion_path] does not exist. Skipping cleaning of old files." "VERBOSE"
+		Logger "The $replicaType replica dir [$replica_deletion_path] does not exist. Skipping cleaning of old files." "VERBOSE"
 	fi
 }
 
 function _SoftDeleteRemote {
-	local replica_type="${1}"
+	local replicaType="${1}"
 	local replica_deletion_path="${2}" # Contains the full path to softdelete / backup directory without ending slash
-	local change_time="${3}"
+	local changeTime="${3}"
 	__CheckArguments 3 $# ${FUNCNAME[0]} "$@"	#__WITH_PARANOIA_DEBUG
 
 	local retval
@@ -1544,21 +1545,21 @@ function _SoftDeleteRemote {
 	CheckConnectivityRemoteHost
 
 	if [ $_DRYRUN == true ]; then
-		Logger "Listing files older than $change_time days on $replica_type replica. Does not remove anything." "NOTICE"
+		Logger "Listing files older than $changeTime days on $replicaType replica. Does not remove anything." "NOTICE"
 	else
-		Logger "Removing files older than $change_time days on $replica_type replica." "NOTICE"
+		Logger "Removing files older than $changeTime days on $replicaType replica." "NOTICE"
 	fi
 
 	if [ $_VERBOSE == true ]; then
 		# Cannot launch log function from xargs, ugly hack
-		cmd=$SSH_CMD' "if [ -d \"'$replica_deletion_path'\" ]; then '$COMMAND_SUDO' '$REMOTE_FIND_CMD' \"'$replica_deletion_path'/\" -type f -ctime +'$change_time' -print0 | xargs -0 -I {} echo Will delete file {} && '$COMMAND_SUDO' '$REMOTE_FIND_CMD' \"'$replica_deletion_path'/\" -type d -empty -ctime '$change_time' -print0 | xargs -0 -I {} echo Will delete directory {}; else echo \"The $replica_type replica dir [$replica_deletion_path] does not exist. Skipping cleaning of old files.\"; fi" > "'$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$SCRIPT_PID'" 2>&1'
+		cmd=$SSH_CMD' "if [ -d \"'$replica_deletion_path'\" ]; then '$COMMAND_SUDO' '$REMOTE_FIND_CMD' \"'$replica_deletion_path'/\" -type f -ctime +'$changeTime' -print0 | xargs -0 -I {} echo Will delete file {} && '$COMMAND_SUDO' '$REMOTE_FIND_CMD' \"'$replica_deletion_path'/\" -type d -empty -ctime '$changeTime' -print0 | xargs -0 -I {} echo Will delete directory {}; else echo \"The $replicaType replica dir [$replica_deletion_path] does not exist. Skipping cleaning of old files.\"; fi" > "'$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$SCRIPT_PID'" 2>&1'
 		Logger "cmd: $cmd" "DEBUG"
 		eval "$cmd"
 		Logger "Command output:\n$(cat $RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$SCRIPT_PID)" "VERBOSE"
 	fi
 
 	if [ $_DRYRUN == false ]; then
-		cmd=$SSH_CMD' "if [ -d \"'$replica_deletion_path'\" ]; then '$COMMAND_SUDO' '$REMOTE_FIND_CMD' \"'$replica_deletion_path'/\" -type f -ctime +'$change_time' -print0 | xargs -0 -I {} '$COMMAND_SUDO' rm -f \"{}\" && '$COMMAND_SUDO' '$REMOTE_FIND_CMD' \"'$replica_deletion_path'/\" -type d -empty -ctime '$change_time' -print0 | xargs -0 -I {} '$COMMAND_SUDO' rm -rf \"{}\"; else echo \"The $replica_type replica_dir [$replica_deletion_path] does not exist. Skipping cleaning of old files.\"; fi" >> "'$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$SCRIPT_PID'" 2>&1'
+		cmd=$SSH_CMD' "if [ -d \"'$replica_deletion_path'\" ]; then '$COMMAND_SUDO' '$REMOTE_FIND_CMD' \"'$replica_deletion_path'/\" -type f -ctime +'$changeTime' -print0 | xargs -0 -I {} '$COMMAND_SUDO' rm -f \"{}\" && '$COMMAND_SUDO' '$REMOTE_FIND_CMD' \"'$replica_deletion_path'/\" -type d -empty -ctime '$changeTime' -print0 | xargs -0 -I {} '$COMMAND_SUDO' rm -rf \"{}\"; else echo \"The $replicaType replica_dir [$replica_deletion_path] does not exist. Skipping cleaning of old files.\"; fi" >> "'$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$SCRIPT_PID'" 2>&1'
 
 		Logger "cmd: $cmd" "DEBUG"
 		eval "$cmd"
@@ -1567,10 +1568,10 @@ function _SoftDeleteRemote {
 	fi
 	retval=$?
 	if [ $retval -ne 0 ]; then
-		Logger "Error while executing cleanup on remote $replica_type replica." "ERROR"
+		Logger "Error while executing cleanup on remote $replicaType replica." "ERROR"
 		Logger "Command output:\n$(cat $RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$SCRIPT_PID)" "NOTICE"
 	else
-		Logger "Cleanup complete on $replica_type replica." "NOTICE"
+		Logger "Cleanup complete on $replicaType replica." "NOTICE"
 	fi
 }
 
@@ -1707,7 +1708,7 @@ function Init {
 	readonly __treeCurrentFile=10
 	readonly __treeAfterFile=11
 	readonly __treeAfterFileNoSuffix=12
-	readonly __deletedListfile=13
+	readonly __deletedListFile=13
 	readonly __failedDeletedListFile=14
 
 	INITIATOR=()
