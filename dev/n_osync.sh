@@ -109,7 +109,7 @@ function TrapQuit {
 }
 
 function CheckEnvironment {
-        __CheckArguments 0 $# ${FUNCNAME[0]} "$@"    #__WITH_PARANOIA_DEBUG
+        __CheckArguments 0 $# "${FUNCNAME[0]}" "$@"    #__WITH_PARANOIA_DEBUG
 
         if [ "$REMOTE_OPERATION" == "yes" ]; then
                 if ! type ssh > /dev/null 2>&1 ; then
@@ -125,7 +125,7 @@ function CheckEnvironment {
 }
 
 function CheckCurrentConfig {
-        __CheckArguments 0 $# ${FUNCNAME[0]} "$@"    #__WITH_PARANOIA_DEBUG
+        __CheckArguments 0 $# "${FUNCNAME[0]}" "$@"    #__WITH_PARANOIA_DEBUG
 
         # Check all variables that should contain "yes" or "no"
         declare -a yes_no_vars=(CREATE_DIRS SUDO_EXEC SSH_COMPRESSION SSH_IGNORE_KNOWN_HOSTS REMOTE_HOST_PING PRESERVE_PERMISSIONS PRESERVE_OWNER PRESERVE_GROUP PRESERVE_EXECUTABILITY PRESERVE_ACL PRESERVE_XATTR COPY_SYMLINKS KEEP_DIRLINKS PRESERVE_HARDLINKS CHECKSUM RSYNC_COMPRESS CONFLICT_BACKUP CONFLICT_BACKUP_MULTIPLE SOFT_DELETE RESUME_SYNC FORCE_STRANGER_LOCK_RESUME PARTIAL DELTA_COPIES STOP_ON_CMD_ERROR RUN_AFTER_CMD_ON_ERROR)
@@ -143,7 +143,7 @@ function CheckCurrentConfig {
 }
 
 function CheckCurrentConfigAll {
-        __CheckArguments 0 $# ${FUNCNAME[0]} "$@"    #__WITH_PARANOIA_DEBUG
+        __CheckArguments 0 $# "${FUNCNAME[0]}" "$@"    #__WITH_PARANOIA_DEBUG
 
         if [ "$INSTANCE_ID" == "" ]; then
                 Logger "No INSTANCE_ID defined in config file." "CRITICAL"
@@ -171,7 +171,7 @@ function CheckCurrentConfigAll {
 
 function _CheckReplicaPathsLocal {
 	local replica_path="${1}"
-	__CheckArguments 1 $# ${FUNCNAME[0]} "$@"	#__WITH_PARANOIA_DEBUG
+	__CheckArguments 1 $# "${FUNCNAME[0]}" "$@"	#__WITH_PARANOIA_DEBUG
 
 	if [ ! -w "$replica_path" ]; then
 		Logger "Local replica path [$replica_path] is not writable." "CRITICAL"
@@ -197,7 +197,7 @@ function _CheckReplicaPathsLocal {
 
 function _CheckReplicaPathsRemote {
 	local replica_path="${1}"
-	__CheckArguments 1 $# ${FUNCNAME[0]} "$@"	#__WITH_PARANOIA_DEBUG
+	__CheckArguments 1 $# "${FUNCNAME[0]}" "$@"	#__WITH_PARANOIA_DEBUG
 
 	local cmd
 
@@ -223,7 +223,7 @@ function _CheckReplicaPathsRemote {
 }
 
 function CheckReplicaPaths {
-	__CheckArguments 0 $# ${FUNCNAME[0]} "$@"	#__WITH_PARANOIA_DEBUG
+	__CheckArguments 0 $# "${FUNCNAME[0]}" "$@"	#__WITH_PARANOIA_DEBUG
 
 	local pids
 
@@ -256,7 +256,7 @@ function CheckReplicaPaths {
 
 function _CheckDiskSpaceLocal {
 	local replica_path="${1}"
-	__CheckArguments 1 $# ${FUNCNAME[0]} "$@"	#__WITH_PARANOIA_DEBUG
+	__CheckArguments 1 $# "${FUNCNAME[0]}" "$@"	#__WITH_PARANOIA_DEBUG
 
 	local disk_space
 
@@ -270,7 +270,7 @@ function _CheckDiskSpaceLocal {
 
 function _CheckDiskSpaceRemote {
 	local replica_path="${1}"
-	__CheckArguments 1 $# ${FUNCNAME[0]} "$@"	#__WITH_PARANOIA_DEBUG
+	__CheckArguments 1 $# "${FUNCNAME[0]}" "$@"	#__WITH_PARANOIA_DEBUG
 
 	Logger "Checking remote minimum disk space in [$replica_path]." "NOTICE"
 
@@ -295,7 +295,7 @@ function _CheckDiskSpaceRemote {
 }
 
 function CheckDiskSpace {
-	__CheckArguments 0 $# ${FUNCNAME[0]} "$@"	#__WITH_PARANOIA_DEBUG
+	__CheckArguments 0 $# "${FUNCNAME[0]}" "$@"	#__WITH_PARANOIA_DEBUG
 
 	local pids
 
@@ -319,7 +319,7 @@ function CheckDiskSpace {
 
 function _CreateStateDirsLocal {
 	local replica_state_dir="${1}"
-	__CheckArguments 1 $# ${FUNCNAME[0]} "$@"	#__WITH_PARANOIA_DEBUG
+	__CheckArguments 1 $# "${FUNCNAME[0]}" "$@"	#__WITH_PARANOIA_DEBUG
 
 	if ! [ -d "$replica_state_dir" ]; then
 		$COMMAND_SUDO mkdir -p "$replica_state_dir" >> "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$SCRIPT_PID" 2>&1
@@ -333,7 +333,7 @@ function _CreateStateDirsLocal {
 
 function _CreateStateDirsRemote {
 	local replica_state_dir="${1}"
-	__CheckArguments 1 $# ${FUNCNAME[0]} "$@"	#__WITH_PARANOIA_DEBUG
+	__CheckArguments 1 $# "${FUNCNAME[0]}" "$@"	#__WITH_PARANOIA_DEBUG
 
 	local cmd
 
@@ -351,7 +351,7 @@ function _CreateStateDirsRemote {
 }
 
 function CreateStateDirs {
-	__CheckArguments 0 $# ${FUNCNAME[0]} "$@"	#__WITH_PARANOIA_DEBUG
+	__CheckArguments 0 $# "${FUNCNAME[0]}" "$@"	#__WITH_PARANOIA_DEBUG
 
 	local pids
 
@@ -373,7 +373,7 @@ function CreateStateDirs {
 
 function _CheckLocksLocal {
 	local lockfile="${1}"
-	__CheckArguments 1 $# ${FUNCNAME[0]} "$@"	#__WITH_PARANOIA_DEBUG
+	__CheckArguments 1 $# "${FUNCNAME[0]}" "$@"	#__WITH_PARANOIA_DEBUG
 
 	local lockfile_content
 	local lock_pid
@@ -396,7 +396,7 @@ function _CheckLocksLocal {
 
 function _CheckLocksRemote {
 	local lockfile="${1}"
-	__CheckArguments 1 $# ${FUNCNAME[0]} "$@"	#__WITH_PARANOIA_DEBUG
+	__CheckArguments 1 $# "${FUNCNAME[0]}" "$@"	#__WITH_PARANOIA_DEBUG
 
 	local cmd
 	local lock_pid
@@ -444,7 +444,7 @@ function _CheckLocksRemote {
 }
 
 function CheckLocks {
-	__CheckArguments 0 $# ${FUNCNAME[0]} "$@"	#__WITH_PARANOIA_DEBUG
+	__CheckArguments 0 $# "${FUNCNAME[0]}" "$@"	#__WITH_PARANOIA_DEBUG
 
 	local pids
 
@@ -480,7 +480,7 @@ function CheckLocks {
 function _WriteLockFilesLocal {
 	local lockfile="${1}"
 	local replicaType="${2}"
-	__CheckArguments 2 $# ${FUNCNAME[0]} "$@"	#__WITH_PARANOIA_DEBUG
+	__CheckArguments 2 $# "${FUNCNAME[0]}" "$@"	#__WITH_PARANOIA_DEBUG
 
 	$COMMAND_SUDO echo "$SCRIPT_PID@$INSTANCE_ID" > "$lockfile"
 	if [ $?	!= 0 ]; then
@@ -494,7 +494,7 @@ function _WriteLockFilesLocal {
 function _WriteLockFilesRemote {
 	local lockfile="${1}"
 	local replicaType="${2}"
-	__CheckArguments 2 $# ${FUNCNAME[0]} "$@"	#__WITH_PARANOIA_DEBUG
+	__CheckArguments 2 $# "${FUNCNAME[0]}" "$@"	#__WITH_PARANOIA_DEBUG
 
 	local cmd
 
@@ -513,7 +513,7 @@ function _WriteLockFilesRemote {
 }
 
 function WriteLockFiles {
-	__CheckArguments 0 $# ${FUNCNAME[0]} "$@"	#__WITH_PARANOIA_DEBUG
+	__CheckArguments 0 $# "${FUNCNAME[0]}" "$@"	#__WITH_PARANOIA_DEBUG
 
 	local initiatorPid
 	local targetPid
@@ -552,7 +552,7 @@ function WriteLockFiles {
 
 function _UnlockReplicasLocal {
 	local lockfile="${1}"
-	__CheckArguments 1 $# ${FUNCNAME[0]} "$@"	#__WITH_PARANOIA_DEBUG
+	__CheckArguments 1 $# "${FUNCNAME[0]}" "$@"	#__WITH_PARANOIA_DEBUG
 
 	if [ -f "$lockfile" ]; then
 		$COMMAND_SUDO rm "$lockfile"
@@ -566,7 +566,7 @@ function _UnlockReplicasLocal {
 
 function _UnlockReplicasRemote {
 	local lockfile="${1}"
-	__CheckArguments 1 $# ${FUNCNAME[0]} "$@"	#__WITH_PARANOIA_DEBUG
+	__CheckArguments 1 $# "${FUNCNAME[0]}" "$@"	#__WITH_PARANOIA_DEBUG
 
 	local cmd=
 
@@ -585,7 +585,7 @@ function _UnlockReplicasRemote {
 }
 
 function UnlockReplicas {
-	__CheckArguments 0 $# ${FUNCNAME[0]} "$@"	#__WITH_PARANOIA_DEBUG
+	__CheckArguments 0 $# "${FUNCNAME[0]}" "$@"	#__WITH_PARANOIA_DEBUG
 
 	local pids
 
@@ -628,7 +628,7 @@ function treeList {
 	local escapedReplicaPath
 	local rsyncCmd
 
-	__CheckArguments 3 $# ${FUNCNAME[0]} "$@"	#__WITH_PARANOIA_DEBUG
+	__CheckArguments 3 $# "${FUNCNAME[0]}" "$@"	#__WITH_PARANOIA_DEBUG
 
 	escapedReplicaPath=$(EscapeSpaces "$replicaPath")
 
@@ -663,7 +663,7 @@ function treeList {
 # deleteList(replicaType): Creates a list of files vanished from last run on replica $1 (initiator/target)
 function deleteList {
 	local replicaType="${1}" # replica type: initiator, target
-	__CheckArguments 1 $# ${FUNCNAME[0]} "$@"	#__WITH_PARANOIA_DEBUG
+	__CheckArguments 1 $# "${FUNCNAME[0]}" "$@"	#__WITH_PARANOIA_DEBUG
 
 	local cmd
 
@@ -701,7 +701,7 @@ function _getFileCtimeMtimeLocal {
 	local replicaPath="${1}" # Contains replica path
 	local replicaType="${2}" # Initiator / Target
 	local fileList="${3}" # Contains list of files to get time attrs
-	__CheckArguments 3 $# ${FUNCNAME[0]} "$@"	#__WITH_PARANOIA_DEBUG
+	__CheckArguments 3 $# "${FUNCNAME[0]}" "$@"	#__WITH_PARANOIA_DEBUG
 
 	echo -n "" > "$RUN_DIR/$PROGRAM.ctime_mtime.$replicaType.$SCRIPT_PID"
 	while read -r file; do $STAT_CTIME_MTIME_CMD "$replicaPath$file" | sort >> "$RUN_DIR/$PROGRAM.ctime_mtime.$replicaType.$SCRIPT_PID"; done < "$fileList"
@@ -719,7 +719,7 @@ function _getFileCtimeMtimeRemote {
 	local replicapath="${1}" # Contains replica path
 	local replicaType="${2}"
 	local fileList="${3}"
-	__CheckArguments 3 $# ${FUNCNAME[0]} "$@"	#__WITH_PARANOIA_DEBUG
+	__CheckArguments 3 $# "${FUNCNAME[0]}" "$@"	#__WITH_PARANOIA_DEBUG
 
 	local cmd
 
@@ -740,7 +740,7 @@ function _getFileCtimeMtimeRemote {
 function syncAttrs {
 	local initiatorReplica="${1}"
 	local targetReplica="${2}"
-	__CheckArguments 2 $# ${FUNCNAME[0]} "$@"	#__WITH_PARANOIA_DEBUG
+	__CheckArguments 2 $# "${FUNCNAME[0]}" "$@"	#__WITH_PARANOIA_DEBUG
 
 	local rsyncCmd
 	local retval
@@ -864,7 +864,7 @@ function syncAttrs {
 function syncUpdate {
 	local sourceReplica="${1}" # Contains replica type of source: initiator, target
 	local destinationReplica="${2}" # Contains replica type of destination: initiator, target
-	__CheckArguments 2 $# ${FUNCNAME[0]} "$@"	#__WITH_PARANOIA_DEBUG
+	__CheckArguments 2 $# "${FUNCNAME[0]}" "$@"	#__WITH_PARANOIA_DEBUG
 
 	local rsyncCmd
 	local retval
@@ -927,7 +927,7 @@ function _deleteLocal {
 	local replicaType="${1}" # Replica type
 	local replicaDir="${2}" # Full path to replica
 	local deletionDir="${3}" # deletion dir in format .[workdir]/deleted
-	__CheckArguments 3 $# ${FUNCNAME[0]} "$@"	#__WITH_PARANOIA_DEBUG
+	__CheckArguments 3 $# "${FUNCNAME[0]}" "$@"	#__WITH_PARANOIA_DEBUG
 
 	local parentdir
 	local previousFile=""
@@ -990,7 +990,7 @@ function _deleteRemote {
 	local replicaType="${1}" # Replica type
 	local replicaDir="${2}" # Full path to replica
 	local deletionDir="${3}" # deletion dir in format .[workdir]/deleted
-	__CheckArguments 3 $# ${FUNCNAME[0]} "$@"	#__WITH_PARANOIA_DEBUG
+	__CheckArguments 3 $# "${FUNCNAME[0]}" "$@"	#__WITH_PARANOIA_DEBUG
 
 	local escDestDir
 	local rsyncCmd
@@ -1138,7 +1138,7 @@ ENDSSH
 # delete_Propagation(replica type)
 function deletionPropagation {
 	local replicaType="${1}" # Contains replica type: initiator, target
-	__CheckArguments 1 $# ${FUNCNAME[0]} "$@"	#__WITH_PARANOIA_DEBUG
+	__CheckArguments 1 $# "${FUNCNAME[0]}" "$@"	#__WITH_PARANOIA_DEBUG
 
 	local replicaDir
 	local deleteDir
@@ -1192,7 +1192,7 @@ function deletionPropagation {
 ###### Step 5a & 5b: Create after run file list of replicas
 
 function Sync {
-	__CheckArguments 0 $# ${FUNCNAME[0]} "$@"	#__WITH_PARANOIA_DEBUG
+	__CheckArguments 0 $# "${FUNCNAME[0]}" "$@"	#__WITH_PARANOIA_DEBUG
 
 	local resumeCount
 	local resumeInitiator
@@ -1504,7 +1504,7 @@ function _SoftDeleteLocal {
 	local replicaDeletionPath="${2}" # Contains the full path to softdelete / backup directory without ending slash
 	local changeTime="${3}"
 
-	__CheckArguments 3 $# ${FUNCNAME[0]} "$@"	#__WITH_PARANOIA_DEBUG
+	__CheckArguments 3 $# "${FUNCNAME[0]}" "$@"	#__WITH_PARANOIA_DEBUG
 
 	local retval
 
@@ -1546,7 +1546,7 @@ function _SoftDeleteRemote {
 	local replicaType="${1}"
 	local replicaDeletionPath="${2}" # Contains the full path to softdelete / backup directory without ending slash
 	local changeTime="${3}"
-	__CheckArguments 3 $# ${FUNCNAME[0]} "$@"	#__WITH_PARANOIA_DEBUG
+	__CheckArguments 3 $# "${FUNCNAME[0]}" "$@"	#__WITH_PARANOIA_DEBUG
 
 	local retval
 
@@ -1585,7 +1585,7 @@ function _SoftDeleteRemote {
 }
 
 function SoftDelete {
-	__CheckArguments 0 $# ${FUNCNAME[0]} "$@"	#__WITH_PARANOIA_DEBUG
+	__CheckArguments 0 $# "${FUNCNAME[0]}" "$@"	#__WITH_PARANOIA_DEBUG
 
 	local pids
 
@@ -1621,7 +1621,7 @@ function SoftDelete {
 }
 
 function Init {
-	__CheckArguments 0 $# ${FUNCNAME[0]} "$@"	#__WITH_PARANOIA_DEBUG
+	__CheckArguments 0 $# "${FUNCNAME[0]}" "$@"	#__WITH_PARANOIA_DEBUG
 
 	# Set error exit code if a piped command fails
 	set -o pipefail
@@ -1786,7 +1786,7 @@ function Init {
 }
 
 function Main {
-	__CheckArguments 0 $# ${FUNCNAME[0]} "$@"	#__WITH_PARANOIA_DEBUG
+	__CheckArguments 0 $# "${FUNCNAME[0]}" "$@"	#__WITH_PARANOIA_DEBUG
 
 	CreateStateDirs
 	CheckLocks
@@ -1794,7 +1794,7 @@ function Main {
 }
 
 function Usage {
-	__CheckArguments 0 $# ${FUNCNAME[0]} "$@"	#__WITH_PARANOIA_DEBUG
+	__CheckArguments 0 $# "${FUNCNAME[0]}" "$@"	#__WITH_PARANOIA_DEBUG
 
 	if [ "$IS_STABLE" != "yes" ]; then
                 echo -e "\e[93mThis is an unstable dev build. Please use with caution.\e[0m"
@@ -1832,7 +1832,7 @@ function Usage {
 }
 
 function SyncOnChanges {
-	__CheckArguments 0 $# ${FUNCNAME[0]} "$@"	#__WITH_PARANOIA_DEBUG
+	__CheckArguments 0 $# "${FUNCNAME[0]}" "$@"	#__WITH_PARANOIA_DEBUG
 
 	local cmd
 	local retval
