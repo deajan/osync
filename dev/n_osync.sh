@@ -4,7 +4,7 @@ PROGRAM="osync" # Rsync based two way sync engine with fault tolerance
 AUTHOR="(C) 2013-2016 by Orsiris de Jong"
 CONTACT="http://www.netpower.fr/osync - ozy@netpower.fr"
 PROGRAM_VERSION=1.2-beta
-PROGRAM_BUILD=2016101401
+PROGRAM_BUILD=2016101601
 IS_STABLE=no
 
 # Execution order						#__WITH_PARANOIA_DEBUG
@@ -661,25 +661,25 @@ function tree_list {
 	fi
 }
 
-# delete_list(replica, tree-file-after, tree-file-current, deleted-list-file, deleted-failed-list-file): Creates a list of files vanished from last run on replica $1 (initiator/target)
+# delete_list(replicaType): Creates a list of files vanished from last run on replica $1 (initiator/target)
 function delete_list {
 	local replicaType="${1}" # replica type: initiator, target
-	local tree_file_after="${2}" # tree-file-after, will be prefixed with replica type
-	local tree_file_current="${3}" # tree-file-current, will be prefixed with replica type
-	local deleted_list_file="${4}" # file containing deleted file list, will be prefixed with replica type
-	local deleted_failed_list_file="${5}" # file containing files that could not be deleted on last run, will be prefixed with replica type
-	__CheckArguments 5 $# ${FUNCNAME[0]} "$@"	#__WITH_PARANOIA_DEBUG
+	#local tree_file_after="${2}" # tree-file-after, will be prefixed with replica type
+	#local tree_file_current="${3}" # tree-file-current, will be prefixed with replica type
+	#local deleted_list_file="${4}" # file containing deleted file list, will be prefixed with replica type
+	#local deleted_failed_list_file="${5}" # file containing files that could not be deleted on last run, will be prefixed with replica type
+	__CheckArguments 1 $# ${FUNCNAME[0]} "$@"	#__WITH_PARANOIA_DEBUG
 
 	local cmd
 
 	Logger "Creating $replicaType replica deleted file list." "NOTICE"
-	if [ -f "${INITIATOR[$__replicaDir]}${INITIATOR[$__stateDir]}/$replicaType${INITIATOR[$__treeAfterFile]}_NO_SUFFIX" ]; then
+	if [ -f "${INITIATOR[$__replicaDir]}${INITIATOR[$__stateDir]}/$replicaType${INITIATOR[$__treeAfterFileNoSuffix]}" ]; then
 		## Same functionnality, comm is much faster than grep but is not available on every platform
 		if type comm > /dev/null 2>&1 ; then
-			cmd="comm -23 \"${INITIATOR[$__replicaDir]}${INITIATOR[$__stateDir]}/$replicaType${INITIATOR[$__treeAfterFileNoSuffix]}\" \"${INITIATOR[$__replicaDir]}${INITIATOR[$__stateDir]}/$replicaType$tree_file_current\" > \"${INITIATOR[$__replicaDir]}${INITIATOR[$__stateDir]}/$replicaType$deleted_list_file\""
+			cmd="comm -23 \"${INITIATOR[$__replicaDir]}${INITIATOR[$__stateDir]}/$replicaType${INITIATOR[$__treeAfterFileNoSuffix]}\" \"${INITIATOR[$__replicaDir]}${INITIATOR[$__stateDir]}/$replicaType${INITIATOR[$__treeCurrentFile]}\" > \"${INITIATOR[$__replicaDir]}${INITIATOR[$__stateDir]}/$replicaType${INITIATOR[$__deletedListFile]}\""
 		else
 			## The || : forces the command to have a good result
-			cmd="(grep -F -x -v -f \"${INITIATOR[$__replicaDir]}${INITIATOR[$__stateDir]}/$replicaType$tree_file_current\" \"${INITIATOR[$__replicaDir]}${INITIATOR[$__stateDir]}/$replicaType${INITIATOR[$__treeAfterFileNoSuffix]}\" || :) > \"${INITIATOR[$__replicaDir]}${INITIATOR[$__stateDir]}/$replicaType$deleted_list_file\""
+			cmd="(grep -F -x -v -f \"${INITIATOR[$__replicaDir]}${INITIATOR[$__stateDir]}/$replicaType${INITIATOR[$__treeCurrentFile]}\" \"${INITIATOR[$__replicaDir]}${INITIATOR[$__stateDir]}/$replicaType${INITIATOR[$__treeAfterFileNoSuffix]}\" || :) > \"${INITIATOR[$__replicaDir]}${INITIATOR[$__stateDir]}/$replicaType${INITIATOR[$__deletedListFile]}\""
 		fi
 
 		Logger "CMD: $cmd" "DEBUG"
@@ -687,14 +687,19 @@ function delete_list {
 		retval=$?
 
 		# Add delete failed file list to current delete list and then empty it
-		if [ -f "${INITIATOR[$__replicaDir]}${INITIATOR[$__stateDir]}/$replicaType$deleted_failed_list_file" ]; then
-			cat "${INITIATOR[$__replicaDir]}${INITIATOR[$__stateDir]}/$replicaType$deleted_failed_list_file" >> "${INITIATOR[$__replicaDir]}${INITIATOR[$__stateDir]}/$replicaType$deleted_list_file"
-			rm -f "${INITIATOR[$__replicaDir]}${INITIATOR[$__stateDir]}/$replicaType$deleted_failed_list_file"
+		if [ -f "${INITIATOR[$__replicaDir]}${INITIATOR[$__stateDir]}/$replicaType${INITIATOR[$__failedDeletedListFile]}" ]; then
+			cat "${INITIATOR[$__replicaDir]}${INITIATOR[$__stateDir]}/$replicaType${INITIATOR[$__failedDeletedListFile]}" >> "${INITIATOR[$__replicaDir]}${INITIATOR[$__stateDir]}/$replicaType${INITIATOR[$__deletedListFile]}"
+			if [ $? == 0 ]; then
+				rm -f "${INITIATOR[$__replicaDir]}${INITIATOR[$__stateDir]}/$replicaType${INITIATOR[$__failedDeletedListFile]}"
+			else
+				Logger "Cannot add failed deleted list to current deleted list for replica [$replicaType]." "ERROR"
+			fi
 		fi
-		exit
+		Logger "Its done" "WARN"
 		return $retval
 	else
-		touch "${INITIATOR[$__replicaDir]}${INITIATOR[$__stateDir]}/$replicaType$deleted_list_file"
+		Logger "Not done" "WARN"
+		touch "${INITIATOR[$__replicaDir]}${INITIATOR[$__stateDir]}/$replicaType${INITIATOR[$__deletedListFile]}"
 		return $retval
 	fi
 }
@@ -775,6 +780,7 @@ function sync_attrs {
 		if [ -f "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$SCRIPT_PID" ]; then
 			Logger "List:\n$(cat $RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$SCRIPT_PID)" "VERBOSE"
 		fi
+		#TODO: Apply SC2002: unnecessary cat
 		cat "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$SCRIPT_PID" | ( grep -Ev "^[^ ]*(c|s|t)[^ ]* " || :) | ( grep -E "^[^ ]*(p|o|g|a)[^ ]* " || :) | sed -e 's/^[^ ]* //' >> "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}-cleaned.$SCRIPT_PID"
 		if [ $? != 0 ]; then
 			Logger "Cannot prepare file list for attribute sync." "CRITICAL"
@@ -1300,12 +1306,12 @@ function Sync {
 	## Step 1a & 1b
 	if [ "$resumeInitiator" == "${SYNC_ACTION[1]}" ] || [ "$resumeTarget" == "${SYNC_ACTION[1]}" ]; then
 		if [ "$resumeInitiator" == "${SYNC_ACTION[1]}" ]; then
-			delete_list "${INITIATOR[$__type]}" "${INITIATOR[$__treeAfterFile]}" "${INITIATOR[$__treeCurrentFile]}" "${INITIATOR[$__deletedListFile]}" "${INITIATOR[$__failedDeletedListFile]}" &
+			delete_list "${INITIATOR[$__type]}" &
 			initiatorPid="$!"
 		fi
 
 		if [ "$resumeTarget" == "${SYNC_ACTION[1]}" ]; then
-			delete_list "${TARGET[$__type]}" "${INITIATOR[$__treeAfterFile]}" "${INITIATOR[$__treeCurrentFile]}" "${INITIATOR[$__deletedListFile]}" "${INITIATOR[$__failedDeletedListFile]}" &
+			delete_list "${TARGET[$__type]}" &
 			targetPid="$!"
 		fi
 
