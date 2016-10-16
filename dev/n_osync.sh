@@ -4,7 +4,7 @@ PROGRAM="osync" # Rsync based two way sync engine with fault tolerance
 AUTHOR="(C) 2013-2016 by Orsiris de Jong"
 CONTACT="http://www.netpower.fr/osync - ozy@netpower.fr"
 PROGRAM_VERSION=1.2-beta
-PROGRAM_BUILD=2016101602
+PROGRAM_BUILD=2016101603
 IS_STABLE=no
 
 # Execution order						#__WITH_PARANOIA_DEBUG
@@ -613,7 +613,6 @@ function UnlockReplicas {
 	fi
 }
 
-#TODO #WIP: change sync core function names and variable names according to new coding standards
 ###### Sync core functions
 
 	## Rsync does not like spaces in directory names, considering it as two different directories. Handling this schema by escaping space.
@@ -1146,11 +1145,13 @@ function deletionPropagation {
 
 	Logger "Propagating deletions to $replicaType replica." "NOTICE"
 
+	#TODO: deletionPropagation replicaType = source replica whereas _deleteXxxxxx replicaType = dest replica
+
 	if [ "$replicaType" == "${INITIATOR[$__type]}" ]; then
 		replicaDir="${INITIATOR[$__replicaDir]}"
 		deleteDir="${INITIATOR[$__deleteDir]}"
 
-		_deleteLocal "$replicaType" "$replicaDir" "$deleteDir"
+		_deleteLocal "${TARGET[$__type]}" "$replicaDir" "$deleteDir"
 		retval=$?
 		if [ $retval != 0 ]; then
 			Logger "Deletion on $replicaType replica failed." "CRITICAL"
@@ -1161,9 +1162,9 @@ function deletionPropagation {
 		deleteDir="${TARGET[$__deleteDir]}"
 
 		if [ "$REMOTE_OPERATION" == "yes" ]; then
-			_deleteRemote "$replicaType" "$replicaDir" "$deleteDir"
+			_deleteRemote "${INITIATOR[$__type]}" "$replicaDir" "$deleteDir"
 		else
-			_deleteLocal "$replicaType" "$replicaDir" "$deleteDir"
+			_deleteLocal "${INITIATOR[$__type]}" "$replicaDir" "$deleteDir"
 		fi
 		retval=$?
 		if [ $retval == 0 ]; then
