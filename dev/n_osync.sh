@@ -4,7 +4,7 @@ PROGRAM="osync" # Rsync based two way sync engine with fault tolerance
 AUTHOR="(C) 2013-2016 by Orsiris de Jong"
 CONTACT="http://www.netpower.fr/osync - ozy@netpower.fr"
 PROGRAM_VERSION=1.2-beta
-PROGRAM_BUILD=2016091603
+PROGRAM_BUILD=2016101401
 IS_STABLE=no
 
 # Execution order						#__WITH_PARANOIA_DEBUG
@@ -229,7 +229,7 @@ function CheckReplicaPaths {
 
 	# Use direct comparaison before having a portable realpath implementation
 	#INITIATOR_SYNC_DIR_CANN=$(realpath "${INITIATOR[$__replicaDir]}")	#TODO(verylow): investigate realpath & readlink issues on MSYS and busybox here
-	#TARGET_SYNC_DIR_CANN=$(realpath "${TARGET[$__replicaDir]})
+	#TARGET_SYNC_DIR_CANN=$(realpath "${TARGET[$__replicaDir]}")
 
 	if [ "$REMOTE_OPERATION" != "yes" ]; then
 		if [ "${INITIATOR[$__replicaDir]}" == "${TARGET[$__replicaDir]}" ]; then
@@ -613,6 +613,7 @@ function UnlockReplicas {
 	fi
 }
 
+#TODO: change sync core function names and variable names according to new coding standards
 ###### Sync core functions
 
 	## Rsync does not like spaces in directory names, considering it as two different directories. Handling this schema by escaping space.
@@ -636,19 +637,24 @@ function tree_list {
 	if [ "$REMOTE_OPERATION" == "yes" ] && [ "$replicaType" == "${TARGET[$__type]}" ]; then
 		CheckConnectivity3rdPartyHosts
 		CheckConnectivityRemoteHost
-		rsync_cmd="$(type -p $RSYNC_EXECUTABLE) --rsync-path=\"$RSYNC_PATH\" $RSYNC_ARGS $RSYNC_ATTR_ARGS $RSYNC_TYPE_ARGS -8 --exclude \"$OSYNC_DIR\" $RSYNC_PATTERNS $RSYNC_PARTIAL_EXCLUDE -e \"$RSYNC_SSH_CMD\" --list-only $REMOTE_USER@$REMOTE_HOST:\"$escaped_replica_path/\" | grep \"^-\|^d\" | awk '{\$1=\$2=\$3=\$4=\"\" ;print}' | awk '{\$1=\$1 ;print}' | (grep -v \"^\.$\" || :) | sort > \"$RUN_DIR/$PROGRAM.$replicaType.$SCRIPT_PID\""
+		rsync_cmd="$(type -p $RSYNC_EXECUTABLE) --rsync-path=\"$RSYNC_PATH\" $RSYNC_ARGS -L $RSYNC_ATTR_ARGS $RSYNC_TYPE_ARGS -8 --exclude \"$OSYNC_DIR\" $RSYNC_PATTERNS $RSYNC_PARTIAL_EXCLUDE -e \"$RSYNC_SSH_CMD\" --list-only $REMOTE_USER@$REMOTE_HOST:\"$escaped_replica_path\" 2> \"$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$replicaType.error.$SCRIPT_PID\" | grep \"^-\|^d\|^l\" | awk '{\$1=\$2=\$3=\$4=\"\" ;print}' | awk '{\$1=\$1 ;print}' | (grep -v \"^\.$\" || :) | sort > \"$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$replicaType.$SCRIPT_PID\""
 	else
-		rsync_cmd="$(type -p $RSYNC_EXECUTABLE) --rsync-path=\"$RSYNC_PATH\" $RSYNC_ARGS $RSYNC_ATTR_ARGS $RSYNC_TYPE_ARGS -8 --exclude \"$OSYNC_DIR\" $RSYNC_PATTERNS $RSYNC_PARTIAL_EXCLUDE --list-only \"$replica_path/\" | grep \"^-\|^d\" | awk '{\$1=\$2=\$3=\$4=\"\" ;print}' | awk '{\$1=\$1 ;print}' | (grep -v \"^\.$\" || :) | sort > \"$RUN_DIR/$PROGRAM.$replicaType.$SCRIPT_PID\""
+		rsync_cmd="$(type -p $RSYNC_EXECUTABLE) --rsync-path=\"$RSYNC_PATH\" $RSYNC_ARGS -L $RSYNC_ATTR_ARGS $RSYNC_TYPE_ARGS -8 --exclude \"$OSYNC_DIR\" $RSYNC_PATTERNS $RSYNC_PARTIAL_EXCLUDE --list-only \"$replica_path\" 2> \"$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$replicaType.error.$SCRIPT_PID\" | grep \"^-\|^d\|^l\" | awk '{\$1=\$2=\$3=\$4=\"\" ;print}' | awk '{\$1=\$1 ;print}' | (grep -v \"^\.$\" || :) | sort > \"$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$replicaType.$SCRIPT_PID\""
 	fi
 	Logger "RSYNC_CMD: $rsync_cmd" "DEBUG"
+	#TODO: check the following statement
 	## Redirect commands stderr here to get rsync stderr output in logfile with eval "$rsync_cmd" 2>> "$LOG_FILE"
 	## When log writing fails, $! is empty and WaitForTaskCompletion fails.  Removing the 2>> log
 	eval "$rsync_cmd"
 	retval=$?
 	## Retval 24 = some files vanished while creating list
-	if ([ $retval == 0 ] || [ $retval == 24 ]) && [ -f "$RUN_DIR/$PROGRAM.$replicaType.$SCRIPT_PID" ]; then
-		mv -f "$RUN_DIR/$PROGRAM.$replicaType.$SCRIPT_PID" "${INITIATOR[$__replicaDir]}${INITIATOR[$__stateDir]}/$replicaType$tree_filename"
+	if ([ $retval == 0 ] || [ $retval == 24 ]) && [ -f "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$replicaType.$SCRIPT_PID" ]; then
+		mv -f "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$replicaType.$SCRIPT_PID" "${INITIATOR[$__replicaDir]}${INITIATOR[$__stateDir]}/$replicaType$tree_filename"
 		return $?
+	elif [ $retval == 23 ]; then
+		Logger "Some files could not be listed in [$replica_path]. Check for failing symlinks." "ERROR"
+		Logger "Command output\n$(cat $RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$replicaType.error.$SCRIPT_PID)" "NOTICE"
+		return 0
 	else
 		Logger "Cannot create replica file list in [$replica_path]." "CRITICAL"
 		return $retval
@@ -685,7 +691,7 @@ function delete_list {
 			cat "${INITIATOR[$__replicaDir]}${INITIATOR[$__stateDir]}/$replicaType$deleted_failed_list_file" >> "${INITIATOR[$__replicaDir]}${INITIATOR[$__stateDir]}/$replicaType$deleted_list_file"
 			rm -f "${INITIATOR[$__replicaDir]}${INITIATOR[$__stateDir]}/$replicaType$deleted_failed_list_file"
 		fi
-
+		exit
 		return $retval
 	else
 		touch "${INITIATOR[$__replicaDir]}${INITIATOR[$__stateDir]}/$replicaType$deleted_list_file"
@@ -790,7 +796,7 @@ function sync_attrs {
 	fi
 	WaitForTaskCompletion $pids 1800 0 ${FUNCNAME[0]} true $KEEP_LOGGING
 
-	# If target gets updated first, then sync_attr must update initiator's attrs first
+	# If target gets updated first, then sync_attr must update initiators attrs first
 	# For join, remove leading replica paths
 
 	sed -i'.tmp' "s;^${INITIATOR[$__replicaDir]};;g" "$RUN_DIR/$PROGRAM.ctime_mtime.${INITIATOR[$__type]}.$SCRIPT_PID"
