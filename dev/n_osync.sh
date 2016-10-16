@@ -4,7 +4,7 @@ PROGRAM="osync" # Rsync based two way sync engine with fault tolerance
 AUTHOR="(C) 2013-2016 by Orsiris de Jong"
 CONTACT="http://www.netpower.fr/osync - ozy@netpower.fr"
 PROGRAM_VERSION=1.2-beta
-PROGRAM_BUILD=2016101601
+PROGRAM_BUILD=2016101602
 IS_STABLE=no
 
 # Execution order						#__WITH_PARANOIA_DEBUG
@@ -26,18 +26,18 @@ IS_STABLE=no
 #	 	CheckLocks			yes		#__WITH_PARANOIA_DEBUG
 #	 	WriteLockFiles			yes		#__WITH_PARANOIA_DEBUG
 #	 	Sync				no		#__WITH_PARANOIA_DEBUG
-#			tree_list		yes		#__WITH_PARANOIA_DEBUG
-#			tree_list		yes		#__WITH_PARANOIA_DEBUG
-#			delete_list		yes		#__WITH_PARANOIA_DEBUG
-#			delete_list		yes		#__WITH_PARANOIA_DEBUG
-#			sync_attrs		no		#__WITH_PARANOIA_DEBUG
-#			_get_file_ctime_mtime	yes		#__WITH_PARANOIA_DEBUG
-#			sync_update		no		#__WITH_PARANOIA_DEBUG
-#			sync_update		no		#__WITH_PARANOIA_DEBUG
-#			deletion_propagation	yes		#__WITH_PARANOIA_DEBUG
-#			deletion_propagation	yes		#__WITH_PARANOIA_DEBUG
-#			tree_list		yes		#__WITH_PARANOIA_DEBUG
-#			tree_list		yes		#__WITH_PARANOIA_DEBUG
+#			treeList		yes		#__WITH_PARANOIA_DEBUG
+#			treeList		yes		#__WITH_PARANOIA_DEBUG
+#			deleteList		yes		#__WITH_PARANOIA_DEBUG
+#			deleteList		yes		#__WITH_PARANOIA_DEBUG
+#			syncAttrs		no		#__WITH_PARANOIA_DEBUG
+#			_getFileCtimeMtime	yes		#__WITH_PARANOIA_DEBUG
+#			syncUpdate		no		#__WITH_PARANOIA_DEBUG
+#			syncUpdate		no		#__WITH_PARANOIA_DEBUG
+#			deletionPropagation	yes		#__WITH_PARANOIA_DEBUG
+#			deletionPropagation	yes		#__WITH_PARANOIA_DEBUG
+#			treeList		yes		#__WITH_PARANOIA_DEBUG
+#			treeList		yes		#__WITH_PARANOIA_DEBUG
 #		SoftDelete			yes		#__WITH_PARANOIA_DEBUG
 #	RunAfterHook				yes		#__WITH_PARANOIA_DEBUG
 #	UnlockReplicas				yes		#__WITH_PARANOIA_DEBUG
@@ -613,61 +613,57 @@ function UnlockReplicas {
 	fi
 }
 
-#TODO: change sync core function names and variable names according to new coding standards
+#TODO #WIP: change sync core function names and variable names according to new coding standards
 ###### Sync core functions
 
 	## Rsync does not like spaces in directory names, considering it as two different directories. Handling this schema by escaping space.
-	## It seems this only happens when trying to execute an rsync command through weval $rsync_cmd on a remote host.
+	## It seems this only happens when trying to execute an rsync command through weval $rsyncCmd on a remote host.
 	## So I am using unescaped $INITIATOR_SYNC_DIR for local rsync calls and escaped $ESC_INITIATOR_SYNC_DIR for remote rsync calls like user@host:$ESC_INITIATOR_SYNC_DIR
 	## The same applies for target sync dir..............................................T.H.I.S..I.S..A..P.R.O.G.R.A.M.M.I.N.G..N.I.G.H.T.M.A.R.E
 
-function tree_list {
-	local replica_path="${1}" # path to the replica for which a tree needs to be constructed
+function treeList {
+	local replicaPath="${1}" # path to the replica for which a tree needs to be constructed
 	local replicaType="${2}" # replica type: initiator, target
-	local tree_filename="${3}" # filename to output tree (will be prefixed with $replicaType)
+	local treeFilename="${3}" # filename to output tree (will be prefixed with $replicaType)
 
-	local escaped_replica_path
-	local rsync_cmd
+	local escapedReplicaPath
+	local rsyncCmd
 
 	__CheckArguments 3 $# ${FUNCNAME[0]} "$@"	#__WITH_PARANOIA_DEBUG
 
-	escaped_replica_path=$(EscapeSpaces "$replica_path")
+	escapedReplicaPath=$(EscapeSpaces "$replicaPath")
 
-	Logger "Creating $replicaType replica file list [$replica_path]." "NOTICE"
+	Logger "Creating $replicaType replica file list [$replicaPath]." "NOTICE"
 	if [ "$REMOTE_OPERATION" == "yes" ] && [ "$replicaType" == "${TARGET[$__type]}" ]; then
 		CheckConnectivity3rdPartyHosts
 		CheckConnectivityRemoteHost
-		rsync_cmd="$(type -p $RSYNC_EXECUTABLE) --rsync-path=\"$RSYNC_PATH\" $RSYNC_ARGS -L $RSYNC_ATTR_ARGS $RSYNC_TYPE_ARGS -8 --exclude \"$OSYNC_DIR\" $RSYNC_PATTERNS $RSYNC_PARTIAL_EXCLUDE -e \"$RSYNC_SSH_CMD\" --list-only $REMOTE_USER@$REMOTE_HOST:\"$escaped_replica_path\" 2> \"$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$replicaType.error.$SCRIPT_PID\" | grep \"^-\|^d\|^l\" | awk '{\$1=\$2=\$3=\$4=\"\" ;print}' | awk '{\$1=\$1 ;print}' | (grep -v \"^\.$\" || :) | sort > \"$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$replicaType.$SCRIPT_PID\""
+		rsyncCmd="$(type -p $RSYNC_EXECUTABLE) --rsync-path=\"$RSYNC_PATH\" $RSYNC_ARGS -L $RSYNC_ATTR_ARGS $RSYNC_TYPE_ARGS -8 --exclude \"$OSYNC_DIR\" $RSYNC_PATTERNS $RSYNC_PARTIAL_EXCLUDE -e \"$RSYNC_SSH_CMD\" --list-only $REMOTE_USER@$REMOTE_HOST:\"$escapedReplicaPath\" 2> \"$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$replicaType.error.$SCRIPT_PID\" | grep \"^-\|^d\|^l\" | awk '{\$1=\$2=\$3=\$4=\"\" ;print}' | awk '{\$1=\$1 ;print}' | (grep -v \"^\.$\" || :) | sort > \"$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$replicaType.$SCRIPT_PID\""
 	else
-		rsync_cmd="$(type -p $RSYNC_EXECUTABLE) --rsync-path=\"$RSYNC_PATH\" $RSYNC_ARGS -L $RSYNC_ATTR_ARGS $RSYNC_TYPE_ARGS -8 --exclude \"$OSYNC_DIR\" $RSYNC_PATTERNS $RSYNC_PARTIAL_EXCLUDE --list-only \"$replica_path\" 2> \"$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$replicaType.error.$SCRIPT_PID\" | grep \"^-\|^d\|^l\" | awk '{\$1=\$2=\$3=\$4=\"\" ;print}' | awk '{\$1=\$1 ;print}' | (grep -v \"^\.$\" || :) | sort > \"$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$replicaType.$SCRIPT_PID\""
+		rsyncCmd="$(type -p $RSYNC_EXECUTABLE) --rsync-path=\"$RSYNC_PATH\" $RSYNC_ARGS -L $RSYNC_ATTR_ARGS $RSYNC_TYPE_ARGS -8 --exclude \"$OSYNC_DIR\" $RSYNC_PATTERNS $RSYNC_PARTIAL_EXCLUDE --list-only \"$replicaPath\" 2> \"$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$replicaType.error.$SCRIPT_PID\" | grep \"^-\|^d\|^l\" | awk '{\$1=\$2=\$3=\$4=\"\" ;print}' | awk '{\$1=\$1 ;print}' | (grep -v \"^\.$\" || :) | sort > \"$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$replicaType.$SCRIPT_PID\""
 	fi
-	Logger "RSYNC_CMD: $rsync_cmd" "DEBUG"
+	Logger "RSYNC_CMD: $rsyncCmd" "DEBUG"
 	#TODO: check the following statement
-	## Redirect commands stderr here to get rsync stderr output in logfile with eval "$rsync_cmd" 2>> "$LOG_FILE"
+	## Redirect commands stderr here to get rsync stderr output in logfile with eval "$rsyncCmd" 2>> "$LOG_FILE"
 	## When log writing fails, $! is empty and WaitForTaskCompletion fails.  Removing the 2>> log
-	eval "$rsync_cmd"
+	eval "$rsyncCmd"
 	retval=$?
 	## Retval 24 = some files vanished while creating list
 	if ([ $retval == 0 ] || [ $retval == 24 ]) && [ -f "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$replicaType.$SCRIPT_PID" ]; then
-		mv -f "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$replicaType.$SCRIPT_PID" "${INITIATOR[$__replicaDir]}${INITIATOR[$__stateDir]}/$replicaType$tree_filename"
+		mv -f "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$replicaType.$SCRIPT_PID" "${INITIATOR[$__replicaDir]}${INITIATOR[$__stateDir]}/$replicaType$treeFilename"
 		return $?
 	elif [ $retval == 23 ]; then
-		Logger "Some files could not be listed in [$replica_path]. Check for failing symlinks." "ERROR"
+		Logger "Some files could not be listed in [$replicaPath]. Check for failing symlinks." "ERROR"
 		Logger "Command output\n$(cat $RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$replicaType.error.$SCRIPT_PID)" "NOTICE"
 		return 0
 	else
-		Logger "Cannot create replica file list in [$replica_path]." "CRITICAL"
+		Logger "Cannot create replica file list in [$replicaPath]." "CRITICAL"
 		return $retval
 	fi
 }
 
-# delete_list(replicaType): Creates a list of files vanished from last run on replica $1 (initiator/target)
-function delete_list {
+# deleteList(replicaType): Creates a list of files vanished from last run on replica $1 (initiator/target)
+function deleteList {
 	local replicaType="${1}" # replica type: initiator, target
-	#local tree_file_after="${2}" # tree-file-after, will be prefixed with replica type
-	#local tree_file_current="${3}" # tree-file-current, will be prefixed with replica type
-	#local deleted_list_file="${4}" # file containing deleted file list, will be prefixed with replica type
-	#local deleted_failed_list_file="${5}" # file containing files that could not be deleted on last run, will be prefixed with replica type
 	__CheckArguments 1 $# ${FUNCNAME[0]} "$@"	#__WITH_PARANOIA_DEBUG
 
 	local cmd
@@ -695,23 +691,21 @@ function delete_list {
 				Logger "Cannot add failed deleted list to current deleted list for replica [$replicaType]." "ERROR"
 			fi
 		fi
-		Logger "Its done" "WARN"
 		return $retval
 	else
-		Logger "Not done" "WARN"
 		touch "${INITIATOR[$__replicaDir]}${INITIATOR[$__stateDir]}/$replicaType${INITIATOR[$__deletedListFile]}"
 		return $retval
 	fi
 }
 
-function _get_file_ctime_mtime_local {
-	local replica_path="${1}" # Contains replica path
+function _getFileCtimeMtimeLocal {
+	local replicaPath="${1}" # Contains replica path
 	local replicaType="${2}" # Initiator / Target
-	local file_list="${3}" # Contains list of files to get time attrs
+	local fileList="${3}" # Contains list of files to get time attrs
 	__CheckArguments 3 $# ${FUNCNAME[0]} "$@"	#__WITH_PARANOIA_DEBUG
 
 	echo -n "" > "$RUN_DIR/$PROGRAM.ctime_mtime.$replicaType.$SCRIPT_PID"
-	while read -r file; do $STAT_CTIME_MTIME_CMD "$replica_path$file" | sort >> "$RUN_DIR/$PROGRAM.ctime_mtime.$replicaType.$SCRIPT_PID"; done < "$file_list"
+	while read -r file; do $STAT_CTIME_MTIME_CMD "$replicaPath$file" | sort >> "$RUN_DIR/$PROGRAM.ctime_mtime.$replicaType.$SCRIPT_PID"; done < "$fileList"
 	if [ $? != 0 ]; then
 		Logger "Getting file attributes failed [$retval] on $replicaType. Stopping execution." "CRITICAL"
 		if [ -f "$RUN_DIR/$PROGRAM.ctime_mtime.$replicaType.$SCRIPT_PID" ]; then
@@ -722,15 +716,15 @@ function _get_file_ctime_mtime_local {
 
 }
 
-function _get_file_ctime_mtime_remote {
-	local replica_path="${1}" # Contains replica path
+function _getFileCtimeMtimeRemote {
+	local replicapath="${1}" # Contains replica path
 	local replicaType="${2}"
-	local file_list="${3}"
+	local fileList="${3}"
 	__CheckArguments 3 $# ${FUNCNAME[0]} "$@"	#__WITH_PARANOIA_DEBUG
 
 	local cmd
 
-	cmd='cat "'$file_list'" | '$SSH_CMD' "while read -r file; do '$REMOTE_STAT_CTIME_MTIME_CMD' \"'$replica_path'\$file\"; done | sort" > "'$RUN_DIR/$PROGRAM.ctime_mtime.$replicaType.$SCRIPT_PID'"'
+	cmd='cat "'$fileList'" | '$SSH_CMD' "while read -r file; do '$REMOTE_STAT_CTIME_MTIME_CMD' \"'$replicaPath'\$file\"; done | sort" > "'$RUN_DIR/$PROGRAM.ctime_mtime.$replicaType.$SCRIPT_PID'"'
 	Logger "CMD: $cmd" "DEBUG"
 	eval "$cmd"
 	if [ $? != 0 ]; then
@@ -744,29 +738,31 @@ function _get_file_ctime_mtime_remote {
 
 # rsync does sync with mtime, but file attribute modifications only change ctime.
 # Hence, detect newer ctime on the replica that gets updated first with CONFLICT_PREVALANCE and update all newer file attributes on this replica before real update
-function sync_attrs {
-	local initiator_replica="${1}"
-	local target_replica="${2}"
-	local delete_list_filename="${INITIATOR[$__deletedListFile]}" # Contains deleted list filename, will be prefixed with replica type
+function syncAttrs {
+	local initiatorReplica="${1}"
+	local targetReplica="${2}"
 	__CheckArguments 2 $# ${FUNCNAME[0]} "$@"	#__WITH_PARANOIA_DEBUG
 
-	local rsync_cmd
+	local rsyncCmd
 	local retval
 
-	local esc_source_dir
-	local esc_dest_dir
+	local sourceDir
+	local destDir
+	local escSourceDir
+	local escDestDir
+	local destReplica
 
 	Logger "Getting list of files that need updates." "NOTICE"
 
 	if [ "$REMOTE_OPERATION" == "yes" ]; then
 		CheckConnectivity3rdPartyHosts
 		CheckConnectivityRemoteHost
-		rsync_cmd="$(type -p $RSYNC_EXECUTABLE) --rsync-path=\"$RSYNC_PATH\" -i -n -8 $RSYNC_ARGS $RSYNC_ATTR_ARGS $RSYNC_PARTIAL_EXCLUDE -e \"$RSYNC_SSH_CMD\" --exclude \"$OSYNC_DIR\" $RSYNC_PATTERNS $RSYNC_PARTIAL_EXCLUDE \"$initiator_replica\" $REMOTE_USER@$REMOTE_HOST:\"$target_replica\" >> $RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$SCRIPT_PID 2>&1 &"
+		rsyncCmd="$(type -p $RSYNC_EXECUTABLE) --rsync-path=\"$RSYNC_PATH\" -i -n -8 $RSYNC_ARGS $RSYNC_ATTR_ARGS $RSYNC_PARTIAL_EXCLUDE -e \"$RSYNC_SSH_CMD\" --exclude \"$OSYNC_DIR\" $RSYNC_PATTERNS $RSYNC_PARTIAL_EXCLUDE \"$initiatorReplica\" $REMOTE_USER@$REMOTE_HOST:\"$targetReplica\" >> $RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$SCRIPT_PID 2>&1 &"
 	else
-		rsync_cmd="$(type -p $RSYNC_EXECUTABLE) --rsync-path=\"$RSYNC_PATH\" -i -n -8 $RSYNC_ARGS $RSYNC_ATTR_ARGS $RSYNC_PARTIAL_EXCLUDE --exclude \"$OSYNC_DIR\" $RSYNC_PATTERNS $RSYNC_PARTIAL_EXCLUDE \"$initiator_replica\" \"$target_replica\" >> $RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$SCRIPT_PID 2>&1 &"
+		rsyncCmd="$(type -p $RSYNC_EXECUTABLE) --rsync-path=\"$RSYNC_PATH\" -i -n -8 $RSYNC_ARGS $RSYNC_ATTR_ARGS $RSYNC_PARTIAL_EXCLUDE --exclude \"$OSYNC_DIR\" $RSYNC_PATTERNS $RSYNC_PARTIAL_EXCLUDE \"$initiatorReplica\" \"$targetReplica\" >> $RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$SCRIPT_PID 2>&1 &"
 	fi
-	Logger "RSYNC_CMD: $rsync_cmd" "DEBUG"
-	eval "$rsync_cmd"
+	Logger "RSYNC_CMD: $rsyncCmd" "DEBUG"
+	eval "$rsyncCmd"
 	WaitForTaskCompletion $! $SOFT_MAX_EXEC_TIME $HARD_MAX_EXEC_TIME ${FUNCNAME[0]} false $KEEP_LOGGING
 	retval=$?
 
@@ -789,15 +785,15 @@ function sync_attrs {
 	fi
 
 	Logger "Getting ctimes for pending files on initiator." "NOTICE"
-	_get_file_ctime_mtime_local "${INITIATOR[$__replicaDir]}" "${INITIATOR[$__type]}" "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}-cleaned.$SCRIPT_PID" &
+	_getFileCtimeMtimeLocal "${INITIATOR[$__replicaDir]}" "${INITIATOR[$__type]}" "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}-cleaned.$SCRIPT_PID" &
 	pids="$!"
 
 	Logger "Getting ctimes for pending files on target." "NOTICE"
 	if [ "$REMOTE_OPERATION" != "yes" ]; then
-		_get_file_ctime_mtime_local "${TARGET[$__replicaDir]}" "${TARGET[$__type]}" "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}-cleaned.$SCRIPT_PID" &
+		_getFileCtimeMtimeLocal "${TARGET[$__replicaDir]}" "${TARGET[$__type]}" "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}-cleaned.$SCRIPT_PID" &
 		pids="$pids;$!"
 	else
-		_get_file_ctime_mtime_remote "${TARGET[$__replicaDir]}" "${TARGET[$__type]}" "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}-cleaned.$SCRIPT_PID" &
+		_getFileCtimeMtimeRemote "${TARGET[$__replicaDir]}" "${TARGET[$__type]}" "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}-cleaned.$SCRIPT_PID" &
 		pids="$pids;$!"
 	fi
 	WaitForTaskCompletion $pids 1800 0 ${FUNCNAME[0]} true $KEEP_LOGGING
@@ -809,205 +805,207 @@ function sync_attrs {
 	sed -i'.tmp' "s;^${TARGET[$__replicaDir]};;g" "$RUN_DIR/$PROGRAM.ctime_mtime.${TARGET[$__type]}.$SCRIPT_PID"
 
 	if [ "$CONFLICT_PREVALANCE" == "${TARGET[$__type]}" ]; then
-		local source_dir="${INITIATOR[$__replicaDir]}"
-		esc_source_dir=$(EscapeSpaces "${INITIATOR[$__replicaDir]}")
-		local dest_dir="${TARGET[$__replicaDir]}"
-		esc_dest_dir=$(EscapeSpaces "${TARGET[$__replicaDir]}")
-		local dest_replica="${TARGET[$__type]}"
+		sourceDir="${INITIATOR[$__replicaDir]}"
+		escSourceDir=$(EscapeSpaces "${INITIATOR[$__replicaDir]}")
+		destDir="${TARGET[$__replicaDir]}"
+		escDestDir=$(EscapeSpaces "${TARGET[$__replicaDir]}")
+		destReplica="${TARGET[$__type]}"
 		join -j 1 -t ';' -o 1.1,1.2,2.2 "$RUN_DIR/$PROGRAM.ctime_mtime.${INITIATOR[$__type]}.$SCRIPT_PID" "$RUN_DIR/$PROGRAM.ctime_mtime.${TARGET[$__type]}.$SCRIPT_PID" | awk -F';' '{if ($2 > $3) print $1}' > "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}-ctime_files.$SCRIPT_PID"
 	else
-		local source_dir="${TARGET[$__replicaDir]}"
-		esc_source_dir=$(EscapeSpaces "${TARGET[$__replicaDir]}")
-		local dest_dir="${INITIATOR[$__replicaDir]}"
-		esc_dest_dir=$(EscapeSpaces "${INITIATOR[$__replicaDir]}")
-		local dest_replica="${INITIATOR[$__type]}"
+		sourceDir="${TARGET[$__replicaDir]}"
+		escSourceDir=$(EscapeSpaces "${TARGET[$__replicaDir]}")
+		destDir="${INITIATOR[$__replicaDir]}"
+		escDestDir=$(EscapeSpaces "${INITIATOR[$__replicaDir]}")
+		destReplica="${INITIATOR[$__type]}"
 		join -j 1 -t ';' -o 1.1,1.2,2.2 "$RUN_DIR/$PROGRAM.ctime_mtime.${TARGET[$__type]}.$SCRIPT_PID" "$RUN_DIR/$PROGRAM.ctime_mtime.${INITIATOR[$__type]}.$SCRIPT_PID" | awk -F';' '{if ($2 > $3) print $1}' > "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}-ctime_files.$SCRIPT_PID"
 	fi
 
 	if [ $(wc -l < "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}-ctime_files.$SCRIPT_PID") -eq 0 ]; then
-		Logger "Updating file attributes on $dest_replica not required" "NOTICE"
+		Logger "Updating file attributes on $destReplica not required" "NOTICE"
 		return 0
 	fi
 
-	Logger "Updating file attributes on $dest_replica." "NOTICE"
+	Logger "Updating file attributes on $destReplica." "NOTICE"
 
 	if [ "$REMOTE_OPERATION" == "yes" ]; then
 		CheckConnectivity3rdPartyHosts
 		CheckConnectivityRemoteHost
 
 		# No rsync args (hence no -r) because files are selected with --from-file
-		if [ "$dest_replica" == "${INITIATOR[$__type]}" ]; then
-			rsync_cmd="$(type -p $RSYNC_EXECUTABLE) --rsync-path=\"$RSYNC_PATH\" $RSYNC_DRY_ARG $RSYNC_ATTR_ARGS $SYNC_OPTS -e \"$RSYNC_SSH_CMD\" --exclude \"$OSYNC_DIR\" $RSYNC_PATTERNS $RSYNC_PARTIAL_EXCLUDE --exclude-from=\"${INITIATOR[$__replicaDir]}${INITIATOR[$__stateDir]}/${INITIATOR[$__type]}$delete_list_filename\" --exclude-from=\"${INITIATOR[$__replicaDir]}${INITIATOR[$__stateDir]}/${TARGET[$__type]}$delete_list_filename\" --files-from=\"$RUN_DIR/$PROGRAM.${FUNCNAME[0]}-ctime_files.$SCRIPT_PID\" $REMOTE_USER@$REMOTE_HOST:\"$esc_source_dir\" \"$dest_dir\" >> $RUN_DIR/$PROGRAM.attr-update.$dest_replica.$SCRIPT_PID 2>&1 &"
+		if [ "$destReplica" == "${INITIATOR[$__type]}" ]; then
+			rsyncCmd="$(type -p $RSYNC_EXECUTABLE) --rsync-path=\"$RSYNC_PATH\" $RSYNC_DRY_ARG $RSYNC_ATTR_ARGS $SYNC_OPTS -e \"$RSYNC_SSH_CMD\" --exclude \"$OSYNC_DIR\" $RSYNC_PATTERNS $RSYNC_PARTIAL_EXCLUDE --exclude-from=\"${INITIATOR[$__replicaDir]}${INITIATOR[$__stateDir]}/${INITIATOR[$__type]}${INITIATOR[$__deletedListFile]}\" --exclude-from=\"${INITIATOR[$__replicaDir]}${INITIATOR[$__stateDir]}/${TARGET[$__type]}${INITIATOR[$__deletedListFile]}\" --files-from=\"$RUN_DIR/$PROGRAM.${FUNCNAME[0]}-ctime_files.$SCRIPT_PID\" $REMOTE_USER@$REMOTE_HOST:\"$escSourceDir\" \"$destDir\" >> $RUN_DIR/$PROGRAM.attr-update.$destReplica.$SCRIPT_PID 2>&1 &"
 		else
-			rsync_cmd="$(type -p $RSYNC_EXECUTABLE) --rsync-path=\"$RSYNC_PATH\" $RSYNC_DRY_ARG $RSYNC_ATTR_ARGS $SYNC_OPTS -e \"$RSYNC_SSH_CMD\" --exclude \"$OSYNC_DIR\" $RSYNC_PATTERNS $RSYNC_PARTIAL_EXCLUDE --exclude-from=\"${INITIATOR[$__replicaDir]}${INITIATOR[$__stateDir]}/${INITIATOR[$__type]}$delete_list_filename\" --exclude-from=\"${INITIATOR[$__replicaDir]}${INITIATOR[$__stateDir]}/${TARGET[$__type]}$delete_list_filename\" --files-from=\"$RUN_DIR/$PROGRAM.${FUNCNAME[0]}-ctime_files.$SCRIPT_PID\" \"$source_dir\" $REMOTE_USER@$REMOTE_HOST:\"$esc_dest_dir\" >> $RUN_DIR/$PROGRAM.attr-update.$dest_replica.$SCRIPT_PID 2>&1 &"
+			rsyncCmd="$(type -p $RSYNC_EXECUTABLE) --rsync-path=\"$RSYNC_PATH\" $RSYNC_DRY_ARG $RSYNC_ATTR_ARGS $SYNC_OPTS -e \"$RSYNC_SSH_CMD\" --exclude \"$OSYNC_DIR\" $RSYNC_PATTERNS $RSYNC_PARTIAL_EXCLUDE --exclude-from=\"${INITIATOR[$__replicaDir]}${INITIATOR[$__stateDir]}/${INITIATOR[$__type]}${INITIATOR[$__deletedListFile]}\" --exclude-from=\"${INITIATOR[$__replicaDir]}${INITIATOR[$__stateDir]}/${TARGET[$__type]}${INITIATOR[$__deletedListFile]}\" --files-from=\"$RUN_DIR/$PROGRAM.${FUNCNAME[0]}-ctime_files.$SCRIPT_PID\" \"$sourceDir\" $REMOTE_USER@$REMOTE_HOST:\"$escDestDir\" >> $RUN_DIR/$PROGRAM.attr-update.$destReplica.$SCRIPT_PID 2>&1 &"
 		fi
 	else
-		rsync_cmd="$(type -p $RSYNC_EXECUTABLE) --rsync-path=\"$RSYNC_PATH\" $RSYNC_DRY_ARG $RSYNC_ATTR_ARGS $SYNC_OPTS --exclude \"$OSYNC_DIR\" $RSYNC_PATTERNS $RSYNC_PARTIAL_EXCLUDE --exclude-from=\"${INITIATOR[$__replicaDir]}${INITIATOR[$__stateDir]}/${INITIATOR[$__type]}$delete_list_filename\" --exclude-from=\"${INITIATOR[$__replicaDir]}${INITIATOR[$__stateDir]}/${TARGET[$__type]}$delete_list_filename\" --files-from=\"$RUN_DIR/$PROGRAM.${FUNCNAME[0]}-ctime_files.$SCRIPT_PID\" \"$source_dir\" \"$dest_dir\" >> $RUN_DIR/$PROGRAM.attr-update.$dest_replica.$SCRIPT_PID 2>&1 &"
+		rsyncCmd="$(type -p $RSYNC_EXECUTABLE) --rsync-path=\"$RSYNC_PATH\" $RSYNC_DRY_ARG $RSYNC_ATTR_ARGS $SYNC_OPTS --exclude \"$OSYNC_DIR\" $RSYNC_PATTERNS $RSYNC_PARTIAL_EXCLUDE --exclude-from=\"${INITIATOR[$__replicaDir]}${INITIATOR[$__stateDir]}/${INITIATOR[$__type]}${INITIATOR[$__deletedListFile]}\" --exclude-from=\"${INITIATOR[$__replicaDir]}${INITIATOR[$__stateDir]}/${TARGET[$__type]}${INITIATOR[$__deletedListFile]}\" --files-from=\"$RUN_DIR/$PROGRAM.${FUNCNAME[0]}-ctime_files.$SCRIPT_PID\" \"$sourceDir\" \"$destDir\" >> $RUN_DIR/$PROGRAM.attr-update.$destReplica.$SCRIPT_PID 2>&1 &"
 
 	fi
 
-	Logger "RSYNC_CMD: $rsync_cmd" "DEBUG"
-	eval "$rsync_cmd"
+	Logger "RSYNC_CMD: $rsyncCmd" "DEBUG"
+	eval "$rsyncCmd"
 	WaitForTaskCompletion $! $SOFT_MAX_EXEC_TIME $HARD_MAX_EXEC_TIME ${FUNCNAME[0]} false $KEEP_LOGGING
 	retval=$?
 
 	if [ $retval != 0 ] && [ $retval != 24 ]; then
-		Logger "Updating file attributes on $dest_replica [$retval]. Stopping execution." "CRITICAL"
-		if [ -f "$RUN_DIR/$PROGRAM.attr-update.$dest_replica.$SCRIPT_PID" ]; then
-			Logger "Rsync output:\n$(cat $RUN_DIR/$PROGRAM.attr-update.$dest_replica.$SCRIPT_PID)" "NOTICE"
+		Logger "Updating file attributes on $destReplica [$retval]. Stopping execution." "CRITICAL"
+		if [ -f "$RUN_DIR/$PROGRAM.attr-update.$destReplica.$SCRIPT_PID" ]; then
+			Logger "Rsync output:\n$(cat $RUN_DIR/$PROGRAM.attr-update.$destReplica.$SCRIPT_PID)" "NOTICE"
 		fi
 		exit 1
 	else
-		if [ -f "$RUN_DIR/$PROGRAM.attr-update.$dest_replica.$SCRIPT_PID" ]; then
-			Logger "List:\n$(cat $RUN_DIR/$PROGRAM.attr-update.$dest_replica.$SCRIPT_PID)" "VERBOSE"
+		if [ -f "$RUN_DIR/$PROGRAM.attr-update.$destReplica.$SCRIPT_PID" ]; then
+			Logger "List:\n$(cat $RUN_DIR/$PROGRAM.attr-update.$destReplica.$SCRIPT_PID)" "VERBOSE"
 		fi
-		Logger "Successfully updated file attributes on $dest_replica replica." "NOTICE"
+		Logger "Successfully updated file attributes on $destReplica replica." "NOTICE"
 	fi
 }
 
-# sync_update(source replica, destination replica, delete_list_filename)
-function sync_update {
-	local source_replica="${1}" # Contains replica type of source: initiator, target
-	local destination_replica="${2}" # Contains replica type of destination: initiator, target
-	local delete_list_filename="${3}" # Contains deleted list filename, will be prefixed with replica type
-	__CheckArguments 3 $# ${FUNCNAME[0]} "$@"	#__WITH_PARANOIA_DEBUG
+# syncUpdate(source replica, destination replica, delete_list_filename)
+function syncUpdate {
+	local sourceReplica="${1}" # Contains replica type of source: initiator, target
+	local destinationReplica="${2}" # Contains replica type of destination: initiator, target
+	__CheckArguments 2 $# ${FUNCNAME[0]} "$@"	#__WITH_PARANOIA_DEBUG
 
-	local rsync_cmd
+	local rsyncCmd
 	local retval
 
-	local esc_source_dir
-	local esc_dest_dir
+	local sourceDir
+	local escSourceDir
+	local destDir
+	local escDestDir
 
-	Logger "Updating $destination_replica replica." "NOTICE"
-	if [ "$source_replica" == "${INITIATOR[$__type]}" ]; then
-		local source_dir="${INITIATOR[$__replicaDir]}"
-		local dest_dir="${TARGET[$__replicaDir]}"
-		local backup_args="$TARGET_BACKUP"
+	local backupArgs
 
-		esc_source_dir=$(EscapeSpaces "${INITIATOR[$__replicaDir]}")
-		esc_dest_dir=$(EscapeSpaces "${TARGET[$__replicaDir]}")
+	Logger "Updating $destinationReplica replica." "NOTICE"
+	if [ "$sourceReplica" == "${INITIATOR[$__type]}" ]; then
+		sourceDir="${INITIATOR[$__replicaDir]}"
+		destDir="${TARGET[$__replicaDir]}"
+		backupArgs="$TARGET_BACKUP"
+
+		escSourceDir=$(EscapeSpaces "${INITIATOR[$__replicaDir]}")
+		escDestDir=$(EscapeSpaces "${TARGET[$__replicaDir]}")
 	else
-		local source_dir="${TARGET[$__replicaDir]}"
-		local dest_dir="${INITIATOR[$__replicaDir]}"
-		local backup_args="$INITIATOR_BACKUP"
+		sourceDir="${TARGET[$__replicaDir]}"
+		destDir="${INITIATOR[$__replicaDir]}"
+		backupArgs="$INITIATOR_BACKUP"
 
-		esc_source_dir=$(EscapeSpaces "${TARGET[$__replicaDir]}")
-		esc_dest_dir=$(EscapeSpaces "${INITIATOR[$__replicaDir]}")
+		escSourceDir=$(EscapeSpaces "${TARGET[$__replicaDir]}")
+		escDestDir=$(EscapeSpaces "${INITIATOR[$__replicaDir]}")
 	fi
 
 	if [ "$REMOTE_OPERATION" == "yes" ]; then
 		CheckConnectivity3rdPartyHosts
 		CheckConnectivityRemoteHost
-		if [ "$source_replica" == "${INITIATOR[$__type]}" ]; then
-			rsync_cmd="$(type -p $RSYNC_EXECUTABLE) --rsync-path=\"$RSYNC_PATH\" $RSYNC_ARGS $RSYNC_DRY_ARG $RSYNC_ATTR_ARGS $RSYNC_TYPE_ARGS $SYNC_OPTS -e \"$RSYNC_SSH_CMD\" $backup_args --exclude \"$OSYNC_DIR\" $RSYNC_PATTERNS $RSYNC_PARTIAL_EXCLUDE --exclude-from=\"${INITIATOR[$__replicaDir]}${INITIATOR[$__stateDir]}/$source_replica$delete_list_filename\" --exclude-from=\"${INITIATOR[$__replicaDir]}${INITIATOR[$__stateDir]}/$destination_replica$delete_list_filename\" \"$source_dir\" $REMOTE_USER@$REMOTE_HOST:\"$esc_dest_dir\" >> $RUN_DIR/$PROGRAM.update.$destination_replica.$SCRIPT_PID 2>&1"
+		if [ "$sourceReplica" == "${INITIATOR[$__type]}" ]; then
+			rsyncCmd="$(type -p $RSYNC_EXECUTABLE) --rsync-path=\"$RSYNC_PATH\" $RSYNC_ARGS $RSYNC_DRY_ARG $RSYNC_ATTR_ARGS $RSYNC_TYPE_ARGS $SYNC_OPTS -e \"$RSYNC_SSH_CMD\" $backupArgs --exclude \"$OSYNC_DIR\" $RSYNC_PATTERNS $RSYNC_PARTIAL_EXCLUDE --exclude-from=\"${INITIATOR[$__replicaDir]}${INITIATOR[$__stateDir]}/$sourceReplica${INITIATOR[$__deletedListFile]}\" --exclude-from=\"${INITIATOR[$__replicaDir]}${INITIATOR[$__stateDir]}/$destinationReplica${INITIATOR[$__deletedListFile]}\" \"$sourceDir\" $REMOTE_USER@$REMOTE_HOST:\"$escDestDir\" >> $RUN_DIR/$PROGRAM.update.$destinationReplica.$SCRIPT_PID 2>&1"
 		else
-			rsync_cmd="$(type -p $RSYNC_EXECUTABLE) --rsync-path=\"$RSYNC_PATH\" $RSYNC_ARGS $RSYNC_DRY_ARG $RSYNC_ATTR_ARGS $RSYNC_TYPE_ARGS $SYNC_OPTS -e \"$RSYNC_SSH_CMD\" $backup_args --exclude \"$OSYNC_DIR\" $RSYNC_PATTERNS $RSYNC_PARTIAL_EXCLUDE --exclude-from=\"${INITIATOR[$__replicaDir]}${INITIATOR[$__stateDir]}/$destination_replica$delete_list_filename\" --exclude-from=\"${INITIATOR[$__replicaDir]}${INITIATOR[$__stateDir]}/$source_replica$delete_list_filename\" $REMOTE_USER@$REMOTE_HOST:\"$esc_source_dir\" \"$dest_dir\" >> $RUN_DIR/$PROGRAM.update.$destination_replica.$SCRIPT_PID 2>&1"
+			rsyncCmd="$(type -p $RSYNC_EXECUTABLE) --rsync-path=\"$RSYNC_PATH\" $RSYNC_ARGS $RSYNC_DRY_ARG $RSYNC_ATTR_ARGS $RSYNC_TYPE_ARGS $SYNC_OPTS -e \"$RSYNC_SSH_CMD\" $backupArgs --exclude \"$OSYNC_DIR\" $RSYNC_PATTERNS $RSYNC_PARTIAL_EXCLUDE --exclude-from=\"${INITIATOR[$__replicaDir]}${INITIATOR[$__stateDir]}/$destinationReplica${INITIATOR[$__deletedListFile]}\" --exclude-from=\"${INITIATOR[$__replicaDir]}${INITIATOR[$__stateDir]}/$sourceReplica${INITIATOR[$__deletedListFile]}\" $REMOTE_USER@$REMOTE_HOST:\"$escSourceDir\" \"$destDir\" >> $RUN_DIR/$PROGRAM.update.$destinationReplica.$SCRIPT_PID 2>&1"
 		fi
 	else
-		rsync_cmd="$(type -p $RSYNC_EXECUTABLE) --rsync-path=\"$RSYNC_PATH\" $RSYNC_ARGS $RSYNC_DRY_ARG $RSYNC_ATTR_ARGS $RSYNC_TYPE_ARGS $SYNC_OPTS $backup_args --exclude \"$OSYNC_DIR\" $RSYNC_PATTERNS $RSYNC_PARTIAL_EXCLUDE --exclude-from=\"${INITIATOR[$__replicaDir]}${INITIATOR[$__stateDir]}/$source_replica$delete_list_filename\" --exclude-from=\"${INITIATOR[$__replicaDir]}${INITIATOR[$__stateDir]}/$destination_replica$delete_list_filename\" \"$source_dir\" \"$dest_dir\" >> $RUN_DIR/$PROGRAM.update.$destination_replica.$SCRIPT_PID 2>&1"
+		rsyncCmd="$(type -p $RSYNC_EXECUTABLE) --rsync-path=\"$RSYNC_PATH\" $RSYNC_ARGS $RSYNC_DRY_ARG $RSYNC_ATTR_ARGS $RSYNC_TYPE_ARGS $SYNC_OPTS $backupArgs --exclude \"$OSYNC_DIR\" $RSYNC_PATTERNS $RSYNC_PARTIAL_EXCLUDE --exclude-from=\"${INITIATOR[$__replicaDir]}${INITIATOR[$__stateDir]}/$sourceReplica${INITIATOR[$__deletedListFile]}\" --exclude-from=\"${INITIATOR[$__replicaDir]}${INITIATOR[$__stateDir]}/$destinationReplica${INITIATOR[$__deletedListFile]}\" \"$sourceDir\" \"$destDir\" >> $RUN_DIR/$PROGRAM.update.$destinationReplica.$SCRIPT_PID 2>&1"
 	fi
-	Logger "RSYNC_CMD: $rsync_cmd" "DEBUG"
-	eval "$rsync_cmd"
+	Logger "RSYNC_CMD: $rsyncCmd" "DEBUG"
+	eval "$rsyncCmd"
 	retval=$?
 
 	if [ $retval != 0 ] && [ $retval != 24 ]; then
-		Logger "Updating $destination_replica replica failed. Stopping execution." "CRITICAL"
-		if [ -f "$RUN_DIR/$PROGRAM.update.$destination_replica.$SCRIPT_PID" ]; then
-			Logger "Rsync output:\n$(cat $RUN_DIR/$PROGRAM.update.$destination_replica.$SCRIPT_PID)" "NOTICE"
+		Logger "Updating $destinationReplica replica failed. Stopping execution." "CRITICAL"
+		if [ -f "$RUN_DIR/$PROGRAM.update.$destinationReplica.$SCRIPT_PID" ]; then
+			Logger "Rsync output:\n$(cat $RUN_DIR/$PROGRAM.update.$destinationReplica.$SCRIPT_PID)" "NOTICE"
 		fi
 		exit 1
 	else
-		if [ -f "$RUN_DIR/$PROGRAM.update.$destination_replica.$SCRIPT_PID" ]; then
-			Logger "List:\n$(cat $RUN_DIR/$PROGRAM.update.$destination_replica.$SCRIPT_PID)" "VERBOSE"
+		if [ -f "$RUN_DIR/$PROGRAM.update.$destinationReplica.$SCRIPT_PID" ]; then
+			Logger "List:\n$(cat $RUN_DIR/$PROGRAM.update.$destinationReplica.$SCRIPT_PID)" "VERBOSE"
 		fi
-		Logger "Updating $destination_replica replica succeded." "NOTICE"
+		Logger "Updating $destinationReplica replica succeded." "NOTICE"
 		return 0
 	fi
 }
 
-# delete_local(replica dir, delete file list, delete dir, delete failed file)
-function _delete_local {
-	local replica_dir="${1}" # Full path to replica
-	local deleted_list_file="${2}" # file containing deleted file list, will be prefixed with replica type
-	local deletion_dir="${3}" # deletion dir in format .[workdir]/deleted
-	local deleted_failed_list_file="${4}" # file containing files that could not be deleted on last run, will be prefixed with replica type
-	__CheckArguments 4 $# ${FUNCNAME[0]} "$@"	#__WITH_PARANOIA_DEBUG
+function _deleteLocal {
+	local replicaType="${1}" # Replica type
+	local replicaDir="${2}" # Full path to replica
+	local deletionDir="${3}" # deletion dir in format .[workdir]/deleted
+	__CheckArguments 3 $# ${FUNCNAME[0]} "$@"	#__WITH_PARANOIA_DEBUG
 
 	local parentdir
-	local previous_file=""
+	local previousFile=""
 	local result
 
-	if [ ! -d "$replica_dir$deletion_dir" ] && [ $_DRYRUN == false ]; then
-		$COMMAND_SUDO mkdir -p "$replica_dir$deletion_dir"
+	if [ ! -d "$replicaDir$deletionDir" ] && [ $_DRYRUN == false ]; then
+		$COMMAND_SUDO mkdir -p "$replicaDir$deletionDir"
 		if [ $? != 0 ]; then
-			Logger "Cannot create local replica deletion directory in [$replica_dir$deletion_dir]." "ERROR"
+			Logger "Cannot create local replica deletion directory in [$replicaDir$deletionDir]." "ERROR"
 			exit 1
 		fi
 	fi
 
 	while read -r files; do
 		## On every run, check wheter the next item is already deleted because it is included in a directory already deleted
-		if [[ "$files" != "$previous_file/"* ]] && [ "$files" != "" ]; then
+		if [[ "$files" != "$previousFile/"* ]] && [ "$files" != "" ]; then
 
 			if [ "$SOFT_DELETE" != "no" ]; then
 				if [ $_DRYRUN == false ]; then
-					if [ -e "$replica_dir$deletion_dir/$files" ]; then
-						rm -rf "${replica_dir:?}$deletion_dir/$files"
+					if [ -e "$replicaDir$deletionDir/$files" ]; then
+						rm -rf "${replicaDir:?}$deletionDir/$files"
 					fi
 
-					if [ -e "$replica_dir$files" ]; then
+					if [ -e "$replicaDir$files" ]; then
 						# In order to keep full path on soft deletion, create parent directories before move
 						parentdir="$(dirname "$files")"
 						if [ "$parentdir" != "." ]; then
-							mkdir -p "$replica_dir$deletion_dir/$parentdir"
-							Logger "Moving deleted file [$replica_dir$files] to [$replica_dir$deletion_dir/$parentdir]." "VERBOSE"
-							mv -f "$replica_dir$files" "$replica_dir$deletion_dir/$parentdir"
+							mkdir -p "$replicaDir$deletionDir/$parentdir"
+							Logger "Moving deleted file [$replicaDir$files] to [$replicaDir$deletionDir/$parentdir]." "VERBOSE"
+							mv -f "$replicaDir$files" "$replicaDir$deletionDir/$parentdir"
 						else
-							Logger "Moving deleted file [$replica_dir$files] to [$replica_dir$deletion_dir]." "VERBOSE"
-							mv -f "$replica_dir$files" "$replica_dir$deletion_dir"
+							Logger "Moving deleted file [$replicaDir$files] to [$replicaDir$deletionDir]." "VERBOSE"
+							mv -f "$replicaDir$files" "$replicaDir$deletionDir"
 						fi
 						if [ $? != 0 ]; then
-							Logger "Cannot move [$replica_dir$files] to deletion directory." "ERROR"
-							echo "$files" >> "${INITIATOR[$__replicaDir]}${INITIATOR[$__stateDir]}/$deleted_failed_list_file"
+							Logger "Cannot move [$replicaDir$files] to deletion directory." "ERROR"
+							echo "$files" >> "${INITIATOR[$__replicaDir]}${INITIATOR[$__stateDir]}/$replicaType${INITIATOR[$__failedDeletedListFile]}"
 						fi
 					fi
 				fi
 			else
 				if [ $_DRYRUN == false ]; then
-					if [ -e "$replica_dir$files" ]; then
-						rm -rf "$replica_dir$files"
+					if [ -e "$replicaDir$files" ]; then
+						rm -rf "$replicaDir$files"
 						result=$?
-						Logger "Deleting [$replica_dir$files]." "VERBOSE"
+						Logger "Deleting [$replicaDir$files]." "VERBOSE"
 						if [ $result != 0 ]; then
-							Logger "Cannot delete [$replica_dir$files]." "ERROR"
-							echo "$files" >> "${INITIATOR[$__replicaDir]}${INITIATOR[$__stateDir]}/$deleted_failed_list_file"
+							Logger "Cannot delete [$replicaDir$files]." "ERROR"
+							echo "$files" >> "${INITIATOR[$__replicaDir]}${INITIATOR[$__stateDir]}/$replicaType${INITIATOR[$__failedDeletedListFile]}"
 						fi
 					fi
 				fi
 			fi
-			previous_file="$files"
+			previousFile="$files"
 		fi
-	done < "${INITIATOR[$__replicaDir]}${INITIATOR[$__stateDir]}/$deleted_list_file"
+	done < "${INITIATOR[$__replicaDir]}${INITIATOR[$__stateDir]}/$replicaType${INITIATOR[$__deletedListFile]}"
 }
 
-function _delete_remote {
-	local replica_dir="${1}" # Full path to replica
-	local deleted_list_file="${2}" # file containing deleted file list, will be prefixed with replica type
-	local deletion_dir="${3}" # deletion dir in format .[workdir]/deleted
-	local deleted_failed_list_file="${4}" # file containing files that could not be deleted on last run, will be prefixed with replica type
-	__CheckArguments 4 $# ${FUNCNAME[0]} "$@"	#__WITH_PARANOIA_DEBUG
+function _deleteRemote {
+	local replicaType="${1}" # Replica type
+	local replicaDir="${2}" # Full path to replica
+	local deletionDir="${3}" # deletion dir in format .[workdir]/deleted
+	__CheckArguments 3 $# ${FUNCNAME[0]} "$@"	#__WITH_PARANOIA_DEBUG
 
-	local esc_dest_dir
-	local rsync_cmd
+	local escDestDir
+	local rsyncCmd
+
+	local escSourceFile
 
 	## This is a special coded function. Need to redelcare local functions on remote host, passing all needed variables as escaped arguments to ssh command.
 	## Anything beetween << ENDSSH and ENDSSH will be executed remotely
 
 	# Additionnaly, we need to copy the deletetion list to the remote state folder
-	esc_dest_dir="$(EscapeSpaces "${TARGET[$__replicaDir]}${TARGET[$__stateDir]}")"
-	rsync_cmd="$(type -p $RSYNC_EXECUTABLE) --rsync-path=\"$RSYNC_PATH\" -e \"$RSYNC_SSH_CMD\" \"${INITIATOR[$__replicaDir]}${INITIATOR[$__stateDir]}/$deleted_list_file\" $REMOTE_USER@$REMOTE_HOST:\"$esc_dest_dir/\" >> $RUN_DIR/$PROGRAM.${FUNCNAME[0]}.precopy.$SCRIPT_PID 2>&1"
-	Logger "RSYNC_CMD: $rsync_cmd" "DEBUG"
-	eval "$rsync_cmd" 2>> "$LOG_FILE"
+	escDestDir="$(EscapeSpaces "${TARGET[$__replicaDir]}${TARGET[$__stateDir]}")"
+	rsyncCmd="$(type -p $RSYNC_EXECUTABLE) --rsync-path=\"$RSYNC_PATH\" -e \"$RSYNC_SSH_CMD\" \"${INITIATOR[$__replicaDir]}${INITIATOR[$__stateDir]}/$replicaType${INITIATOR[$__deletedListFile]}\" $REMOTE_USER@$REMOTE_HOST:\"$escDestDir/\" >> $RUN_DIR/$PROGRAM.${FUNCNAME[0]}.precopy.$SCRIPT_PID 2>&1"
+	Logger "RSYNC_CMD: $rsyncCmd" "DEBUG"
+	eval "$rsyncCmd" 2>> "$LOG_FILE"
 	if [ $? != 0 ]; then
 		Logger "Cannot copy the deletion list to remote replica." "ERROR"
 		if [ -f "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.precopy.$SCRIPT_PID" ]; then
@@ -1016,7 +1014,7 @@ function _delete_remote {
 		exit 1
 	fi
 
-$SSH_CMD ERROR_ALERT=0 sync_on_changes=$sync_on_changes _DEBUG=$_DEBUG _DRYRUN=$_DRYRUN _VERBOSE=$_VERBOSE COMMAND_SUDO=$COMMAND_SUDO FILE_LIST="$(EscapeSpaces "${TARGET[$__replicaDir]}${TARGET[$__stateDir]}/$deleted_list_file")" REPLICA_DIR="$(EscapeSpaces "$replica_dir")" SOFT_DELETE=$SOFT_DELETE DELETE_DIR="$(EscapeSpaces "$deletion_dir")" FAILED_DELETE_LIST="$(EscapeSpaces "${TARGET[$__replicaDir]}${TARGET[$__stateDir]}/$deleted_failed_list_file")" 'bash -s' << 'ENDSSH' >> "$RUN_DIR/$PROGRAM.remote_deletion.$SCRIPT_PID" 2>&1
+$SSH_CMD ERROR_ALERT=0 sync_on_changes=$sync_on_changes _DEBUG=$_DEBUG _DRYRUN=$_DRYRUN _VERBOSE=$_VERBOSE COMMAND_SUDO=$COMMAND_SUDO FILE_LIST="$(EscapeSpaces "${TARGET[$__replicaDir]}${TARGET[$__stateDir]}/$replicaType${INITIATOR[$__deletedListFile]}")" REPLICA_DIR="$(EscapeSpaces "$replicaDir")" SOFT_DELETE=$SOFT_DELETE DELETION_DIR="$(EscapeSpaces "$deletionDir")" FAILED_DELETE_LIST="$(EscapeSpaces "${TARGET[$__replicaDir]}${TARGET[$__stateDir]}/${INITIATOR[$__failedDeletedListFile]}")" 'bash -s' << 'ENDSSH' >> "$RUN_DIR/$PROGRAM.remote_deletion.$SCRIPT_PID" 2>&1
 
 	## The following lines are executed remotely
 	function _logger {
@@ -1062,36 +1060,36 @@ $SSH_CMD ERROR_ALERT=0 sync_on_changes=$sync_on_changes _DEBUG=$_DEBUG _DRYRUN=$
 	> "$FAILED_DELETE_LIST"
 
 	parentdir=
-	previous_file=""
+	previousFile=""
 
-	if [ ! -d "$REPLICA_DIR$DELETE_DIR" ] && [ $_DRYRUN == false ]; then
-		$COMMAND_SUDO mkdir -p "$REPLICA_DIR$DELETE_DIR"
+	if [ ! -d "$REPLICA_DIR$DELETION_DIR" ] && [ $_DRYRUN == false ]; then
+		$COMMAND_SUDO mkdir -p "$REPLICA_DIR$DELETION_DIR"
 		if [ $? != 0 ]; then
-			Logger "Cannot create remote replica deletion directory in [$REPLICA_DIR$DELETE_DIR]." "ERROR"
+			Logger "Cannot create remote replica deletion directory in [$REPLICA_DIR$DELETION_DIR]." "ERROR"
 			exit 1
 		fi
 	fi
 
 	while read -r files; do
 		## On every run, check wheter the next item is already deleted because it is included in a directory already deleted
-		if [[ "$files" != "$previous_file/"* ]] && [ "$files" != "" ]; then
+		if [[ "$files" != "$previousFile/"* ]] && [ "$files" != "" ]; then
 
 			if [ "$SOFT_DELETE" != "no" ]; then
 				if [ $_DRYRUN == false ]; then
-					if [ -e "$REPLICA_DIR$DELETE_DIR/$files" ]; then
-						$COMMAND_SUDO rm -rf "$REPLICA_DIR$DELETE_DIR/$files"
+					if [ -e "$REPLICA_DIR$DELETION_DIR/$files" ]; then
+						$COMMAND_SUDO rm -rf "$REPLICA_DIR$DELETION_DIR/$files"
 					fi
 
 					if [ -e "$REPLICA_DIR$files" ]; then
 						# In order to keep full path on soft deletion, create parent directories before move
 						parentdir="$(dirname "$files")"
 						if [ "$parentdir" != "." ]; then
-							$COMMAND_SUDO mkdir -p "$REPLICA_DIR$DELETE_DIR/$parentdir"
-							$COMMAND_SUDO mv -f "$REPLICA_DIR$files" "$REPLICA_DIR$DELETE_DIR/$parentdir"
-							Logger "Moving deleted file [$REPLICA_DIR$files] to [$REPLICA_DIR$DELETE_DIR/$parentdir]." "VERBOSE"
+							$COMMAND_SUDO mkdir -p "$REPLICA_DIR$DELETION_DIR/$parentdir"
+							$COMMAND_SUDO mv -f "$REPLICA_DIR$files" "$REPLICA_DIR$DELETION_DIR/$parentdir"
+							Logger "Moving deleted file [$REPLICA_DIR$files] to [$REPLICA_DIR$DELETION_DIR/$parentdir]." "VERBOSE"
 						else
-							$COMMAND_SUDO mv -f "$REPLICA_DIR$files" "$REPLICA_DIR$DELETE_DIR"
-							Logger "Moving deleted file [$REPLICA_DIR$files] to [$REPLICA_DIR$DELETE_DIR]." "VERBOSE"
+							$COMMAND_SUDO mv -f "$REPLICA_DIR$files" "$REPLICA_DIR$DELETION_DIR"
+							Logger "Moving deleted file [$REPLICA_DIR$files] to [$REPLICA_DIR$DELETION_DIR]." "VERBOSE"
 						fi
 						if [ $? != 0 ]; then
 							Logger "Cannot move [$REPLICA_DIR$files] to deletion directory." "ERROR"
@@ -1112,7 +1110,7 @@ $SSH_CMD ERROR_ALERT=0 sync_on_changes=$sync_on_changes _DEBUG=$_DEBUG _DRYRUN=$
 					fi
 				fi
 			fi
-			previous_file="$files"
+			previousFile="$files"
 		fi
 	done < "$FILE_LIST"
 ENDSSH
@@ -1123,10 +1121,10 @@ ENDSSH
 	fi
 
 	## Copy back the deleted failed file list
-	esc_source_file="$(EscapeSpaces "${TARGET[$__replicaDir]}${TARGET[$__stateDir]}/$deleted_failed_list_file")"
-	rsync_cmd="$(type -p $RSYNC_EXECUTABLE) --rsync-path=\"$RSYNC_PATH\" -e \"$RSYNC_SSH_CMD\" $REMOTE_USER@$REMOTE_HOST:\"$esc_source_file\" \"${INITIATOR[$__replicaDir]}${INITIATOR[$__stateDir]}\" > \"$RUN_DIR/$PROGRAM.remote_failed_deletion_list_copy.$SCRIPT_PID\""
-	Logger "RSYNC_CMD: $rsync_cmd" "DEBUG"
-	eval "$rsync_cmd" 2>> "$LOG_FILE"
+	escSourceFile="$(EscapeSpaces "${TARGET[$__replicaDir]}${TARGET[$__stateDir]}/${INITIATOR[$__failedDeletedListFile]}")"
+	rsyncCmd="$(type -p $RSYNC_EXECUTABLE) --rsync-path=\"$RSYNC_PATH\" -e \"$RSYNC_SSH_CMD\" $REMOTE_USER@$REMOTE_HOST:\"$escSourceFile\" \"${INITIATOR[$__replicaDir]}${INITIATOR[$__stateDir]}\" > \"$RUN_DIR/$PROGRAM.remote_failed_deletion_list_copy.$SCRIPT_PID\""
+	Logger "RSYNC_CMD: $rsyncCmd" "DEBUG"
+	eval "$rsyncCmd" 2>> "$LOG_FILE"
 	result=$?
 	if [ $result != 0 ]; then
 		Logger "Cannot copy back the failed deletion list to initiator replica." "CRITICAL"
@@ -1138,36 +1136,34 @@ ENDSSH
 	return 0
 }
 
-# delete_propagation(replica name, deleted_list_filename, deleted_failed_file_list)
-function deletion_propagation {
+# delete_Propagation(replica type)
+function deletionPropagation {
 	local replicaType="${1}" # Contains replica type: initiator, target
-	local deleted_list_file="${2}" # file containing deleted file list, will be prefixed with replica type
-	local deleted_failed_list_file="${3}" # file containing files that could not be deleted on last run, will be prefixed with replica type
-	__CheckArguments 3 $# ${FUNCNAME[0]} "$@"	#__WITH_PARANOIA_DEBUG
+	__CheckArguments 1 $# ${FUNCNAME[0]} "$@"	#__WITH_PARANOIA_DEBUG
 
-	local replica_dir
-	local delete_dir
+	local replicaDir
+	local deleteDir
 
 	Logger "Propagating deletions to $replicaType replica." "NOTICE"
 
 	if [ "$replicaType" == "${INITIATOR[$__type]}" ]; then
-		replica_dir="${INITIATOR[$__replicaDir]}"
-		delete_dir="${INITIATOR[$__deleteDir]}"
+		replicaDir="${INITIATOR[$__replicaDir]}"
+		deleteDir="${INITIATOR[$__deleteDir]}"
 
-		_delete_local "$replica_dir" "${TARGET[$__type]}$deleted_list_file" "$delete_dir" "${TARGET[$__type]}$deleted_failed_list_file"
+		_deleteLocal "$replicaType" "$replicaDir" "$deleteDir"
 		retval=$?
 		if [ $retval != 0 ]; then
-			Logger "Deletion on replica $replicaType failed." "CRITICAL"
+			Logger "Deletion on $replicaType replica failed." "CRITICAL"
 			exit 1
 		fi
 	else
-		replica_dir="${TARGET[$__replicaDir]}"
-		delete_dir="${TARGET[$__deleteDir]}"
+		replicaDir="${TARGET[$__replicaDir]}"
+		deleteDir="${TARGET[$__deleteDir]}"
 
 		if [ "$REMOTE_OPERATION" == "yes" ]; then
-			_delete_remote "$replica_dir" "${INITIATOR[$__type]}$deleted_list_file" "$delete_dir" "${INITIATOR[$__type]}$deleted_failed_list_file"
+			_deleteRemote "$replicaType" "$replicaDir" "$deleteDir"
 		else
-			_delete_local "$replica_dir" "${INITIATOR[$__type]}$deleted_list_file" "$delete_dir" "${INITIATOR[$__type]}$deleted_failed_list_file"
+			_deleteLocal "$replicaType" "$replicaDir" "$deleteDir"
 		fi
 		retval=$?
 		if [ $retval == 0 ]; then
@@ -1176,7 +1172,7 @@ function deletion_propagation {
 			fi
 			return $retval
 		else
-			Logger "Deletion on remote system failed." "CRITICAL"
+			Logger "Deletion on $replicaType failed." "CRITICAL"
 			if [ -f "$RUN_DIR/$PROGRAM.remote_deletion.$SCRIPT_PID" ]; then
 				Logger "Remote:\n$(cat $RUN_DIR/$PROGRAM.remote_deletion.$SCRIPT_PID)" "CRITICAL"
 			fi
@@ -1261,12 +1257,12 @@ function Sync {
 	## Step 0a & 0b
 	if [ "$resumeInitiator" == "none" ] || [ "$resumeTarget" == "none" ] || [ "$resumeInitiator" == "${SYNC_ACTION[0]}" ] || [ "$resumeTarget" == "${SYNC_ACTION[0]}" ]; then
 		if [ "$resumeInitiator" == "none" ] || [ "$resumeInitiator" == "${SYNC_ACTION[0]}" ]; then
-			tree_list "${INITIATOR[$__replicaDir]}" "${INITIATOR[$__type]}" "${INITIATOR[$__treeCurrentFile]}" &
+			treeList "${INITIATOR[$__replicaDir]}" "${INITIATOR[$__type]}" "${INITIATOR[$__treeCurrentFile]}" &
 			initiatorPid="$!"
 		fi
 
 		if [ "$resumeTarget" == "none" ] || [ "$resumeTarget" == "${SYNC_ACTION[0]}" ]; then
-			tree_list "${TARGET[$__replicaDir]}" "${TARGET[$__type]}" "${INITIATOR[$__treeCurrentFile]}" &
+			treeList "${TARGET[$__replicaDir]}" "${TARGET[$__type]}" "${INITIATOR[$__treeCurrentFile]}" &
 			targetPid="$!"
 		fi
 
@@ -1306,12 +1302,12 @@ function Sync {
 	## Step 1a & 1b
 	if [ "$resumeInitiator" == "${SYNC_ACTION[1]}" ] || [ "$resumeTarget" == "${SYNC_ACTION[1]}" ]; then
 		if [ "$resumeInitiator" == "${SYNC_ACTION[1]}" ]; then
-			delete_list "${INITIATOR[$__type]}" &
+			deleteList "${INITIATOR[$__type]}" &
 			initiatorPid="$!"
 		fi
 
 		if [ "$resumeTarget" == "${SYNC_ACTION[1]}" ]; then
-			delete_list "${TARGET[$__type]}" &
+			deleteList "${TARGET[$__type]}" &
 			targetPid="$!"
 		fi
 
@@ -1351,7 +1347,7 @@ function Sync {
 	## Step 2
 	if [ "$resumeInitiator" == "${SYNC_ACTION[2]}" ] || [ "$resumeTarget" == "${SYNC_ACTION[2]}" ]; then
 		if [ "$RSYNC_ATTR_ARGS" != "" ]; then
-			sync_attrs "${INITIATOR[$__replicaDir]}" "$TARGET_SYNC_DIR"
+			syncAttrs "${INITIATOR[$__replicaDir]}" "$TARGET_SYNC_DIR"
 			WaitForTaskCompletion $! $SOFT_MAX_EXEC_TIME $HARD_MAX_EXEC_TIME ${FUNCNAME[0]} false $KEEP_LOGGING
 			if [ $? != 0 ]; then
 				echo "${SYNC_ACTION[2]}" > "${INITIATOR[$__initiatorLastActionFile]}"
@@ -1376,14 +1372,14 @@ function Sync {
 	if [ "$resumeInitiator" == "${SYNC_ACTION[3]}" ] || [ "$resumeTarget" == "${SYNC_ACTION[3]}" ]; then
 		if [ "$CONFLICT_PREVALANCE" == "${TARGET[$__type]}" ]; then
 			if [ "$resumeTarget" == "${SYNC_ACTION[3]}" ]; then
-				sync_update "${TARGET[$__type]}" "${INITIATOR[$__type]}" "${INITIATOR[$__deletedListFile]}"
+				syncUpdate "${TARGET[$__type]}" "${INITIATOR[$__type]}"
 				if [ $? == 0 ]; then
 					echo "${SYNC_ACTION[4]}" > "${INITIATOR[$__targetLastActionFile]}"
 					resumeTarget="${SYNC_ACTION[4]}"
 				fi
 			fi
 			if [ "$resumeInitiator" == "${SYNC_ACTION[3]}" ]; then
-				sync_update "${INITIATOR[$__type]}" "${TARGET[$__type]}" "${INITIATOR[$__deletedListFile]}"
+				syncUpdate "${INITIATOR[$__type]}" "${TARGET[$__type]}"
 				if [ $? == 0 ]; then
 					echo "${SYNC_ACTION[4]}" > "${INITIATOR[$__initiatorLastActionFile]}"
 					resumeInitiator="${SYNC_ACTION[4]}"
@@ -1391,14 +1387,14 @@ function Sync {
 			fi
 		else
 			if [ "$resumeInitiator" == "${SYNC_ACTION[3]}" ]; then
-				sync_update "${INITIATOR[$__type]}" "${TARGET[$__type]}" "${INITIATOR[$__deletedListFile]}"
+				syncUpdate "${INITIATOR[$__type]}" "${TARGET[$__type]}"
 				if [ $? == 0 ]; then
 					echo "${SYNC_ACTION[4]}" > "${INITIATOR[$__initiatorLastActionFile]}"
 					resumeInitiator="${SYNC_ACTION[4]}"
 				fi
 			fi
 			if [ "$resumeTarget" == "${SYNC_ACTION[3]}" ]; then
-				sync_update "${TARGET[$__type]}" "${INITIATOR[$__type]}" "${INITIATOR[$__deletedListFile]}"
+				syncUpdate "${TARGET[$__type]}" "${INITIATOR[$__type]}"
 				if [ $? == 0 ]; then
 					echo "${SYNC_ACTION[4]}" > "${INITIATOR[$__targetLastActionFile]}"
 					resumeTarget="${SYNC_ACTION[4]}"
@@ -1410,12 +1406,12 @@ function Sync {
 	## Step 4a & 4b
 	if [ "$resumeInitiator" == "${SYNC_ACTION[4]}" ] || [ "$resumeTarget" == "${SYNC_ACTION[4]}" ]; then
 		if [ "$resumeInitiator" == "${SYNC_ACTION[4]}" ]; then
-			deletion_propagation "${TARGET[$__type]}" "${INITIATOR[$__deletedListFile]}" "${INITIATOR[$__failedDeletedListFile]}" &
+			deletionPropagation "${TARGET[$__type]}" &
 			initiatorPid="$!"
 		fi
 
 		if [ "$resumeTarget" == "${SYNC_ACTION[4]}" ]; then
-			deletion_propagation "${INITIATOR[$__type]}" "${INITIATOR[$__deletedListFile]}" "${INITIATOR[$__failedDeletedListFile]}" &
+			deletionPropagation "${INITIATOR[$__type]}" &
 			targetPid="$!"
 		fi
 
@@ -1456,12 +1452,12 @@ function Sync {
 	## Step 5a & 5b
 	if [ "$resumeInitiator" == "${SYNC_ACTION[5]}" ] || [ "$resumeTarget" == "${SYNC_ACTION[5]}" ]; then
 		if [ "$resumeInitiator" == "${SYNC_ACTION[5]}" ]; then
-			tree_list "${INITIATOR[$__replicaDir]}" "${INITIATOR[$__type]}" "${INITIATOR[$__treeAfterFile]}" &
+			treeList "${INITIATOR[$__replicaDir]}" "${INITIATOR[$__type]}" "${INITIATOR[$__treeAfterFile]}" &
 			initiatorPid="$!"
 		fi
 
 		if [ "$resumeTarget" == "${SYNC_ACTION[5]}" ]; then
-			tree_list "${TARGET[$__replicaDir]}" "${TARGET[$__type]}" "${INITIATOR[$__treeAfterFile]}" &
+			treeList "${TARGET[$__replicaDir]}" "${TARGET[$__type]}" "${INITIATOR[$__treeAfterFile]}" &
 			targetPid="$!"
 		fi
 
@@ -1504,14 +1500,14 @@ function Sync {
 
 function _SoftDeleteLocal {
 	local replicaType="${1}" # replica type (initiator, target)
-	local replica_deletion_path="${2}" # Contains the full path to softdelete / backup directory without ending slash
+	local replicaDeletionPath="${2}" # Contains the full path to softdelete / backup directory without ending slash
 	local changeTime="${3}"
 
 	__CheckArguments 3 $# ${FUNCNAME[0]} "$@"	#__WITH_PARANOIA_DEBUG
 
 	local retval
 
-	if [ -d "$replica_deletion_path" ]; then
+	if [ -d "$replicaDeletionPath" ]; then
 		if [ $_DRYRUN == true ]; then
 			Logger "Listing files older than $changeTime days on $replicaType replica. Does not remove anything." "NOTICE"
 		else
@@ -1520,14 +1516,14 @@ function _SoftDeleteLocal {
 
 		if [ $_VERBOSE == true ]; then
 			# Cannot launch log function from xargs, ugly hack
-			$COMMAND_SUDO $FIND_CMD "$replica_deletion_path/" -type f -ctime +$changeTime -print0 | xargs -0 -I {} echo "Will delete file {}" >> "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$SCRIPT_PID"
+			$COMMAND_SUDO $FIND_CMD "$replicaDeletionPath/" -type f -ctime +$changeTime -print0 | xargs -0 -I {} echo "Will delete file {}" >> "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$SCRIPT_PID"
 			Logger "Command output:\n$(cat $RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$SCRIPT_PID)" "VERBOSE"
-			$COMMAND_SUDO $FIND_CMD "$replica_deletion_path/" -type d -empty -ctime +$changeTime -print0 | xargs -0 -I {} echo "Will delete directory {}" >> "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$SCRIPT_PID"
+			$COMMAND_SUDO $FIND_CMD "$replicaDeletionPath/" -type d -empty -ctime +$changeTime -print0 | xargs -0 -I {} echo "Will delete directory {}" >> "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$SCRIPT_PID"
 			Logger "Command output:\n$(cat $RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$SCRIPT_PID)" "VERBOSE"
 		fi
 
 		if [ $_DRYRUN == false ]; then
-			$COMMAND_SUDO $FIND_CMD "$replica_deletion_path/" -type f -ctime +$changeTime -print0 | xargs -0 -I {} $COMMAND_SUDO rm -f "{}" && $COMMAND_SUDO $FIND_CMD "$replica_deletion_path/" -type d -empty -ctime +$changeTime -print0 | xargs -0 -I {} $COMMAND_SUDO rm -rf "{}" >> "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$SCRIPT_PID" 2>&1
+			$COMMAND_SUDO $FIND_CMD "$replicaDeletionPath/" -type f -ctime +$changeTime -print0 | xargs -0 -I {} $COMMAND_SUDO rm -f "{}" && $COMMAND_SUDO $FIND_CMD "$replicaDeletionPath/" -type d -empty -ctime +$changeTime -print0 | xargs -0 -I {} $COMMAND_SUDO rm -rf "{}" >> "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$SCRIPT_PID" 2>&1
 		else
 			Dummy
 		fi
@@ -1538,16 +1534,16 @@ function _SoftDeleteLocal {
 		else
 			Logger "Cleanup complete on $replicaType replica." "NOTICE"
 		fi
-	elif [ -d "$replica_deletion_path" ] && ! [ -w "$replica_deletion_path" ]; then
-		Logger "The $replicaType replica dir [$replica_deletion_path] is not writable. Cannot clean old files." "ERROR"
+	elif [ -d "$replicaDeletionPath" ] && ! [ -w "$replicaDeletionPath" ]; then
+		Logger "The $replicaType replica dir [$replicaDeletionPath] is not writable. Cannot clean old files." "ERROR"
 	else
-		Logger "The $replicaType replica dir [$replica_deletion_path] does not exist. Skipping cleaning of old files." "VERBOSE"
+		Logger "The $replicaType replica dir [$replicaDeletionPath] does not exist. Skipping cleaning of old files." "VERBOSE"
 	fi
 }
 
 function _SoftDeleteRemote {
 	local replicaType="${1}"
-	local replica_deletion_path="${2}" # Contains the full path to softdelete / backup directory without ending slash
+	local replicaDeletionPath="${2}" # Contains the full path to softdelete / backup directory without ending slash
 	local changeTime="${3}"
 	__CheckArguments 3 $# ${FUNCNAME[0]} "$@"	#__WITH_PARANOIA_DEBUG
 
@@ -1564,14 +1560,14 @@ function _SoftDeleteRemote {
 
 	if [ $_VERBOSE == true ]; then
 		# Cannot launch log function from xargs, ugly hack
-		cmd=$SSH_CMD' "if [ -d \"'$replica_deletion_path'\" ]; then '$COMMAND_SUDO' '$REMOTE_FIND_CMD' \"'$replica_deletion_path'/\" -type f -ctime +'$changeTime' -print0 | xargs -0 -I {} echo Will delete file {} && '$COMMAND_SUDO' '$REMOTE_FIND_CMD' \"'$replica_deletion_path'/\" -type d -empty -ctime '$changeTime' -print0 | xargs -0 -I {} echo Will delete directory {}; else echo \"The $replicaType replica dir [$replica_deletion_path] does not exist. Skipping cleaning of old files.\"; fi" > "'$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$SCRIPT_PID'" 2>&1'
+		cmd=$SSH_CMD' "if [ -d \"'$replicaDeletionPath'\" ]; then '$COMMAND_SUDO' '$REMOTE_FIND_CMD' \"'$replicaDeletionPath'/\" -type f -ctime +'$changeTime' -print0 | xargs -0 -I {} echo Will delete file {} && '$COMMAND_SUDO' '$REMOTE_FIND_CMD' \"'$replicaDeletionPath'/\" -type d -empty -ctime '$changeTime' -print0 | xargs -0 -I {} echo Will delete directory {}; else echo \"The $replicaType replica dir [$replicaDeletionPath] does not exist. Skipping cleaning of old files.\"; fi" > "'$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$SCRIPT_PID'" 2>&1'
 		Logger "cmd: $cmd" "DEBUG"
 		eval "$cmd"
 		Logger "Command output:\n$(cat $RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$SCRIPT_PID)" "VERBOSE"
 	fi
 
 	if [ $_DRYRUN == false ]; then
-		cmd=$SSH_CMD' "if [ -d \"'$replica_deletion_path'\" ]; then '$COMMAND_SUDO' '$REMOTE_FIND_CMD' \"'$replica_deletion_path'/\" -type f -ctime +'$changeTime' -print0 | xargs -0 -I {} '$COMMAND_SUDO' rm -f \"{}\" && '$COMMAND_SUDO' '$REMOTE_FIND_CMD' \"'$replica_deletion_path'/\" -type d -empty -ctime '$changeTime' -print0 | xargs -0 -I {} '$COMMAND_SUDO' rm -rf \"{}\"; else echo \"The $replicaType replica_dir [$replica_deletion_path] does not exist. Skipping cleaning of old files.\"; fi" >> "'$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$SCRIPT_PID'" 2>&1'
+		cmd=$SSH_CMD' "if [ -d \"'$replicaDeletionPath'\" ]; then '$COMMAND_SUDO' '$REMOTE_FIND_CMD' \"'$replicaDeletionPath'/\" -type f -ctime +'$changeTime' -print0 | xargs -0 -I {} '$COMMAND_SUDO' rm -f \"{}\" && '$COMMAND_SUDO' '$REMOTE_FIND_CMD' \"'$replicaDeletionPath'/\" -type d -empty -ctime '$changeTime' -print0 | xargs -0 -I {} '$COMMAND_SUDO' rm -rf \"{}\"; else echo \"The $replicaType replicaDir [$replicaDeletionPath] does not exist. Skipping cleaning of old files.\"; fi" >> "'$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$SCRIPT_PID'" 2>&1'
 
 		Logger "cmd: $cmd" "DEBUG"
 		eval "$cmd"
@@ -1693,17 +1689,17 @@ function Init {
 	## Replica format
 	## Why the f*** does bash not have simple objects ?
 	# Local variables used for state filenames
-	local lock_filename="lock"
-	local state_dir="state"
-	local backup_dir="backup"
-	local delete_dir="deleted"
-	local partial_dir="_partial"
-	local last_action="last-action"
-       	local resume_count="resume-count"
+	local lockFilename="lock"
+	local stateDir="state"
+	local backupDir="backup"
+	local deleteDir="deleted"
+	local partialDir="_partial"
+	local lastAction="last-action"
+       	local resumeCount="resume-count"
 	if [ "$_DRYRUN" == true ]; then
-       		local dry_suffix="-dry"
+       		local drySuffix="-dry"
 	else
-		local dry_suffix=
+		local drySuffix=
 	fi
 
 	# The following associative like array definitions are used for bash ver < 4 compat
@@ -1726,27 +1722,27 @@ function Init {
 	INITIATOR=()
 	INITIATOR[$__type]='initiator'
 	INITIATOR[$__replicaDir]="$INITIATOR_SYNC_DIR"
-	INITIATOR[$__lockFile]="$INITIATOR_SYNC_DIR$OSYNC_DIR/$lock_filename"
-	INITIATOR[$__stateDir]="$OSYNC_DIR/$state_dir"
-	INITIATOR[$__backupDir]="$OSYNC_DIR/$backup_dir"
-	INITIATOR[$__deleteDir]="$OSYNC_DIR/$delete_dir"
-	INITIATOR[$__partialDir]="$OSYNC_DIR/$partial_dir"
-	INITIATOR[$__initiatorLastActionFile]="$INITIATOR_SYNC_DIR$OSYNC_DIR/$state_dir/initiator-$last_action-$INSTANCE_ID$dry_suffix"
-	INITIATOR[$__targetLastActionFile]="$INITIATOR_SYNC_DIR$OSYNC_DIR/$state_dir/target-$last_action-$INSTANCE_ID$dry_suffix"
-	INITIATOR[$__resumeCount]="$INITIATOR_SYNC_DIR$OSYNC_DIR/$state_dir/$resume_count-$INSTANCE_ID$dry_suffix"
-	INITIATOR[$__treeCurrentFile]="-tree-current-$INSTANCE_ID$dry_suffix"
-	INITIATOR[$__treeAfterFile]="-tree-after-$INSTANCE_ID$dry_suffix"
+	INITIATOR[$__lockFile]="$INITIATOR_SYNC_DIR$OSYNC_DIR/$lockFilename"
+	INITIATOR[$__stateDir]="$OSYNC_DIR/$stateDir"
+	INITIATOR[$__backupDir]="$OSYNC_DIR/$backupDir"
+	INITIATOR[$__deleteDir]="$OSYNC_DIR/$deleteDir"
+	INITIATOR[$__partialDir]="$OSYNC_DIR/$partialDir"
+	INITIATOR[$__initiatorLastActionFile]="$INITIATOR_SYNC_DIR$OSYNC_DIR/$stateDir/initiator-$lastAction-$INSTANCE_ID$drySuffix"
+	INITIATOR[$__targetLastActionFile]="$INITIATOR_SYNC_DIR$OSYNC_DIR/$stateDir/target-$lastAction-$INSTANCE_ID$drySuffix"
+	INITIATOR[$__resumeCount]="$INITIATOR_SYNC_DIR$OSYNC_DIR/$stateDir/$resumeCount-$INSTANCE_ID$drySuffix"
+	INITIATOR[$__treeCurrentFile]="-tree-current-$INSTANCE_ID$drySuffix"
+	INITIATOR[$__treeAfterFile]="-tree-after-$INSTANCE_ID$drySuffix"
 	INITIATOR[$__treeAfterFileNoSuffix]="-tree-after-$INSTANCE_ID"
-	INITIATOR[$__deletedListFile]="-deleted-list-$INSTANCE_ID$dry_suffix"
-	INITIATOR[$__failedDeletedListFile]="-failed-delete-$INSTANCE_ID$dry_suffix"
+	INITIATOR[$__deletedListFile]="-deleted-list-$INSTANCE_ID$drySuffix"
+	INITIATOR[$__failedDeletedListFile]="-failed-delete-$INSTANCE_ID$drySuffix"
 
 	TARGET=()
 	TARGET[$__type]='target'
 	TARGET[$__replicaDir]="$TARGET_SYNC_DIR"
-	TARGET[$__lockFile]="$TARGET_SYNC_DIR$OSYNC_DIR/$lock_filename"
-	TARGET[$__stateDir]="$OSYNC_DIR/$state_dir"
-	TARGET[$__backupDir]="$OSYNC_DIR/$backup_dir"
-	TARGET[$__deleteDir]="$OSYNC_DIR/$delete_dir"
+	TARGET[$__lockFile]="$TARGET_SYNC_DIR$OSYNC_DIR/$lockFilename"
+	TARGET[$__stateDir]="$OSYNC_DIR/$stateDir"
+	TARGET[$__backupDir]="$OSYNC_DIR/$backupDir"
+	TARGET[$__deleteDir]="$OSYNC_DIR/$deleteDir"
 
 	PARTIAL_DIR="${INITIATOR[$__partialDir]}"
 
