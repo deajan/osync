@@ -1,8 +1,6 @@
 #!/usr/bin/env bash
 
-# osync test suite 2016091603
-# TODO: Add big fileset tests (eg: drupal 8 ?), add soft deletion tests, add deletion propagation test, add file attrib test
-
+# osync test suite 2016101601
 
 # 4 tests:
 # quicklocal
@@ -20,6 +18,13 @@
 # softdelete deleted
 # softdelete backup
 # lock checks
+# file attribute tests
+
+#TODO: conf file modes missing
+#TODO: conflict resolution missing
+#TODO: softdelete missing
+#TODO: lock checks missing
+#TODO: fille attribute missing
 
 TEST_DISK=/dev/vda1
 LARGE_FILESET_URL="http://ftp.drupal.org/files/projects/drupal-8.1.9.tar.gz"
@@ -47,6 +52,8 @@ INITIATOR_DIR="${HOME}/osync/initiator"
 TARGET_DIR="${HOME}/osync/target"
 OSYNC_WORKDIR=".osync_workdir"
 OSYNC_STATE_DIR="$OSYNC_WORKDIR/state"
+OSYNC_DELETE_DIR="$OSYNC_WORKDIR/deleted"
+OSYNC_BACKUP_DIR="$OSYNC_WORKDIR/backup"
 
 # Setup an array with all function modes
 declare -Ag osyncParameters
@@ -93,8 +100,10 @@ function DownloadLargeFileSet() {
 	wget -q "$LARGE_FILESET_URL" > /dev/null
 	assertEquals "Download [$LARGE_FILESET_URL]." "0" $?
 
-	tar xvf $(basename "$LARGE_FILESET_URL") -C "$destinationPath" > /dev/null
+	tar xvf "$(basename $LARGE_FILESET_URL)" -C "$destinationPath" > /dev/null
 	assertEquals "Extract $(basename $LARGE_FILESET_URL)" "0" $?
+
+	rm -f "$(basename $LARGE_FILESET_URL)"
 }
 
 function CreateOldFile () {
@@ -165,12 +174,53 @@ function test_Exclusions () {
 		REMOTE_HOST_PING=no RSYNC_EXCLUDE_PATTERN="*.php" ./$OSYNC_EXECUTABLE $i
 		assertEquals "Exclusions with parameters [$i]." "0" $?
 
-		#WIP Add real exclusion tests here
+		#WIP Add exclusion from file tests here
 		numberOfInitiatorFiles=$(find "$INITIATOR_DIR" ! -wholename "$INITIATOR_DIR/$OSYNC_WORKDIR*" | wc -l)
 		numberOfTargetFiles=$(find "$TARGET_DIR" ! -wholename "$TARGET_DIR/$OSYNC_WORKDIR*" | wc -l)
 		numberOfExcludedFiles=$((numberOfInitiatorFiles-numberOfTargetFiles))
 
 		assertEquals "Number of php files: $numberOfPHPFiles - Number of excluded files: $numberOfExcludedFiles" $numberOfPHPFiles $numberOfExcludedFiles
+	done
+}
+
+function test_Deletetion () {
+	local iFile1="$INITIATOR_DIR/ific"
+	local iFile2="$INITIATOR_DIR/ifoc"
+	local tFile1="$TARGET_DIR/tfic"
+	local tFile2="$TARGET_DIR/tfoc"
+
+
+	for i in "${osyncParameters[@]}"; do
+		cd "$OSYNC_DIR"
+
+		PrepareLocalDirs
+		touch "$iFile1"
+		touch "$iFile2"
+		touch "$tFile1"
+		touch "$tFile2"
+
+		REMOTE_HOST_PING=no ./$OSYNC_EXECUTABLE $i
+		assertEquals "First deletion run with parameters [$i]." "0" $?
+
+		rm -f "$iFile1"
+		rm -f "$tFile1"
+
+		REMOTE_HOST_PING=no ./$OSYNC_EXECUTABLE $i
+		assertEquals "Second deletion run with parameters [$i]." "0" $?
+
+		[ -f "$TARGET_DIR/$OSYNC_DELETED_DIR/$(basename $iFile1)" ]
+		assertEquals "File [$TARGET_DIR/$OSYNC_DELETED_DIR/$(basename $iFile1)] has been soft deleted on target" "0" $?
+		[ -f "$iFile1" ]
+		assertEquals "File [$iFile1] is still in initiator" "1" $?
+		[ -f "${iFile1/$INITIATOR_DIR/TARGET_DIR}" ]
+		assertEquals "File [${iFile1/$INITIATOR_DIR/TARGET_DIR}] is still in target" "1" $?
+
+		[ -f "INITIATOR_DIR/$OSYNC_DELETED_DIR/$(basename $tFile1)" ]
+		assertEquals "File [$INITIATOR_DIR/$OSYNC_DELETED_DIR/$(basename $tFile1)] has been soft deleted on initiator" "0" $?
+		[ -f "$tFile1" ]
+		assertEquals "File [$tFile1] is still in target" "1" $?
+		[ -f "${tFile1/$TARGET_DIR/INITIATOR_DIR}" ]
+		assertEquals "File [${tFile1/$TARGET_DIR/INITIATOR_DIR}] is still in initiator" "1" $?
 	done
 }
 
