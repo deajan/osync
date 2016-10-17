@@ -4,7 +4,7 @@ PROGRAM="osync" # Rsync based two way sync engine with fault tolerance
 AUTHOR="(C) 2013-2016 by Orsiris de Jong"
 CONTACT="http://www.netpower.fr/osync - ozy@netpower.fr"
 PROGRAM_VERSION=1.2-beta
-PROGRAM_BUILD=2016101603
+PROGRAM_BUILD=2016101701
 IS_STABLE=no
 
 # Execution order						#__WITH_PARANOIA_DEBUG
@@ -646,9 +646,13 @@ function treeList {
 	## When log writing fails, $! is empty and WaitForTaskCompletion fails.  Removing the 2>> log
 	eval "$rsyncCmd"
 	retval=$?
-	## Retval 24 = some files vanished while creating list
-	if ([ $retval == 0 ] || [ $retval == 24 ]) && [ -f "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$replicaType.$SCRIPT_PID" ]; then
+
+	if [ -f "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$replicaType.$SCRIPT_PID" ]; then
 		mv -f "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$replicaType.$SCRIPT_PID" "${INITIATOR[$__replicaDir]}${INITIATOR[$__stateDir]}/$replicaType$treeFilename"
+	fi
+
+	## Retval 24 = some files vanished while creating list
+	if ([ $retval == 0 ] || [ $retval == 24 ]) then
 		return $?
 	elif [ $retval == 23 ]; then
 		Logger "Some files could not be listed in [$replicaPath]. Check for failing symlinks." "ERROR"
@@ -1801,8 +1805,8 @@ function Usage {
         fi
 
 	echo "$PROGRAM $PROGRAM_VERSION $PROGRAM_BUILD"
-	echo $AUTHOR
-	echo $CONTACT
+	echo "$AUTHOR"
+	echo "$CONTACT"
 	echo ""
 	echo "You may use osync with a full blown configuration file, or use its default options for quick command line sync."
 	echo "Usage: osync.sh /path/to/config/file [OPTIONS]"
