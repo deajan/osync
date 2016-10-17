@@ -9,6 +9,17 @@ RECENT CHANGES
 
 XX Xxx 2016: osync v1.2-RC1 released
 - Improved unit tests
+	! Added conflict resolution tests
+	! Added softdeletion tests
+	! Added lock tests
+! documentation update, statefulness
+
+17 Oct 2016: osync v1.2-beta2 released
+- osync now propagates symlink deletions and moves symlinks without referrents to deletion dir
+- Upgrade script now has the ability to add any missing value
+- Improved unit tests
+	- Added upgrade script test
+	- Added deletion propagation tests
 
 30 Aug 2016: osync v1.2-beta released
 - Rendered more recent code compatible with bash 3.2+
