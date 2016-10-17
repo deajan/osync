@@ -6,13 +6,149 @@ AUTHOR="(C) 2016 by Orsiris de Jong"
 CONTACT="http://www.netpower.fr/osync - ozy@netpower.fr"
 OLD_PROGRAM_VERSION="v1.0x-v1.1x"
 NEW_PROGRAM_VERSION="v1.2x"
-PROGRAM_BUILD=2016081902 # Will go into config file rev
+CONFIG_FILE_VERSION=2016081901
+PROGRAM_BUILD=2016101701
 
 ## type -p does not work on platforms other than linux (bash). If if does not work, always assume output is not a zero exitcode
 if ! type "$BASH" > /dev/null; then
         echo "Please run this script only with bash shell. Tested on bash >= 3.2"
         exit 127
 fi
+
+# Defines all keywords / value sets in osync configuration files
+# bash does not support two dimensional arrays, so we declare two arrays:
+# ${KEYWORDS[index]}=${VALUES[index]}
+
+KEYWORDS=(
+INSTANCE_ID
+INITIATOR_SYNC_DIR
+TARGET_SYNC_DIR
+SSH_RSA_PRIVATE_KEY
+CREATE_DIRS
+LOGFILE
+MINIMUM_SPACE
+BANDWIDTH
+SUDO_EXEC
+RSYNC_EXECUTABLE
+RSYNC_REMOTE_PATH
+RSYNC_PATTERN_FIRST
+RSYNC_INCLUDE_PATTERN
+RSYNC_EXCLUDE_PATTERN
+RSYNC_INCLUDE_FROM
+RSYNC_EXCLUDE_FROM
+PATH_SEPARATOR_CHAR
+SSH_COMPRESSION
+SSH_IGNORE_KNOWN_HOSTS
+REMOTE_HOST_PING
+REMOTE_3RD_PARTY_HOSTS
+PRESERVE_PERMISSIONS
+PRESERVE_OWNER
+PRESERVE_GROUP
+PRESERVE_EXECUTABILITY
+PRESERVE_ACL
+PRESERVE_XATTR
+COPY_SYMLINKS
+KEEP_DIRLINKS
+PRESERVE_HARDLINKS
+CHECKSUM
+RSYNC_COMPRESS
+SOFT_MAX_EXEC_TIME
+HARD_MAX_EXEC_TIME
+KEEP_LOGGING
+MIN_WAIT
+MAX_WAIT
+CONFLICT_BACKUP
+CONFLICT_BACKUP_MULTIPLE
+CONFLICT_BACKUP_DAYS
+CONFLICT_PREVALANCE
+SOFT_DELETE
+SOFT_DELETE_DAYS
+RESUME_SYNC
+RESUME_TRY
+FORCE_STRANGER_LOCK_RESUME
+PARTIAL
+DELTA_COPIES
+DESTINATION_MAILS
+SENDER_MAIL
+SMTP_SERVER
+SMTP_PORT
+SMTP_ENCRYPTION
+SMTP_USER
+SMTP_PASSWORD
+LOCAL_RUN_BEFORE_CMD
+LOCAL_RUN_AFTER_CMD
+REMOTE_RUN_BEFORE_CMD
+REMOTE_RUN_AFTER_CMD
+MAX_EXEC_TIME_PER_CMD_BEFORE
+MAX_EXEC_TIME_PER_CMD_AFTER
+STOP_ON_CMD_ERROR
+RUN_AFTER_CMD_ON_ERROR
+)
+
+VALUES=(
+sync-test
+''
+''
+${HOME}/backupuser/.ssh/id_rsa
+no
+''
+10240
+0
+no
+rsync
+''
+include
+''
+''
+''
+''
+\;
+yes
+no
+no
+www.kernel.org www.google.com
+yes
+yes
+yes
+yes
+no
+no
+no
+no
+no
+yes
+7200
+10600
+1801
+60
+7200
+yes
+no
+30
+initiator
+yes
+30
+yes
+2
+no
+no
+yes
+''
+alert@your.system.tld
+smtp.your.isp.tld
+25
+none
+''
+''
+''
+''
+''
+''
+0
+0
+yes
+no
+)
 
 function Init {
 	OSYNC_DIR=".osync_workdir"
@@ -309,7 +445,7 @@ function RenameStateFiles {
 	fi
 }
 
-function RewriteConfigFiles {
+function RewriteOldConfigFiles {
 	local config_file="${1}"
 
 	if ((! grep "MASTER_SYNC_DIR=" "$config_file" > /dev/null) && (! grep "INITIATOR_SYNC_DIR=" "$config_file" > /dev/null)); then
@@ -334,67 +470,38 @@ function RewriteConfigFiles {
 	sed -i'.tmp' 's/^CONFLICT_PREVALANCE=slave/CONFLICT_PREVALANCE=target/g' "$config_file"
 	sed -i'.tmp' 's/^SYNC_ID=/INSTANCE_ID=/g' "$config_file"
 
-	# Add new config file values from v1.1x
-	if ! grep "^RSYNC_PATTERN_FIRST=" "$config_file" > /dev/null; then
-		sed -i'.tmp' '/^LOGFILE=*/a\'$'\n''RSYNC_PATTERN_FIRST=include\'$'\n''' "$config_file"
-	fi
-
-       	if ! grep "^SSH_IGNORE_KNOWN_HOSTS=" "$config_file" > /dev/null; then
-                sed -i'.tmp' '/^SSH_COMPRESSION=*/a\'$'\n''SSH_IGNORE_KNOWN_HOSTS=no\'$'\n''' "$config_file"
-	fi
-
-	if ! grep "^RSYNC_INCLUDE_PATTERN=" "$config_file" > /dev/null; then
-		sed -i'.tmp' '/^RSYNC_EXCLUDE_PATTERN=*/a\'$'\n''RSYNC_INCLUDE_PATTERN=""\'$'\n''' "$config_file"
-	fi
-
-	if ! grep "^RSYNC_INCLUDE_FROM=" "$config_file" > /dev/null; then
-		sed -i'.tmp' '/^RSYNC_EXCLUDE_FROM=*/a\'$'\n''RSYNC_INCLUDE_FROM=""\'$'\n''' "$config_file"
-	fi
-
-	if ! grep "^PRESERVE_PERMISSIONS=" "$config_file" > /dev/null; then
-		sed -i'.tmp' '/^REMOTE_3RD_PARTY_HOSTS=*/a\'$'\n''PRESERVE_PERMISSIONS=yes\'$'\n''' "$config_file"
-	fi
-
-	if ! grep "^PRESERVE_OWNER=" "$config_file" > /dev/null; then
-		sed -i'.tmp' '/^PRESERVE_PERMISSIONS=*/a\'$'\n''PRESERVE_OWNER=yes\'$'\n''' "$config_file"
-	fi
-
-	if ! grep "^PRESERVE_GROUP=" "$config_file" > /dev/null; then
-		sed -i'.tmp' '/^PRESERVE_OWNER=*/a\'$'\n''PRESERVE_GROUP=yes\'$'\n''' "$config_file"
-	fi
-
-	if ! grep "^PRESERVE_EXECUTABILITY=" "$config_file" > /dev/null; then
-		sed -i'.tmp' '/^PRESERVE_GROUP=*/a\'$'\n''PRESERVE_EXECUTABILITY=yes\'$'\n''' "$config_file"
-	fi
-
-	if ! grep "^CHECKSUM=" "$config_file" > /dev/null; then
-		sed -i'.tmp' '/^PRESERVE_HARDLINKS=*/a\'$'\n''CHECKSUM=no\'$'\n''' "$config_file"
-	fi
-
-	if ! grep "^KEEP_LOGGING=" "$config_file" > /dev/null; then
-		sed -i'.tmp' '/^HARD_MAX_EXEC_TIME=*/a\'$'\n''KEEP_LOGGING=1801\'$'\n''' "$config_file"
-	fi
-
-	if ! grep "^MAX_WAIT=" "$config_file" > /dev/null; then
-		sed -i'.tmp' '/^MIN_WAIT=*/a\'$'\n''MAX_WAIT=300\'$'\n''' "$config_file"
-	fi
-
-	if ! grep "^PARTIAL=" "$config_file" > /dev/null; then
-		sed -i'.tmp' '/^FORCE_STRANGER_LOCK_RESUME=*/a\'$'\n''PARTIAL=no\'$'\n''' "$config_file"
-	fi
-
-	if ! grep "^DELTA_COPIES=" "$config_file" > /dev/null; then
-		sed -i'.tmp' '/^PARTIAL=*/a\'$'\n''DELTA_COPIES=yes\'$'\n''' "$config_file"
-	fi
-
-	if ! grep "^RUN_AFTER_CMD_ON_ERROR=" "$config_file" > /dev/null; then
-		sed -i'.tmp' '/^STOP_ON_CMD_ERROR=*/a\'$'\n''RUN_AFTER_CMD_ON_ERROR=no\'$'\n''' "$config_file"
-	fi
-
-	# "onfig file rev" to deal with earlier variants of the file
-	sed -i'.tmp' '/onfig file rev/c\###### '$SUBPROGRAM' config file rev '$PROGRAM_BUILD "$config_file"
-
 	rm -f "$config_file.tmp"
+}
+
+function AddMissingConfigOptions {
+        local config_file="${1}"
+        local counter=0
+
+        while [ $counter -lt ${#KEYWORDS[@]} ]; do
+                if ! grep "^${KEYWORDS[$counter]}=" > /dev/null "$config_file"; then
+                        echo "${KEYWORDS[$counter]} not found"
+                        if [ $counter -gt 0 ]; then
+                                sed -i'.tmp' '/^'${KEYWORDS[$((counter-1))]}'=*/a\'$'\n'${KEYWORDS[$counter]}'="'"${VALUES[$counter]}"'"\'$'\n''' "$config_file"
+                                if [ $? -ne 0 ]; then
+                                        echo "Cannot add missing ${[KEYWORDS[$counter]}."
+                                        exit 1
+                                fi
+                        else
+                                sed -i'.tmp' '/onfig file rev*/a\'$'\n'${KEYWORDS[$counter]}'="'"${VALUES[$counter]}"'"\'$'\n''' "$config_file"
+                        fi
+                        echo "Added missing ${KEYWORDS[$counter]} config option with default option [${VALUES[$counter]}]"
+                fi
+                counter=$((counter+1))
+        done
+}
+
+function UpdateConfigHeader {
+        local config_file="${1}"
+
+        # "onfig file rev" to deal with earlier variants of the file
+        sed -i'.tmp' '/onfig file rev/c\###### '$SUBPROGRAM' config file rev '$CONFIG_FILE_VERSION' '$NEW_PROGRAM_VERSION "$config_file"
+
+        rm -f "$config_file.tmp"
 }
 
 _QUICKSYNC=0
@@ -431,7 +538,9 @@ elif [ "$1" != "" ] && [ -f "$1" ] && [ -w "$1" ]; then
 	CONF_FILE="${CONF_FILE%/}"
 	LoadConfigFile "$CONF_FILE"
 	Init
-	RewriteConfigFiles "$CONF_FILE"
+        RewriteOldConfigFiles "$CONF_FILE"
+        AddMissingConfigOptions "$CONF_FILE"
+        UpdateConfigHeader "$CONF_FILE"
 	RenameStateFiles
 else
 	Usage
