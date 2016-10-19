@@ -4,7 +4,7 @@ PROGRAM="osync" # Rsync based two way sync engine with fault tolerance
 AUTHOR="(C) 2013-2016 by Orsiris de Jong"
 CONTACT="http://www.netpower.fr/osync - ozy@netpower.fr"
 PROGRAM_VERSION=1.2-beta2
-PROGRAM_BUILD=2016101702
+PROGRAM_BUILD=2016101704
 IS_STABLE=no
 
 # Execution order						#__WITH_PARANOIA_DEBUG
@@ -392,6 +392,11 @@ function _CheckLocksLocal {
 		kill -9 $lock_pid > /dev/null 2>&1
 		if [ $? != 0 ]; then
 			Logger "There is a dead osync lock in [$lockfile]. Instance [$lock_pid] no longer running. Resuming." "NOTICE"
+			#rm "$lockfile"
+			#if [ $? != 0 ]; then
+			#	Logger "Cannot remove lock in [$lockfile]." "CRITICAL"
+			#	exit 1
+			#fi
 		else
 			Logger "There is already a local instance of osync running [$lock_pid] for this replica. Cannot start." "CRITICAL"
 			exit 1
@@ -463,23 +468,23 @@ function CheckLocks {
 		if [ $? != 0 ]; then
 			exit 1
 		fi
-	fi
-
-	_CheckLocksLocal "${INITIATOR[$__lockFile]}" &
-	pids="$!"
-	if [ "$REMOTE_OPERATION" != "yes" ]; then
-		_CheckLocksLocal "${TARGET[$__lockFile]}" &
-		pids="$pids;$!"
 	else
-		_CheckLocksRemote "${TARGET[$__lockFile]}" &
-		pids="$pids;$!"
+		_CheckLocksLocal "${INITIATOR[$__lockFile]}" &
+		pids="$!"
+		if [ "$REMOTE_OPERATION" != "yes" ]; then
+			_CheckLocksLocal "${TARGET[$__lockFile]}" &
+			pids="$pids;$!"
+		else
+			_CheckLocksRemote "${TARGET[$__lockFile]}" &
+			pids="$pids;$!"
+		fi
+		WaitForTaskCompletion $pids 720 1800 ${FUNCNAME[0]} true $KEEP_LOGGING
+		if [ $? -ne 0 ]; then
+			Logger "Cancelling task." "CRITICAL"
+			exit 1
+		fi
+		WriteLockFiles
 	fi
-	WaitForTaskCompletion $pids 720 1800 ${FUNCNAME[0]} true $KEEP_LOGGING
-	if [ $? -ne 0 ]; then
-		Logger "Cancelling task." "CRITICAL"
-		exit 1
-	fi
-	WriteLockFiles
 }
 
 function _WriteLockFilesLocal {
@@ -487,10 +492,14 @@ function _WriteLockFilesLocal {
 	local replicaType="${2}"
 	__CheckArguments 2 $# "${FUNCNAME[0]}" "$@"	#__WITH_PARANOIA_DEBUG
 
-	$COMMAND_SUDO echo "$SCRIPT_PID@$INSTANCE_ID" > "$lockfile"
+	(
+		set -o noclobber
+		$COMMAND_SUDO echo "$SCRIPT_PID@$INSTANCE_ID" > "$lockfile" 2> "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}-$replicaType.$SCRIPT_PID"
+	)
 	if [ $?	!= 0 ]; then
 		Logger "Could not create lock file on local $replicaType in [$lockfile]." "CRITICAL"
-		exit 1
+		Logger "Command output\n$($RUN_DIR/$PROGRAM.${FUNCNAME[0]}-$replicaType.$SCRIPT_PID)" "NOTICE"
+		return 1
 	else
 		Logger "Locked local $replicaType replica in [$lockfile]." "DEBUG"
 	fi
@@ -506,12 +515,13 @@ function _WriteLockFilesRemote {
 	CheckConnectivity3rdPartyHosts
 	CheckConnectivityRemoteHost
 
-	cmd=$SSH_CMD' "echo '$SCRIPT_PID@$INSTANCE_ID' | '$COMMAND_SUDO' tee \"'$lockfile'\"" > /dev/null 2>&1'
+	cmd=$SSH_CMD' "( set -o noclobber; echo '$SCRIPT_PID@$INSTANCE_ID' | '$COMMAND_SUDO' tee \"'$lockfile'\")" > /dev/null 2> $RUN_DIR/$PROGRAM.${FUNCNAME[0]}-$replicaType.$SCRIPT_PID'
 	Logger "cmd: $cmd" "DEBUG"
 	eval "$cmd"
 	if [ $? != 0 ]; then
 		Logger "Could not create lock file on remote $replicaType in [$lockfile]." "CRITICAL"
-		exit 1
+		Loggxer "Command output:\n$(cat $RUN_DIR/$PROGRAM.${FUNCNAME[0]}-$replicaType.$SCRIPT_PID)" "NOTICE"
+		return 1
 	else
 		Logger "Locked remote $replicaType replica in [$lockfile]." "DEBUG"
 	fi
@@ -543,9 +553,9 @@ function WriteLockFiles {
 		IFS=';' read -r -a pidArray <<< "$WAIT_FOR_TASK_COMPLETION"
 		for pid in "${pidArray[@]}"; do
 			pid=${pid%:*}
-			if [ $pid == $initiatorPid ]; then
+			if [ "$pid" == "$initiatorPid" ]; then
 				INITIATOR_LOCK_FILE_EXISTS=false
-			elif [ $pid == $targetPid ]; then
+			elif [ "$pid" == "$targetPid" ]; then
 				TARGET_LOCK_FILE_EXISTS=false
 			fi
 		done
