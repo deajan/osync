@@ -3,7 +3,7 @@
 PROGRAM="osync" # Rsync based two way sync engine with fault tolerance
 AUTHOR="(C) 2013-2016 by Orsiris de Jong"
 CONTACT="http://www.netpower.fr/osync - ozy@netpower.fr"
-PROGRAM_VERSION=1.2-beta
+PROGRAM_VERSION=1.2-beta2
 PROGRAM_BUILD=2016101701
 IS_STABLE=no
 
@@ -116,6 +116,11 @@ function CheckEnvironment {
                         Logger "ssh not present. Cannot start sync." "CRITICAL"
                         exit 1
                 fi
+
+		if ! type sshpass > /dev/null 2>&1 ; then
+			Logger "sshpass not present. Cannot use password authentication." "CRITICAL"
+			exit 1
+		fi
         fi
 
         if ! type rsync > /dev/null 2>&1 ; then
@@ -161,8 +166,8 @@ function CheckCurrentConfigAll {
 	fi
 
         #TODO(low): Add runtime variable tests (RSYNC_ARGS etc)
-	if [ "$REMOTE_OPERATION" == "yes" ] && [ ! -f "$SSH_RSA_PRIVATE_KEY" ]; then
-		Logger "Cannot find rsa private key [$SSH_RSA_PRIVATE_KEY]. Cannot connect to remote system." "CRITICAL"
+	if [ "$REMOTE_OPERATION" == "yes" ] && ([ ! -f "$SSH_RSA_PRIVATE_KEY" ] && [ ! -f "$SSH_PASSWORD_FILE" ]); then
+		Logger "Cannot find rsa private key [$SSH_RSA_PRIVATE_KEY] nor password file [$SSH_PASSWORD_FILE]. No authentication method provided." "CRITICAL"
 		exit 1
 	fi
 }
@@ -1658,7 +1663,10 @@ function Init {
 		fi
 
 		if [ "$SSH_RSA_PRIVATE_KEY" == "" ]; then
-			SSH_RSA_PRIVATE_KEY=~/.ssh/id_rsa
+			if [ ! -f "$SSH_PASSWORD_FILE" ]; then
+				# Assume that there might exist a standard rsa key
+				SSH_RSA_PRIVATE_KEY=~/.ssh/id_rsa
+			fi
 		fi
 
 		# remove everything before '@'
@@ -1689,7 +1697,7 @@ function Init {
         INITIATOR_SYNC_DIR="${INITIATOR_SYNC_DIR/#\~/$HOME}"
         TARGET_SYNC_DIR="${TARGET_SYNC_DIR/#\~/$HOME}"
         SSH_RSA_PRIVATE_KEY="${SSH_RSA_PRIVATE_KEY/#\~/$HOME}"
-
+	SSH_PASSWORD_FILE="${SSH_PASSWORD_FILE/#\~/$HOME}"
 
 	## Replica format
 	## Why the f*** does bash not have simple objects ?
@@ -1827,6 +1835,7 @@ function Usage {
 	echo "--initiator=\"\"		Master replica path. Will contain state and backup directory (is mandatory)"
 	echo "--target=\"\" 		Local or remote target replica path. Can be a ssh uri like ssh://user@host.com:22//path/to/target/replica (is mandatory)"
 	echo "--rsakey=\"\"		Alternative path to rsa private key for ssh connection to target replica"
+	echo "--password-file=\"\"      If no rsa private key is used for ssh authentication, a password file can be used"
 	echo "--instance-id=\"\"	Optional sync task name to identify this synchronization task when using multiple targets"
 	echo ""
 	echo "Additionaly, you may set most osync options at runtime. eg:"
@@ -1956,6 +1965,10 @@ for i in "$@"; do
 		SSH_RSA_PRIVATE_KEY=${i##*=}
 		opts=$opts" --rsakey=\"$SSH_RSA_PRIVATE_KEY\""
 		;;
+		--password-file=*)
+		SSH_PASSWORD_FILE=${i##*=}
+		opts=$opts" --password-file\"$SSH_PASSWORD_FILE\""
+		;;
 		--instance-id=*)
 		INSTANCE_ID=${i##*=}
 		opts=$opts" --instance-id=\"$INSTANCE_ID\""
@@ -2041,9 +2054,9 @@ opts="${opts# *}"
 
 	GetLocalOS
 	InitLocalOSSettings
-	CheckEnvironment
 	PreInit
 	Init
+	CheckEnvironment
 	PostInit
 	if [ $_QUICK_SYNC -lt 2 ]; then
 		CheckCurrentConfig
