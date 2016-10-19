@@ -4,7 +4,7 @@ PROGRAM="osync" # Rsync based two way sync engine with fault tolerance
 AUTHOR="(C) 2013-2016 by Orsiris de Jong"
 CONTACT="http://www.netpower.fr/osync - ozy@netpower.fr"
 PROGRAM_VERSION=1.2-beta2
-PROGRAM_BUILD=2016101701
+PROGRAM_BUILD=2016101702
 IS_STABLE=no
 
 
@@ -1514,7 +1514,7 @@ function CheckEnvironment {
 			exit 1
 		fi
 
-		if ! type sshpass > /dev/null 2>&1 ; then
+		if [ "$SSH_PASSWORD_FILE" != "" ] && ! type sshpass > /dev/null 2>&1 ; then
 			Logger "sshpass not present. Cannot use password authentication." "CRITICAL"
 			exit 1
 		fi
