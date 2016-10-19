@@ -6,7 +6,7 @@ AUTHOR="(C) 2016 by Orsiris de Jong"
 CONTACT="http://www.netpower.fr/osync - ozy@netpower.fr"
 OLD_PROGRAM_VERSION="v1.0x-v1.1x"
 NEW_PROGRAM_VERSION="v1.2x"
-CONFIG_FILE_VERSION=2016081901
+CONFIG_FILE_VERSION=2016101901
 PROGRAM_BUILD=2016101701
 
 ## type -p does not work on platforms other than linux (bash). If if does not work, always assume output is not a zero exitcode
@@ -24,6 +24,7 @@ INSTANCE_ID
 INITIATOR_SYNC_DIR
 TARGET_SYNC_DIR
 SSH_RSA_PRIVATE_KEY
+SSH_PASSWORD_FILE
 CREATE_DIRS
 LOGFILE
 MINIMUM_SPACE
@@ -90,6 +91,7 @@ sync-test
 ''
 ''
 ${HOME}/backupuser/.ssh/id_rsa
+''
 no
 ''
 10240
