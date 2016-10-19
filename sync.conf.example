@@ -20,7 +20,7 @@ TARGET_SYNC_DIR="/home/git/osync/dir2"
 ## If the target system is remote, you can specify a RSA key (please use full path). If not defined, the default ~/.ssh/id_rsa will be used. See documentation for further information.
 SSH_RSA_PRIVATE_KEY="/home/backupuser/.ssh/id_rsa"
 
-## Alternatively, you may specify an SSH password file (less secure).
+## Alternatively, you may specify an SSH password file (less secure). Needs sshpass utility installed.
 SSH_PASSWORD_FILE=""
 
 ## Create sync directories if they do not exist
