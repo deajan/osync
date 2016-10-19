@@ -11,7 +11,7 @@ IS_STABLE=no
 
 #### MINIMAL-FUNCTION-SET BEGIN ####
 
-## FUNC_BUILD=2016091601
+## FUNC_BUILD=2016101901
 ## BEGIN Generic bash functions written in 2013-2016 by Orsiris de Jong - http://www.netpower.fr - ozy@netpower.fr
 
 ## To use in a program, define the following variables:
@@ -109,7 +109,7 @@ function _Logger {
 	local evalue="${3}" # What to log to stderr
 
 	echo -e "$lvalue" >> "$LOG_FILE"
-	CURRENT_LOG="$CURRENT_LOG"$'\n'"$lvalue" #WIP
+	CURRENT_LOG="$CURRENT_LOG"$'\n'"$lvalue"
 
 	if [ $_LOGGER_STDERR == true ] && [ "$evalue" != "" ]; then
 		cat <<< "$evalue" 1>&2
@@ -531,6 +531,7 @@ function TrapError {
 	local job="$0"
 	local line="$1"
 	local code="${2:-1}"
+
 	if [ $_SILENT == false ]; then
 		echo -e " /!\ ERROR in ${job}: Near line ${line}, exit code ${code}"
 	fi
@@ -538,6 +539,7 @@ function TrapError {
 
 function LoadConfigFile {
 	local configFile="${1}"
+
 
 
 	if [ ! -f "$configFile" ]; then
@@ -600,11 +602,11 @@ function joinString {
 
 function WaitForTaskCompletion {
 	local pids="${1}" # pids to wait for, separated by semi-colon
-	local soft_max_time="${2}" # If program with pid $pid takes longer than $soft_max_time seconds, will log a warning, unless $soft_max_time equals 0.
-	local hard_max_time="${3}" # If program with pid $pid takes longer than $hard_max_time seconds, will stop execution, unless $hard_max_time equals 0.
-	local caller_name="${4}" # Who called this function
+	local softMaxTime="${2}" # If program with pid $pid takes longer than $softMaxTime seconds, will log a warning, unless $softMaxTime equals 0.
+	local hardMaxTime="${3}" # If program with pid $pid takes longer than $hardMaxTime seconds, will stop execution, unless $hardMaxTime equals 0.
+	local callerName="${4}" # Who called this function
 	local counting="${5:-true}" # Count time since function has been launched if true, since script has been launched if false
-	local keep_logging="${6:-0}" # Log a standby message every X seconds. Set to zero to disable logging
+	local keepLogging="${6:-0}" # Log a standby message every X seconds. Set to zero to disable logging
 
 
 	local soft_alert=false # Does a soft alert need to be triggered, if yes, send an alert once
@@ -639,8 +641,8 @@ function WaitForTaskCompletion {
 			exec_time=$SECONDS
 		fi
 
-		if [ $keep_logging -ne 0 ]; then
-			if [ $((($exec_time + 1) % $keep_logging)) -eq 0 ]; then
+		if [ $keepLogging -ne 0 ]; then
+			if [ $((($exec_time + 1) % $keepLogging)) -eq 0 ]; then
 				if [ $log_ttime -ne $exec_time ]; then # Fix when sleep time lower than 1s
 					log_ttime=$exec_time
 					Logger "Current tasks still running with pids [$(joinString , ${pidsArray[@]})]." "NOTICE"
@@ -648,15 +650,15 @@ function WaitForTaskCompletion {
 			fi
 		fi
 
-		if [ $exec_time -gt $soft_max_time ]; then
-			if [ $soft_alert == true ] && [ $soft_max_time -ne 0 ]; then
-				Logger "Max soft execution time exceeded for task [$caller_name] with pids [$(joinString , ${pidsArray[@]})]." "WARN"
+		if [ $exec_time -gt $softMaxTime ]; then
+			if [ $soft_alert == true ] && [ $softMaxTime -ne 0 ]; then
+				Logger "Max soft execution time exceeded for task [$callerName] with pids [$(joinString , ${pidsArray[@]})]." "WARN"
 				soft_alert=true
 				SendAlert true
 
 			fi
-			if [ $exec_time -gt $hard_max_time ] && [ $hard_max_time -ne 0 ]; then
-				Logger "Max hard execution time exceeded for task [$caller_name] with pids [$(joinString , ${pidsArray[@]})]. Stopping task execution." "ERROR"
+			if [ $exec_time -gt $hardMaxTime ] && [ $hardMaxTime -ne 0 ]; then
+				Logger "Max hard execution time exceeded for task [$callerName] with pids [$(joinString , ${pidsArray[@]})]. Stopping task execution." "ERROR"
 				for pid in "${pidsArray[@]}"; do
 					KillChilds $pid true
 					if [ $? == 0 ]; then
@@ -684,7 +686,7 @@ function WaitForTaskCompletion {
 					retval=$?
 					if [ $retval -ne 0 ]; then
 						errorcount=$((errorcount+1))
-						Logger "${FUNCNAME[0]} called by [$caller_name] finished monitoring [$pid] with exitcode [$retval]." "DEBUG"
+						Logger "${FUNCNAME[0]} called by [$callerName] finished monitoring [$pid] with exitcode [$retval]." "DEBUG"
 						if [ "$WAIT_FOR_TASK_COMPLETION" == "" ]; then
 							WAIT_FOR_TASK_COMPLETION="$pid:$retval"
 						else
@@ -717,6 +719,11 @@ function ParallelExec {
 	local numberOfProcesses="${1}" # Number of simultaneous commands to run
 	local commandsArg="${2}" # Semi-colon separated list of commands, or file containing one command per line
 	local readFromFile="${3:-false}" # Is commandsArg a file or a string ?
+	local softMaxTime="${4:-0}"
+	local hardMaxTime="${5:-0}"
+	local callerName="${6}" # Who called this function
+	local counting="${7:-true}" # Count time since function has been launched if true, since script has been launched if false
+	local keepLogging="${8:-0}" # Log a standby message every X seconds. Set to zero to disable logging
 
 
 	local commandCount
@@ -755,7 +762,7 @@ function ParallelExec {
 				command="${commandsArray[$counter]}"
 			fi
 			Logger "Running command [$command]." "DEBUG"
-			eval "$command" &
+			eval "$command" > "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$SCRIPT_PID" 2>&1 &
 			pid=$!
 			pidsArray+=($pid)
 			commandsArrayPid[$pid]="$command"
@@ -810,6 +817,7 @@ function SedStripQuotes {
 # Usage: var=$(StripSingleQuotes "$var")
 function StripSingleQuotes {
 	local string="${1}"
+
 	string="${string/#\'/}" # Remove singlequote if it begins string
 	string="${string/%\'/}" # Remove singlequote if it ends string
 	echo "$string"
@@ -818,6 +826,7 @@ function StripSingleQuotes {
 # Usage: var=$(StripDoubleQuotes "$var")
 function StripDoubleQuotes {
 	local string="${1}"
+
 	string="${string/#\"/}"
 	string="${string/%\"/}"
 	echo "$string"
@@ -825,12 +834,14 @@ function StripDoubleQuotes {
 
 function StripQuotes {
 	local string="${1}"
+
 	echo "$(StripSingleQuotes $(StripDoubleQuotes $string))"
 }
 
 # Usage var=$(EscapeSpaces "$var") or var="$(EscapeSpaces "$var")"
 function EscapeSpaces {
 	local string="${1}" # String on which spaces will be escaped
+
 	echo "${string// /\\ }"
 }
 
@@ -838,6 +849,7 @@ function IsNumericExpand {
 	eval "local value=\"${1}\"" # Needed eval so variable variables can be processed
 
 	local re="^-?[0-9]+([.][0-9]+)?$"
+
 	if [[ $value =~ $re ]]; then
 		echo 1
 	else
@@ -884,24 +896,24 @@ function urlEncode {
 }
 
 function urlDecode {
-	local url_encoded="${1//+/ }"
+	local urlEncoded="${1//+/ }"
 
-	printf '%b' "${url_encoded//%/\\x}"
+	printf '%b' "${urlEncoded//%/\\x}"
 }
 
 function GetLocalOS {
 
-	local local_os_var=
+	local localOsVar
 
-	local_os_var="$(uname -spio 2>&1)"
+	localOsVar="$(uname -spio 2>&1)"
 	if [ $? != 0 ]; then
-		local_os_var="$(uname -v 2>&1)"
+		localOsVar="$(uname -v 2>&1)"
 		if [ $? != 0 ]; then
-			local_os_var="$(uname)"
+			localOsVar="$(uname)"
 		fi
 	fi
 
-	case $local_os_var in
+	case $localOsVar in
 		*"Linux"*)
 		LOCAL_OS="Linux"
 		;;
@@ -916,22 +928,22 @@ function GetLocalOS {
 		;;
 		*)
 		if [ "$IGNORE_OS_TYPE" == "yes" ]; then		#DOC: Undocumented option
-			Logger "Running on unknown local OS [$local_os_var]." "WARN"
+			Logger "Running on unknown local OS [$localOsVar]." "WARN"
 			return
 		fi
-		Logger "Running on >> $local_os_var << not supported. Please report to the author." "ERROR"
+		Logger "Running on >> $localOsVar << not supported. Please report to the author." "ERROR"
 		exit 1
 		;;
 	esac
-	Logger "Local OS: [$local_os_var]." "DEBUG"
+	Logger "Local OS: [$localOsVar]." "DEBUG"
 }
 
 #### MINIMAL-FUNCTION-SET END ####
 
 function GetRemoteOS {
 
-	local cmd=
-	local remote_os_var=
+	local cmd
+	local remoteOsVar
 
 
 	if [ "$REMOTE_OPERATION" == "yes" ]; then
@@ -960,9 +972,9 @@ function GetRemoteOS {
 			fi
 		fi
 
-		remote_os_var=$(cat "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$SCRIPT_PID")
+		remoteOsVar=$(cat "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$SCRIPT_PID")
 
-		case $remote_os_var in
+		case $remoteOsVar in
 			*"Linux"*)
 			REMOTE_OS="Linux"
 			;;
@@ -981,21 +993,21 @@ function GetRemoteOS {
 			;;
 			*)
 			if [ "$IGNORE_OS_TYPE" == "yes" ]; then		#DOC: Undocumented option
-				Logger "Running on unknown remote OS [$remote_os_var]." "WARN"
+				Logger "Running on unknown remote OS [$remoteOsVar]." "WARN"
 				return
 			fi
 			Logger "Running on remote OS failed. Please report to the author if the OS is not supported." "CRITICAL"
-			Logger "Remote OS said:\n$remote_os_var" "CRITICAL"
+			Logger "Remote OS said:\n$remoteOsVar" "CRITICAL"
 			exit 1
 		esac
 
-		Logger "Remote OS: [$remote_os_var]." "DEBUG"
+		Logger "Remote OS: [$remoteOsVar]." "DEBUG"
 	fi
 }
 
 function RunLocalCommand {
 	local command="${1}" # Command to run
-	local hard_max_time="${2}" # Max time to wait for command to compleet
+	local hardMaxTime="${2}" # Max time to wait for command to compleet
 
 	if [ $_DRYRUN == true ]; then
 		Logger "Dryrun: Local command [$command] not run." "NOTICE"
@@ -1004,7 +1016,7 @@ function RunLocalCommand {
 
 	Logger "Running command [$command] on local host." "NOTICE"
 	eval "$command" > "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$SCRIPT_PID" 2>&1 &
-	WaitForTaskCompletion $! 0 $hard_max_time ${FUNCNAME[0]} true $KEEP_LOGGING
+	WaitForTaskCompletion $! 0 $hardMaxTime ${FUNCNAME[0]} true $KEEP_LOGGING
 	retval=$?
 	if [ $retval -eq 0 ]; then
 		Logger "Command succeded." "NOTICE"
@@ -1025,7 +1037,7 @@ function RunLocalCommand {
 ## Runs remote command $1 and waits for completition in $2 seconds
 function RunRemoteCommand {
 	local command="${1}" # Command to run
-	local hard_max_time="${2}" # Max time to wait for command to compleet
+	local hardMaxTime="${2}" # Max time to wait for command to compleet
 
 	CheckConnectivity3rdPartyHosts
 	CheckConnectivityRemoteHost
@@ -1038,7 +1050,7 @@ function RunRemoteCommand {
 	cmd=$SSH_CMD' "$command" > "'$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$SCRIPT_PID'" 2>&1'
 	Logger "cmd: $cmd" "DEBUG"
 	eval "$cmd" &
-	WaitForTaskCompletion $! 0 $hard_max_time ${FUNCNAME[0]} true $KEEP_LOGGING
+	WaitForTaskCompletion $! 0 $hardMaxTime ${FUNCNAME[0]} true $KEEP_LOGGING
 	retval=$?
 	if [ $retval -eq 0 ]; then
 		Logger "Command succeded." "NOTICE"
@@ -1059,7 +1071,7 @@ function RunRemoteCommand {
 
 function RunBeforeHook {
 
-	local pids=
+	local pids
 
 	if [ "$LOCAL_RUN_BEFORE_CMD" != "" ]; then
 		RunLocalCommand "$LOCAL_RUN_BEFORE_CMD" $MAX_EXEC_TIME_PER_CMD_BEFORE &
@@ -1113,13 +1125,13 @@ function CheckConnectivityRemoteHost {
 
 function CheckConnectivity3rdPartyHosts {
 
-	local remote_3rd_party_success
+	local remote3rdPartySuccess
 	local retval
 
 	if [ "$_PARANOIA_DEBUG" != "yes" ]; then # Do not loose time in paranoia debug
 
 		if [ "$REMOTE_3RD_PARTY_HOSTS" != "" ]; then
-			remote_3rd_party_success=false
+			remote3rdPartySuccess=false
 			for i in $REMOTE_3RD_PARTY_HOSTS
 			do
 				eval "$PING_CMD $i > /dev/null 2>&1" &
@@ -1128,11 +1140,11 @@ function CheckConnectivity3rdPartyHosts {
 				if [ $retval != 0 ]; then
 					Logger "Cannot ping 3rd party host [$i]. Return code [$retval]." "NOTICE"
 				else
-					remote_3rd_party_success=true
+					remote3rdPartySuccess=true
 				fi
 			done
 
-			if [ $remote_3rd_party_success == false ]; then
+			if [ $remote3rdPartySuccess == false ]; then
 				Logger "No remote 3rd party host responded to ping. No internet ?" "WARN"
 				return 1
 			else
@@ -1146,7 +1158,7 @@ function CheckConnectivity3rdPartyHosts {
 #__END_WITH_PARANOIA_DEBUG
 
 function RsyncPatternsAdd {
-	local pattern_type="${1}"	# exclude or include
+	local patternType="${1}"	# exclude or include
 	local pattern="${2}"
 
 	local rest
@@ -1157,7 +1169,7 @@ function RsyncPatternsAdd {
 	while [ -n "$rest" ]
 	do
 		# Take the string until first occurence until $PATH_SEPARATOR_CHAR
-		str=${rest%%;*}
+		str=${rest%%;*} #TODO: replace ; with $PATH_SEPARATOR_CHAR
 		# Handle the last case
 		if [ "$rest" = "${rest/$PATH_SEPARATOR_CHAR/}" ]; then
 			rest=
@@ -1166,25 +1178,25 @@ function RsyncPatternsAdd {
 			rest=${rest#*$PATH_SEPARATOR_CHAR}
 		fi
 			if [ "$RSYNC_PATTERNS" == "" ]; then
-			RSYNC_PATTERNS="--"$pattern_type"=\"$str\""
+			RSYNC_PATTERNS="--"$patternType"=\"$str\""
 		else
-			RSYNC_PATTERNS="$RSYNC_PATTERNS --"$pattern_type"=\"$str\""
+			RSYNC_PATTERNS="$RSYNC_PATTERNS --"$patternType"=\"$str\""
 		fi
 	done
 	set +f
 }
 
 function RsyncPatternsFromAdd {
-	local pattern_type="${1}"
-	local pattern_from="${2}"
+	local patternType="${1}"
+	local patternFrom="${2}"
 
 	## Check if the exclude list has a full path, and if not, add the config file path if there is one
-	if [ "$(basename $pattern_from)" == "$pattern_from" ]; then
-		pattern_from="$(dirname $CONFIG_FILE)/$pattern_from"
+	if [ "$(basename $patternFrom)" == "$patternFrom" ]; then
+		patternFrom="$(dirname $CONFIG_FILE)/$patternFrom"
 	fi
 
-	if [ -e "$pattern_from" ]; then
-		RSYNC_PATTERNS="$RSYNC_PATTERNS --"$pattern_type"-from=\"$pattern_from\""
+	if [ -e "$patternFrom" ]; then
+		RSYNC_PATTERNS="$RSYNC_PATTERNS --"$patternType"-from=\"$patternFrom\""
 	fi
 }
 
@@ -1345,9 +1357,20 @@ function PreInit {
 function PostInit {
 
 	# Define remote commands
-	SSH_CMD="$(type -p ssh) $SSH_COMP -i $SSH_RSA_PRIVATE_KEY $SSH_OPTS $REMOTE_USER@$REMOTE_HOST -p $REMOTE_PORT"
-	SCP_CMD="$(type -p scp) $SSH_COMP -i $SSH_RSA_PRIVATE_KEY -P $REMOTE_PORT"
-	RSYNC_SSH_CMD="$(type -p ssh) $SSH_COMP -i $SSH_RSA_PRIVATE_KEY $SSH_OPTS -p $REMOTE_PORT"
+	if [ -f "$SSH_RSA_PRIVATE_KEY" ]; then
+		SSH_CMD="$(type -p ssh) $SSH_COMP -i $SSH_RSA_PRIVATE_KEY $SSH_OPTS $REMOTE_USER@$REMOTE_HOST -p $REMOTE_PORT"
+		SCP_CMD="$(type -p scp) $SSH_COMP -i $SSH_RSA_PRIVATE_KEY -P $REMOTE_PORT"
+		RSYNC_SSH_CMD="$(type -p ssh) $SSH_COMP -i $SSH_RSA_PRIVATE_KEY $SSH_OPTS -p $REMOTE_PORT"
+	elif [ -f "$SSH_PASSWORD_FILE" ]; then
+		SSH_CMD="$(type -p sshpass) -f $SSH_PASSWORD_FILE $(type -p ssh) $SSH_COMP $SSH_OPTS $REMOTE_USER@$REMOTE_HOST -p $REMOTE_PORT"
+		SCP_CMD="$(type -p sshpass) -f $SSH_PASSWORD_FILE $(type -p scp) $SSH_COMP -P $REMOTE_PORT"
+		RSYNC_SSH_CMD="$(type -p sshpass) -f $SSH_PASSWORD_FILE $(type -p ssh) $SSH_COMP $SSH_OPTS -p $REMOTE_PORT"
+	else
+		SSH_PASSWORD=""
+		SSH_CMD=""
+		SCP_CMD=""
+		RSYNC_SSH_CMD=""
+	fi
 }
 
 function InitLocalOSSettings {
@@ -1490,6 +1513,11 @@ function CheckEnvironment {
 			Logger "ssh not present. Cannot start sync." "CRITICAL"
 			exit 1
 		fi
+
+		if ! type sshpass > /dev/null 2>&1 ; then
+			Logger "sshpass not present. Cannot use password authentication." "CRITICAL"
+			exit 1
+		fi
 	fi
 
 	if ! type rsync > /dev/null 2>&1 ; then
@@ -1533,8 +1561,8 @@ function CheckCurrentConfigAll {
 	fi
 
 	#TODO(low): Add runtime variable tests (RSYNC_ARGS etc)
-	if [ "$REMOTE_OPERATION" == "yes" ] && [ ! -f "$SSH_RSA_PRIVATE_KEY" ]; then
-		Logger "Cannot find rsa private key [$SSH_RSA_PRIVATE_KEY]. Cannot connect to remote system." "CRITICAL"
+	if [ "$REMOTE_OPERATION" == "yes" ] && ([ ! -f "$SSH_RSA_PRIVATE_KEY" ] && [ ! -f "$SSH_PASSWORD_FILE" ]); then
+		Logger "Cannot find rsa private key [$SSH_RSA_PRIVATE_KEY] nor password file [$SSH_PASSWORD_FILE]. No authentication method provided." "CRITICAL"
 		exit 1
 	fi
 }
@@ -2998,7 +3026,10 @@ function Init {
 		fi
 
 		if [ "$SSH_RSA_PRIVATE_KEY" == "" ]; then
-			SSH_RSA_PRIVATE_KEY=~/.ssh/id_rsa
+			if [ ! -f "$SSH_PASSWORD_FILE" ]; then
+				# Assume that there might exist a standard rsa key
+				SSH_RSA_PRIVATE_KEY=~/.ssh/id_rsa
+			fi
 		fi
 
 		# remove everything before '@'
@@ -3029,7 +3060,7 @@ function Init {
 	INITIATOR_SYNC_DIR="${INITIATOR_SYNC_DIR/#\~/$HOME}"
 	TARGET_SYNC_DIR="${TARGET_SYNC_DIR/#\~/$HOME}"
 	SSH_RSA_PRIVATE_KEY="${SSH_RSA_PRIVATE_KEY/#\~/$HOME}"
-
+	SSH_PASSWORD_FILE="${SSH_PASSWORD_FILE/#\~/$HOME}"
 
 	## Replica format
 	## Why the f*** does bash not have simple objects ?
@@ -3165,6 +3196,7 @@ function Usage {
 	echo "--initiator=\"\"		Master replica path. Will contain state and backup directory (is mandatory)"
 	echo "--target=\"\" 		Local or remote target replica path. Can be a ssh uri like ssh://user@host.com:22//path/to/target/replica (is mandatory)"
 	echo "--rsakey=\"\"		Alternative path to rsa private key for ssh connection to target replica"
+	echo "--password-file=\"\"      If no rsa private key is used for ssh authentication, a password file can be used"
 	echo "--instance-id=\"\"	Optional sync task name to identify this synchronization task when using multiple targets"
 	echo ""
 	echo "Additionaly, you may set most osync options at runtime. eg:"
@@ -3293,6 +3325,10 @@ for i in "$@"; do
 		SSH_RSA_PRIVATE_KEY=${i##*=}
 		opts=$opts" --rsakey=\"$SSH_RSA_PRIVATE_KEY\""
 		;;
+		--password-file=*)
+		SSH_PASSWORD_FILE=${i##*=}
+		opts=$opts" --password-file\"$SSH_PASSWORD_FILE\""
+		;;
 		--instance-id=*)
 		INSTANCE_ID=${i##*=}
 		opts=$opts" --instance-id=\"$INSTANCE_ID\""
@@ -3378,9 +3414,9 @@ opts="${opts# *}"
 
 	GetLocalOS
 	InitLocalOSSettings
-	CheckEnvironment
 	PreInit
 	Init
+	CheckEnvironment
 	PostInit
 	if [ $_QUICK_SYNC -lt 2 ]; then
 		CheckCurrentConfig
