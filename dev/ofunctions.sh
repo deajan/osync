@@ -1,6 +1,6 @@
 #### MINIMAL-FUNCTION-SET BEGIN ####
 
-## FUNC_BUILD=2016102101
+## FUNC_BUILD=2016102102
 ## BEGIN Generic bash functions written in 2013-2016 by Orsiris de Jong - http://www.netpower.fr - ozy@netpower.fr
 
 ## To use in a program, define the following variables:
@@ -872,19 +872,20 @@ function IsNumericExpand {
 	local re="^-?[0-9]+([.][0-9]+)?$"
 
 	if [[ $value =~ $re ]]; then
-		echo 1
+		echo 1 && return 1
 	else
-		echo 0
+		echo 0 && return 0
 	fi
 }
 
+# Usage [ $(IsNumeric $var) -eq 1 ]
 function IsNumeric {
 	local value="${1}"
 
 	if [[ $value =~ ^[0-9]+([.][0-9]+)?$ ]]; then
-		echo 1
+		echo 1 && return 1
 	else
-		echo 0
+		echo 0 && return 0
 	fi
 }
 
@@ -892,9 +893,9 @@ function IsInteger {
 	local value="${1}"
 
 	if [[ $value =~ ^[0-9]+$ ]]; then
-		echo 1
+		echo 1 && return 1
 	else
-		echo 0
+		echo 0 && return 0
 	fi
 }
 
@@ -928,13 +929,13 @@ arrayContains () {
 	local e
 
 	if [ "$2" == "" ]; then
-		echo 1 && return 1
+		echo 0 && return 0
 	fi
 
 	for e in "${@:2}"; do
-		[[ "$e" == "$1" ]] && echo 0 && return 0
+		[[ "$e" == "$1" ]] && echo 1 && return 1
 	done
-	echo 1 && return 1
+	echo 0 && return 0
 }
 
 function GetLocalOS {

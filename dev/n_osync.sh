@@ -4,7 +4,7 @@ PROGRAM="osync" # Rsync based two way sync engine with fault tolerance
 AUTHOR="(C) 2013-2016 by Orsiris de Jong"
 CONTACT="http://www.netpower.fr/osync - ozy@netpower.fr"
 PROGRAM_VERSION=1.2-beta2
-PROGRAM_BUILD=2016102101
+PROGRAM_BUILD=2016102102
 IS_STABLE=no
 
 # Execution order						#__WITH_PARANOIA_DEBUG
@@ -171,7 +171,7 @@ function CheckCurrentConfigAll {
 		exit 1
 	fi
 
-	if [ "$SKIP_DELETION" != "" ] && [ $(arrayContains "${INITIATOR[$__type]}" "${SKIP_DELETION[@]}") -ne 0 ] && [ $(arrayContains "${TARGET[$__type]}" "${SKIP_DELETION[@]}") -ne 0 ]; then
+	if [ "$SKIP_DELETION" != "" ] && [ $(arrayContains "${INITIATOR[$__type]}" "${SKIP_DELETION[@]}") -eq 0 ] && [ $(arrayContains "${TARGET[$__type]}" "${SKIP_DELETION[@]}") -eq 0 ]; then
 		Logger "Bogus skip deletion parameter." "CRITICAL"
 		exit 1
 	fi
@@ -1172,7 +1172,7 @@ function deletionPropagation {
 	#TODO: deletionPropagation replicaType = source replica whereas _deleteXxxxxx replicaType = dest replica
 
 	if [ "$replicaType" == "${INITIATOR[$__type]}" ]; then
-		if [ $(arrayContains "${INITIATOR[$__type]}" "${SKIP_DELETION[@]}") -ne 0 ]; then
+		if [ $(arrayContains "${INITIATOR[$__type]}" "${SKIP_DELETION[@]}") -eq 0 ]; then
 			replicaDir="${INITIATOR[$__replicaDir]}"
 			deleteDir="${INITIATOR[$__deleteDir]}"
 
@@ -1186,7 +1186,7 @@ function deletionPropagation {
 			Logger "Skipping deletion on replica $replicaType." "NOTICE"
 		fi
 	elif [ "$replicaType" == "${TARGET[$__type]}" ]; then
-		if [ $(arrayContains "${TARGET[$__type]}" "${SKIP_DELETION[@]}") -ne 0 ]; then
+		if [ $(arrayContains "${TARGET[$__type]}" "${SKIP_DELETION[@]}") -eq 0 ]; then
 			replicaDir="${TARGET[$__replicaDir]}"
 			deleteDir="${TARGET[$__deleteDir]}"
 
