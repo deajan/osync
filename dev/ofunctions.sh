@@ -1,6 +1,6 @@
 #### MINIMAL-FUNCTION-SET BEGIN ####
 
-## FUNC_BUILD=2016101901
+## FUNC_BUILD=2016102101
 ## BEGIN Generic bash functions written in 2013-2016 by Orsiris de Jong - http://www.netpower.fr - ozy@netpower.fr
 
 ## To use in a program, define the following variables:
@@ -920,6 +920,21 @@ function urlDecode {
 	local urlEncoded="${1//+/ }"
 
 	printf '%b' "${urlEncoded//%/\\x}"
+}
+
+## Modified version of http://stackoverflow.com/a/8574392
+## Usage: arrayContains "needle" "${haystack[@]}"
+arrayContains () {
+	local e
+
+	if [ "$2" == "" ]; then
+		echo 1 && return 1
+	fi
+
+	for e in "${@:2}"; do
+		[[ "$e" == "$1" ]] && echo 0 && return 0
+	done
+	echo 1 && return 1
 }
 
 function GetLocalOS {
