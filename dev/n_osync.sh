@@ -4,7 +4,7 @@ PROGRAM="osync" # Rsync based two way sync engine with fault tolerance
 AUTHOR="(C) 2013-2016 by Orsiris de Jong"
 CONTACT="http://www.netpower.fr/osync - ozy@netpower.fr"
 PROGRAM_VERSION=1.2-beta2
-PROGRAM_BUILD=2016102102
+PROGRAM_BUILD=2016102103
 IS_STABLE=no
 
 # Execution order						#__WITH_PARANOIA_DEBUG
@@ -661,9 +661,6 @@ function treeList {
 		rsyncCmd="$(type -p $RSYNC_EXECUTABLE) --rsync-path=\"$RSYNC_PATH\" $RSYNC_ARGS -L $RSYNC_ATTR_ARGS $RSYNC_TYPE_ARGS -8 --exclude \"$OSYNC_DIR\" $RSYNC_PATTERNS $RSYNC_PARTIAL_EXCLUDE --list-only \"$replicaPath\" 2> \"$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$replicaType.error.$SCRIPT_PID\" | grep \"^-\|^d\|^l\" | awk '{\$1=\$2=\$3=\$4=\"\" ;print}' | awk '{\$1=\$1 ;print}' | (grep -v \"^\.$\" || :) | sort > \"$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$replicaType.$SCRIPT_PID\""
 	fi
 	Logger "RSYNC_CMD: $rsyncCmd" "DEBUG"
-	#TODO: check the following statement
-	## Redirect commands stderr here to get rsync stderr output in logfile with eval "$rsyncCmd" 2>> "$LOG_FILE"
-	## When log writing fails, $! is empty and WaitForTaskCompletion fails.  Removing the 2>> log
 	eval "$rsyncCmd"
 	retval=$?
 
@@ -1306,10 +1303,10 @@ function Sync {
 			targetFail=false
 			for pid in "${pidArray[@]}"; do
 				pid=${pid%:*}
-				if [ $pid == $initiatorPid ]; then
+				if [ "$pid" == "$initiatorPid" ]; then
 					echo "${SYNC_ACTION[0]}" > "${INITIATOR[$__initiatorLastActionFile]}"
 					initiatorFail=true
-				elif [ $pid == $targetPid ]; then
+				elif [ "$pid" == "$targetPid" ]; then
 					echo "${SYNC_ACTION[0]}" > "${INITIATOR[$__targetLastActionFile]}"
 					targetFail=true
 				fi
@@ -1351,10 +1348,10 @@ function Sync {
 			targetFail=false
 			for pid in "${pidArray[@]}"; do
 				pid=${pid%:*}
-				if [ $pid == $initiatorPid ]; then
+				if [ "$pid" == "$initiatorPid" ]; then
 					echo "${SYNC_ACTION[1]}" > "${INITIATOR[$__initiatorLastActionFile]}"
 					initiatorFail=true
-				elif [ $pid == $targetPid ]; then
+				elif [ "$pid" == "$targetPid" ]; then
 					echo "${SYNC_ACTION[1]}" > "${INITIATOR[$__targetLastActionFile]}"
 					targetFail=true
 				fi
@@ -1455,10 +1452,10 @@ function Sync {
 			targetFail=false
 			for pid in "${pidArray[@]}"; do
 				pid=${pid%:*}
-				if [ $pid == $initiatorPid ]; then
+				if [ "$pid" == "$initiatorPid" ]; then
 					echo "${SYNC_ACTION[4]}" > "${INITIATOR[$__initiatorLastActionFile]}"
 					initiatorFail=true
-				elif [ $pid == $targetPid ]; then
+				elif [ "$pid" == "$targetPid" ]; then
 					echo "${SYNC_ACTION[4]}" > "${INITIATOR[$__targetLastActionFile]}"
 					targetFail=true
 				fi
@@ -1501,10 +1498,10 @@ function Sync {
 			targetFail=false
 			for pid in "${pidArray[@]}"; do
 				pid=${pid%:*}
-				if [ $pid == $initiatorPid ]; then
+				if [ "$pid" == "$initiatorPid" ]; then
 					echo "${SYNC_ACTION[5]}" > "${INITIATOR[$__initiatorLastActionFile]}"
 					initiatorFail=true
-				elif [ $pid == $targetPid ]; then
+				elif [ "$pid" == "$targetPid" ]; then
 					echo "${SYNC_ACTION[5]}" > "${INITIATOR[$__targetLastActionFile]}"
 					targetFail=true
 				fi
@@ -2075,7 +2072,12 @@ opts="${opts# *}"
 	else
 		LOG_FILE="$LOGFILE"
 	fi
-	Logger "Script begin, logging to [$LOG_FILE]." "DEBUG"
+	if [ ! -w "$LOG_FILE" ]; then
+		echo "Cannot write to log $[LOG_FILE]."
+		exit 1
+	else
+		Logger "Script begin, logging to [$LOG_FILE]." "DEBUG"
+	fi
 
 	if [ "$IS_STABLE" != "yes" ]; then
                 Logger "This is an unstable dev build. Please use with caution." "WARN"
