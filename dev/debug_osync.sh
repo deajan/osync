@@ -4,7 +4,7 @@ PROGRAM="osync" # Rsync based two way sync engine with fault tolerance
 AUTHOR="(C) 2013-2016 by Orsiris de Jong"
 CONTACT="http://www.netpower.fr/osync - ozy@netpower.fr"
 PROGRAM_VERSION=1.2-beta2
-PROGRAM_BUILD=2016101702
+PROGRAM_BUILD=2016102101
 IS_STABLE=no
 
 # Execution order						#__WITH_PARANOIA_DEBUG
@@ -45,7 +45,7 @@ IS_STABLE=no
 
 #### MINIMAL-FUNCTION-SET BEGIN ####
 
-## FUNC_BUILD=2016101901
+## FUNC_BUILD=2016102101
 ## BEGIN Generic bash functions written in 2013-2016 by Orsiris de Jong - http://www.netpower.fr - ozy@netpower.fr
 
 ## To use in a program, define the following variables:
@@ -967,6 +967,21 @@ function urlDecode {
 	printf '%b' "${urlEncoded//%/\\x}"
 }
 
+## Modified version of http://stackoverflow.com/a/8574392
+## Usage: arrayContains "needle" "${haystack[@]}"
+arrayContains () {
+	local e
+
+	if [ "$2" == "" ]; then
+		echo 1 && return 1
+	fi
+
+	for e in "${@:2}"; do
+		[[ "$e" == "$1" ]] && echo 0 && return 0
+	done
+	echo 1 && return 1
+}
+
 function GetLocalOS {
 	__CheckArguments 0 $# ${FUNCNAME[0]} "$@"	#__WITH_PARANOIA_DEBUG
 
@@ -1698,6 +1713,11 @@ function CheckCurrentConfigAll {
 		Logger "Cannot find rsa private key [$SSH_RSA_PRIVATE_KEY] nor password file [$SSH_PASSWORD_FILE]. No authentication method provided." "CRITICAL"
 		exit 1
 	fi
+
+	if [ "$SKIP_DELETION" != "" ] && [ $(arrayContains "${INITIATOR[$__type]}" "${SKIP_DELETION[@]}") -ne 0 ] && [ $(arrayContains "${TARGET[$__type]}" "${SKIP_DELETION[@]}") -ne 0 ]; then
+		Logger "Bogus skip deletion parameter." "CRITICAL"
+		exit 1
+	fi
 }
 
 ###### Osync specific functions (non shared)
@@ -1920,6 +1940,11 @@ function _CheckLocksLocal {
 		kill -9 $lock_pid > /dev/null 2>&1
 		if [ $? != 0 ]; then
 			Logger "There is a dead osync lock in [$lockfile]. Instance [$lock_pid] no longer running. Resuming." "NOTICE"
+			#rm "$lockfile"
+			#if [ $? != 0 ]; then
+			#	Logger "Cannot remove lock in [$lockfile]." "CRITICAL"
+			#	exit 1
+			#fi
 		else
 			Logger "There is already a local instance of osync running [$lock_pid] for this replica. Cannot start." "CRITICAL"
 			exit 1
@@ -1991,23 +2016,23 @@ function CheckLocks {
 		if [ $? != 0 ]; then
 			exit 1
 		fi
-	fi
-
-	_CheckLocksLocal "${INITIATOR[$__lockFile]}" &
-	pids="$!"
-	if [ "$REMOTE_OPERATION" != "yes" ]; then
-		_CheckLocksLocal "${TARGET[$__lockFile]}" &
-		pids="$pids;$!"
 	else
-		_CheckLocksRemote "${TARGET[$__lockFile]}" &
-		pids="$pids;$!"
+		_CheckLocksLocal "${INITIATOR[$__lockFile]}" &
+		pids="$!"
+		if [ "$REMOTE_OPERATION" != "yes" ]; then
+			_CheckLocksLocal "${TARGET[$__lockFile]}" &
+			pids="$pids;$!"
+		else
+			_CheckLocksRemote "${TARGET[$__lockFile]}" &
+			pids="$pids;$!"
+		fi
+		WaitForTaskCompletion $pids 720 1800 ${FUNCNAME[0]} true $KEEP_LOGGING
+		if [ $? -ne 0 ]; then
+			Logger "Cancelling task." "CRITICAL"
+			exit 1
+		fi
+		WriteLockFiles
 	fi
-	WaitForTaskCompletion $pids 720 1800 ${FUNCNAME[0]} true $KEEP_LOGGING
-	if [ $? -ne 0 ]; then
-		Logger "Cancelling task." "CRITICAL"
-		exit 1
-	fi
-	WriteLockFiles
 }
 
 function _WriteLockFilesLocal {
@@ -2015,10 +2040,14 @@ function _WriteLockFilesLocal {
 	local replicaType="${2}"
 	__CheckArguments 2 $# "${FUNCNAME[0]}" "$@"	#__WITH_PARANOIA_DEBUG
 
-	$COMMAND_SUDO echo "$SCRIPT_PID@$INSTANCE_ID" > "$lockfile"
+	(
+		set -o noclobber
+		$COMMAND_SUDO echo "$SCRIPT_PID@$INSTANCE_ID" > "$lockfile" 2> "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}-$replicaType.$SCRIPT_PID"
+	)
 	if [ $?	!= 0 ]; then
 		Logger "Could not create lock file on local $replicaType in [$lockfile]." "CRITICAL"
-		exit 1
+		Logger "Command output\n$($RUN_DIR/$PROGRAM.${FUNCNAME[0]}-$replicaType.$SCRIPT_PID)" "NOTICE"
+		return 1
 	else
 		Logger "Locked local $replicaType replica in [$lockfile]." "DEBUG"
 	fi
@@ -2034,12 +2063,13 @@ function _WriteLockFilesRemote {
 	CheckConnectivity3rdPartyHosts
 	CheckConnectivityRemoteHost
 
-	cmd=$SSH_CMD' "echo '$SCRIPT_PID@$INSTANCE_ID' | '$COMMAND_SUDO' tee \"'$lockfile'\"" > /dev/null 2>&1'
+	cmd=$SSH_CMD' "( set -o noclobber; echo '$SCRIPT_PID@$INSTANCE_ID' | '$COMMAND_SUDO' tee \"'$lockfile'\")" > /dev/null 2> $RUN_DIR/$PROGRAM.${FUNCNAME[0]}-$replicaType.$SCRIPT_PID'
 	Logger "cmd: $cmd" "DEBUG"
 	eval "$cmd"
 	if [ $? != 0 ]; then
 		Logger "Could not create lock file on remote $replicaType in [$lockfile]." "CRITICAL"
-		exit 1
+		Loggxer "Command output:\n$(cat $RUN_DIR/$PROGRAM.${FUNCNAME[0]}-$replicaType.$SCRIPT_PID)" "NOTICE"
+		return 1
 	else
 		Logger "Locked remote $replicaType replica in [$lockfile]." "DEBUG"
 	fi
@@ -2071,9 +2101,9 @@ function WriteLockFiles {
 		IFS=';' read -r -a pidArray <<< "$WAIT_FOR_TASK_COMPLETION"
 		for pid in "${pidArray[@]}"; do
 			pid=${pid%:*}
-			if [ $pid == $initiatorPid ]; then
+			if [ "$pid" == "$initiatorPid" ]; then
 				INITIATOR_LOCK_FILE_EXISTS=false
-			elif [ $pid == $targetPid ]; then
+			elif [ "$pid" == "$targetPid" ]; then
 				TARGET_LOCK_FILE_EXISTS=false
 			fi
 		done
@@ -2685,36 +2715,44 @@ function deletionPropagation {
 	#TODO: deletionPropagation replicaType = source replica whereas _deleteXxxxxx replicaType = dest replica
 
 	if [ "$replicaType" == "${INITIATOR[$__type]}" ]; then
-		replicaDir="${INITIATOR[$__replicaDir]}"
-		deleteDir="${INITIATOR[$__deleteDir]}"
+		if [ $(arrayContains "${INITIATOR[$__type]}" "${SKIP_DELETION[@]}") -ne 0 ]; then
+			replicaDir="${INITIATOR[$__replicaDir]}"
+			deleteDir="${INITIATOR[$__deleteDir]}"
 
-		_deleteLocal "${TARGET[$__type]}" "$replicaDir" "$deleteDir"
-		retval=$?
-		if [ $retval != 0 ]; then
-			Logger "Deletion on $replicaType replica failed." "CRITICAL"
-			exit 1
+			_deleteLocal "${TARGET[$__type]}" "$replicaDir" "$deleteDir"
+			retval=$?
+			if [ $retval != 0 ]; then
+				Logger "Deletion on $replicaType replica failed." "CRITICAL"
+				exit 1
+			fi
+		else
+			Logger "Skipping deletion on replica $replicaType." "NOTICE"
 		fi
-	else
-		replicaDir="${TARGET[$__replicaDir]}"
-		deleteDir="${TARGET[$__deleteDir]}"
+	elif [ "$replicaType" == "${TARGET[$__type]}" ]; then
+		if [ $(arrayContains "${TARGET[$__type]}" "${SKIP_DELETION[@]}") -ne 0 ]; then
+			replicaDir="${TARGET[$__replicaDir]}"
+			deleteDir="${TARGET[$__deleteDir]}"
 
-		if [ "$REMOTE_OPERATION" == "yes" ]; then
-			_deleteRemote "${INITIATOR[$__type]}" "$replicaDir" "$deleteDir"
-		else
-			_deleteLocal "${INITIATOR[$__type]}" "$replicaDir" "$deleteDir"
-		fi
-		retval=$?
-		if [ $retval == 0 ]; then
-			if [ -f "$RUN_DIR/$PROGRAM._delete_remote.$SCRIPT_PID" ]; then
-				Logger "Remote:\n$(cat $RUN_DIR/$PROGRAM._delete_remote.$SCRIPT_PID)" "VERBOSE"
+			if [ "$REMOTE_OPERATION" == "yes" ]; then
+				_deleteRemote "${INITIATOR[$__type]}" "$replicaDir" "$deleteDir"
+			else
+				_deleteLocal "${INITIATOR[$__type]}" "$replicaDir" "$deleteDir"
 			fi
-			return $retval
-		else
-			Logger "Deletion on $replicaType failed." "CRITICAL"
-			if [ -f "$RUN_DIR/$PROGRAM.remote_deletion.$SCRIPT_PID" ]; then
-				Logger "Remote:\n$(cat $RUN_DIR/$PROGRAM.remote_deletion.$SCRIPT_PID)" "CRITICAL"
+			retval=$?
+			if [ $retval == 0 ]; then
+				if [ -f "$RUN_DIR/$PROGRAM._delete_remote.$SCRIPT_PID" ]; then
+					Logger "Remote:\n$(cat $RUN_DIR/$PROGRAM._delete_remote.$SCRIPT_PID)" "VERBOSE"
+				fi
+				return $retval
+			else
+				Logger "Deletion on $replicaType failed." "CRITICAL"
+				if [ -f "$RUN_DIR/$PROGRAM.remote_deletion.$SCRIPT_PID" ]; then
+					Logger "Remote:\n$(cat $RUN_DIR/$PROGRAM.remote_deletion.$SCRIPT_PID)" "CRITICAL"
+				fi
+				exit 1
 			fi
-			exit 1
+		else
+			Logger "Skipping deletion on replica $replicaType." "NOTICE"
 		fi
 	fi
 }
@@ -3365,6 +3403,7 @@ function Usage {
 	echo "--rsakey=\"\"		Alternative path to rsa private key for ssh connection to target replica"
 	echo "--password-file=\"\"      If no rsa private key is used for ssh authentication, a password file can be used"
 	echo "--instance-id=\"\"	Optional sync task name to identify this synchronization task when using multiple targets"
+	echo "--skip-deletion=\"\"      You may skip deletion propagation on initiator or target. Valid values: initiator target initiator,target"
 	echo ""
 	echo "Additionaly, you may set most osync options at runtime. eg:"
 	echo "SOFT_DELETE_DAYS=365 osync.sh --initiator=/path --target=/other/path"
@@ -3500,6 +3539,11 @@ for i in "$@"; do
 		--instance-id=*)
 		INSTANCE_ID=${i##*=}
 		opts=$opts" --instance-id=\"$INSTANCE_ID\""
+		;;
+		--skip-deletion=*)
+		#SKIP_DELETION=${i##*=}
+		opts=$opts" --skip-deletion=\"${i##*=}\""
+		IFS=',' read -r -a SKIP_DELETION <<< ${i##*=}
 		;;
 		--on-changes)
 		sync_on_changes=true
