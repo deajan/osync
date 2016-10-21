@@ -6,7 +6,7 @@ AUTHOR="(C) 2016 by Orsiris de Jong"
 CONTACT="http://www.netpower.fr/osync - ozy@netpower.fr"
 OLD_PROGRAM_VERSION="v1.0x-v1.1x"
 NEW_PROGRAM_VERSION="v1.2x"
-CONFIG_FILE_VERSION=2016101901
+CONFIG_FILE_VERSION=2016102101
 PROGRAM_BUILD=2016101701
 
 ## type -p does not work on platforms other than linux (bash). If if does not work, always assume output is not a zero exitcode
@@ -64,6 +64,7 @@ CONFLICT_BACKUP_DAYS
 CONFLICT_PREVALANCE
 SOFT_DELETE
 SOFT_DELETE_DAYS
+SKIP_DELETION
 RESUME_SYNC
 RESUME_TRY
 FORCE_STRANGER_LOCK_RESUME
@@ -130,6 +131,7 @@ no
 initiator
 yes
 30
+''
 yes
 2
 no

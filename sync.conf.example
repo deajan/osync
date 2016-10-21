@@ -2,7 +2,7 @@
 
 ###### osync - Rsync based two way sync engine with fault tolerance
 ###### (C) 2013-2016 by Orsiris de Jong (www.netpower.fr)
-###### osync v1.1x / v1.2x config file rev 2016101901
+###### osync v1.1x / v1.2x config file rev 2016102101
 
 ## ---------- GENERAL OPTIONS
 
@@ -132,6 +132,9 @@ CONFLICT_PREVALANCE=initiator
 SOFT_DELETE=yes
 ## Osync will clean deleted files after a given number of days. Setting this to 0 will disable cleaning and keep deleted files forever. Warning: This can be very space consuming.
 SOFT_DELETE_DAYS=30
+
+## Optional deletion skip on replicas. Valid values are "initiator", "target", or "initiator,target"
+SKIP_DELETION=
 
 ## ---------- RESUME OPTIONS
 
