@@ -1,6 +1,6 @@
 #### MINIMAL-FUNCTION-SET BEGIN ####
 
-## FUNC_BUILD=2016102202
+## FUNC_BUILD=2016102203
 ## BEGIN Generic bash functions written in 2013-2016 by Orsiris de Jong - http://www.netpower.fr - ozy@netpower.fr
 
 ## To use in a program, define the following variables:
@@ -946,7 +946,7 @@ function GetLocalOS {
 
 	local localOsVar
 
-	if type -p busybox; then
+	if type -p busybox > /dev/null; then
 		localOsVar="BusyBox"
 	else
 		localOsVar="$(uname -spio 2>&1)"

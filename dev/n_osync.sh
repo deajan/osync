@@ -4,7 +4,7 @@ PROGRAM="osync" # Rsync based two way sync engine with fault tolerance
 AUTHOR="(C) 2013-2016 by Orsiris de Jong"
 CONTACT="http://www.netpower.fr/osync - ozy@netpower.fr"
 PROGRAM_VERSION=1.2-beta2
-PROGRAM_BUILD=2016102202
+PROGRAM_BUILD=2016102203
 IS_STABLE=no
 
 # Execution order						#__WITH_PARANOIA_DEBUG
@@ -773,7 +773,7 @@ function syncAttrs {
 	local destReplica
 
 	if [ "$LOCAL_OS" == "BUSYBOX" ]; then
-		Logger "Skipping acl synchronization (busybox doesn't have join command)." "NOTICE"
+		Logger "Skipping acl synchronization. Busybox doesn't have join command." "NOTICE"
 		return 0
 	fi
 
