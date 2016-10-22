@@ -4,7 +4,7 @@ PROGRAM="osync" # Rsync based two way sync engine with fault tolerance
 AUTHOR="(C) 2013-2016 by Orsiris de Jong"
 CONTACT="http://www.netpower.fr/osync - ozy@netpower.fr"
 PROGRAM_VERSION=1.2-beta2
-PROGRAM_BUILD=2016102104
+PROGRAM_BUILD=2016102201
 IS_STABLE=no
 
 # Execution order						#__WITH_PARANOIA_DEBUG
@@ -1530,17 +1530,23 @@ function Sync {
 function _SoftDeleteLocal {
 	local replicaType="${1}" # replica type (initiator, target)
 	local replicaDeletionPath="${2}" # Contains the full path to softdelete / backup directory without ending slash
-	local changeTime="${3}"
+	local changeTime="${3}" # Delete files older than changeTime days
+	local deletionType="${4}" # Trivial deletion type string
 
-	__CheckArguments 3 $# "${FUNCNAME[0]}" "$@"	#__WITH_PARANOIA_DEBUG
+	__CheckArguments 4 $# "${FUNCNAME[0]}" "$@"	#__WITH_PARANOIA_DEBUG
 
 	local retval
 
+	if [ "$LOCAL_OS" == "BUSYBOX" ]; then
+		Logger "Skipping $deletionType deletion on $replicaType. Busybox find -ctime not supported." "NOTICE"
+		return 0
+	fi
+
 	if [ -d "$replicaDeletionPath" ]; then
 		if [ $_DRYRUN == true ]; then
-			Logger "Listing files older than $changeTime days on $replicaType replica. Does not remove anything." "NOTICE"
+			Logger "Listing files older than $changeTime days on $replicaType replica for $deletionType deletion. Does not remove anything." "NOTICE"
 		else
-			Logger "Removing files older than $changeTime days on $replicaType replica." "NOTICE"
+			Logger "Removing files older than $changeTime days on $replicaType replica for $deletionType deletion." "NOTICE"
 		fi
 
 		if [ $_VERBOSE == true ]; then
@@ -1573,18 +1579,25 @@ function _SoftDeleteLocal {
 function _SoftDeleteRemote {
 	local replicaType="${1}"
 	local replicaDeletionPath="${2}" # Contains the full path to softdelete / backup directory without ending slash
-	local changeTime="${3}"
-	__CheckArguments 3 $# "${FUNCNAME[0]}" "$@"	#__WITH_PARANOIA_DEBUG
+	local changeTime="${3}" # Delete files older than changeTime days
+	local deletionType="${4}" # Trivial deletion type string
+
+	__CheckArguments 4 $# "${FUNCNAME[0]}" "$@"	#__WITH_PARANOIA_DEBUG
 
 	local retval
+
+	if [ "$REMOTE_OS" == "BUSYBOX" ]; then
+		Logger "Skipping $deletionType deletion on $replicaType. Busybox find -ctime not supported." "NOTICE"
+		return 0
+	fi
 
 	CheckConnectivity3rdPartyHosts
 	CheckConnectivityRemoteHost
 
 	if [ $_DRYRUN == true ]; then
-		Logger "Listing files older than $changeTime days on $replicaType replica. Does not remove anything." "NOTICE"
+		Logger "Listing files older than $changeTime days on $replicaType replica for $deletionType deletion. Does not remove anything." "NOTICE"
 	else
-		Logger "Removing files older than $changeTime days on $replicaType replica." "NOTICE"
+		Logger "Removing files older than $changeTime days on $replicaType replica for $deletionType deletion." "NOTICE"
 	fi
 
 	if [ $_VERBOSE == true ]; then
@@ -1620,13 +1633,13 @@ function SoftDelete {
 	if [ "$CONFLICT_BACKUP" != "no" ] && [ $CONFLICT_BACKUP_DAYS -ne 0 ]; then
 		Logger "Running conflict backup cleanup." "NOTICE"
 
-		_SoftDeleteLocal "${INITIATOR[$__type]}" "${INITIATOR[$__replicaDir]}${INITIATOR[$__backupDir]}" $CONFLICT_BACKUP_DAYS &
+		_SoftDeleteLocal "${INITIATOR[$__type]}" "${INITIATOR[$__replicaDir]}${INITIATOR[$__backupDir]}" $CONFLICT_BACKUP_DAYS "conflict backup" &
 		pids="$!"
 		if [ "$REMOTE_OPERATION" != "yes" ]; then
-			_SoftDeleteLocal "${TARGET[$__type]}" "${TARGET[$__replicaDir]}${TARGET[$__backupDir]}" $CONFLICT_BACKUP_DAYS &
+			_SoftDeleteLocal "${TARGET[$__type]}" "${TARGET[$__replicaDir]}${TARGET[$__backupDir]}" $CONFLICT_BACKUP_DAYS "conflict backup" &
 			pids="$pids;$!"
 		else
-			_SoftDeleteRemote "${TARGET[$__type]}" "${TARGET[$__replicaDir]}${TARGET[$__backupDir]}" $CONFLICT_BACKUP_DAYS &
+			_SoftDeleteRemote "${TARGET[$__type]}" "${TARGET[$__replicaDir]}${TARGET[$__backupDir]}" $CONFLICT_BACKUP_DAYS "conflict backup" &
 			pids="$pids;$!"
 		fi
 		WaitForTaskCompletion $pids 720 1800 ${FUNCNAME[0]} true $KEEP_LOGGING
@@ -1635,13 +1648,13 @@ function SoftDelete {
 	if [ "$SOFT_DELETE" != "no" ] && [ $SOFT_DELETE_DAYS -ne 0 ]; then
 		Logger "Running soft deletion cleanup." "NOTICE"
 
-		_SoftDeleteLocal "${INITIATOR[$__type]}" "${INITIATOR[$__replicaDir]}${INITIATOR[$__deleteDir]}" $SOFT_DELETE_DAYS &
+		_SoftDeleteLocal "${INITIATOR[$__type]}" "${INITIATOR[$__replicaDir]}${INITIATOR[$__deleteDir]}" $SOFT_DELETE_DAYS "softdelete" &
 		pids="$!"
 		if [ "$REMOTE_OPERATION" != "yes" ]; then
-			_SoftDeleteLocal "${TARGET[$__type]}" "${TARGET[$__replicaDir]}${TARGET[$__deleteDir]}" $SOFT_DELETE_DAYS &
+			_SoftDeleteLocal "${TARGET[$__type]}" "${TARGET[$__replicaDir]}${TARGET[$__deleteDir]}" $SOFT_DELETE_DAYS "softdelete" &
 			pids="$pids;$!"
 		else
-			_SoftDeleteRemote "${TARGET[$__type]}" "${TARGET[$__replicaDir]}${TARGET[$__deleteDir]}" $SOFT_DELETE_DAYS &
+			_SoftDeleteRemote "${TARGET[$__type]}" "${TARGET[$__replicaDir]}${TARGET[$__deleteDir]}" $SOFT_DELETE_DAYS "softdelete" &
 			pids="$pids;$!"
 		fi
 		WaitForTaskCompletion $pids 720 1800 ${FUNCNAME[0]} true $KEEP_LOGGING
