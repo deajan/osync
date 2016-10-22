@@ -946,7 +946,7 @@ function GetLocalOS {
 
 	local localOsVar
 
-	if type -p busybox > /dev/null; then
+	if type busybox > /dev/null 2>&1; then
 		localOsVar="BusyBox"
 	else
 		localOsVar="$(uname -spio 2>&1)"
