@@ -1,6 +1,6 @@
 #### MINIMAL-FUNCTION-SET BEGIN ####
 
-## FUNC_BUILD=2016102201
+## FUNC_BUILD=2016102202
 ## BEGIN Generic bash functions written in 2013-2016 by Orsiris de Jong - http://www.netpower.fr - ozy@netpower.fr
 
 ## To use in a program, define the following variables:
@@ -946,11 +946,15 @@ function GetLocalOS {
 
 	local localOsVar
 
-	localOsVar="$(uname -spio 2>&1)"
-	if [ $? != 0 ]; then
-		localOsVar="$(uname -v 2>&1)"
+	if type -p busybox; then
+		localOsVar="BusyBox"
+	else
+		localOsVar="$(uname -spio 2>&1)"
 		if [ $? != 0 ]; then
-			localOsVar="$(uname)"
+			localOsVar="$(uname -v 2>&1)"
+			if [ $? != 0 ]; then
+				localOsVar="$(uname)"
+			fi
 		fi
 	fi
 
@@ -967,8 +971,11 @@ function GetLocalOS {
 		*"Darwin"*)
 		LOCAL_OS="MacOSX"
 		;;
+		*"BusyBox"*)
+		LOCAL_OS="BUSYBOX"
+		;;
 		*)
-		if [ "$IGNORE_OS_TYPE" == "yes" ]; then		#DOC: Undocumented option
+		if [ "$IGNORE_OS_TYPE" == "yes" ]; then		#TODO(doc): Undocumented option
 			Logger "Running on unknown local OS [$localOsVar]." "WARN"
 			return
 		fi
@@ -987,6 +994,7 @@ function GetRemoteOS {
 	local cmd
 	local remoteOsVar
 
+	#TODO: Add busybox detection here
 
 	if [ "$REMOTE_OPERATION" == "yes" ]; then
 		CheckConnectivity3rdPartyHosts
@@ -1490,7 +1498,7 @@ function InitLocalOSSettings {
 		PING_CMD="ping -c 2 -i .2"
 	fi
 
-	if [ "$LOCAL_OS" == "busybox" ]; then
+	if [ "$LOCAL_OS" == "BUSYBOX" ]; then
 		PROCESS_STATE_CMD="echo none"
 	else
 		PROCESS_STATE_CMD='ps -p$pid -o state= 2 > /dev/null'
@@ -1498,10 +1506,12 @@ function InitLocalOSSettings {
 
 	## Stat command has different syntax on Linux and FreeBSD/MacOSX
 	if [ "$LOCAL_OS" == "MacOSX" ] || [ "$LOCAL_OS" == "BSD" ]; then
+		# Tested on BSD and Mac
 		STAT_CMD="stat -f \"%Sm\""
 		STAT_CTIME_MTIME_CMD="stat -f %N;%c;%m"
 	else
-		STAT_CMD="stat --format %y"
+		# Tested on GNU stat and busybox
+		STAT_CMD="stat -c %y"
 		STAT_CTIME_MTIME_CMD="stat -c %n;%Z;%Y"
 	fi
 }
