@@ -1,6 +1,6 @@
 #### MINIMAL-FUNCTION-SET BEGIN ####
 
-## FUNC_BUILD=2016102102
+## FUNC_BUILD=2016102201
 ## BEGIN Generic bash functions written in 2013-2016 by Orsiris de Jong - http://www.netpower.fr - ozy@netpower.fr
 
 ## To use in a program, define the following variables:
@@ -684,8 +684,10 @@ function WaitForTaskCompletion {
 			if [ $(IsInteger $pid) -eq 1 ]; then
 				if kill -0 $pid > /dev/null 2>&1; then
 					# Handle uninterruptible sleep state or zombies by ommiting them from running process array (How to kill that is already dead ? :)
-					#TODO(high): have this tested on *BSD, Mac & Win
-					pidState=$(ps -p$pid -o state= 2 > /dev/null)
+					#TODO(high): have this tested on *BSD, Mac, Win & busybox.
+					#TODO(high): propagate changes to ParallelExec
+					#pidState=$(ps -p$pid -o state= 2 > /dev/null)
+					pidState="$(eval $PROCESS_STATE_CMD)"
 					if [ "$pidState" != "D" ] && [ "$pidState" != "Z" ]; then
 						newPidsArray+=($pid)
 					fi
@@ -791,7 +793,8 @@ function ParallelExec {
 			if [ $(IsInteger $pid) -eq 1 ]; then
 				# Handle uninterruptible sleep state or zombies by ommiting them from running process array (How to kill that is already dead ? :)
 				if kill -0 $pid > /dev/null 2>&1; then
-					pidState=$(ps -p$pid -o state= 2 > /dev/null)
+					#pidState=$(ps -p$pid -o state= 2 > /dev/null)
+					pidState="$(eval $PROCESS_STATE_CMD)"
 					if [ "$pidState" != "D" ] && [ "$pidState" != "Z" ]; then
 						newPidsArray+=($pid)
 					fi
@@ -1485,6 +1488,12 @@ function InitLocalOSSettings {
 	else
 		FIND_CMD=find
 		PING_CMD="ping -c 2 -i .2"
+	fi
+
+	if [ "$LOCAL_OS" == "busybox" ]; then
+		PROCESS_STATE_CMD="echo none"
+	else
+		PROCESS_STATE_CMD='ps -p$pid -o state= 2 > /dev/null'
 	fi
 
 	## Stat command has different syntax on Linux and FreeBSD/MacOSX
