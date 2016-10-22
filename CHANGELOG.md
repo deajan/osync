@@ -100,9 +100,11 @@ XX xxx 2016: osync v1.1.3 released
 - Improved Logging
 - Updated osync to be fully compliant with coding style
 - Uploaded coding style manifest
+- Added LSB info to init script for Debian based distros
 
 v0-v1.0x - Jun 2013 - Sep 2015
-- Added LSB info to init script for Debian based distros
+------------------------------
+
 22 Jul. 2015: Osync v1.00a released
 - Small improvements in osync-batch.sh time management
 - Improved various logging on error
@@ -118,6 +120,7 @@ v0-v1.0x - Jun 2013 - Sep 2015
 - Fixed typo in soft deletion code preventing logging slave deleted backup files
 - Removed legacy lockfile code from init script
 - Removed hardcoded program name from init script
+
 01 Avr. 2015: Osync v1.00pre
 - Improved and refactored the soft deletion routine by merging conflict backup and soft deletion
 	- Reworked soft deletion code to handle a case where a top level directory gets deleted even if the files contained in it are not old enough (this obviously shouldn't happen on most FS)
@@ -151,6 +154,7 @@ v0-v1.0x - Jun 2013 - Sep 2015
 - Fixed remote OS detection when a banner is used on SSH
 - Added a routine that reinjects failed deletions for next run in order to prevent bringing back when deletion failed with permission issues
 - Added treat dir symlink as dir parameter
+
 27 May 2014: Osync 0.99 RC3
 - Additionnal delete fix for *BSD and MSYS (deleted file list not created right)
 - Fixed dry mode to use non dry after run treelists to create delete lists
@@ -197,6 +201,7 @@ v0-v1.0x - Jun 2013 - Sep 2015
 - Merged tree list functions into one
 - Added possibility to quick sync two local directories without any prior configuration
 - Added time control on OS detection
+
 02 Nov. 2013: Osync 0.99 RC2
 - Minor improvement on operating system detection
 - Improved RunLocalCommand execution hook
@@ -221,6 +226,7 @@ v0-v1.0x - Jun 2013 - Sep 2015
 - Improved verbose output
 - Fixed various typos
 - Enforced CheckConnectivityRemoteHost and CheckConnectivity3rdPartyHosts checks (if one of these fails, osync is stopped)
+
 18 Aug. 2013: Osync 0.99 RC1
 - Added possibility to change default logfile
 - Fixed a possible error upon master replica lock check
@@ -231,6 +237,7 @@ v0-v1.0x - Jun 2013 - Sep 2015
 - Update and delete functions now run rsync with --stats parameter
 - Fixed LoadConfigFile function will not warn on wrong config file
 - Added --no-maxtime parameter for sync big changes without enforcing execution time checks
+
 03 Aug. 2013: beta 3 milestone
 - Softdelete functions do now honor --dry switch
 - Simplified sync delete functions
@@ -238,10 +245,12 @@ v0-v1.0x - Jun 2013 - Sep 2015
 - Added CentOS 5 compatibility (comm v5.97 without --nocheck-order function replaced by sort)
 - Tree functions now honor supplementary rsync arguments
 - Tree functions now honor exclusion lists
+
 01 Aug. 2013: beta 2 milestone
 - Fixed an issue with spaces in directory trees
 - Fixed an issue with recursive directory trees
 - Revamped a bit code to add bash 3.2 compatibility
+
 24 Jul. 2013: beta milestone
 - Fixed some bad error handling in CheckMasterSlaveDirs and LockDirectories
 - Added support for spaces in sync dirs and exclude lists
