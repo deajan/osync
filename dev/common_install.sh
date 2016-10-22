@@ -4,7 +4,7 @@ PROGRAM=[prgname]
 PROGRAM_VERSION=[version]
 PROGRAM_BINARY=$PROGRAM".sh"
 PROGRAM_BATCH=$PROGRAM"-batch.sh"
-SCRIPT_BUILD=2016090605
+SCRIPT_BUILD=2016102201
 
 ## osync / obackup / pmocr / zsnap install script
 ## Tested on RHEL / CentOS 6 & 7, Fedora 23, Debian 7 & 8, Mint 17 and FreeBSD 8 & 10
@@ -70,13 +70,18 @@ function urlencode() {
         local c="${1:i:1}"
         case $c in
             [a-zA-Z0-9.~_-]) printf "$c" ;;
-            *) printf '%%%02X' "'$c" ;; 
+            *) printf '%%%02X' "'$c" ;;
         esac
     done
 }
 
 function SetOSSettings {
 	USER=root
+
+	if  type busybox > /dev/null 2>&1; then
+		QuickLogger "$0 won't work in busybox. Please use $PROGRAM_BINARY.sh directly."
+		exit 1
+	fi
 
 	local local_os_var
 
