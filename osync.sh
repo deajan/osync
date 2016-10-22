@@ -4,14 +4,14 @@ PROGRAM="osync" # Rsync based two way sync engine with fault tolerance
 AUTHOR="(C) 2013-2016 by Orsiris de Jong"
 CONTACT="http://www.netpower.fr/osync - ozy@netpower.fr"
 PROGRAM_VERSION=1.2-beta2
-PROGRAM_BUILD=2016102102
+PROGRAM_BUILD=2016102203
 IS_STABLE=no
 
 
 
 #### MINIMAL-FUNCTION-SET BEGIN ####
 
-## FUNC_BUILD=2016102102
+## FUNC_BUILD=2016102203
 ## BEGIN Generic bash functions written in 2013-2016 by Orsiris de Jong - http://www.netpower.fr - ozy@netpower.fr
 
 ## To use in a program, define the following variables:
@@ -675,8 +675,10 @@ function WaitForTaskCompletion {
 			if [ $(IsInteger $pid) -eq 1 ]; then
 				if kill -0 $pid > /dev/null 2>&1; then
 					# Handle uninterruptible sleep state or zombies by ommiting them from running process array (How to kill that is already dead ? :)
-					#TODO(high): have this tested on *BSD, Mac & Win
-					pidState=$(ps -p$pid -o state= 2 > /dev/null)
+					#TODO(high): have this tested on *BSD, Mac, Win & busybox.
+					#TODO(high): propagate changes to ParallelExec
+					#pidState=$(ps -p$pid -o state= 2 > /dev/null)
+					pidState="$(eval $PROCESS_STATE_CMD)"
 					if [ "$pidState" != "D" ] && [ "$pidState" != "Z" ]; then
 						newPidsArray+=($pid)
 					fi
@@ -775,7 +777,8 @@ function ParallelExec {
 			if [ $(IsInteger $pid) -eq 1 ]; then
 				# Handle uninterruptible sleep state or zombies by ommiting them from running process array (How to kill that is already dead ? :)
 				if kill -0 $pid > /dev/null 2>&1; then
-					pidState=$(ps -p$pid -o state= 2 > /dev/null)
+					#pidState=$(ps -p$pid -o state= 2 > /dev/null)
+					pidState="$(eval $PROCESS_STATE_CMD)"
 					if [ "$pidState" != "D" ] && [ "$pidState" != "Z" ]; then
 						newPidsArray+=($pid)
 					fi
@@ -921,11 +924,15 @@ function GetLocalOS {
 
 	local localOsVar
 
-	localOsVar="$(uname -spio 2>&1)"
-	if [ $? != 0 ]; then
-		localOsVar="$(uname -v 2>&1)"
+	if type busybox > /dev/null 2>&1; then
+		localOsVar="BusyBox"
+	else
+		localOsVar="$(uname -spio 2>&1)"
 		if [ $? != 0 ]; then
-			localOsVar="$(uname)"
+			localOsVar="$(uname -v 2>&1)"
+			if [ $? != 0 ]; then
+				localOsVar="$(uname)"
+			fi
 		fi
 	fi
 
@@ -942,8 +949,11 @@ function GetLocalOS {
 		*"Darwin"*)
 		LOCAL_OS="MacOSX"
 		;;
+		*"BusyBox"*)
+		LOCAL_OS="BUSYBOX"
+		;;
 		*)
-		if [ "$IGNORE_OS_TYPE" == "yes" ]; then		#DOC: Undocumented option
+		if [ "$IGNORE_OS_TYPE" == "yes" ]; then		#TODO(doc): Undocumented option
 			Logger "Running on unknown local OS [$localOsVar]." "WARN"
 			return
 		fi
@@ -961,6 +971,7 @@ function GetRemoteOS {
 	local cmd
 	local remoteOsVar
 
+	#TODO: Add busybox detection here
 
 	if [ "$REMOTE_OPERATION" == "yes" ]; then
 		CheckConnectivity3rdPartyHosts
@@ -1403,12 +1414,20 @@ function InitLocalOSSettings {
 		PING_CMD="ping -c 2 -i .2"
 	fi
 
+	if [ "$LOCAL_OS" == "BUSYBOX" ]; then
+		PROCESS_STATE_CMD="echo none"
+	else
+		PROCESS_STATE_CMD='ps -p$pid -o state= 2 > /dev/null'
+	fi
+
 	## Stat command has different syntax on Linux and FreeBSD/MacOSX
 	if [ "$LOCAL_OS" == "MacOSX" ] || [ "$LOCAL_OS" == "BSD" ]; then
+		# Tested on BSD and Mac
 		STAT_CMD="stat -f \"%Sm\""
 		STAT_CTIME_MTIME_CMD="stat -f %N;%c;%m"
 	else
-		STAT_CMD="stat --format %y"
+		# Tested on GNU stat and busybox
+		STAT_CMD="stat -c %y"
 		STAT_CTIME_MTIME_CMD="stat -c %n;%Z;%Y"
 	fi
 }
@@ -1547,14 +1566,14 @@ function CheckCurrentConfig {
 	# Check all variables that should contain "yes" or "no"
 	declare -a yes_no_vars=(CREATE_DIRS SUDO_EXEC SSH_COMPRESSION SSH_IGNORE_KNOWN_HOSTS REMOTE_HOST_PING PRESERVE_PERMISSIONS PRESERVE_OWNER PRESERVE_GROUP PRESERVE_EXECUTABILITY PRESERVE_ACL PRESERVE_XATTR COPY_SYMLINKS KEEP_DIRLINKS PRESERVE_HARDLINKS CHECKSUM RSYNC_COMPRESS CONFLICT_BACKUP CONFLICT_BACKUP_MULTIPLE SOFT_DELETE RESUME_SYNC FORCE_STRANGER_LOCK_RESUME PARTIAL DELTA_COPIES STOP_ON_CMD_ERROR RUN_AFTER_CMD_ON_ERROR)
 	for i in "${yes_no_vars[@]}"; do
-		test="if [ \"\$$i\" != \"yes\" ] && [ \"\$$i\" != \"no\" ]; then Logger \"Bogus $i value defined in config file. Correct your config file or update it using the update script if using and old version.\" \"CRITICAL\"; exit 1; fi"
+		test="if [ \"\$$i\" != \"yes\" ] && [ \"\$$i\" != \"no\" ]; then Logger \"Bogus $i value [$$i] defined in config file. Correct your config file or update it using the update script if using and old version.\" \"CRITICAL\"; exit 1; fi"
 		eval "$test"
 	done
 
 	# Check all variables that should contain a numerical value >= 0
 	declare -a num_vars=(MINIMUM_SPACE BANDWIDTH SOFT_MAX_EXEC_TIME HARD_MAX_EXEC_TIME KEEP_LOGGING MIN_WAIT MAX_WAIT CONFLICT_BACKUP_DAYS SOFT_DELETE_DAYS RESUME_TRY MAX_EXEC_TIME_PER_CMD_BEFORE MAX_EXEC_TIME_PER_CMD_AFTER)
 	for i in "${num_vars[@]}"; do
-		test="if [ $(IsNumeric \"\$$i\") -eq 0 ]; then Logger \"Bogus $i value defined in config file. Correct your config file or update it using the update script if using and old version.\" \"CRITICAL\"; exit 1; fi"
+		test="if [ $(IsNumericExpand \"\$$i\") -eq 0 ]; then Logger \"Bogus $i value [$$i] defined in config file. Correct your config file or update it using the update script if using and old version.\" \"CRITICAL\"; exit 1; fi"
 		eval "$test"
 	done
 }
@@ -2053,9 +2072,6 @@ function treeList {
 		rsyncCmd="$(type -p $RSYNC_EXECUTABLE) --rsync-path=\"$RSYNC_PATH\" $RSYNC_ARGS -L $RSYNC_ATTR_ARGS $RSYNC_TYPE_ARGS -8 --exclude \"$OSYNC_DIR\" $RSYNC_PATTERNS $RSYNC_PARTIAL_EXCLUDE --list-only \"$replicaPath\" 2> \"$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$replicaType.error.$SCRIPT_PID\" | grep \"^-\|^d\|^l\" | awk '{\$1=\$2=\$3=\$4=\"\" ;print}' | awk '{\$1=\$1 ;print}' | (grep -v \"^\.$\" || :) | sort > \"$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$replicaType.$SCRIPT_PID\""
 	fi
 	Logger "RSYNC_CMD: $rsyncCmd" "DEBUG"
-	#TODO: check the following statement
-	## Redirect commands stderr here to get rsync stderr output in logfile with eval "$rsyncCmd" 2>> "$LOG_FILE"
-	## When log writing fails, $! is empty and WaitForTaskCompletion fails.  Removing the 2>> log
 	eval "$rsyncCmd"
 	retval=$?
 
@@ -2163,6 +2179,11 @@ function syncAttrs {
 	local escDestDir
 	local destReplica
 
+	if [ "$LOCAL_OS" == "BUSYBOX" ]; then
+		Logger "Skipping acl synchronization. Busybox doesn't have join command." "NOTICE"
+		return 0
+	fi
+
 	Logger "Getting list of files that need updates." "NOTICE"
 
 	if [ "$REMOTE_OPERATION" == "yes" ]; then
@@ -2187,8 +2208,7 @@ function syncAttrs {
 		if [ -f "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$SCRIPT_PID" ]; then
 			Logger "List:\n$(cat $RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$SCRIPT_PID)" "VERBOSE"
 		fi
-		#TODO: Apply SC2002: unnecessary cat
-		cat "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$SCRIPT_PID" | ( grep -Ev "^[^ ]*(c|s|t)[^ ]* " || :) | ( grep -E "^[^ ]*(p|o|g|a)[^ ]* " || :) | sed -e 's/^[^ ]* //' >> "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}-cleaned.$SCRIPT_PID"
+		( grep -Ev "^[^ ]*(c|s|t)[^ ]* " "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$SCRIPT_PID" || :) | ( grep -E "^[^ ]*(p|o|g|a)[^ ]* " || :) | sed -e 's/^[^ ]* //' >> "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}-cleaned.$SCRIPT_PID"
 		if [ $? != 0 ]; then
 			Logger "Cannot prepare file list for attribute sync." "CRITICAL"
 			exit 1
@@ -2689,10 +2709,10 @@ function Sync {
 			targetFail=false
 			for pid in "${pidArray[@]}"; do
 				pid=${pid%:*}
-				if [ $pid == $initiatorPid ]; then
+				if [ "$pid" == "$initiatorPid" ]; then
 					echo "${SYNC_ACTION[0]}" > "${INITIATOR[$__initiatorLastActionFile]}"
 					initiatorFail=true
-				elif [ $pid == $targetPid ]; then
+				elif [ "$pid" == "$targetPid" ]; then
 					echo "${SYNC_ACTION[0]}" > "${INITIATOR[$__targetLastActionFile]}"
 					targetFail=true
 				fi
@@ -2734,10 +2754,10 @@ function Sync {
 			targetFail=false
 			for pid in "${pidArray[@]}"; do
 				pid=${pid%:*}
-				if [ $pid == $initiatorPid ]; then
+				if [ "$pid" == "$initiatorPid" ]; then
 					echo "${SYNC_ACTION[1]}" > "${INITIATOR[$__initiatorLastActionFile]}"
 					initiatorFail=true
-				elif [ $pid == $targetPid ]; then
+				elif [ "$pid" == "$targetPid" ]; then
 					echo "${SYNC_ACTION[1]}" > "${INITIATOR[$__targetLastActionFile]}"
 					targetFail=true
 				fi
@@ -2838,10 +2858,10 @@ function Sync {
 			targetFail=false
 			for pid in "${pidArray[@]}"; do
 				pid=${pid%:*}
-				if [ $pid == $initiatorPid ]; then
+				if [ "$pid" == "$initiatorPid" ]; then
 					echo "${SYNC_ACTION[4]}" > "${INITIATOR[$__initiatorLastActionFile]}"
 					initiatorFail=true
-				elif [ $pid == $targetPid ]; then
+				elif [ "$pid" == "$targetPid" ]; then
 					echo "${SYNC_ACTION[4]}" > "${INITIATOR[$__targetLastActionFile]}"
 					targetFail=true
 				fi
@@ -2884,10 +2904,10 @@ function Sync {
 			targetFail=false
 			for pid in "${pidArray[@]}"; do
 				pid=${pid%:*}
-				if [ $pid == $initiatorPid ]; then
+				if [ "$pid" == "$initiatorPid" ]; then
 					echo "${SYNC_ACTION[5]}" > "${INITIATOR[$__initiatorLastActionFile]}"
 					initiatorFail=true
-				elif [ $pid == $targetPid ]; then
+				elif [ "$pid" == "$targetPid" ]; then
 					echo "${SYNC_ACTION[5]}" > "${INITIATOR[$__targetLastActionFile]}"
 					targetFail=true
 				fi
@@ -2917,16 +2937,22 @@ function Sync {
 function _SoftDeleteLocal {
 	local replicaType="${1}" # replica type (initiator, target)
 	local replicaDeletionPath="${2}" # Contains the full path to softdelete / backup directory without ending slash
-	local changeTime="${3}"
+	local changeTime="${3}" # Delete files older than changeTime days
+	local deletionType="${4}" # Trivial deletion type string
 
 
 	local retval
 
+	if [ "$LOCAL_OS" == "BUSYBOX" ]; then
+		Logger "Skipping $deletionType deletion on $replicaType. Busybox find -ctime not supported." "NOTICE"
+		return 0
+	fi
+
 	if [ -d "$replicaDeletionPath" ]; then
 		if [ $_DRYRUN == true ]; then
-			Logger "Listing files older than $changeTime days on $replicaType replica. Does not remove anything." "NOTICE"
+			Logger "Listing files older than $changeTime days on $replicaType replica for $deletionType deletion. Does not remove anything." "NOTICE"
 		else
-			Logger "Removing files older than $changeTime days on $replicaType replica." "NOTICE"
+			Logger "Removing files older than $changeTime days on $replicaType replica for $deletionType deletion." "NOTICE"
 		fi
 
 		if [ $_VERBOSE == true ]; then
@@ -2959,17 +2985,24 @@ function _SoftDeleteLocal {
 function _SoftDeleteRemote {
 	local replicaType="${1}"
 	local replicaDeletionPath="${2}" # Contains the full path to softdelete / backup directory without ending slash
-	local changeTime="${3}"
+	local changeTime="${3}" # Delete files older than changeTime days
+	local deletionType="${4}" # Trivial deletion type string
+
 
 	local retval
+
+	if [ "$REMOTE_OS" == "BUSYBOX" ]; then
+		Logger "Skipping $deletionType deletion on $replicaType. Busybox find -ctime not supported." "NOTICE"
+		return 0
+	fi
 
 	CheckConnectivity3rdPartyHosts
 	CheckConnectivityRemoteHost
 
 	if [ $_DRYRUN == true ]; then
-		Logger "Listing files older than $changeTime days on $replicaType replica. Does not remove anything." "NOTICE"
+		Logger "Listing files older than $changeTime days on $replicaType replica for $deletionType deletion. Does not remove anything." "NOTICE"
 	else
-		Logger "Removing files older than $changeTime days on $replicaType replica." "NOTICE"
+		Logger "Removing files older than $changeTime days on $replicaType replica for $deletionType deletion." "NOTICE"
 	fi
 
 	if [ $_VERBOSE == true ]; then
@@ -3004,13 +3037,13 @@ function SoftDelete {
 	if [ "$CONFLICT_BACKUP" != "no" ] && [ $CONFLICT_BACKUP_DAYS -ne 0 ]; then
 		Logger "Running conflict backup cleanup." "NOTICE"
 
-		_SoftDeleteLocal "${INITIATOR[$__type]}" "${INITIATOR[$__replicaDir]}${INITIATOR[$__backupDir]}" $CONFLICT_BACKUP_DAYS &
+		_SoftDeleteLocal "${INITIATOR[$__type]}" "${INITIATOR[$__replicaDir]}${INITIATOR[$__backupDir]}" $CONFLICT_BACKUP_DAYS "conflict backup" &
 		pids="$!"
 		if [ "$REMOTE_OPERATION" != "yes" ]; then
-			_SoftDeleteLocal "${TARGET[$__type]}" "${TARGET[$__replicaDir]}${TARGET[$__backupDir]}" $CONFLICT_BACKUP_DAYS &
+			_SoftDeleteLocal "${TARGET[$__type]}" "${TARGET[$__replicaDir]}${TARGET[$__backupDir]}" $CONFLICT_BACKUP_DAYS "conflict backup" &
 			pids="$pids;$!"
 		else
-			_SoftDeleteRemote "${TARGET[$__type]}" "${TARGET[$__replicaDir]}${TARGET[$__backupDir]}" $CONFLICT_BACKUP_DAYS &
+			_SoftDeleteRemote "${TARGET[$__type]}" "${TARGET[$__replicaDir]}${TARGET[$__backupDir]}" $CONFLICT_BACKUP_DAYS "conflict backup" &
 			pids="$pids;$!"
 		fi
 		WaitForTaskCompletion $pids 720 1800 ${FUNCNAME[0]} true $KEEP_LOGGING
@@ -3019,13 +3052,13 @@ function SoftDelete {
 	if [ "$SOFT_DELETE" != "no" ] && [ $SOFT_DELETE_DAYS -ne 0 ]; then
 		Logger "Running soft deletion cleanup." "NOTICE"
 
-		_SoftDeleteLocal "${INITIATOR[$__type]}" "${INITIATOR[$__replicaDir]}${INITIATOR[$__deleteDir]}" $SOFT_DELETE_DAYS &
+		_SoftDeleteLocal "${INITIATOR[$__type]}" "${INITIATOR[$__replicaDir]}${INITIATOR[$__deleteDir]}" $SOFT_DELETE_DAYS "softdelete" &
 		pids="$!"
 		if [ "$REMOTE_OPERATION" != "yes" ]; then
-			_SoftDeleteLocal "${TARGET[$__type]}" "${TARGET[$__replicaDir]}${TARGET[$__deleteDir]}" $SOFT_DELETE_DAYS &
+			_SoftDeleteLocal "${TARGET[$__type]}" "${TARGET[$__replicaDir]}${TARGET[$__deleteDir]}" $SOFT_DELETE_DAYS "softdelete" &
 			pids="$pids;$!"
 		else
-			_SoftDeleteRemote "${TARGET[$__type]}" "${TARGET[$__replicaDir]}${TARGET[$__deleteDir]}" $SOFT_DELETE_DAYS &
+			_SoftDeleteRemote "${TARGET[$__type]}" "${TARGET[$__replicaDir]}${TARGET[$__deleteDir]}" $SOFT_DELETE_DAYS "softdelete" &
 			pids="$pids;$!"
 		fi
 		WaitForTaskCompletion $pids 720 1800 ${FUNCNAME[0]} true $KEEP_LOGGING
@@ -3451,7 +3484,12 @@ opts="${opts# *}"
 	else
 		LOG_FILE="$LOGFILE"
 	fi
-	Logger "Script begin, logging to [$LOG_FILE]." "DEBUG"
+	if [ ! -w "$LOG_FILE" ]; then
+		echo "Cannot write to log $[LOG_FILE]."
+		exit 1
+	else
+		Logger "Script begin, logging to [$LOG_FILE]." "DEBUG"
+	fi
 
 	if [ "$IS_STABLE" != "yes" ]; then
 		Logger "This is an unstable dev build. Please use with caution." "WARN"
