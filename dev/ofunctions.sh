@@ -1,6 +1,6 @@
 #### MINIMAL-FUNCTION-SET BEGIN ####
 
-## FUNC_BUILD=2016102301
+## FUNC_BUILD=2016102302
 ## BEGIN Generic bash functions written in 2013-2016 by Orsiris de Jong - http://www.netpower.fr - ozy@netpower.fr
 
 ## To use in a program, define the following variables:
@@ -1022,35 +1022,41 @@ function GetRemoteOS {
 	local cmd
 	local remoteOsVar
 
-	#TODO: Add busybox detection here
-
 	if [ "$REMOTE_OPERATION" == "yes" ]; then
 		CheckConnectivity3rdPartyHosts
 		CheckConnectivityRemoteHost
-		cmd=$SSH_CMD' "uname -spio" > "'$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$SCRIPT_PID'" 2>&1'
+
+		cmd=$SSH_CMD' "type busybox" > /dev/null 2>&1'
 		Logger "cmd: $cmd" "DEBUG"
 		eval "$cmd" &
-		WaitForTaskCompletion $! 120 240 ${FUNCNAME[0]}"-1" true $KEEP_LOGGING
-		retval=$?
-		if [ $retval != 0 ]; then
-			cmd=$SSH_CMD' "uname -v" > "'$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$SCRIPT_PID'" 2>&1'
+		WaitForTaskCompletion $! 120 240 ${FUNCNAME[0]}"-0" true $KEEP_LOGGING
+		if [ $retval == 0 ]; then
+			remoteOsVar="BusyBox"
+		else
+			cmd=$SSH_CMD' "uname -spio" > "'$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$SCRIPT_PID'" 2>&1'
 			Logger "cmd: $cmd" "DEBUG"
 			eval "$cmd" &
-			WaitForTaskCompletion $! 120 240 ${FUNCNAME[0]}"-2" true $KEEP_LOGGING
+			WaitForTaskCompletion $! 120 240 ${FUNCNAME[0]}"-1" true $KEEP_LOGGING
 			retval=$?
 			if [ $retval != 0 ]; then
-				cmd=$SSH_CMD' "uname" > "'$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$SCRIPT_PID'" 2>&1'
+				cmd=$SSH_CMD' "uname -v" > "'$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$SCRIPT_PID'" 2>&1'
 				Logger "cmd: $cmd" "DEBUG"
 				eval "$cmd" &
-				WaitForTaskCompletion $! 120 240 ${FUNCNAME[0]}"-3" true $KEEP_LOGGING
+				WaitForTaskCompletion $! 120 240 ${FUNCNAME[0]}"-2" true $KEEP_LOGGING
 				retval=$?
 				if [ $retval != 0 ]; then
-					Logger "Cannot Get remote OS type." "ERROR"
+					cmd=$SSH_CMD' "uname" > "'$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$SCRIPT_PID'" 2>&1'
+					Logger "cmd: $cmd" "DEBUG"
+					eval "$cmd" &
+					WaitForTaskCompletion $! 120 240 ${FUNCNAME[0]}"-3" true $KEEP_LOGGING
+					retval=$?
+					if [ $retval != 0 ]; then
+						Logger "Cannot Get remote OS type." "ERROR"
+					fi
 				fi
 			fi
+			remoteOsVar=$(cat "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$SCRIPT_PID")
 		fi
-
-		remoteOsVar=$(cat "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$SCRIPT_PID")
 
 		case $remoteOsVar in
 			*"Linux"*)
@@ -1064,6 +1070,9 @@ function GetRemoteOS {
 			;;
 			*"Darwin"*)
 			REMOTE_OS="MacOSX"
+			;;
+			*"BusyBox"*)
+			REMOTE_OS="BUSYBOX"
 			;;
 			*"ssh"*|*"SSH"*)
 			Logger "Cannot connect to remote system." "CRITICAL"
