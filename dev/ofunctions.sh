@@ -1,6 +1,6 @@
 #### MINIMAL-FUNCTION-SET BEGIN ####
 
-## FUNC_BUILD=2016102302
+## FUNC_BUILD=2016102303
 ## BEGIN Generic bash functions written in 2013-2016 by Orsiris de Jong - http://www.netpower.fr - ozy@netpower.fr
 
 ## To use in a program, define the following variables:
@@ -903,7 +903,10 @@ function IsInteger {
 }
 
 # Converts human readable sizes into integer kilobyte sizes
+# Usage numericSize="$(HumanToNumeric $humanSize)"
 function HumanToNumeric {
+	local value="${1}"
+
 	local notation
 	local suffix
 	local suffixPresent
@@ -912,22 +915,22 @@ function HumanToNumeric {
 	notation=(K M G T P E)
 	for suffix in "${notation[@]}"; do
 		multiplier=$((multiplier+1))
-		if [[ "$disk_space" == *"$suffix"* ]]; then
+		if [[ "$value" == *"$suffix"* ]]; then
 			suffixPresent=$suffix
 			break;
 		fi
 	done
 
 	if [ "$suffixPresent" != "" ]; then
-		disk_space=${disk_space%$suffix*}
-		disk_space=${disk_space%.*}
+		value=${value%$suffix*}
+		value=${value%.*}
 		# /1024 since we convert to kilobytes instead of bytes
-		disk_space=$((disk_space*(1024**multiplier/1024)))
+		value=$((value*(1024**multiplier/1024)))
 	else
-		disk_space=${disk_space%.*}
+		value=${value%.*}
 	fi
 
-	echo $disk_space
+	echo $value
 }
 
 ## from https://gist.github.com/cdown/1163649
