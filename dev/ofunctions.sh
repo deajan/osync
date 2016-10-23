@@ -1,6 +1,6 @@
 #### MINIMAL-FUNCTION-SET BEGIN ####
 
-## FUNC_BUILD=2016102303
+## FUNC_BUILD=2016102311
 ## BEGIN Generic bash functions written in 2013-2016 by Orsiris de Jong - http://www.netpower.fr - ozy@netpower.fr
 
 ## To use in a program, define the following variables:
@@ -8,6 +8,8 @@
 ## INSTANCE_ID=program-instance-name
 ## _DEBUG=yes/no
 
+#TODO(high): Refactor GetRemoteOs into big oneliner for faster execution (if busybox else uname else uname -spio in one statement)
+#TODO(high): Implement busybox support in SendEmail function
 #TODO: Windows checks, check sendmail & mailsend
 
 if ! type "$BASH" > /dev/null; then
@@ -267,7 +269,7 @@ function SendAlert {
 	fi
 
 	# <OSYNC SPECIFIC>
-	if [ "$_QUICK_SYNC" -eq 2 ]; then
+	if [ "$_QUICK_SYNC" == "2" ]; then
 		Logger "Current task is a quicksync task. Will not send any alert." "NOTICE"
 		return 0
 	fi
@@ -299,6 +301,23 @@ function SendAlert {
 	if [ "$mail_no_attachment" -eq 0 ]; then
 		attachment_command="-a $ALERT_LOG_FILE"
 	fi
+
+	if [ "$LOCAL_OS" == "BUSYBOX" ]; then
+		if type sendmail > /dev/null 2>&1; then
+			echo -e "Subject:$subject\r\n$body" | $(type -p sendmail) -f "$SENDER_MAIL" -S "$SMTP_SERVER:$SMTP_PORT" -au"$SMTP_USER" -ap"$SMTP_PASSWORD" $DESTINATION_MAILS
+			if [ $? != 0 ]; then
+				Logger "Cannot send alert mail via $(type -p sendmail) !!!" "WARN"
+				# Don't bother try other mail systems with busybox
+				return 1
+			else
+				return 0
+			fi
+		else
+			Logger "Sendmail not present. Won't send any mail" "WARN"
+			return 1
+		fi
+	fi
+
 	if type mutt > /dev/null 2>&1 ; then
 		echo "$body" | $(type -p mutt) -x -s "$subject" $DESTINATION_MAILS $attachment_command
 		if [ $? != 0 ]; then
@@ -407,21 +426,21 @@ function SendAlert {
 # SendEmail "subject" "Body text" "receiver@example.com receiver2@otherdomain.com" "/path/to/attachment.file"
 # Usage (Windows, make sure you have mailsend.exe in executable path, see http://github.com/muquit/mailsend)
 # attachment is optional but must be in windows format like "c:\\some\path\\my.file", or ""
-# smtp_server.domain.tld is mandatory, as is smtp_port (should be 25, 465 or 587)
+# smtp_server.domain.tld is mandatory, as is smtpPort (should be 25, 465 or 587)
 # encryption can be set to tls, ssl or none
-# smtp_user and smtp_password are optional
-# SendEmail "subject" "Body text" "receiver@example.com receiver2@otherdomain.com" "/path/to/attachment.file" "sender_email@example.com" "smtp_server.domain.tld" "smtp_port" "encryption" "smtp_user" "smtp_password"
+# smtpUser and smtpPassword are optional
+# SendEmail "subject" "Body text" "receiver@example.com receiver2@otherdomain.com" "/path/to/attachment.file" "senderEmail@example.com" "smtpServer.domain.tld" "smtpPort" "encryption" "smtpUser" "smtpPassword"
 function SendEmail {
 	local subject="${1}"
 	local message="${2}"
-	local destination_mails="${3}"
+	local destinationMails="${3}"
 	local attachment="${4}"
-	local sender_email="${5}"
-	local smtp_server="${6}"
-	local smtp_port="${7}"
+	local senderEmail="${5}"
+	local smtpServer="${6}"
+	local smtpPort="${7}"
 	local encryption="${8}"
-	local smtp_user="${9}"
-	local smtp_password="${10}"
+	local smtpUser="${9}"
+	local smtpPassword="${10}"
 
 	# CheckArguments will report a warning that can be ignored if used in Windows with paranoia debug enabled
 	__CheckArguments 4 $# ${FUNCNAME[0]} "$@"	#__WITH_PARANOIA_DEBUG
@@ -439,8 +458,24 @@ function SendEmail {
 		mail_no_attachment=0
 	fi
 
+	if [ "$LOCAL_OS" == "BUSYBOX" ]; then
+		if type sendmail > /dev/null 2>&1; then
+			echo -e "Subject:$subject\r\n$message" | $(type -p sendmail) -f "$senderEmail" -S "$smtpServer:$smtpPort" -au"$smtpUser" -ap"$smtpPassword" "$destinationMails"
+			if [ $? != 0 ]; then
+				Logger "Cannot send alert mail via $(type -p sendmail) !!!" "WARN"
+				# Don't bother try other mail systems with busybox
+				return 1
+			else
+				return 0
+			fi
+		else
+			Logger "Sendmail not present. Won't send any mail" "WARN"
+			return 1
+		fi
+	fi
+
 	if type mutt > /dev/null 2>&1 ; then
-		echo "$message" | $(type -p mutt) -x -s "$subject" "$destination_mails" $attachment_command
+		echo "$message" | $(type -p mutt) -x -s "$subject" "$destinationMails" $attachment_command
 		if [ $? != 0 ]; then
 			Logger "Cannot send mail via $(type -p mutt) !!!" "WARN"
 		else
@@ -457,10 +492,10 @@ function SendEmail {
 		else
 			attachment_command=""
 		fi
-		echo "$message" | $(type -p mail) $attachment_command -s "$subject" "$destination_mails"
+		echo "$message" | $(type -p mail) $attachment_command -s "$subject" "$destinationMails"
 		if [ $? != 0 ]; then
 			Logger "Cannot send mail via $(type -p mail) with attachments !!!" "WARN"
-			echo "$message" | $(type -p mail) -s "$subject" "$destination_mails"
+			echo "$message" | $(type -p mail) -s "$subject" "$destinationMails"
 			if [ $? != 0 ]; then
 				Logger "Cannot send mail via $(type -p mail) without attachments !!!" "WARN"
 			else
@@ -474,7 +509,7 @@ function SendEmail {
 	fi
 
 	if type sendmail > /dev/null 2>&1 ; then
-		echo -e "Subject:$subject\r\n$message" | $(type -p sendmail) "$destination_mails"
+		echo -e "Subject:$subject\r\n$message" | $(type -p sendmail) "$destinationMails"
 		if [ $? != 0 ]; then
 			Logger "Cannot send mail via $(type -p sendmail) !!!" "WARN"
 		else
@@ -485,17 +520,17 @@ function SendEmail {
 
 	# Windows specific
 	if type "mailsend.exe" > /dev/null 2>&1 ; then
-		if [ "$sender_email" == "" ]; then
+		if [ "$senderEmail" == "" ]; then
 			Logger "Missing sender email." "ERROR"
 			return 1
 		fi
-		if [ "$smtp_server" == "" ]; then
+		if [ "$smtpServer" == "" ]; then
 			Logger "Missing smtp port." "ERROR"
 			return 1
 		fi
-		if [ "$smtp_port" == "" ]; then
+		if [ "$smtpPort" == "" ]; then
 			Logger "Missing smtp port, assuming 25." "WARN"
-			smtp_port=25
+			smtpPort=25
 		fi
 		if [ "$encryption" != "tls" ] && [ "$encryption" != "ssl" ]  && [ "$encryption" != "none" ]; then
 			Logger "Bogus smtp encryption, assuming none." "WARN"
@@ -505,10 +540,10 @@ function SendEmail {
 		elif [ "$encryption" == "ssl" ]:; then
 			encryption_string=-ssl
 		fi
-		if [ "$smtp_user" != "" ] && [ "$smtp_password" != "" ]; then
-			auth_string="-auth -user \"$smtp_user\" -pass \"$smtp_password\""
+		if [ "$smtpUser" != "" ] && [ "$smtpPassword" != "" ]; then
+			auth_string="-auth -user \"$smtpUser\" -pass \"$smtpPassword\""
 		fi
-		$(type mailsend.exe) -f "$sender_email" -t "$destination_mails" -sub "$subject" -M "$message" -attach "$attachment" -smtp "$smtp_server" -port "$smtp_port" $encryption_string $auth_string
+		$(type mailsend.exe) -f "$senderEmail" -t "$destinationMails" -sub "$subject" -M "$message" -attach "$attachment" -smtp "$smtpServer" -port "$smtpPort" $encryption_string $auth_string
 		if [ $? != 0 ]; then
 			Logger "Cannot send mail via $(type mailsend.exe) !!!" "WARN"
 		else
@@ -1366,7 +1401,7 @@ function RsyncPatterns {
 			RsyncPatternsFromAdd "include" "$RSYNC_INCLUDE_FROM"
 		fi
 	# Use default include first for quicksync runs
-	elif [ "$RSYNC_PATTERN_FIRST" == "include" ] || [ $_QUICK_SYNC -eq 2 ]; then
+	elif [ "$RSYNC_PATTERN_FIRST" == "include" ] || [ "$_QUICK_SYNC" == "2" ]; then
 		if [ "$RSYNC_INCLUDE_PATTERN" != "" ]; then
 			RsyncPatternsAdd "include" "$RSYNC_INCLUDE_PATTERN"
 		fi
@@ -1386,6 +1421,8 @@ function RsyncPatterns {
 
 function PreInit {
 	 __CheckArguments 0 $# ${FUNCNAME[0]} "$@"    #__WITH_PARANOIA_DEBUG
+
+	local compressionString
 
 	## SSH compression
 	if [ "$SSH_COMPRESSION" != "no" ]; then
@@ -1477,30 +1514,49 @@ function PreInit {
 	fi
 
 	 ## Set compression executable and extension
-	COMPRESSION_LEVEL=3
-	if type xz > /dev/null 2>&1
-	then
-		COMPRESSION_PROGRAM="| xz -$COMPRESSION_LEVEL"
-		COMPRESSION_EXTENSION=.xz
-	elif type lzma > /dev/null 2>&1
-	then
-		COMPRESSION_PROGRAM="| lzma -$COMPRESSION_LEVEL"
-		COMPRESSION_EXTENSION=.lzma
-	elif type pigz > /dev/null 2>&1
-	then
-		COMPRESSION_PROGRAM="| pigz -$COMPRESSION_LEVEL"
-		COMPRESSION_EXTENSION=.gz
-		# obackup specific
-		COMPRESSION_OPTIONS=--rsyncable
-	elif type gzip > /dev/null 2>&1
-	then
-		COMPRESSION_PROGRAM="| gzip -$COMPRESSION_LEVEL"
-		COMPRESSION_EXTENSION=.gz
-		# obackup specific
-		COMPRESSION_OPTIONS=--rsyncable
+	if [ "$(IsInteger $COMPRESSION_LEVEL)" -eq 0 ]; then
+		COMPRESSION_LEVEL=3
+	fi
+
+	## Busybox fix (Termux xz command doesn't support compression at all)
+	if [ "$LOCAL_OS" == "BUSYBOX" ] || [ "$REMOTE_OS" == "BUSYBOX" ]; then
+		compressionString=""
+		if type gzip > /dev/null 2>&1
+		then
+			COMPRESSION_PROGRAM="| gzip -c$compressionString"
+			COMPRESSION_EXTENSION=.gz
+			# obackup specific
+		else
+			COMPRESSION_PROGRAM=
+			COMPRESSION_EXTENSION=
+		fi
 	else
-		COMPRESSION_PROGRAM=
-		COMPRESSION_EXTENSION=
+		compressionString=" -$COMPRESSION_LEVEL"
+
+		if type xz > /dev/null 2>&1
+		then
+			COMPRESSION_PROGRAM="| xz -c$compressionString"
+			COMPRESSION_EXTENSION=.xz
+		elif type lzma > /dev/null 2>&1
+		then
+			COMPRESSION_PROGRAM="| lzma -c$compressionString"
+			COMPRESSION_EXTENSION=.lzma
+		elif type pigz > /dev/null 2>&1
+		then
+			COMPRESSION_PROGRAM="| pigz -c$compressionString"
+			COMPRESSION_EXTENSION=.gz
+			# obackup specific
+			COMPRESSION_OPTIONS=--rsyncable
+		elif type gzip > /dev/null 2>&1
+		then
+			COMPRESSION_PROGRAM="| gzip -c$compressionString"
+			COMPRESSION_EXTENSION=.gz
+			# obackup specific
+			COMPRESSION_OPTIONS=--rsyncable
+		else
+			COMPRESSION_PROGRAM=
+			COMPRESSION_EXTENSION=
+		fi
 	fi
 	ALERT_LOG_FILE="$ALERT_LOG_FILE$COMPRESSION_EXTENSION"
 }
