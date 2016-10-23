@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-# osync test suite 2016101601
+# osync test suite 2016102301
 
 # 4 tests:
 # quicklocal
@@ -24,7 +24,8 @@
 #TODO: conflict resolution missing
 #TODO: softdelete missing
 #TODO: lock checks missing
-#TODO: fille attribute missing
+#TODO: file attribute missing
+#TODO: skip deletion tests
 
 TEST_DISK=/dev/vda1
 LARGE_FILESET_URL="http://ftp.drupal.org/files/projects/drupal-8.1.9.tar.gz"
@@ -34,8 +35,15 @@ OSYNC_DIR=${OSYNC_DIR%%/dev*}
 DEV_DIR="$OSYNC_DIR/dev"
 TESTS_DIR="$DEV_DIR/tests"
 
+LOCAL_CONF="local.conf"
+REMOTE_CONF="remote.conf"
+OLD_CONF="old.conf"
+TMP_OLD_CONF="tmp.old.conf"
+
 OSYNC_EXECUTABLE="osync.sh"
+OSYNC_UPGRADE="upgrade-v1.0x-v1.2x.sh"
 TMP_FILE="$DEV_DIR/tmp"
+
 
 
 if [ "$TRAVIS_RUN" == true ]; then
@@ -48,8 +56,8 @@ else
 	SSH_PORT=49999
 fi
 
-INITIATOR_DIR="${HOME}/osync/initiator"
-TARGET_DIR="${HOME}/osync/target"
+INITIATOR_DIR="${HOME}/osync-tests/initiator"
+TARGET_DIR="${HOME}/osync-tests/target"
 OSYNC_WORKDIR=".osync_workdir"
 OSYNC_STATE_DIR="$OSYNC_WORKDIR/state"
 OSYNC_DELETE_DIR="$OSYNC_WORKDIR/deleted"
@@ -136,6 +144,11 @@ function oneTimeSetUp () {
 
 function oneTimeTearDown () {
 	SetStableToOrigin
+}
+
+function setUp () {
+        rm -rf "$INITIATOR_DIR"
+        rm -rf "$TARGET_DIR"
 }
 
 function test_Merge () {
@@ -226,6 +239,9 @@ function test_Deletetion () {
 
 function test_osync_quicksync_local () {
 	cd "$OSYNC_DIR"
+
+	PrepareLocalDirs
+
 	./$OSYNC_EXECUTABLE --initiator="$INITIATOR_DIR" --target="$TARGET_DIR"
 	assertEquals "Return code" "0" $?
 
@@ -239,6 +255,9 @@ function test_osync_quicksync_local () {
 
 function test_osync_quicksync_remote () {
 	cd "$OSYNC_DIR"
+
+	PrepareLocalDirs
+
 	# Disable remote host ping because Travis can't ping
 	REMOTE_HOST_PING=no ./$OSYNC_EXECUTABLE --initiator="$INITIATOR_DIR" --target="ssh://localhost:$SSH_PORT/$TARGET_DIR" --rsakey="${HOME}/.ssh/id_rsa_local"
 	assertEquals "Return code" "0" $?
@@ -341,5 +360,25 @@ function test_ParallelExec () {
 	assertEquals "ParallelExec test 6" "2" $?
 
 }
+
+function test_UpgradeConfRun () {
+
+        # Basic return code tests. Need to go deep into file presence testing
+        cd "$OSYNC_DIR"
+
+	PrepareLocalDirs
+
+        # Make a security copy of the old config file
+        cp "$CONF_DIR/$OLD_CONF" "$CONF_DIR/$TMP_OLD_CONF"
+
+        ./$OSYNC_UPGRADE "$CONF_DIR/$TMP_OLD_CONF"
+        assertEquals "Conf file upgrade" "0" $?
+        ./$OSYNC_EXECUTABLE "$CONF_DIR/$TMP_OLD_CONF"
+        assertEquals "Upgraded conf file execution test" "0" $?
+
+        rm -f "$CONF_DIR/$TMP_OLD_CONF"
+        rm -f "$CONF_DIR/$TMP_OLD_CONF.save"
+}
+
 
 . "$TESTS_DIR/shunit2/shunit2"
