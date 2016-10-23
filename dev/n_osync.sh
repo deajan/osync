@@ -4,7 +4,7 @@ PROGRAM="osync" # Rsync based two way sync engine with fault tolerance
 AUTHOR="(C) 2013-2016 by Orsiris de Jong"
 CONTACT="http://www.netpower.fr/osync - ozy@netpower.fr"
 PROGRAM_VERSION=1.2-beta2
-PROGRAM_BUILD=2016102301
+PROGRAM_BUILD=2016102302
 IS_STABLE=no
 
 # Execution order						#__WITH_PARANOIA_DEBUG
@@ -269,10 +269,20 @@ function _CheckDiskSpaceLocal {
 	__CheckArguments 1 $# "${FUNCNAME[0]}" "$@"	#__WITH_PARANOIA_DEBUG
 
 	local disk_space
+	local notation
+	local suffix
+	local suffixPresent
+	local multiplier=0
 
 	Logger "Checking minimum disk space in [$replica_path]." "NOTICE"
 
-	disk_space=$(df -P "$replica_path" | tail -1 | awk '{print $4}')
+	disk_space=$(df "$replica_path" | tail -1 | awk '{print $4}')
+
+	# Ugly fix for df in some busybox environments that can only show human formats
+        if [ $(IsInteger $disk_space) -eq 0 ]; then
+		disk_space=$(HumanToNumeric $disk_space)
+	fi
+
 	if [ $disk_space -lt $MINIMUM_SPACE ]; then
 		Logger "There is not enough free space on replica [$replica_path] ($disk_space KB)." "WARN"
 	fi
@@ -290,7 +300,7 @@ function _CheckDiskSpaceRemote {
 	CheckConnectivity3rdPartyHosts
 	CheckConnectivityRemoteHost
 
-	cmd=$SSH_CMD' "'$COMMAND_SUDO' df -P \"'$replica_path'\"" > "'$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$SCRIPT_PID'" 2>&1'
+	cmd=$SSH_CMD' "'$COMMAND_SUDO' df \"'$replica_path'\"" > "'$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$SCRIPT_PID'" 2>&1'
 	Logger "cmd: $cmd" "DEBUG"
 	eval "$cmd"
 	if [ $? != 0 ]; then
@@ -298,6 +308,12 @@ function _CheckDiskSpaceRemote {
 		Logger "Command output:\n$(cat $RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$SCRIPT_PID)" "NOTICE"
 	else
 		disk_space=$(cat $RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$SCRIPT_PID | tail -1 | awk '{print $4}')
+
+		# Ugly fix for df in some busybox environments that can only show human formats
+	        if [ $(IsInteger $disk_space) -eq 0 ]; then
+			disk_space=$(HumanToNumeric $disk_space)
+		fi
+
 		if [ $disk_space -lt $MINIMUM_SPACE ]; then
 			Logger "There is not enough free space on replica [$replica_path] ($disk_space KB)." "WARN"
 		fi
