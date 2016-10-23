@@ -1019,6 +1019,7 @@ function GetLocalOS {
 function GetRemoteOS {
 	__CheckArguments 0 $# ${FUNCNAME[0]} "$@"	#__WITH_PARANOIA_DEBUG
 
+	local retval
 	local cmd
 	local remoteOsVar
 
@@ -1030,6 +1031,7 @@ function GetRemoteOS {
 		Logger "cmd: $cmd" "DEBUG"
 		eval "$cmd" &
 		WaitForTaskCompletion $! 120 240 ${FUNCNAME[0]}"-0" true $KEEP_LOGGING
+		retval=$?
 		if [ $retval == 0 ]; then
 			remoteOsVar="BusyBox"
 		else
