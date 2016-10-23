@@ -1,6 +1,6 @@
 #### MINIMAL-FUNCTION-SET BEGIN ####
 
-## FUNC_BUILD=2016102311
+## FUNC_BUILD=2016102314
 ## BEGIN Generic bash functions written in 2013-2016 by Orsiris de Jong - http://www.netpower.fr - ozy@netpower.fr
 
 ## To use in a program, define the following variables:
@@ -304,7 +304,14 @@ function SendAlert {
 
 	if [ "$LOCAL_OS" == "BUSYBOX" ]; then
 		if type sendmail > /dev/null 2>&1; then
-			echo -e "Subject:$subject\r\n$body" | $(type -p sendmail) -f "$SENDER_MAIL" -S "$SMTP_SERVER:$SMTP_PORT" -au"$SMTP_USER" -ap"$SMTP_PASSWORD" $DESTINATION_MAILS
+			if [ "$ENCRYPTION" == "tls" ]; then
+				echo -e "Subject:$subject\r\n$body" | $(type -p sendmail) -f "$SENDER_MAIL" -H "exec openssl s_client -quiet -tls1_2 -starttls smtp -connect $SMTP_SERVER:$SMTP_PORT" -au"$SMTP_USER" -ap"$SMTP_PASSWORD" $DESTINATION_MAILS
+			elif [ "$ENCRYPTION" == "ssl" ]; then
+				echo -e "Subject:$subject\r\n$body" | $(type -p sendmail) -f "$SENDER_MAIL" -H "exec openssl s_client -quiet -connect $SMTP_SERVER:$SMTP_PORT" -au"$SMTP_USER" -ap"$SMTP_PASSWORD" $DESTINATION_MAILS
+			else
+				echo -e "Subject:$subject\r\n$body" | $(type -p sendmail) -f "$SENDER_MAIL" -S "$SMTP_SERVER:$SMTP_PORT" -au"$SMTP_USER" -ap"$SMTP_PASSWORD" $DESTINATION_MAILS
+			fi
+
 			if [ $? != 0 ]; then
 				Logger "Cannot send alert mail via $(type -p sendmail) !!!" "WARN"
 				# Don't bother try other mail systems with busybox
@@ -429,13 +436,13 @@ function SendAlert {
 # smtp_server.domain.tld is mandatory, as is smtpPort (should be 25, 465 or 587)
 # encryption can be set to tls, ssl or none
 # smtpUser and smtpPassword are optional
-# SendEmail "subject" "Body text" "receiver@example.com receiver2@otherdomain.com" "/path/to/attachment.file" "senderEmail@example.com" "smtpServer.domain.tld" "smtpPort" "encryption" "smtpUser" "smtpPassword"
+# SendEmail "subject" "Body text" "receiver@example.com receiver2@otherdomain.com" "/path/to/attachment.file" "senderMail@example.com" "smtpServer.domain.tld" "smtpPort" "encryption" "smtpUser" "smtpPassword"
 function SendEmail {
 	local subject="${1}"
 	local message="${2}"
 	local destinationMails="${3}"
 	local attachment="${4}"
-	local senderEmail="${5}"
+	local senderMail="${5}"
 	local smtpServer="${6}"
 	local smtpPort="${7}"
 	local encryption="${8}"
@@ -460,7 +467,14 @@ function SendEmail {
 
 	if [ "$LOCAL_OS" == "BUSYBOX" ]; then
 		if type sendmail > /dev/null 2>&1; then
-			echo -e "Subject:$subject\r\n$message" | $(type -p sendmail) -f "$senderEmail" -S "$smtpServer:$smtpPort" -au"$smtpUser" -ap"$smtpPassword" "$destinationMails"
+			if [ "$ENCRYPTION" == "tls" ]; then
+				echo -e "Subject:$subject\r\n$message" | $(type -p sendmail) -f "$SenderMail" -H "exec openssl s_client -quiet -tls1_2 -starttls smtp -connect $smtpServer:$smtpPort" -au"$smtpUser" -ap"$smtpPassword" "$destinationMails"
+			elif [ "$ENCRYPTION" == "ssl" ]; then
+				echo -e "Subject:$subject\r\n$message" | $(type -p sendmail) -f "$SenderMail" -H "exec openssl s_client -quiet -connect $smtpServer:$smtpPort" -au"$smtpUser" -ap"$smtpPassword" "$destinationMails"
+			else
+				echo -e "Subject:$subject\r\n$message" | $(type -p sendmail) -f "$SenderMail" -S "$smtpServer:$SmtpPort" -au"$smtpUser" -ap"$smtpPassword" "$destinationMails"
+			fi
+
 			if [ $? != 0 ]; then
 				Logger "Cannot send alert mail via $(type -p sendmail) !!!" "WARN"
 				# Don't bother try other mail systems with busybox
@@ -520,7 +534,7 @@ function SendEmail {
 
 	# Windows specific
 	if type "mailsend.exe" > /dev/null 2>&1 ; then
-		if [ "$senderEmail" == "" ]; then
+		if [ "$senderMail" == "" ]; then
 			Logger "Missing sender email." "ERROR"
 			return 1
 		fi
@@ -543,7 +557,7 @@ function SendEmail {
 		if [ "$smtpUser" != "" ] && [ "$smtpPassword" != "" ]; then
 			auth_string="-auth -user \"$smtpUser\" -pass \"$smtpPassword\""
 		fi
-		$(type mailsend.exe) -f "$senderEmail" -t "$destinationMails" -sub "$subject" -M "$message" -attach "$attachment" -smtp "$smtpServer" -port "$smtpPort" $encryption_string $auth_string
+		$(type mailsend.exe) -f "$senderMail" -t "$destinationMails" -sub "$subject" -M "$message" -attach "$attachment" -smtp "$smtpServer" -port "$smtpPort" $encryption_string $auth_string
 		if [ $? != 0 ]; then
 			Logger "Cannot send mail via $(type mailsend.exe) !!!" "WARN"
 		else
