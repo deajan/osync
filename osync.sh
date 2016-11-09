@@ -4,14 +4,14 @@ PROGRAM="osync" # Rsync based two way sync engine with fault tolerance
 AUTHOR="(C) 2013-2016 by Orsiris de Jong"
 CONTACT="http://www.netpower.fr/osync - ozy@netpower.fr"
 PROGRAM_VERSION=1.2-beta2
-PROGRAM_BUILD=2016102203
+PROGRAM_BUILD=2016102304
 IS_STABLE=no
 
 
 
 #### MINIMAL-FUNCTION-SET BEGIN ####
 
-## FUNC_BUILD=2016102203
+## FUNC_BUILD=2016110901
 ## BEGIN Generic bash functions written in 2013-2016 by Orsiris de Jong - http://www.netpower.fr - ozy@netpower.fr
 
 ## To use in a program, define the following variables:
@@ -19,6 +19,8 @@ IS_STABLE=no
 ## INSTANCE_ID=program-instance-name
 ## _DEBUG=yes/no
 
+#TODO(high): Refactor GetRemoteOs into big oneliner for faster execution (if busybox else uname else uname -spio in one statement)
+#TODO(high): Implement busybox support in SendEmail function
 #TODO: Windows checks, check sendmail & mailsend
 
 if ! type "$BASH" > /dev/null; then
@@ -90,7 +92,7 @@ fi
 
 
 # Default alert attachment filename
-ALERT_LOG_FILE="$RUN_DIR/$PROGRAM.last.log"
+ALERT_LOG_FILE="$RUN_DIR/$PROGRAM.$INSTANCE_ID.last.log"
 
 # Set error exit code if a piped command fails
 	set -o pipefail
@@ -263,7 +265,7 @@ function SendAlert {
 	fi
 
 	# <OSYNC SPECIFIC>
-	if [ "$_QUICK_SYNC" -eq 2 ]; then
+	if [ "$_QUICK_SYNC" == "2" ]; then
 		Logger "Current task is a quicksync task. Will not send any alert." "NOTICE"
 		return 0
 	fi
@@ -295,6 +297,30 @@ function SendAlert {
 	if [ "$mail_no_attachment" -eq 0 ]; then
 		attachment_command="-a $ALERT_LOG_FILE"
 	fi
+
+	if [ "$LOCAL_OS" == "BUSYBOX" ]; then
+		if type sendmail > /dev/null 2>&1; then
+			if [ "$ENCRYPTION" == "tls" ]; then
+				echo -e "Subject:$subject\r\n$body" | $(type -p sendmail) -f "$SENDER_MAIL" -H "exec openssl s_client -quiet -tls1_2 -starttls smtp -connect $SMTP_SERVER:$SMTP_PORT" -au"$SMTP_USER" -ap"$SMTP_PASSWORD" $DESTINATION_MAILS
+			elif [ "$ENCRYPTION" == "ssl" ]; then
+				echo -e "Subject:$subject\r\n$body" | $(type -p sendmail) -f "$SENDER_MAIL" -H "exec openssl s_client -quiet -connect $SMTP_SERVER:$SMTP_PORT" -au"$SMTP_USER" -ap"$SMTP_PASSWORD" $DESTINATION_MAILS
+			else
+				echo -e "Subject:$subject\r\n$body" | $(type -p sendmail) -f "$SENDER_MAIL" -S "$SMTP_SERVER:$SMTP_PORT" -au"$SMTP_USER" -ap"$SMTP_PASSWORD" $DESTINATION_MAILS
+			fi
+
+			if [ $? != 0 ]; then
+				Logger "Cannot send alert mail via $(type -p sendmail) !!!" "WARN"
+				# Don't bother try other mail systems with busybox
+				return 1
+			else
+				return 0
+			fi
+		else
+			Logger "Sendmail not present. Won't send any mail" "WARN"
+			return 1
+		fi
+	fi
+
 	if type mutt > /dev/null 2>&1 ; then
 		echo "$body" | $(type -p mutt) -x -s "$subject" $DESTINATION_MAILS $attachment_command
 		if [ $? != 0 ]; then
@@ -403,21 +429,21 @@ function SendAlert {
 # SendEmail "subject" "Body text" "receiver@example.com receiver2@otherdomain.com" "/path/to/attachment.file"
 # Usage (Windows, make sure you have mailsend.exe in executable path, see http://github.com/muquit/mailsend)
 # attachment is optional but must be in windows format like "c:\\some\path\\my.file", or ""
-# smtp_server.domain.tld is mandatory, as is smtp_port (should be 25, 465 or 587)
+# smtp_server.domain.tld is mandatory, as is smtpPort (should be 25, 465 or 587)
 # encryption can be set to tls, ssl or none
-# smtp_user and smtp_password are optional
-# SendEmail "subject" "Body text" "receiver@example.com receiver2@otherdomain.com" "/path/to/attachment.file" "sender_email@example.com" "smtp_server.domain.tld" "smtp_port" "encryption" "smtp_user" "smtp_password"
+# smtpUser and smtpPassword are optional
+# SendEmail "subject" "Body text" "receiver@example.com receiver2@otherdomain.com" "/path/to/attachment.file" "senderMail@example.com" "smtpServer.domain.tld" "smtpPort" "encryption" "smtpUser" "smtpPassword"
 function SendEmail {
 	local subject="${1}"
 	local message="${2}"
-	local destination_mails="${3}"
+	local destinationMails="${3}"
 	local attachment="${4}"
-	local sender_email="${5}"
-	local smtp_server="${6}"
-	local smtp_port="${7}"
+	local senderMail="${5}"
+	local smtpServer="${6}"
+	local smtpPort="${7}"
 	local encryption="${8}"
-	local smtp_user="${9}"
-	local smtp_password="${10}"
+	local smtpUser="${9}"
+	local smtpPassword="${10}"
 
 	# CheckArguments will report a warning that can be ignored if used in Windows with paranoia debug enabled
 
@@ -434,8 +460,31 @@ function SendEmail {
 		mail_no_attachment=0
 	fi
 
+	if [ "$LOCAL_OS" == "BUSYBOX" ]; then
+		if type sendmail > /dev/null 2>&1; then
+			if [ "$ENCRYPTION" == "tls" ]; then
+				echo -e "Subject:$subject\r\n$message" | $(type -p sendmail) -f "$SenderMail" -H "exec openssl s_client -quiet -tls1_2 -starttls smtp -connect $smtpServer:$smtpPort" -au"$smtpUser" -ap"$smtpPassword" "$destinationMails"
+			elif [ "$ENCRYPTION" == "ssl" ]; then
+				echo -e "Subject:$subject\r\n$message" | $(type -p sendmail) -f "$SenderMail" -H "exec openssl s_client -quiet -connect $smtpServer:$smtpPort" -au"$smtpUser" -ap"$smtpPassword" "$destinationMails"
+			else
+				echo -e "Subject:$subject\r\n$message" | $(type -p sendmail) -f "$SenderMail" -S "$smtpServer:$SmtpPort" -au"$smtpUser" -ap"$smtpPassword" "$destinationMails"
+			fi
+
+			if [ $? != 0 ]; then
+				Logger "Cannot send alert mail via $(type -p sendmail) !!!" "WARN"
+				# Don't bother try other mail systems with busybox
+				return 1
+			else
+				return 0
+			fi
+		else
+			Logger "Sendmail not present. Won't send any mail" "WARN"
+			return 1
+		fi
+	fi
+
 	if type mutt > /dev/null 2>&1 ; then
-		echo "$message" | $(type -p mutt) -x -s "$subject" "$destination_mails" $attachment_command
+		echo "$message" | $(type -p mutt) -x -s "$subject" "$destinationMails" $attachment_command
 		if [ $? != 0 ]; then
 			Logger "Cannot send mail via $(type -p mutt) !!!" "WARN"
 		else
@@ -452,10 +501,10 @@ function SendEmail {
 		else
 			attachment_command=""
 		fi
-		echo "$message" | $(type -p mail) $attachment_command -s "$subject" "$destination_mails"
+		echo "$message" | $(type -p mail) $attachment_command -s "$subject" "$destinationMails"
 		if [ $? != 0 ]; then
 			Logger "Cannot send mail via $(type -p mail) with attachments !!!" "WARN"
-			echo "$message" | $(type -p mail) -s "$subject" "$destination_mails"
+			echo "$message" | $(type -p mail) -s "$subject" "$destinationMails"
 			if [ $? != 0 ]; then
 				Logger "Cannot send mail via $(type -p mail) without attachments !!!" "WARN"
 			else
@@ -469,7 +518,7 @@ function SendEmail {
 	fi
 
 	if type sendmail > /dev/null 2>&1 ; then
-		echo -e "Subject:$subject\r\n$message" | $(type -p sendmail) "$destination_mails"
+		echo -e "Subject:$subject\r\n$message" | $(type -p sendmail) "$destinationMails"
 		if [ $? != 0 ]; then
 			Logger "Cannot send mail via $(type -p sendmail) !!!" "WARN"
 		else
@@ -480,17 +529,17 @@ function SendEmail {
 
 	# Windows specific
 	if type "mailsend.exe" > /dev/null 2>&1 ; then
-		if [ "$sender_email" == "" ]; then
+		if [ "$senderMail" == "" ]; then
 			Logger "Missing sender email." "ERROR"
 			return 1
 		fi
-		if [ "$smtp_server" == "" ]; then
+		if [ "$smtpServer" == "" ]; then
 			Logger "Missing smtp port." "ERROR"
 			return 1
 		fi
-		if [ "$smtp_port" == "" ]; then
+		if [ "$smtpPort" == "" ]; then
 			Logger "Missing smtp port, assuming 25." "WARN"
-			smtp_port=25
+			smtpPort=25
 		fi
 		if [ "$encryption" != "tls" ] && [ "$encryption" != "ssl" ]  && [ "$encryption" != "none" ]; then
 			Logger "Bogus smtp encryption, assuming none." "WARN"
@@ -500,10 +549,10 @@ function SendEmail {
 		elif [ "$encryption" == "ssl" ]:; then
 			encryption_string=-ssl
 		fi
-		if [ "$smtp_user" != "" ] && [ "$smtp_password" != "" ]; then
-			auth_string="-auth -user \"$smtp_user\" -pass \"$smtp_password\""
+		if [ "$smtpUser" != "" ] && [ "$smtpPassword" != "" ]; then
+			auth_string="-auth -user \"$smtpUser\" -pass \"$smtpPassword\""
 		fi
-		$(type mailsend.exe) -f "$sender_email" -t "$destination_mails" -sub "$subject" -M "$message" -attach "$attachment" -smtp "$smtp_server" -port "$smtp_port" $encryption_string $auth_string
+		$(type mailsend.exe) -f "$senderMail" -t "$destinationMails" -sub "$subject" -M "$message" -attach "$attachment" -smtp "$smtpServer" -port "$smtpPort" $encryption_string $auth_string
 		if [ $? != 0 ]; then
 			Logger "Cannot send mail via $(type mailsend.exe) !!!" "WARN"
 		else
@@ -881,6 +930,37 @@ function IsInteger {
 	fi
 }
 
+# Converts human readable sizes into integer kilobyte sizes
+# Usage numericSize="$(HumanToNumeric $humanSize)"
+function HumanToNumeric {
+	local value="${1}"
+
+	local notation
+	local suffix
+	local suffixPresent
+	local multiplier
+
+	notation=(K M G T P E)
+	for suffix in "${notation[@]}"; do
+		multiplier=$((multiplier+1))
+		if [[ "$value" == *"$suffix"* ]]; then
+			suffixPresent=$suffix
+			break;
+		fi
+	done
+
+	if [ "$suffixPresent" != "" ]; then
+		value=${value%$suffix*}
+		value=${value%.*}
+		# /1024 since we convert to kilobytes instead of bytes
+		value=$((value*(1024**multiplier/1024)))
+	else
+		value=${value%.*}
+	fi
+
+	echo $value
+}
+
 ## from https://gist.github.com/cdown/1163649
 function urlEncode {
 	local length="${#1}"
@@ -968,38 +1048,46 @@ function GetLocalOS {
 
 function GetRemoteOS {
 
+	local retval
 	local cmd
 	local remoteOsVar
-
-	#TODO: Add busybox detection here
 
 	if [ "$REMOTE_OPERATION" == "yes" ]; then
 		CheckConnectivity3rdPartyHosts
 		CheckConnectivityRemoteHost
-		cmd=$SSH_CMD' "uname -spio" > "'$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$SCRIPT_PID'" 2>&1'
+
+		cmd=$SSH_CMD' "type busybox" > /dev/null 2>&1'
 		Logger "cmd: $cmd" "DEBUG"
 		eval "$cmd" &
-		WaitForTaskCompletion $! 120 240 ${FUNCNAME[0]}"-1" true $KEEP_LOGGING
+		WaitForTaskCompletion $! 120 240 ${FUNCNAME[0]}"-0" true $KEEP_LOGGING
 		retval=$?
-		if [ $retval != 0 ]; then
-			cmd=$SSH_CMD' "uname -v" > "'$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$SCRIPT_PID'" 2>&1'
+		if [ $retval == 0 ]; then
+			remoteOsVar="BusyBox"
+		else
+			cmd=$SSH_CMD' "uname -spio" > "'$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$SCRIPT_PID'" 2>&1'
 			Logger "cmd: $cmd" "DEBUG"
 			eval "$cmd" &
-			WaitForTaskCompletion $! 120 240 ${FUNCNAME[0]}"-2" true $KEEP_LOGGING
+			WaitForTaskCompletion $! 120 240 ${FUNCNAME[0]}"-1" true $KEEP_LOGGING
 			retval=$?
 			if [ $retval != 0 ]; then
-				cmd=$SSH_CMD' "uname" > "'$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$SCRIPT_PID'" 2>&1'
+				cmd=$SSH_CMD' "uname -v" > "'$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$SCRIPT_PID'" 2>&1'
 				Logger "cmd: $cmd" "DEBUG"
 				eval "$cmd" &
-				WaitForTaskCompletion $! 120 240 ${FUNCNAME[0]}"-3" true $KEEP_LOGGING
+				WaitForTaskCompletion $! 120 240 ${FUNCNAME[0]}"-2" true $KEEP_LOGGING
 				retval=$?
 				if [ $retval != 0 ]; then
-					Logger "Cannot Get remote OS type." "ERROR"
+					cmd=$SSH_CMD' "uname" > "'$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$SCRIPT_PID'" 2>&1'
+					Logger "cmd: $cmd" "DEBUG"
+					eval "$cmd" &
+					WaitForTaskCompletion $! 120 240 ${FUNCNAME[0]}"-3" true $KEEP_LOGGING
+					retval=$?
+					if [ $retval != 0 ]; then
+						Logger "Cannot Get remote OS type." "ERROR"
+					fi
 				fi
 			fi
+			remoteOsVar=$(cat "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$SCRIPT_PID")
 		fi
-
-		remoteOsVar=$(cat "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$SCRIPT_PID")
 
 		case $remoteOsVar in
 			*"Linux"*)
@@ -1013,6 +1101,9 @@ function GetRemoteOS {
 			;;
 			*"Darwin"*)
 			REMOTE_OS="MacOSX"
+			;;
+			*"BusyBox"*)
+			REMOTE_OS="BUSYBOX"
 			;;
 			*"ssh"*|*"SSH"*)
 			Logger "Cannot connect to remote system." "CRITICAL"
@@ -1243,7 +1334,7 @@ function RsyncPatterns {
 			RsyncPatternsFromAdd "include" "$RSYNC_INCLUDE_FROM"
 		fi
 	# Use default include first for quicksync runs
-	elif [ "$RSYNC_PATTERN_FIRST" == "include" ] || [ $_QUICK_SYNC -eq 2 ]; then
+	elif [ "$RSYNC_PATTERN_FIRST" == "include" ] || [ "$_QUICK_SYNC" == "2" ]; then
 		if [ "$RSYNC_INCLUDE_PATTERN" != "" ]; then
 			RsyncPatternsAdd "include" "$RSYNC_INCLUDE_PATTERN"
 		fi
@@ -1262,6 +1353,8 @@ function RsyncPatterns {
 }
 
 function PreInit {
+
+	local compressionString
 
 	## SSH compression
 	if [ "$SSH_COMPRESSION" != "no" ]; then
@@ -1353,30 +1446,49 @@ function PreInit {
 	fi
 
 	 ## Set compression executable and extension
-	COMPRESSION_LEVEL=3
-	if type xz > /dev/null 2>&1
-	then
-		COMPRESSION_PROGRAM="| xz -$COMPRESSION_LEVEL"
-		COMPRESSION_EXTENSION=.xz
-	elif type lzma > /dev/null 2>&1
-	then
-		COMPRESSION_PROGRAM="| lzma -$COMPRESSION_LEVEL"
-		COMPRESSION_EXTENSION=.lzma
-	elif type pigz > /dev/null 2>&1
-	then
-		COMPRESSION_PROGRAM="| pigz -$COMPRESSION_LEVEL"
-		COMPRESSION_EXTENSION=.gz
-		# obackup specific
-		COMPRESSION_OPTIONS=--rsyncable
-	elif type gzip > /dev/null 2>&1
-	then
-		COMPRESSION_PROGRAM="| gzip -$COMPRESSION_LEVEL"
-		COMPRESSION_EXTENSION=.gz
-		# obackup specific
-		COMPRESSION_OPTIONS=--rsyncable
+	if [ "$(IsInteger $COMPRESSION_LEVEL)" -eq 0 ]; then
+		COMPRESSION_LEVEL=3
+	fi
+
+	## Busybox fix (Termux xz command doesn't support compression at all)
+	if [ "$LOCAL_OS" == "BUSYBOX" ] || [ "$REMOTE_OS" == "BUSYBOX" ]; then
+		compressionString=""
+		if type gzip > /dev/null 2>&1
+		then
+			COMPRESSION_PROGRAM="| gzip -c$compressionString"
+			COMPRESSION_EXTENSION=.gz
+			# obackup specific
+		else
+			COMPRESSION_PROGRAM=
+			COMPRESSION_EXTENSION=
+		fi
 	else
-		COMPRESSION_PROGRAM=
-		COMPRESSION_EXTENSION=
+		compressionString=" -$COMPRESSION_LEVEL"
+
+		if type xz > /dev/null 2>&1
+		then
+			COMPRESSION_PROGRAM="| xz -c$compressionString"
+			COMPRESSION_EXTENSION=.xz
+		elif type lzma > /dev/null 2>&1
+		then
+			COMPRESSION_PROGRAM="| lzma -c$compressionString"
+			COMPRESSION_EXTENSION=.lzma
+		elif type pigz > /dev/null 2>&1
+		then
+			COMPRESSION_PROGRAM="| pigz -c$compressionString"
+			COMPRESSION_EXTENSION=.gz
+			# obackup specific
+			COMPRESSION_OPTIONS=--rsyncable
+		elif type gzip > /dev/null 2>&1
+		then
+			COMPRESSION_PROGRAM="| gzip -c$compressionString"
+			COMPRESSION_EXTENSION=.gz
+			# obackup specific
+			COMPRESSION_OPTIONS=--rsyncable
+		else
+			COMPRESSION_PROGRAM=
+			COMPRESSION_EXTENSION=
+		fi
 	fi
 	ALERT_LOG_FILE="$ALERT_LOG_FILE$COMPRESSION_EXTENSION"
 }
@@ -1694,13 +1806,23 @@ function CheckReplicaPaths {
 function _CheckDiskSpaceLocal {
 	local replica_path="${1}"
 
-	local disk_space
+	local diskSpace
+	local notation
+	local suffix
+	local suffixPresent
+	local multiplier=0
 
 	Logger "Checking minimum disk space in [$replica_path]." "NOTICE"
 
-	disk_space=$(df -P "$replica_path" | tail -1 | awk '{print $4}')
-	if [ $disk_space -lt $MINIMUM_SPACE ]; then
-		Logger "There is not enough free space on replica [$replica_path] ($disk_space KB)." "WARN"
+	diskSpace=$(df "$replica_path" | tail -1 | awk '{print $4}')
+
+	# Ugly fix for df in some busybox environments that can only show human formats
+	if [ $(IsInteger $diskSpace) -eq 0 ]; then
+		diskSpace=$(HumanToNumeric $diskSpace)
+	fi
+
+	if [ $diskSpace -lt $MINIMUM_SPACE ]; then
+		Logger "There is not enough free space on replica [$replica_path] ($diskSpace KB)." "WARN"
 	fi
 }
 
@@ -1710,21 +1832,27 @@ function _CheckDiskSpaceRemote {
 	Logger "Checking remote minimum disk space in [$replica_path]." "NOTICE"
 
 	local cmd
-	local disk_space
+	local diskSpace
 
 	CheckConnectivity3rdPartyHosts
 	CheckConnectivityRemoteHost
 
-	cmd=$SSH_CMD' "'$COMMAND_SUDO' df -P \"'$replica_path'\"" > "'$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$SCRIPT_PID'" 2>&1'
+	cmd=$SSH_CMD' "'$COMMAND_SUDO' df \"'$replica_path'\"" > "'$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$SCRIPT_PID'" 2>&1'
 	Logger "cmd: $cmd" "DEBUG"
 	eval "$cmd"
 	if [ $? != 0 ]; then
 		Logger "Cannot get free space on target [$replica_path]." "ERROR"
 		Logger "Command output:\n$(cat $RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$SCRIPT_PID)" "NOTICE"
 	else
-		disk_space=$(cat $RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$SCRIPT_PID | tail -1 | awk '{print $4}')
-		if [ $disk_space -lt $MINIMUM_SPACE ]; then
-			Logger "There is not enough free space on replica [$replica_path] ($disk_space KB)." "WARN"
+		diskSpace=$(cat $RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$SCRIPT_PID | tail -1 | awk '{print $4}')
+
+		# Ugly fix for df in some busybox environments that can only show human formats
+		if [ $(IsInteger $diskSpace) -eq 0 ]; then
+			diskSpace=$(HumanToNumeric $diskSpace)
+		fi
+
+		if [ $diskSpace -lt $MINIMUM_SPACE ]; then
+			Logger "There is not enough free space on replica [$replica_path] ($diskSpace KB)." "WARN"
 		fi
 	fi
 }
@@ -2067,9 +2195,9 @@ function treeList {
 	if [ "$REMOTE_OPERATION" == "yes" ] && [ "$replicaType" == "${TARGET[$__type]}" ]; then
 		CheckConnectivity3rdPartyHosts
 		CheckConnectivityRemoteHost
-		rsyncCmd="$(type -p $RSYNC_EXECUTABLE) --rsync-path=\"$RSYNC_PATH\" $RSYNC_ARGS -L $RSYNC_ATTR_ARGS $RSYNC_TYPE_ARGS -8 --exclude \"$OSYNC_DIR\" $RSYNC_PATTERNS $RSYNC_PARTIAL_EXCLUDE -e \"$RSYNC_SSH_CMD\" --list-only $REMOTE_USER@$REMOTE_HOST:\"$escapedReplicaPath\" 2> \"$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$replicaType.error.$SCRIPT_PID\" | grep \"^-\|^d\|^l\" | awk '{\$1=\$2=\$3=\$4=\"\" ;print}' | awk '{\$1=\$1 ;print}' | (grep -v \"^\.$\" || :) | sort > \"$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$replicaType.$SCRIPT_PID\""
+		rsyncCmd="$(type -p $RSYNC_EXECUTABLE) --rsync-path=\"$RSYNC_PATH\" $RSYNC_ARGS -L $RSYNC_ATTR_ARGS $RSYNC_TYPE_ARGS -8 --exclude \"$OSYNC_DIR\" $RSYNC_PATTERNS $RSYNC_PARTIAL_EXCLUDE -e \"$RSYNC_SSH_CMD\" --list-only $REMOTE_USER@$REMOTE_HOST:\"$escapedReplicaPath\" 2> \"$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$replicaType.error.$SCRIPT_PID\" | (grep -E \"^-|^d|^l\" || :) | (awk '{\$1=\$2=\$3=\$4=\"\" ;print}' || :) | (awk '{\$1=\$1 ;print}' || :) | (grep -v \"^\.$\" || :) | sort > \"$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$replicaType.$SCRIPT_PID\""
 	else
-		rsyncCmd="$(type -p $RSYNC_EXECUTABLE) --rsync-path=\"$RSYNC_PATH\" $RSYNC_ARGS -L $RSYNC_ATTR_ARGS $RSYNC_TYPE_ARGS -8 --exclude \"$OSYNC_DIR\" $RSYNC_PATTERNS $RSYNC_PARTIAL_EXCLUDE --list-only \"$replicaPath\" 2> \"$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$replicaType.error.$SCRIPT_PID\" | grep \"^-\|^d\|^l\" | awk '{\$1=\$2=\$3=\$4=\"\" ;print}' | awk '{\$1=\$1 ;print}' | (grep -v \"^\.$\" || :) | sort > \"$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$replicaType.$SCRIPT_PID\""
+		rsyncCmd="$(type -p $RSYNC_EXECUTABLE) --rsync-path=\"$RSYNC_PATH\" $RSYNC_ARGS -L $RSYNC_ATTR_ARGS $RSYNC_TYPE_ARGS -8 --exclude \"$OSYNC_DIR\" $RSYNC_PATTERNS $RSYNC_PARTIAL_EXCLUDE --list-only \"$replicaPath\" 2> \"$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$replicaType.error.$SCRIPT_PID\" | (grep -E \"^-|^d|^l\" || :) | (awk '{\$1=\$2=\$3=\$4=\"\" ;print}' || :) | (awk '{\$1=\$1 ;print}' || :) | (grep -v \"^\.$\" || :) | sort > \"$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$replicaType.$SCRIPT_PID\""
 	fi
 	Logger "RSYNC_CMD: $rsyncCmd" "DEBUG"
 	eval "$rsyncCmd"
