@@ -1,6 +1,6 @@
 #### MINIMAL-FUNCTION-SET BEGIN ####
 
-## FUNC_BUILD=2016102314
+## FUNC_BUILD=2016110901
 ## BEGIN Generic bash functions written in 2013-2016 by Orsiris de Jong - http://www.netpower.fr - ozy@netpower.fr
 
 ## To use in a program, define the following variables:
@@ -85,7 +85,7 @@ fi
 
 
 # Default alert attachment filename
-ALERT_LOG_FILE="$RUN_DIR/$PROGRAM.last.log"
+ALERT_LOG_FILE="$RUN_DIR/$PROGRAM.$INSTANCE_ID.last.log"
 
 # Set error exit code if a piped command fails
 	set -o pipefail
