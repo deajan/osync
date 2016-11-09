@@ -459,7 +459,7 @@ function SendEmail {
 	local auth_string=
 
 	if [ ! -f "$attachment" ]; then
-		attachment_command="-a $ALERT_LOG_FILE"
+		attachment_command="-a $attachment"
 		mail_no_attachment=1
 	else
 		mail_no_attachment=0
