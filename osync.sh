@@ -4,14 +4,14 @@ PROGRAM="osync" # Rsync based two way sync engine with fault tolerance
 AUTHOR="(C) 2013-2016 by Orsiris de Jong"
 CONTACT="http://www.netpower.fr/osync - ozy@netpower.fr"
 PROGRAM_VERSION=1.2-beta2
-PROGRAM_BUILD=2016102304
+PROGRAM_BUILD=2016111001
 IS_STABLE=no
 
 
 
 #### MINIMAL-FUNCTION-SET BEGIN ####
 
-## FUNC_BUILD=2016110901
+## FUNC_BUILD=2016111002
 ## BEGIN Generic bash functions written in 2013-2016 by Orsiris de Jong - http://www.netpower.fr - ozy@netpower.fr
 
 ## To use in a program, define the following variables:
@@ -92,7 +92,7 @@ fi
 
 
 # Default alert attachment filename
-ALERT_LOG_FILE="$RUN_DIR/$PROGRAM.$INSTANCE_ID.last.log"
+ALERT_LOG_FILE="$RUN_DIR/$PROGRAM.$SCRIPT_PID.last.log"
 
 # Set error exit code if a piped command fails
 	set -o pipefail
@@ -420,7 +420,7 @@ function SendAlert {
 
 	# Delete tmp log file
 	if [ -f "$ALERT_LOG_FILE" ]; then
-		rm "$ALERT_LOG_FILE"
+		rm -f "$ALERT_LOG_FILE"
 	fi
 }
 
@@ -454,7 +454,7 @@ function SendEmail {
 	local auth_string=
 
 	if [ ! -f "$attachment" ]; then
-		attachment_command="-a $ALERT_LOG_FILE"
+		attachment_command="-a $attachment"
 		mail_no_attachment=1
 	else
 		mail_no_attachment=0
@@ -1004,7 +1004,9 @@ function GetLocalOS {
 
 	local localOsVar
 
-	if type busybox > /dev/null 2>&1; then
+	# There's no good way to tell if currently running in BusyBox shell. Using sluggish way.
+	ls --help 2>&1 | grep -i BusyBox > /dev/null
+	if [ $? == 0 ]; then
 		localOsVar="BusyBox"
 	else
 		localOsVar="$(uname -spio 2>&1)"
@@ -1056,7 +1058,7 @@ function GetRemoteOS {
 		CheckConnectivity3rdPartyHosts
 		CheckConnectivityRemoteHost
 
-		cmd=$SSH_CMD' "type busybox" > /dev/null 2>&1'
+		cmd=$SSH_CMD' "ls --help 2>&1 | grep -i BusyBox > /dev/null"'
 		Logger "cmd: $cmd" "DEBUG"
 		eval "$cmd" &
 		WaitForTaskCompletion $! 120 240 ${FUNCNAME[0]}"-0" true $KEEP_LOGGING
@@ -3612,15 +3614,14 @@ opts="${opts# *}"
 	else
 		LOG_FILE="$LOGFILE"
 	fi
-	if [ ! -w "$LOG_FILE" ]; then
-		echo "Cannot write to log $[LOG_FILE]."
-		exit 1
+	if [ ! -w "$(dirname LOG_FILE)" ]; then
+		echo "Cannot write to log [$(dirname LOG_FILE)]."
 	else
 		Logger "Script begin, logging to [$LOG_FILE]." "DEBUG"
 	fi
 
 	if [ "$IS_STABLE" != "yes" ]; then
-		Logger "This is an unstable dev build. Please use with caution." "WARN"
+		Logger "This is an unstable dev build [$PROGRAM_BUILD]. Please use with caution." "WARN"
 	fi
 
 	GetLocalOS
