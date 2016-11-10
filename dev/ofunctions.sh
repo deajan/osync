@@ -1,6 +1,6 @@
 #### MINIMAL-FUNCTION-SET BEGIN ####
 
-## FUNC_BUILD=2016111001
+## FUNC_BUILD=2016111002
 ## BEGIN Generic bash functions written in 2013-2016 by Orsiris de Jong - http://www.netpower.fr - ozy@netpower.fr
 
 ## To use in a program, define the following variables:
@@ -424,7 +424,7 @@ function SendAlert {
 
 	# Delete tmp log file
 	if [ -f "$ALERT_LOG_FILE" ]; then
-		rm "$ALERT_LOG_FILE"
+		rm -f "$ALERT_LOG_FILE"
 	fi
 }
 
@@ -1026,7 +1026,9 @@ function GetLocalOS {
 
 	local localOsVar
 
-	if type busybox > /dev/null 2>&1; then
+	# There's no good way to tell if currently running in BusyBox shell. Using sluggish way.
+	ls --help 2>&1 | grep -i BusyBox > /dev/null
+	if [ $? == 0 ]; then
 		localOsVar="BusyBox"
 	else
 		localOsVar="$(uname -spio 2>&1)"
@@ -1079,7 +1081,7 @@ function GetRemoteOS {
 		CheckConnectivity3rdPartyHosts
 		CheckConnectivityRemoteHost
 
-		cmd=$SSH_CMD' "type busybox" > /dev/null 2>&1'
+		cmd=$SSH_CMD' "ls --help 2>&1 | grep -i BusyBox > /dev/null"'
 		Logger "cmd: $cmd" "DEBUG"
 		eval "$cmd" &
 		WaitForTaskCompletion $! 120 240 ${FUNCNAME[0]}"-0" true $KEEP_LOGGING
