@@ -1,4 +1,4 @@
-## FUNC_BUILD=2016071902-c
+## FUNC_BUILD=2016071902-d
 ## BEGIN Generic functions for osync & obackup written in 2013-2016 by Orsiris de Jong - http://www.netpower.fr - ozy@netpower.fr
 
 ## type -p does not work on platforms other than linux (bash). If if does not work, always assume output is not a zero exitcode
@@ -71,7 +71,7 @@ fi
 
 
 # Default alert attachment filename
-ALERT_LOG_FILE="$RUN_DIR/$PROGRAM.last.log"
+ALERT_LOG_FILE="$RUN_DIR/$PROGRAM.$$.last.log"
 
 # Set error exit code if a piped command fails
 	set -o pipefail
@@ -342,7 +342,7 @@ function SendAlert {
 
 	# Delete tmp log file
 	if [ -f "$ALERT_LOG_FILE" ]; then
-		rm "$ALERT_LOG_FILE"
+		rm -f "$ALERT_LOG_FILE"
 	fi
 }
 
@@ -377,7 +377,7 @@ function SendEmail {
 	local auth_string=
 
 	if [ ! -f "$attachment" ]; then
-		attachment_command="-a $ALERT_LOG_FILE"
+		attachment_command="-a $attachment"
 		mail_no_attachment=1
 	else
 		mail_no_attachment=0
