@@ -4,6 +4,11 @@ git clone git+ssh://aur@aur.archlinux.org/osync.git osync.aur &&
 cd "osync.aur" &&
 srcdir="." &&
 source "PKGBUILD" &&
+
+# Get pkgver from current osync
+pkgver=$(grep PROGRAM_VERSION= ../../../osync.sh)
+pkgver=${pkgver##*=}
+
 url=$(echo -n ${source[0]} | sed 's/git+//g' | sed 's/#.*//g') &&
 branch=$(echo -n ${source[0]} | sed 's/.*#branch=//g') &&
 git clone -b $branch $url &&
