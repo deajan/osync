@@ -2,7 +2,7 @@
 
 ###### osync - Rsync based two way sync engine with fault tolerance
 ###### (C) 2013-2016 by Orsiris de Jong (www.netpower.fr)
-###### osync v1.1x / v1.2x config file rev 2016102101
+###### osync v1.1x / v1.2x config file rev 2016111201
 
 ## ---------- GENERAL OPTIONS
 
@@ -154,9 +154,15 @@ DELTA_COPIES=yes
 ## ---------- ALERT OPTIONS
 
 ## List of alert mails separated by spaces
+## Most Unix systems have preconfigured mail support and don't need anything else than the destination mail
+## Just make sure that the current user has enough privileges to use mail / mutt / sendmail
+## on pfSense platform, smtp support needs to be configured in System > Advanced > Notifications
 DESTINATION_MAILS="your@alert.tld"
 
-## Windows specific (msys / cygwin environment) only mail options (used with mailsend.exe from muquit, http://github.com/muquit/mailsend or from sendemail.exe from Brandon Zehm, http://caspian.dotconf.net/menu/Software/SendEmail/)
+## Busybox / Windows specific (msys / cygwin environment) only mail options
+## Busybox relies on sendmail
+## Windows mail support relies on mailsend.exe from muquit, http://github.com/muquit/mailsend which needs to be in %PATH% environment variable
+
 SENDER_MAIL="alert@your.system.tld"
 SMTP_SERVER=smtp.your.isp.tld
 SMTP_PORT=25
