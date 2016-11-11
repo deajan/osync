@@ -1,6 +1,6 @@
 #### MINIMAL-FUNCTION-SET BEGIN ####
 
-## FUNC_BUILD=2016111002
+## FUNC_BUILD=2016111201
 ## BEGIN Generic bash functions written in 2013-2016 by Orsiris de Jong - http://www.netpower.fr - ozy@netpower.fr
 
 ## To use in a program, define the following variables:
@@ -8,8 +8,6 @@
 ## INSTANCE_ID=program-instance-name
 ## _DEBUG=yes/no
 
-#TODO(high): Refactor GetRemoteOs into big oneliner for faster execution (if busybox else uname else uname -spio in one statement)
-#TODO(high): Implement busybox support in SendEmail function
 #TODO: Windows checks, check sendmail & mailsend
 
 if ! type "$BASH" > /dev/null; then
@@ -250,14 +248,10 @@ function SendAlert {
 
 	__CheckArguments 0-1 $# ${FUNCNAME[0]} "$@"	#__WITH_PARANOIA_DEBUG
 
-	local mail_no_attachment=
-	local attachment_command=
+	local attachment=
+	local attachmentFile=
 	local subject=
 	local body=
-
-	# Windows specific settings
-	local encryption_string=
-	local auth_string=
 
 	if [ "$DESTINATION_MAILS" == "" ]; then
 		return 0
@@ -278,9 +272,9 @@ function SendAlert {
 	eval "cat \"$LOG_FILE\" $COMPRESSION_PROGRAM > $ALERT_LOG_FILE"
 	if [ $? != 0 ]; then
 		Logger "Cannot create [$ALERT_LOG_FILE]" "WARN"
-		mail_no_attachment=1
+		attachment=False
 	else
-		mail_no_attachment=0
+		attachment=True
 	fi
 	body="$MAIL_ALERT_MSG"$'\n\n'"$CURRENT_LOG"
 
@@ -298,133 +292,17 @@ function SendAlert {
 		subject="Fnished run - $subject"
 	fi
 
-	if [ "$mail_no_attachment" -eq 0 ]; then
-		attachment_command="-a $ALERT_LOG_FILE"
+	if [ "$attachment" == True ]; then
+		attachmentFile="$ALERT_LOG_FILE"
 	fi
 
-	if [ "$LOCAL_OS" == "BUSYBOX" ]; then
-		if type sendmail > /dev/null 2>&1; then
-			if [ "$ENCRYPTION" == "tls" ]; then
-				echo -e "Subject:$subject\r\n$body" | $(type -p sendmail) -f "$SENDER_MAIL" -H "exec openssl s_client -quiet -tls1_2 -starttls smtp -connect $SMTP_SERVER:$SMTP_PORT" -au"$SMTP_USER" -ap"$SMTP_PASSWORD" $DESTINATION_MAILS
-			elif [ "$ENCRYPTION" == "ssl" ]; then
-				echo -e "Subject:$subject\r\n$body" | $(type -p sendmail) -f "$SENDER_MAIL" -H "exec openssl s_client -quiet -connect $SMTP_SERVER:$SMTP_PORT" -au"$SMTP_USER" -ap"$SMTP_PASSWORD" $DESTINATION_MAILS
-			else
-				echo -e "Subject:$subject\r\n$body" | $(type -p sendmail) -f "$SENDER_MAIL" -S "$SMTP_SERVER:$SMTP_PORT" -au"$SMTP_USER" -ap"$SMTP_PASSWORD" $DESTINATION_MAILS
-			fi
-
-			if [ $? != 0 ]; then
-				Logger "Cannot send alert mail via $(type -p sendmail) !!!" "WARN"
-				# Don't bother try other mail systems with busybox
-				return 1
-			else
-				return 0
-			fi
-		else
-			Logger "Sendmail not present. Won't send any mail" "WARN"
-			return 1
-		fi
-	fi
-
-	if type mutt > /dev/null 2>&1 ; then
-		echo "$body" | $(type -p mutt) -x -s "$subject" $DESTINATION_MAILS $attachment_command
-		if [ $? != 0 ]; then
-			Logger "Cannot send alert mail via $(type -p mutt) !!!" "WARN"
-		else
-			Logger "Sent alert mail using mutt." "NOTICE"
-			return 0
-		fi
-	fi
-
-	if type mail > /dev/null 2>&1 ; then
-		if [ "$mail_no_attachment" -eq 0 ] && $(type -p mail) -V | grep "GNU" > /dev/null; then
-			attachment_command="-A $ALERT_LOG_FILE"
-		elif [ "$mail_no_attachment" -eq 0 ] && $(type -p mail) -V > /dev/null; then
-			attachment_command="-a$ALERT_LOG_FILE"
-		else
-			attachment_command=""
-		fi
-		echo "$body" | $(type -p mail) $attachment_command -s "$subject" $DESTINATION_MAILS
-		if [ $? != 0 ]; then
-			Logger "Cannot send alert mail via $(type -p mail) with attachments !!!" "WARN"
-			echo "$body" | $(type -p mail) -s "$subject" $DESTINATION_MAILS
-			if [ $? != 0 ]; then
-				Logger "Cannot send alert mail via $(type -p mail) without attachments !!!" "WARN"
-			else
-				Logger "Sent alert mail using mail command without attachment." "NOTICE"
-				return 0
-			fi
-		else
-			Logger "Sent alert mail using mail command." "NOTICE"
-			return 0
-		fi
-	fi
-
-	if type sendmail > /dev/null 2>&1 ; then
-		echo -e "Subject:$subject\r\n$body" | $(type -p sendmail) $DESTINATION_MAILS
-		if [ $? != 0 ]; then
-			Logger "Cannot send alert mail via $(type -p sendmail) !!!" "WARN"
-		else
-			Logger "Sent alert mail using sendmail command without attachment." "NOTICE"
-			return 0
-		fi
-	fi
-
-	# Windows specific
-	if type "mailsend.exe" > /dev/null 2>&1 ; then
-
-		if [ "$SMTP_ENCRYPTION" != "tls" ] && [ "$SMTP_ENCRYPTION" != "ssl" ]  && [ "$SMTP_ENCRYPTION" != "none" ]; then
-			Logger "Bogus smtp encryption, assuming none." "WARN"
-			encryption_string=
-		elif [ "$SMTP_ENCRYPTION" == "tls" ]; then
-			encryption_string=-starttls
-		elif [ "$SMTP_ENCRYPTION" == "ssl" ]:; then
-			encryption_string=-ssl
-		fi
-		if [ "$SMTP_USER" != "" ] && [ "$SMTP_USER" != "" ]; then
-			auth_string="-auth -user \"$SMTP_USER\" -pass \"$SMTP_PASSWORD\""
-		fi
-		$(type mailsend.exe) -f $SENDER_MAIL -t "$DESTINATION_MAILS" -sub "$subject" -M "$body" -attach "$attachment" -smtp "$SMTP_SERVER" -port "$SMTP_PORT" $encryption_string $auth_string
-		if [ $? != 0 ]; then
-			Logger "Cannot send mail via $(type mailsend.exe) !!!" "WARN"
-		else
-			Logger "Sent mail using mailsend.exe command with attachment." "NOTICE"
-			return 0
-		fi
-	fi
-
-	# Windows specific, kept for compatibility (sendemail from http://caspian.dotconf.net/menu/Software/SendEmail/)
-	if type sendemail > /dev/null 2>&1 ; then
-		if [ "$SMTP_USER" != "" ] && [ "$SMTP_PASSWORD" != "" ]; then
-			SMTP_OPTIONS="-xu $SMTP_USER -xp $SMTP_PASSWORD"
-		else
-			SMTP_OPTIONS=""
-		fi
-		$(type -p sendemail) -f $SENDER_MAIL -t "$DESTINATION_MAILS" -u "$subject" -m "$body" -s $SMTP_SERVER $SMTP_OPTIONS > /dev/null 2>&1
-		if [ $? != 0 ]; then
-			Logger "Cannot send alert mail via $(type -p sendemail) !!!" "WARN"
-		else
-			Logger "Sent alert mail using sendemail command without attachment." "NOTICE"
-			return 0
-		fi
-	fi
-
-	# pfSense specific
-	if [ -f /usr/local/bin/mail.php ]; then
-		echo "$body" | /usr/local/bin/mail.php -s="$subject"
-		if [ $? != 0 ]; then
-			Logger "Cannot send alert mail via /usr/local/bin/mail.php (pfsense) !!!" "WARN"
-		else
-			Logger "Sent alert mail using pfSense mail.php." "NOTICE"
-			return 0
-		fi
-	fi
-
-	# If function has not returned 0 yet, assume it is critical that no alert can be sent
-	Logger "Cannot send alert (neither mutt, mail, sendmail, mailsend, sendemail or pfSense mail.php could be used)." "ERROR" # Is not marked critical because execution must continue
+	SendEmail "$subject" "$body" "$DESTINATION_MAILS" "$attachmentFile" "$SENDER_MAIL" "$SMTP_SERVER" "$SMTP_PORT" "$ENCRYPTION" "SMTP_USER" "$SMTP_PASSWORD"
 
 	# Delete tmp log file
-	if [ -f "$ALERT_LOG_FILE" ]; then
-		rm -f "$ALERT_LOG_FILE"
+	if [ "$attachment" == True ]; then
+		if [ -f "$ALERT_LOG_FILE" ]; then
+			rm -f "$ALERT_LOG_FILE"
+		fi
 	fi
 }
 
