@@ -27,7 +27,24 @@ funcgrep() {
   { declare -f "$1" || declare -f package; } 2>/dev/null | grep -E "$2"
 }
 
+# extract_global_var function compatible with bash 4.2
 extract_global_var() {
+	# $1: variable name
+	# $2: multivalued
+	# $3: name of output var
+
+	local attr=$1 isarray=$2 outputvar=$3 ref
+
+	if (( isarray )); then
+		array_build ref "$attr"
+		[[ ${ref[@]} ]] && array_build "$outputvar" "$attr"
+	else
+		[[ ${!attr} ]] && printf -v "$outputvar" %s "${!attr}"
+	fi
+}
+
+# extract global_var function compatible with bash 4.3+
+old_extract_global_var() {
   # $1: variable name
   # $2: multivalued
   # $3: name of output var
