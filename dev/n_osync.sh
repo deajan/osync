@@ -1877,6 +1877,7 @@ function Usage {
 	echo "[OPTIONS]"
 	echo "--dry             Will run osync without actually doing anything; just testing"
 	echo "--silent          Will run osync without any output to stdout, used for cron jobs"
+	echo "--erronly         Output only errors"
 	echo "--verbose         Increases output"
 	echo "--stats           Adds rsync transfer statistics to verbose output"
 	echo "--partial         Allows rsync to keep partial downloads that can be resumed later (experimental)"

@@ -1,12 +1,12 @@
 # osync  [![Build Status](https://travis-ci.org/deajan/osync.svg?branch=master)](https://travis-ci.org/deajan/osync) [![GitHub Release](https://img.shields.io/github/release/deajan/osync.svg?label=Latest)](https://github.com/deajan/osync/releases/latest)
 
-
 A two way filesync script with fault tolerance, resume, soft deletion, conflictual file backups running on bash (linux, BSD and virtually any system supporting bash).
-File synchronization is bidirectional, based on rsync, can be run manually, as scheduled task, or triggered on file changes.
+File synchronization is bidirectional, and can be run manually, as scheduled task, or triggered on file changes in deamon mode.
+It is a command line tool rsync wrapper with a lot of additional features backed in.
 
-## About
-
-Osync provides the following capabilities
+About
+-----
+osync provides the following capabilities
 	
 - Fault tolerance with resume scenarios
 - Email alerts
@@ -19,21 +19,21 @@ Osync provides the following capabilities
 - Batch runner for multiple sync tasks with rerun option for failed sync tasks
 - ACL synchronization
 
-osync is a state synchronizer. This means that it doesn't have to monitor files for changes. Instead, it compares replica lists between runs.
+osync is a stateful synchronizer. This means that it doesn't have to monitor files for changes. Instead, it compares replica file lists between two runs.
 A full run takes about 2 seconds on a local-local replication and about 10 seconds on a local-remote replication.
 Disabling some features file like attributes preservation and disk space checks may speed up execution. 
 osync uses a initiator / target sync schema. It can sync local to local or local to remote directories. By definition, initiator replica is always a local directory on the system osync runs on.
 osync uses pidlocks to prevent multiple concurrent sync processes on/to the same initiator / target replica.
-You may launch concurrent sync processes on the same system but only for different initiator replicas.
-osync tasks may be launched sequentially by osync osync-batch tool.
+You may launch concurrent sync processes on the same system but as long as the replicas to synchronize are different.
+Multiple osync tasks may be launched sequentially by osync osync-batch tool.
 
-Currently, it has been tested on CentOS 5.x, 6.x, 7.x, Debian 6, Debian 7, Linux Mint 14-17, Ubuntu 12.04, 12.10, FreeBSD 8.3, 10.1, 10.3, Mac OS X and pfSense.
+Currently, it has been tested on CentOS 5.x, 6.x, 7.x, Fedora 22-24, Debian 6-7, Linux Mint 14-18, Ubuntu 12.04-12.10, FreeBSD 8.3-10.3, Mac OS X and pfSense 2.3x.
 Microsoft Windows is supported via MSYS or Cygwin.
+Android support works via busybox (tested on Termux).
 
-
-## Installation
-
-Osync has been designed to not delete any data, but rather make backups of conflictual files or soft deletes.
+Installation
+------------
+osync has been designed to not delete any data, but rather make backups of conflictual files or soft deletes.
 Nevertheless, you should always have a neat backup of your data before trying a new sync tool.
 
 You can download the latest stable release of osync at https://github.com/deajan/osync/archive/v1.1.3.tar.gz
@@ -43,14 +43,14 @@ You may also get the last development version at https://github.com/deajan/osync
 	$ git clone -b "v1.1-maint" https://github.com/deajan/osync
 	$ sh install.sh
 
-Osync will install itself to /usr/local/bin and an example configuration file will be installed to /etc/osync
+osync will install itself to /usr/local/bin and an example configuration file will be installed to /etc/osync
 
-Osync needs to run with bash shell. Using any other shell will most probably result in errors.
+osync needs to run with bash shell. Using any other shell will most probably result in errors.
 If bash is not your default shell, you may invoke it using
 
 	$ bash osync.sh [options]
 
-On *BSD, be sure to have bash installed.
+On *BSD and BusyBox, be sure to have bash installed.
 On MSYS, On top of your basic install, you need msys-rsync and msys-coreutils-ext packages.
 
 ## Upgrade from v1.0x
@@ -64,8 +64,8 @@ You can upgrade all v1.0x-v1.2-dev config files by running the upgrade script
 
 The script will backup your config file, update it's content and try to connect to initiator and target replicas to update the state dir.
 
-## Usage
-
+Usage
+-----
 Osync can work with in three flavors: Quick sync mode, configuration file mode, and daemon mode.
 While quick sync mode is convenient to do fast syncs between some directories, a configuration file gives much more functionnality.
 Please use double quotes as path delimiters. Do not use escaped characters in path names.
@@ -77,7 +77,6 @@ QuickSync example
 
 QuickSync with minimal options
 ------------------------------
-
 In order to run osync the quickest (without transferring file attributes, without softdeletion, without prior space checks and without remote connectivity checks, you may use the following:
 
 	# MINIMUM_SPACE=0 PRESERVE_PERMISSIONS=no PRESERVE_OWNER=no PRESERVE_GROUP=no PRESERVE_EXECUTABILITY=no SOFT_DELETE_DAYS=0 CONFLICT_BACKUP_DAYS=0 REMOTE_HOST_PING=no osync.sh --initiator="/path/to/another dir" --target="ssh://user@host.com:22//path/to/dir2" --rsakey=/home/user/.ssh/id_rsa_private_key_example.com
@@ -110,7 +109,6 @@ Once you're confident about your fist runs, you may add osync as cron task like 
 
 Batch mode
 ----------
-
 You may want to sequentially run multiple sync sets between the same servers. In that case, osync-batch.sh is a nice tool that will run every osync conf file, and, if a task fails,
 run it again if there's still some time left.
 The following example will run all .conf files found in /etc/osync, and retry 3 times every configuration that fails, if the whole sequential run took less than 2 hours.
@@ -145,7 +143,7 @@ Systemd specific (one service per config file)
 
 Contributions
 -------------
-Bug fixes and ideas are welcome. When submitting a PR, please be sure to modify files in dev directory (dev/n_osync.sh & dev/ofunctions.sh) instead of osync.sh which are autogenerated.
+Bug fixes and ideas are welcome. When submitting a PR, please be sure to modify files in dev directory (dev/n_osync.sh, dev/ofunctions.sh, dev/common_install.sh etc) instead of osync.sh and others which are autogenerated.
 Consider reading CODING_STYLE.TXT before submitting a patch.
 
 Troubleshooting
@@ -153,7 +151,7 @@ Troubleshooting
 You may find osync's logs in /var/log/osync.*.log (or current directory if /var/log is not writable).
 Additionnaly, you can use the --verbose flag see to what actions are going on.
 
-## Author
-
+Author
+------
 Feel free to mail me for limited support in my free time :)
 Orsiris de Jong | ozy@netpower.fr

@@ -8,10 +8,28 @@ RECENT CHANGES
 --------------
 
 XX Xxx 2016: osync v1.2-RC1 released
+! apk --no-cache add bash git rsync openssh-client
+! apk --no-cache add sendmail
+! apk --no-cache add openssl if tls or ssl support in sendmail
+
+! New two columns status output with --2col
+- Added busybox (and Android Termux) support
+        - More portable file size functions
+        - More portable compression program commands
+        - More paranoia checks
+        - Added busybox sendmail support
+	- Added tls and ssl support for sendmail
+- Added --skip-deletion support in config and quicksync modes
+- Prevent lock file racing condition
+! Added ssh password file support (needs sshpass doc)
 - Improved unit tests
-	! Added conflict resolution tests
-	! Added softdeletion tests
-	! Added lock tests
+        ! Added conflict resolution tests
+        - Added softdeletion tests
+	- Added softdeletion cleanup tests
+        ! Added lock tests
+        ! Added skip-deletion tests
+	- Added configuration file tests
+	- Added upgrade script test
 ! documentation update, statefulness
 
 17 Oct 2016: osync v1.2-beta2 released
