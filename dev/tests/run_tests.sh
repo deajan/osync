@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-# osync test suite 2016111304
+# osync test suite 2016111305
 
 # 4 tests:
 # quicklocal
@@ -278,9 +278,10 @@ function test_softdeletion_cleanup () {
 
 			touch "$file.new"
 
-			#TODO: CreateOldFile does not work under travis yet (debugfs does not work, drop caches neither)
 			if [ "$TRAVIS_RUN" != true ]; then
 				CreateOldFile "$file.old"
+			else
+				echo "Skipping changing ctime on file because travis does not support debugfs"
 			fi
 		done
 
@@ -305,6 +306,12 @@ function test_softdeletion_cleanup () {
 }
 
 function test_FileAttributePropagation () {
+
+
+	if [ "$TRAVIS_RUN" != true ]; then
+		echo "Skipping FileAttributePropagation tests as travis does not support getfacl / setfacl"
+		return 0
+	fi
 
 	for i in "${osyncParameters[@]}"; do
 		cd "$OSYNC_DIR"
