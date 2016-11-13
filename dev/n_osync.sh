@@ -4,7 +4,7 @@ PROGRAM="osync" # Rsync based two way sync engine with fault tolerance
 AUTHOR="(C) 2013-2016 by Orsiris de Jong"
 CONTACT="http://www.netpower.fr/osync - ozy@netpower.fr"
 PROGRAM_VERSION=1.2-beta2
-PROGRAM_BUILD=2016111002
+PROGRAM_BUILD=2016111301
 IS_STABLE=no
 
 # Execution order						#__WITH_PARANOIA_DEBUG
@@ -1254,8 +1254,6 @@ function Sync {
 	local targetFail
 
 	Logger "Starting synchronization task." "NOTICE"
-	CheckConnectivity3rdPartyHosts
-	CheckConnectivityRemoteHost
 
 	if [ "$RESUME_SYNC" != "no" ]; then
 		if [ -f "${INITIATOR[$__resumeCount]}" ]; then
@@ -1735,6 +1733,8 @@ function Init {
 
 		# remove everything before first '/'
 		TARGET_SYNC_DIR=${hosturiandpath#*/}
+	else
+		REMOTE_OPERATION="no"
 	fi
 
 	if [ "$INITIATOR_SYNC_DIR" == "" ] || [ "$TARGET_SYNC_DIR" == "" ]; then
@@ -2089,7 +2089,6 @@ opts="${opts# *}"
 		fi
 
 		MIN_WAIT=30
-		REMOTE_OPERATION=no
 	else
 		ConfigFile="${1}"
 		LoadConfigFile "$ConfigFile"
