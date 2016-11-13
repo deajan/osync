@@ -122,7 +122,7 @@ function CreateOldFile () {
         drive=$(df "$OSYNC_DIR" | tail -1 | awk '{print $1}')
 
 	# modify ctime on ext4 so osync thinks it has to delete the old files
-	debugfs -w -R 'set_inode_field "$file.old" ctime 201001010101' $drive
+	debugfs -w -R 'set_inode_field "'$filePath'" ctime 201001010101' $drive
 	assertEquals "CreateOldFile [$filePath]" "0" $?
 
 	# force update of inodes (ctimes)
@@ -253,6 +253,7 @@ function test_softdeletion_cleanup () {
 	files[deletedFileSlave]="$TARGET_DIR/$OSYNC_DELETED_DIR/someDeletedFileSlave"
 	files[backedUpFileMaster]="$INITIATOR_DIR/$OSYNC_BACKUP_DIR/someBackedUpFileMaster"
 	files[backedUpFileSlave]="$TARGET_DIR/$OSYNC_BACKUP_DIR/someBackedUpFileSlave"
+
 	for i in "${osyncParameters[@]}"; do
 		cd "$OSYNC_DIR"
 		PrepareLocalDirs
@@ -285,10 +286,12 @@ function test_softdeletion_cleanup () {
 		for file in "${files[@]}"; do
 			[ -f "$file.new" ]
 			assertEquals "New softdeleted / backed up file [$file.new] exists." "0" $?
-			[ ! -f "$file.old" ]
+
 			if [ "$TRAVIS_RUN" != true ]; then
+				[ ! -f "$file.old" ]
 				assertEquals "Old softdeleted / backed up file [$file.old] is deleted permanently." "1" $?
 			else
+				[ ! -f "$file.old" ]
 				assertEquals "Old softdeleted / backed up file [$file.old] is deleted permanently." "0" $?
 			fi
 		done
