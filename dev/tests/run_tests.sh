@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-# osync test suite 2016102301
+# osync test suite 2016111301
 
 # 4 tests:
 # quicklocal
@@ -15,14 +15,11 @@
 # conflict resolution master, file attributes master
 # conflict resolution slave, file attributes slave
 # deletion propagation
-# softdelete deleted
-# softdelete backup
+# softdelete backup (check if backup is working)
 # lock checks
 # file attribute tests
 
-#TODO: conf file modes missing
 #TODO: conflict resolution missing
-#TODO: softdelete missing
 #TODO: lock checks missing
 #TODO: file attribute missing
 #TODO: skip deletion tests
@@ -68,8 +65,8 @@ declare -Ag osyncParameters
 
 osyncParameters[quicklocal]="--initiator=$INITIATOR_DIR --target=$TARGET_DIR"
 osyncParameters[quickRemote]="--initiator=$INITIATOR_DIR --target=ssh://localhost:$SSH_PORT/$TARGET_DIR --rsakey=${HOME}/.ssh/id_rsa_local"
-#osyncParameters[confLocal]="$CONF_DIR/local.conf"
-#osyncParameters[confRemote]="$CONF_DIR/remote.conf"
+osyncParameters[confLocal]="$CONF_DIR/local.conf"
+osyncParameters[confRemote]="$CONF_DIR/remote.conf"
 #osyncParameters[daemonlocal]="$CONF_DIR/local.conf --on-changes"
 #osyncParameters[daemonlocal]="$CONF_DIR/remote.conf --on-changes"
 
@@ -115,12 +112,21 @@ function DownloadLargeFileSet() {
 }
 
 function CreateOldFile () {
+	local drive
 	local filePath="${1}"
 
-	debugfs -w -R 'set_inode_field "$filePath" ctime 201001010101' "$TEST_DISK"
+	touch "$filePath"
+	assertEquals "touch [$filePath]" "0" $?
+
+	# Get current drive
+        drive=$(df "$OSYNC_DIR" | tail -1 | awk '{print $1}')
+
+	# modify ctime on ext4 so osync thinks it has to delete the old files
+	debugfs -w -R 'set_inode_field "$file.old" ctime 201001010101' $drive
 	assertEquals "CreateOldFile [$filePath]" "0" $?
 
-	echo > /proc/sys/vm/drop_caches
+	# force update of inodes (ctimes)
+	echo 3 > /proc/sys/vm/drop_caches
 	assertEquals "Drop caches" "0" $?
 }
 
@@ -171,6 +177,9 @@ function test_LargeFileSet () {
 }
 
 function test_Exclusions () {
+	# Will sync except php files
+	# RSYNC_EXCLUDE_PATTERN="*.php" is set at runtime for quicksync and in config files for other runs
+
 	local numberOfPHPFiles
 	local numberOfExcludedFiles
 	local numberOfInitiatorFiles
@@ -228,7 +237,7 @@ function test_Deletetion () {
 		[ -f "${iFile1/$INITIATOR_DIR/TARGET_DIR}" ]
 		assertEquals "File [${iFile1/$INITIATOR_DIR/TARGET_DIR}] is still in target" "1" $?
 
-		[ -f "INITIATOR_DIR/$OSYNC_DELETED_DIR/$(basename $tFile1)" ]
+		[ -f "$INITIATOR_DIR/$OSYNC_DELETED_DIR/$(basename $tFile1)" ]
 		assertEquals "File [$INITIATOR_DIR/$OSYNC_DELETED_DIR/$(basename $tFile1)] has been soft deleted on initiator" "0" $?
 		[ -f "$tFile1" ]
 		assertEquals "File [$tFile1] is still in target" "1" $?
@@ -237,7 +246,51 @@ function test_Deletetion () {
 	done
 }
 
-function test_osync_quicksync_local () {
+function test_softdeletion_cleanup () {
+	declare -A oldFiles
+
+	files[deletedFileMaster]="$INITIATOR_DIR/$OSYNC_DELETED_DIR/someDeletedFileMaster"
+	files[deletedFileSlave]="$TARGET_DIR/$OSYNC_DELETED_DIR/someDeletedFileSlave"
+	files[backedUpFileMaster]="$INITIATOR_DIR/$OSYNC_BACKUP_DIR/someBackedUpFileMaster"
+	files[backedUpFileSlave]="$TARGET_DIR/$OSYNC_BACKUP_DIR/someBackedUpFileSlave"
+	for i in "${osyncParameters[@]}"; do
+		cd "$OSYNC_DIR"
+
+		PrepareLocalDirs
+
+		# First run
+		REMOTE_HOST_PING=no ./$OSYNC_EXECUTABLE $i
+		assertEquals "First deletion run with parameters [$i]." "0" $?
+
+		# Get current drive
+		drive=$(df "$OSYNC_DIR" | tail -1 | awk '{print $1}')
+
+		# Create some deleted & backed up files, some new and some old
+		for file in "${files[@]}"; do
+			# Create directories first if they don't exist (deletion dir is created by osync, backup dir is created by rsync only when needed)
+			if [ ! -d "$(dirname $file)" ]; then
+				mkdir --parents "$(dirname $file)"
+			fi
+
+			touch "$file.new"
+			CreateOldFile "$file.old"
+		done
+
+		REMOTE_HOST_PING=no ./$OSYNC_EXECUTABLE $i
+
+		# Check file presence
+		for file in "${files[@]}"; do
+			[ -f "$file.new" ]
+			assertEquals "New softdeleted / backed up file [$file.new] exists." "0" $?
+			[ ! -f "$file.old" ]
+			assertEquals "Old softdeleted / backed up file [$file.old] is deleted permanently." "1" $?
+		done
+	done
+
+}
+
+# Those aren't needed anymore as largeFileSet will have them tested too
+function old_test_osync_quicksync_local () {
 	cd "$OSYNC_DIR"
 
 	PrepareLocalDirs
@@ -253,7 +306,7 @@ function test_osync_quicksync_local () {
 }
 
 
-function test_osync_quicksync_remote () {
+function old_test_osync_quicksync_remote () {
 	cd "$OSYNC_DIR"
 
 	PrepareLocalDirs
