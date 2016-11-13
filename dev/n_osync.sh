@@ -4,7 +4,7 @@ PROGRAM="osync" # Rsync based two way sync engine with fault tolerance
 AUTHOR="(C) 2013-2016 by Orsiris de Jong"
 CONTACT="http://www.netpower.fr/osync - ozy@netpower.fr"
 PROGRAM_VERSION=1.2-beta2
-PROGRAM_BUILD=2016111301
+PROGRAM_BUILD=2016111302
 IS_STABLE=no
 
 # Execution order						#__WITH_PARANOIA_DEBUG
@@ -753,7 +753,7 @@ function _getFileCtimeMtimeLocal {
 }
 
 function _getFileCtimeMtimeRemote {
-	local replicapath="${1}" # Contains replica path
+	local replicaPath="${1}" # Contains replica path
 	local replicaType="${2}"
 	local fileList="${3}"
 	__CheckArguments 3 $# "${FUNCNAME[0]}" "$@"	#__WITH_PARANOIA_DEBUG
