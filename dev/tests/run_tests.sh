@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-# osync test suite 2016111302
+# osync test suite 2016111304
 
 # 4 tests:
 # quicklocal
@@ -10,21 +10,19 @@
 
 # for each test:
 # files with spaces, subdirs
-# largefileset
+# largefileset (...large ?)
 # exclusions
-# conflict resolution master, file attributes master
-# conflict resolution slave, file attributes slave
+# conflict resolution initiator with backups / multiple backups
+# conflict resolution target with backups / multiple backups
 # deletion propagation
-# softdelete backup (check if backup is working)
 # lock checks
 # file attribute tests
 
 #TODO: conflict resolution missing
 #TODO: lock checks missing
-#TODO: file attribute missing
 #TODO: skip deletion tests
+#TODO: daemon mode tests
 
-TEST_DISK=/dev/vda1
 LARGE_FILESET_URL="http://ftp.drupal.org/files/projects/drupal-8.1.9.tar.gz"
 
 OSYNC_DIR="$(pwd)"
@@ -65,10 +63,10 @@ declare -Ag osyncParameters
 
 osyncParameters[quicklocal]="--initiator=$INITIATOR_DIR --target=$TARGET_DIR --instance-id=quicklocal"
 osyncParameters[quickRemote]="--initiator=$INITIATOR_DIR --target=ssh://localhost:$SSH_PORT/$TARGET_DIR --rsakey=${HOME}/.ssh/id_rsa_local --instance-id=quickremote"
-osyncParameters[confLocal]="$CONF_DIR/local.conf"
-osyncParameters[confRemote]="$CONF_DIR/remote.conf"
-#osyncParameters[daemonlocal]="$CONF_DIR/local.conf --on-changes"
-#osyncParameters[daemonlocal]="$CONF_DIR/remote.conf --on-changes"
+osyncParameters[confLocal]="$CONF_DIR/$LOCAL_CONF"
+osyncParameters[confRemote]="$CONF_DIR/$REMOTE_CONF"
+#osyncParameters[daemonlocal]="$CONF_DIR/$LOCAL_CONF --on-changes"
+#osyncParameters[daemonlocal]="$CONF_DIR/$REMOTE_CONF --on-changes"
 
 function SetStableToYes () {
 	if grep "^IS_STABLE=YES" "$OSYNC_DIR/$OSYNC_EXECUTABLE" > /dev/null; then
@@ -173,6 +171,12 @@ function test_LargeFileSet () {
 
 		REMOTE_HOST_PING=no ./$OSYNC_EXECUTABLE $i
 		assertEquals "LargeFileSet test with parameters [$i]." "0" $?
+
+		[ -d "$INITIATOR_DIR/$OSYNC_STATE_DIR" ]
+		assertEquals "Initiator state dir exists" "0" $?
+
+		[ -d "$TARGET_DIR/$OSYNC_STATE_DIR" ]
+		assertEquals "Target state dir exists" "0" $?
 	done
 }
 
@@ -230,15 +234,15 @@ function test_Deletetion () {
 		REMOTE_HOST_PING=no ./$OSYNC_EXECUTABLE $i
 		assertEquals "Second deletion run with parameters [$i]." "0" $?
 
-		[ -f "$TARGET_DIR/$OSYNC_DELETED_DIR/$(basename $iFile1)" ]
-		assertEquals "File [$TARGET_DIR/$OSYNC_DELETED_DIR/$(basename $iFile1)] has been soft deleted on target" "0" $?
+		[ -f "$TARGET_DIR/$OSYNC_DELETE_DIR/$(basename $iFile1)" ]
+		assertEquals "File [$TARGET_DIR/$OSYNC_DELETE_DIR/$(basename $iFile1)] has been soft deleted on target" "0" $?
 		[ -f "$iFile1" ]
 		assertEquals "File [$iFile1] is still in initiator" "1" $?
 		[ -f "${iFile1/$INITIATOR_DIR/TARGET_DIR}" ]
 		assertEquals "File [${iFile1/$INITIATOR_DIR/TARGET_DIR}] is still in target" "1" $?
 
-		[ -f "$INITIATOR_DIR/$OSYNC_DELETED_DIR/$(basename $tFile1)" ]
-		assertEquals "File [$INITIATOR_DIR/$OSYNC_DELETED_DIR/$(basename $tFile1)] has been soft deleted on initiator" "0" $?
+		[ -f "$INITIATOR_DIR/$OSYNC_DELETE_DIR/$(basename $tFile1)" ]
+		assertEquals "File [$INITIATOR_DIR/$OSYNC_DELETE_DIR/$(basename $tFile1)] has been soft deleted on initiator" "0" $?
 		[ -f "$tFile1" ]
 		assertEquals "File [$tFile1] is still in target" "1" $?
 		[ -f "${tFile1/$TARGET_DIR/INITIATOR_DIR}" ]
@@ -247,12 +251,12 @@ function test_Deletetion () {
 }
 
 function test_softdeletion_cleanup () {
-	declare -A oldFiles
+	declare -A files
 
-	files[deletedFileMaster]="$INITIATOR_DIR/$OSYNC_DELETED_DIR/someDeletedFileMaster"
-	files[deletedFileSlave]="$TARGET_DIR/$OSYNC_DELETED_DIR/someDeletedFileSlave"
-	files[backedUpFileMaster]="$INITIATOR_DIR/$OSYNC_BACKUP_DIR/someBackedUpFileMaster"
-	files[backedUpFileSlave]="$TARGET_DIR/$OSYNC_BACKUP_DIR/someBackedUpFileSlave"
+	files[deletedFileInitiator]="$INITIATOR_DIR/$OSYNC_DELETE_DIR/someDeletedFileInitiator"
+	files[deletedFileTarget]="$TARGET_DIR/$OSYNC_DELETE_DIR/someDeletedFileTarget"
+	files[backedUpFileInitiator]="$INITIATOR_DIR/$OSYNC_BACKUP_DIR/someBackedUpFileInitiator"
+	files[backedUpFileTarget]="$TARGET_DIR/$OSYNC_BACKUP_DIR/someBackedUpFileTarget"
 
 	for i in "${osyncParameters[@]}"; do
 		cd "$OSYNC_DIR"
@@ -280,6 +284,7 @@ function test_softdeletion_cleanup () {
 			fi
 		done
 
+		# Second run
 		REMOTE_HOST_PING=no ./$OSYNC_EXECUTABLE $i
 
 		# Check file presence
@@ -299,37 +304,48 @@ function test_softdeletion_cleanup () {
 
 }
 
-# Those aren't needed anymore as largeFileSet will have them tested too
-function old_test_osync_quicksync_local () {
-	cd "$OSYNC_DIR"
+function test_FileAttributePropagation () {
 
-	PrepareLocalDirs
+	for i in "${osyncParameters[@]}"; do
+		cd "$OSYNC_DIR"
+		PrepareLocalDirs
 
-	./$OSYNC_EXECUTABLE --initiator="$INITIATOR_DIR" --target="$TARGET_DIR"
-	assertEquals "Return code" "0" $?
+		FileA="FileA"
+		FileB="FileB"
 
-	[ -d "$INITIATOR_DIR/$OSYNC_STATE_DIR" ]
-	assertEquals "Initiator state dir exists" "0" $?
+		touch "$INITIATOR_DIR/$FileA"
+		touch "$TARGET_DIR/$FileB"
 
-	[ -d "$TARGET_DIR/$OSYNC_STATE_DIR" ]
-	assertEquals "Target state dir exists" "0" $?
-}
+		# First run
+		REMOTE_HOST_PING=no ./$OSYNC_EXECUTABLE $i
+		assertEquals "First deletion run with parameters [$i]." "0" $?
 
+		sleep 1
 
-function old_test_osync_quicksync_remote () {
-	cd "$OSYNC_DIR"
+		getfacl -p "$INITIATOR_DIR/$FileA" | grep "other::r--" > /dev/null
+		assertEquals "Check getting ACL on initiator." "0" $?
 
-	PrepareLocalDirs
+		getfacl -p "$TARGET_DIR/$FileB" | grep "other::r--" > /dev/null
+		assertEquals "Check getting ACL on target." "0" $?
 
-	# Disable remote host ping because Travis can't ping
-	REMOTE_HOST_PING=no ./$OSYNC_EXECUTABLE --initiator="$INITIATOR_DIR" --target="ssh://localhost:$SSH_PORT/$TARGET_DIR" --rsakey="${HOME}/.ssh/id_rsa_local"
-	assertEquals "Return code" "0" $?
+		setfacl -m o:r-x "$INITIATOR_DIR/$FileA"
+		assertEquals "Set ACL on initiator" "0" $?
+		setfacl -m o:-w- "$TARGET_DIR/$FileB"
+		assertEquals "Set ACL on target" "0" $?
 
-	[ -d "$INITIATOR_DIR/$OSYNC_STATE_DIR" ]
-	assertEquals "Initiator state dir exists" "0" $?
+		# Second run
+		REMOTE_HOST_PING=no ./$OSYNC_EXECUTABLE $i
+		assertEquals "First deletion run with parameters [$i]." "0" $?
 
-	[ -d "$TARGET_DIR/$OSYNC_STATE_DIR" ]
-	assertEquals "Target state dir exists" "0" $?
+		getfacl -p "$TARGET_DIR/$FileA" | grep "other::r-x" > /dev/null
+		assertEquals "ACLs matched original value on target." "0" $?
+
+		getfacl -p "$INITIATOR_DIR/$FileB" | grep "other::-w-" > /dev/null
+		assertEquals "ACLs matched original value on initiator." "0" $?
+
+		getfacl -p "$TARGET_DIR/$FileA"
+		getfacl -p "$INITIATOR_DIR/$FileB"
+	done
 }
 
 function test_WaitForTaskCompletion () {
