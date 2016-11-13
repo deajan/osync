@@ -308,7 +308,7 @@ function test_softdeletion_cleanup () {
 function test_FileAttributePropagation () {
 
 
-	if [ "$TRAVIS_RUN" != true ]; then
+	if [ "$TRAVIS_RUN" == true ]; then
 		echo "Skipping FileAttributePropagation tests as travis does not support getfacl / setfacl"
 		return 0
 	fi
