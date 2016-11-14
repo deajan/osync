@@ -1,6 +1,6 @@
 #### MINIMAL-FUNCTION-SET BEGIN ####
 
-## FUNC_BUILD=2016111402
+## FUNC_BUILD=2016111403
 ## BEGIN Generic bash functions written in 2013-2016 by Orsiris de Jong - http://www.netpower.fr - ozy@netpower.fr
 
 ## To use in a program, define the following variables:
@@ -141,7 +141,7 @@ function Logger {
 		ERROR_ALERT=true
 		return
 	elif [ "$level" == "WARN" ]; then
-		_Logger "$prefix\e[93m$value\e[0m" "$prefix$level:$value" "$level:$value"
+		_Logger "$prefix\e[33m$value\e[0m" "$prefix$level:$value" "$level:$value"
 		WARN_ALERT=true
 		return
 	elif [ "$level" == "NOTICE" ]; then
@@ -475,7 +475,7 @@ function TrapError {
 	local code="${2:-1}"
 
 	if [ $_SILENT == false ]; then
-		echo -e " /!\ ERROR in ${job}: Near line ${line}, exit code ${code}"
+		echo -e "\e[45m/!\ ERROR in ${job}: Near line ${line}, exit code ${code}"
 	fi
 }
 
