@@ -4,7 +4,7 @@ PROGRAM="osync" # Rsync based two way sync engine with fault tolerance
 AUTHOR="(C) 2013-2016 by Orsiris de Jong"
 CONTACT="http://www.netpower.fr/osync - ozy@netpower.fr"
 PROGRAM_VERSION=1.2-beta2
-PROGRAM_BUILD=2016111002
+PROGRAM_BUILD=2016111401
 IS_STABLE=no
 
 # Execution order						#__WITH_PARANOIA_DEBUG
@@ -45,13 +45,15 @@ IS_STABLE=no
 
 #### MINIMAL-FUNCTION-SET BEGIN ####
 
-## FUNC_BUILD=2016111201
+## FUNC_BUILD=2016111401
 ## BEGIN Generic bash functions written in 2013-2016 by Orsiris de Jong - http://www.netpower.fr - ozy@netpower.fr
 
 ## To use in a program, define the following variables:
 ## PROGRAM=program-name
 ## INSTANCE_ID=program-instance-name
 ## _DEBUG=yes/no
+## _LOGGER_STDERR=True/False
+## _LOGGER_ERR_ONLY=True/False
 
 #TODO: Windows checks, check sendmail & mailsend
 
@@ -187,7 +189,9 @@ function Logger {
 		WARN_ALERT=true
 		return
 	elif [ "$level" == "NOTICE" ]; then
-		_Logger "$prefix$value"
+		if [ "$_LOGGER_ERR_ONLY" != True ]; then
+			_Logger "$prefix$value"
+		fi
 		return
 	elif [ "$level" == "VERBOSE" ]; then
 		if [ $_VERBOSE == true ]; then
@@ -846,10 +850,10 @@ function IsNumericExpand {
 
 	local re="^-?[0-9]+([.][0-9]+)?$"
 
-	if [[ $value =~ $re ]]; then
-		echo 1 && return 1
+	if [[ $value =~ ^-?[0-9]+([.][0-9]+)?$ ]]; then
+		echo 1
 	else
-		echo 0 && return 0
+		echo 0
 	fi
 }
 
@@ -858,9 +862,9 @@ function IsNumeric {
 	local value="${1}"
 
 	if [[ $value =~ ^[0-9]+([.][0-9]+)?$ ]]; then
-		echo 1 && return 1
+		echo 1
 	else
-		echo 0 && return 0
+		echo 0
 	fi
 }
 
@@ -868,9 +872,9 @@ function IsInteger {
 	local value="${1}"
 
 	if [[ $value =~ ^[0-9]+$ ]]; then
-		echo 1 && return 1
+		echo 1
 	else
-		echo 0 && return 0
+		echo 0
 	fi
 }
 
@@ -1690,14 +1694,14 @@ function CheckCurrentConfig {
 	# Check all variables that should contain "yes" or "no"
 	declare -a yes_no_vars=(CREATE_DIRS SUDO_EXEC SSH_COMPRESSION SSH_IGNORE_KNOWN_HOSTS REMOTE_HOST_PING PRESERVE_PERMISSIONS PRESERVE_OWNER PRESERVE_GROUP PRESERVE_EXECUTABILITY PRESERVE_ACL PRESERVE_XATTR COPY_SYMLINKS KEEP_DIRLINKS PRESERVE_HARDLINKS CHECKSUM RSYNC_COMPRESS CONFLICT_BACKUP CONFLICT_BACKUP_MULTIPLE SOFT_DELETE RESUME_SYNC FORCE_STRANGER_LOCK_RESUME PARTIAL DELTA_COPIES STOP_ON_CMD_ERROR RUN_AFTER_CMD_ON_ERROR)
 	for i in "${yes_no_vars[@]}"; do
-		test="if [ \"\$$i\" != \"yes\" ] && [ \"\$$i\" != \"no\" ]; then Logger \"Bogus $i value [$$i] defined in config file. Correct your config file or update it using the update script if using and old version.\" \"CRITICAL\"; exit 1; fi"
+		test="if [ \"\$$i\" != \"yes\" ] && [ \"\$$i\" != \"no\" ]; then Logger \"Bogus $i value [\$$i] defined in config file. Correct your config file or update it using the update script if using and old version.\" \"CRITICAL\"; exit 1; fi"
 		eval "$test"
 	done
 
 	# Check all variables that should contain a numerical value >= 0
 	declare -a num_vars=(MINIMUM_SPACE BANDWIDTH SOFT_MAX_EXEC_TIME HARD_MAX_EXEC_TIME KEEP_LOGGING MIN_WAIT MAX_WAIT CONFLICT_BACKUP_DAYS SOFT_DELETE_DAYS RESUME_TRY MAX_EXEC_TIME_PER_CMD_BEFORE MAX_EXEC_TIME_PER_CMD_AFTER)
 	for i in "${num_vars[@]}"; do
-		test="if [ $(IsNumericExpand \"\$$i\") -eq 0 ]; then Logger \"Bogus $i value [$$i] defined in config file. Correct your config file or update it using the update script if using and old version.\" \"CRITICAL\"; exit 1; fi"
+		test="if [ $(IsNumericExpand \"\$$i\") -eq 0 ]; then Logger \"Bogus $i value [\$$i] defined in config file. Correct your config file or update it using the update script if using and old version.\" \"CRITICAL\"; exit 1; fi"
 		eval "$test"
 	done
 }
@@ -2308,7 +2312,7 @@ function _getFileCtimeMtimeLocal {
 }
 
 function _getFileCtimeMtimeRemote {
-	local replicapath="${1}" # Contains replica path
+	local replicaPath="${1}" # Contains replica path
 	local replicaType="${2}"
 	local fileList="${3}"
 	__CheckArguments 3 $# "${FUNCNAME[0]}" "$@"	#__WITH_PARANOIA_DEBUG
@@ -2809,8 +2813,6 @@ function Sync {
 	local targetFail
 
 	Logger "Starting synchronization task." "NOTICE"
-	CheckConnectivity3rdPartyHosts
-	CheckConnectivityRemoteHost
 
 	if [ "$RESUME_SYNC" != "no" ]; then
 		if [ -f "${INITIATOR[$__resumeCount]}" ]; then
@@ -3290,6 +3292,8 @@ function Init {
 
 		# remove everything before first '/'
 		TARGET_SYNC_DIR=${hosturiandpath#*/}
+	else
+		REMOTE_OPERATION="no"
 	fi
 
 	if [ "$INITIATOR_SYNC_DIR" == "" ] || [ "$TARGET_SYNC_DIR" == "" ]; then
@@ -3432,6 +3436,7 @@ function Usage {
 	echo "[OPTIONS]"
 	echo "--dry             Will run osync without actually doing anything; just testing"
 	echo "--silent          Will run osync without any output to stdout, used for cron jobs"
+	echo "--errors-only     Output only errors (can be combined with silent or verbose)"
 	echo "--verbose         Increases output"
 	echo "--stats           Adds rsync transfer statistics to verbose output"
 	echo "--partial         Allows rsync to keep partial downloads that can be resumed later (experimental)"
@@ -3596,6 +3601,10 @@ for i in "$@"; do
 		--no-locks)
 		_NOLOCKS=true
 		;;
+		--only-errors)
+		_LOGGER_STDERR=True
+		_LOGGER_ERR_ONLY=True
+		;;
 		*)
 		if [ $first == "0" ]; then
 			Logger "Unknown option '$i'" "CRITICAL"
@@ -3643,7 +3652,6 @@ opts="${opts# *}"
 		fi
 
 		MIN_WAIT=30
-		REMOTE_OPERATION=no
 	else
 		ConfigFile="${1}"
 		LoadConfigFile "$ConfigFile"
