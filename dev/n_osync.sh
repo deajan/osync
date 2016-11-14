@@ -4,7 +4,7 @@ PROGRAM="osync" # Rsync based two way sync engine with fault tolerance
 AUTHOR="(C) 2013-2016 by Orsiris de Jong"
 CONTACT="http://www.netpower.fr/osync - ozy@netpower.fr"
 PROGRAM_VERSION=1.2-beta2
-PROGRAM_BUILD=2016111302
+PROGRAM_BUILD=2016111401
 IS_STABLE=no
 
 # Execution order						#__WITH_PARANOIA_DEBUG
@@ -1877,7 +1877,7 @@ function Usage {
 	echo "[OPTIONS]"
 	echo "--dry             Will run osync without actually doing anything; just testing"
 	echo "--silent          Will run osync without any output to stdout, used for cron jobs"
-	echo "--erronly         Output only errors"
+	echo "--errors-only     Output only errors (can be combined with silent or verbose)"
 	echo "--verbose         Increases output"
 	echo "--stats           Adds rsync transfer statistics to verbose output"
 	echo "--partial         Allows rsync to keep partial downloads that can be resumed later (experimental)"
@@ -2041,6 +2041,10 @@ for i in "$@"; do
 		;;
 		--no-locks)
 		_NOLOCKS=true
+		;;
+		--only-errors)
+		_LOGGER_STDERR=True
+		_LOGGER_ERR_ONLY=True
 		;;
 		*)
 		if [ $first == "0" ]; then
