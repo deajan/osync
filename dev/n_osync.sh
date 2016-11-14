@@ -536,12 +536,12 @@ function _WriteLockFilesRemote {
 	CheckConnectivity3rdPartyHosts
 	CheckConnectivityRemoteHost
 
-	cmd=$SSH_CMD' "( set -o noclobber; echo '$SCRIPT_PID@$INSTANCE_ID' | '$COMMAND_SUDO' tee \"'$lockfile'\")" > /dev/null 2> $RUN_DIR/$PROGRAM.${FUNCNAME[0]}-$replicaType.$SCRIPT_PID'
+	cmd=$SSH_CMD' "( set -o noclobber; echo '$SCRIPT_PID@$INSTANCE_ID' | '$COMMAND_SUDO' tee \"'$lockfile'\")" > /dev/null 2> $RUN_DIR/$PROGRAM._WriteLockFilesRemote.$replicaType.$SCRIPT_PID'
 	Logger "cmd: $cmd" "DEBUG"
 	eval "$cmd"
 	if [ $? != 0 ]; then
 		Logger "Could not create lock file on remote $replicaType in [$lockfile]." "CRITICAL"
-		Loggxer "Command output:\n$(cat $RUN_DIR/$PROGRAM.${FUNCNAME[0]}-$replicaType.$SCRIPT_PID)" "NOTICE"
+		Loggxer "Command output:\n$(cat $RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$replicaType.$SCRIPT_PID)" "NOTICE"
 		return 1
 	else
 		Logger "Locked remote $replicaType replica in [$lockfile]." "DEBUG"
@@ -1732,7 +1732,7 @@ function Summary {
 	#WIP: remote deletion summary does not work
 	Logger "File deletions: INITIATOR << >> TARGET" "ALWAYS"
 	if [ "$REMOTE_OPERATION" == "yes" ]; then
-		_SummaryFromFile "${INITIATOR[$__replicaDir]}${INITIATOR[$__stateDir]}/target${TARGET[$__successDeletedListFile]}"
+		_SummaryFromFile "${INITIATOR[$__replicaDir]}${INITIATOR[$__stateDir]}/target${TARGET[$__successDeletedListFile]}" ">>"
 	else
 		_SummaryFromFile "$RUN_DIR/$PROGRAM.delete.target.$SCRIPT_PID" ">>"
 	fi
