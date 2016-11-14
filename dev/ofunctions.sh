@@ -475,7 +475,7 @@ function TrapError {
 	local code="${2:-1}"
 
 	if [ $_SILENT == false ]; then
-		echo -e "\e[45m/!\ ERROR in ${job}: Near line ${line}, exit code ${code}"
+		echo -e "\e[45m/!\ ERROR in ${job}: Near line ${line}, exit code ${code}\e[0m"
 	fi
 }
 
