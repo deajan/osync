@@ -2042,7 +2042,7 @@ for i in "$@"; do
 		--no-locks)
 		_NOLOCKS=true
 		;;
-		--only-errors)
+		--errors-only)
 		_LOGGER_STDERR=True
 		_LOGGER_ERR_ONLY=True
 		;;
