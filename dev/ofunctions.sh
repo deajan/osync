@@ -1,14 +1,15 @@
 #### MINIMAL-FUNCTION-SET BEGIN ####
 
-## FUNC_BUILD=2016111401
+## FUNC_BUILD=2016111402
 ## BEGIN Generic bash functions written in 2013-2016 by Orsiris de Jong - http://www.netpower.fr - ozy@netpower.fr
 
 ## To use in a program, define the following variables:
 ## PROGRAM=program-name
 ## INSTANCE_ID=program-instance-name
 ## _DEBUG=yes/no
-## _LOGGER_STDERR=True/False
-## _LOGGER_ERR_ONLY=True/False
+## _LOGGER_STDERR=true/False
+## _LOGGER_ERR_ONLY=true/False
+## _LOGGER_PREFIX="date"/"time"/""
 
 #TODO: Windows checks, check sendmail & mailsend
 
@@ -144,13 +145,18 @@ function Logger {
 		WARN_ALERT=true
 		return
 	elif [ "$level" == "NOTICE" ]; then
-		if [ "$_LOGGER_ERR_ONLY" != True ]; then
+		if [ "$_LOGGER_ERR_ONLY" != true ]; then
 			_Logger "$prefix$value"
 		fi
 		return
 	elif [ "$level" == "VERBOSE" ]; then
 		if [ $_VERBOSE == true ]; then
 			_Logger "$prefix$value"
+		fi
+		return
+	elif [ "$level" == "ALWAYS" ]; then
+		if [ $_SILENT != true ]; then
+			_Logger "$prefix$value" "$prefix$level:$value" "$level:$value"
 		fi
 		return
 	elif [ "$level" == "DEBUG" ]; then
@@ -278,7 +284,7 @@ function SendAlert {
 		Logger "Cannot create [$ALERT_LOG_FILE]" "WARN"
 		attachment=False
 	else
-		attachment=True
+		attachment=true
 	fi
 	body="$MAIL_ALERT_MSG"$'\n\n'"$CURRENT_LOG"
 
@@ -296,14 +302,14 @@ function SendAlert {
 		subject="Fnished run - $subject"
 	fi
 
-	if [ "$attachment" == True ]; then
+	if [ "$attachment" == true ]; then
 		attachmentFile="$ALERT_LOG_FILE"
 	fi
 
 	SendEmail "$subject" "$body" "$DESTINATION_MAILS" "$attachmentFile" "$SENDER_MAIL" "$SMTP_SERVER" "$SMTP_PORT" "$ENCRYPTION" "SMTP_USER" "$SMTP_PASSWORD"
 
 	# Delete tmp log file
-	if [ "$attachment" == True ]; then
+	if [ "$attachment" == true ]; then
 		if [ -f "$ALERT_LOG_FILE" ]; then
 			rm -f "$ALERT_LOG_FILE"
 		fi
