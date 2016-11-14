@@ -4,7 +4,7 @@ PROGRAM="osync" # Rsync based two way sync engine with fault tolerance
 AUTHOR="(C) 2013-2016 by Orsiris de Jong"
 CONTACT="http://www.netpower.fr/osync - ozy@netpower.fr"
 PROGRAM_VERSION=1.2-beta2
-PROGRAM_BUILD=2016111403
+PROGRAM_BUILD=2016111404
 IS_STABLE=no
 
 # Execution order						#__WITH_PARANOIA_DEBUG
@@ -789,7 +789,7 @@ function syncAttrs {
 	local destReplica
 
 	if [ "$LOCAL_OS" == "BUSYBOX" ]; then
-		Logger "Skipping acl synchronization. Busybox doesn't have join command." "NOTICE"
+		Logger "Skipping acl synchronization. Busybox does not have join command." "NOTICE"
 		return 0
 	fi
 
@@ -1003,10 +1003,11 @@ function _deleteLocal {
 							Logger "Moving deleted file [$replicaDir$files] to [$replicaDir$deletionDir]." "VERBOSE"
 							mv -f "$replicaDir$files" "$replicaDir$deletionDir"
 						fi
-						echo "$replicaDir$files" >> "$RUN_DIR/$PROGRAM.delete.$replicaType.$SCRIPT_PID"
 						if [ $? != 0 ]; then
 							Logger "Cannot move [$replicaDir$files] to deletion directory." "ERROR"
 							echo "$files" >> "${INITIATOR[$__replicaDir]}${INITIATOR[$__stateDir]}/$replicaType${INITIATOR[$__failedDeletedListFile]}"
+						else
+							echo "$files" >> "$RUN_DIR/$PROGRAM.delete.$replicaType.$SCRIPT_PID"
 						fi
 					fi
 				fi
@@ -1019,6 +1020,8 @@ function _deleteLocal {
 						if [ $result != 0 ]; then
 							Logger "Cannot delete [$replicaDir$files]." "ERROR"
 							echo "$files" >> "${INITIATOR[$__replicaDir]}${INITIATOR[$__stateDir]}/$replicaType${INITIATOR[$__failedDeletedListFile]}"
+						else
+							echo "$files" >> "$RUN_DIR/$PROGRAM.delete.$replicaType.$SCRIPT_PID"
 						fi
 					fi
 				fi
@@ -1039,6 +1042,13 @@ function _deleteRemote {
 
 	local escSourceFile
 
+	local failedDeleteList
+	local successDeleteList
+
+	# Check this
+	failedDeleteList="$(EscapeSpaces ${TARGET[$__replicaDir]}${TARGET[$__stateDir]}/$replicaType${TARGET[$__failedDeletedListFile]})"
+	successDeleteList="$(EscapeSpaces ${TARGET[$__replicaDir]}${TARGET[$__stateDir]}/$replicaType${TARGET[$_successDeletedListFile]})"
+
 	## This is a special coded function. Need to redelcare local functions on remote host, passing all needed variables as escaped arguments to ssh command.
 	## Anything beetween << ENDSSH and ENDSSH will be executed remotely
 
@@ -1055,7 +1065,7 @@ function _deleteRemote {
 		exit 1
 	fi
 
-$SSH_CMD ERROR_ALERT=0 sync_on_changes=$sync_on_changes _DEBUG=$_DEBUG _DRYRUN=$_DRYRUN _VERBOSE=$_VERBOSE COMMAND_SUDO=$COMMAND_SUDO FILE_LIST="$(EscapeSpaces "${TARGET[$__replicaDir]}${TARGET[$__stateDir]}/$replicaType${INITIATOR[$__deletedListFile]}")" REPLICA_DIR="$(EscapeSpaces "$replicaDir")" SOFT_DELETE=$SOFT_DELETE DELETION_DIR="$(EscapeSpaces "$deletionDir")" FAILED_DELETE_LIST="$(EscapeSpaces "${TARGET[$__replicaDir]}${TARGET[$__stateDir]}/${INITIATOR[$__failedDeletedListFile]}")" 'bash -s' << 'ENDSSH' >> "$RUN_DIR/$PROGRAM.remote_deletion.$SCRIPT_PID" 2>&1
+$SSH_CMD ERROR_ALERT=0 sync_on_changes=$sync_on_changes _DEBUG=$_DEBUG _DRYRUN=$_DRYRUN _VERBOSE=$_VERBOSE COMMAND_SUDO=$COMMAND_SUDO FILE_LIST="$(EscapeSpaces "${TARGET[$__replicaDir]}${TARGET[$__stateDir]}/$replicaType${INITIATOR[$__deletedListFile]}")" REPLICA_DIR="$(EscapeSpaces "$replicaDir")" SOFT_DELETE=$SOFT_DELETE DELETION_DIR="$(EscapeSpaces "$deletionDir")" FAILED_DELETE_LIST="$failedDeleteList" SUCCESS_DELETED_LIST="$successDeleteList" 'bash -s' << 'ENDSSH' >> "$RUN_DIR/$PROGRAM.remote_deletion.$SCRIPT_PID" 2>&1
 
 	## The following lines are executed remotely
 	function _logger {
@@ -1134,7 +1144,10 @@ $SSH_CMD ERROR_ALERT=0 sync_on_changes=$sync_on_changes _DEBUG=$_DEBUG _DRYRUN=$
 						fi
 						if [ $? != 0 ]; then
 							Logger "Cannot move [$REPLICA_DIR$files] to deletion directory." "ERROR"
+							# Using $files instead of $REPLICA_DIR$files here so the list is ready for next run
 							echo "$files" >> "$FAILED_DELETE_LIST"
+						else
+							echo "$files" >> "$SUCCESS_DELETE_LIST"
 						fi
 					fi
 				fi
@@ -1147,6 +1160,8 @@ $SSH_CMD ERROR_ALERT=0 sync_on_changes=$sync_on_changes _DEBUG=$_DEBUG _DRYRUN=$
 						if [ $result != 0 ]; then
 							Logger "Cannot delete [$REPLICA_DIR$files]." "ERROR"
 							echo "$files" >> "$FAILED_DELETE_LIST"
+						else
+							echo "$files" >> "$SUCCESS_DELETE_LIST"
 						fi
 					fi
 				fi
@@ -1162,8 +1177,11 @@ ENDSSH
 	fi
 
 	## Copy back the deleted failed file list
-	escSourceFile="$(EscapeSpaces "${TARGET[$__replicaDir]}${TARGET[$__stateDir]}/${INITIATOR[$__failedDeletedListFile]}")"
-	rsyncCmd="$(type -p $RSYNC_EXECUTABLE) --rsync-path=\"$RSYNC_PATH\" -e \"$RSYNC_SSH_CMD\" $REMOTE_USER@$REMOTE_HOST:\"$escSourceFile\" \"${INITIATOR[$__replicaDir]}${INITIATOR[$__stateDir]}\" > \"$RUN_DIR/$PROGRAM.remote_failed_deletion_list_copy.$SCRIPT_PID\""
+	#WIP remove if working
+	#escSourceFile="$(EscapeSpaces "${TARGET[$__replicaDir]}${TARGET[$__stateDir]}/${INITIATOR[$__failedDeletedListFile]}")"
+	#rsyncCmd="$(type -p $RSYNC_EXECUTABLE) --rsync-path=\"$RSYNC_PATH\" -e \"$RSYNC_SSH_CMD\" $REMOTE_USER@$REMOTE_HOST:\"$escSourceFile\" \"${INITIATOR[$__replicaDir]}${INITIATOR[$__stateDir]}\" > \"$RUN_DIR/$PROGRAM.remote_failed_deletion_list_copy.$SCRIPT_PID\""
+
+	rsyncCmd="$(type -p $RSYNC_EXECUTABLE) --rsync-path=\"$RSYNC_PATH\" -e \"$RSYNC_SSH_CMD\" $REMOTE_USER@$REMOTE_HOST:\"{$FAILED_DELETE_LIST,$SUCCESS_DELETE_LIST}\" \"${INITIATOR[$__replicaDir]}${INITIATOR[$__stateDir]}\" > \"$RUN_DIR/$PROGRAM.remote_failed_deletion_list_copy.$SCRIPT_PID\""
 	Logger "RSYNC_CMD: $rsyncCmd" "DEBUG"
 	eval "$rsyncCmd" 2>> "$LOG_FILE"
 	result=$?
@@ -1685,7 +1703,7 @@ function _SummaryFromFile {
 	local summaryFile="${1}"
 	local direction="${2}"
 
-	__CheckArguments 0 $# "${FUNCNAME[0]}" "$@"	#__WITH_PARANOIA_DEBUG
+	__CheckArguments 2 $# "${FUNCNAME[0]}" "$@"	#__WITH_PARANOIA_DEBUG
 
 	if [ -f "$summaryFile" ]; then
 		while read -r file; do
@@ -1711,9 +1729,14 @@ function Summary {
 	_SummaryFromFile "$RUN_DIR/$PROGRAM.update.target.$SCRIPT_PID" ">>"
 	_SummaryFromFile "$RUN_DIR/$PROGRAM.update.initiator.$SCRIPT_PID" "<<"
 
+	#WIP: remote deletion summary does not work
 	Logger "File deletions: INITIATOR << >> TARGET" "ALWAYS"
-	_SummaryFromFile "$RUN_DIR/$PROGRAM.attr-update.target.$SCRIPT_PID" ">>"
-	_SummaryFromFile "$RUN_DIR/$PROGRAM.attr-update.initiator.$SCRIPT_PID" "<<"
+	if [ "$REMOTE_OPERATION" == "yes" ]; then
+		_SummaryFromFile "${INITIATOR[$__replicaDir]}${INITIATOR[$__stateDir]}/target${TARGET[$__successDeletedListFile]}"
+	else
+		_SummaryFromFile "$RUN_DIR/$PROGRAM.delete.target.$SCRIPT_PID" ">>"
+	fi
+	_SummaryFromFile "$RUN_DIR/$PROGRAM.delete.initiator.$SCRIPT_PID" "<<"
 
 	_LOGGER_PREFIX="$prefix"
 }
@@ -1822,6 +1845,7 @@ function Init {
 	readonly __treeAfterFileNoSuffix=12
 	readonly __deletedListFile=13
 	readonly __failedDeletedListFile=14
+	readonly __successDeletedListFile=15
 
 	INITIATOR=()
 	INITIATOR[$__type]='initiator'
@@ -1839,6 +1863,7 @@ function Init {
 	INITIATOR[$__treeAfterFileNoSuffix]="-tree-after-$INSTANCE_ID"
 	INITIATOR[$__deletedListFile]="-deleted-list-$INSTANCE_ID$drySuffix"
 	INITIATOR[$__failedDeletedListFile]="-failed-delete-$INSTANCE_ID$drySuffix"
+	INITIATOR[$__successDeletedListFile]="-success-delete-$INSTANCE_ID$drySuffix"
 
 	TARGET=()
 	TARGET[$__type]='target'
@@ -1847,6 +1872,17 @@ function Init {
 	TARGET[$__stateDir]="$OSYNC_DIR/$stateDir"
 	TARGET[$__backupDir]="$OSYNC_DIR/$backupDir"
 	TARGET[$__deleteDir]="$OSYNC_DIR/$deleteDir"
+	TARGET[$__partialDir]="$OSYNC_DIR/$partialDir"											# unused
+	TARGET[$__initiatorLastActionFile]="$TARGET_SYNC_DIR$OSYNC_DIR/$stateDir/initiator-$lastAction-$INSTANCE_ID$drySuffix"		# unused
+	TARGET[$__targetLastActionFile]="$TARGET_SYNC_DIR$OSYNC_DIR/$stateDir/target-$lastAction-$INSTANCE_ID$drySuffix"		# unused
+	TARGET[$__resumeCount]="$TARGET_SYNC_DIR$OSYNC_DIR/$stateDir/$resumeCount-$INSTANCE_ID$drySuffix"				# unused
+	TARGET[$__treeCurrentFile]="-tree-current-$INSTANCE_ID$drySuffix"								# unused
+	TARGET[$__treeAfterFile]="-tree-after-$INSTANCE_ID$drySuffix"									# unused
+	TARGET[$__treeAfterFileNoSuffix]="-tree-after-$INSTANCE_ID"									# unused
+	TARGET[$__deletedListFile]="-deleted-list-$INSTANCE_ID$drySuffix"								# unused
+	TARGET[$__failedDeletedListFile]="-failed-delete-$INSTANCE_ID$drySuffix"
+	TARGET[$__successDeletedListFile]="-success-delete-$INSTANCE_ID$drySuffix"
+
 
 	PARTIAL_DIR="${INITIATOR[$__partialDir]}"
 
@@ -2069,7 +2105,6 @@ for i in "$@"; do
 		opts=$opts" --instance-id=\"$INSTANCE_ID\""
 		;;
 		--skip-deletion=*)
-		#SKIP_DELETION=${i##*=}
 		opts=$opts" --skip-deletion=\"${i##*=}\""
 		IFS=',' read -r -a SKIP_DELETION <<< ${i##*=}
 		;;
