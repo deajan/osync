@@ -1,12 +1,14 @@
 #### MINIMAL-FUNCTION-SET BEGIN ####
 
-## FUNC_BUILD=2016111301
+## FUNC_BUILD=2016111401
 ## BEGIN Generic bash functions written in 2013-2016 by Orsiris de Jong - http://www.netpower.fr - ozy@netpower.fr
 
 ## To use in a program, define the following variables:
 ## PROGRAM=program-name
 ## INSTANCE_ID=program-instance-name
 ## _DEBUG=yes/no
+## _LOGGER_STDERR=True/False
+## _LOGGER_ERR_ONLY=True/False
 
 #TODO: Windows checks, check sendmail & mailsend
 
@@ -142,7 +144,9 @@ function Logger {
 		WARN_ALERT=true
 		return
 	elif [ "$level" == "NOTICE" ]; then
-		_Logger "$prefix$value"
+		if [ "$_LOGGER_ERR_ONLY" != True ]; then
+			_Logger "$prefix$value"
+		fi
 		return
 	elif [ "$level" == "VERBOSE" ]; then
 		if [ $_VERBOSE == true ]; then
