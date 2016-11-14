@@ -7,8 +7,8 @@
 ## PROGRAM=program-name
 ## INSTANCE_ID=program-instance-name
 ## _DEBUG=yes/no
-## _LOGGER_STDERR=true/False
-## _LOGGER_ERR_ONLY=true/False
+## _LOGGER_STDERR=true/false
+## _LOGGER_ERR_ONLY=true/false
 ## _LOGGER_PREFIX="date"/"time"/""
 
 #TODO: Windows checks, check sendmail & mailsend
@@ -282,7 +282,7 @@ function SendAlert {
 	eval "cat \"$LOG_FILE\" $COMPRESSION_PROGRAM > $ALERT_LOG_FILE"
 	if [ $? != 0 ]; then
 		Logger "Cannot create [$ALERT_LOG_FILE]" "WARN"
-		attachment=False
+		attachment=false
 	else
 		attachment=true
 	fi
@@ -501,7 +501,7 @@ function LoadConfigFile {
 }
 
 function Spinner {
-	if [ $_SILENT == true ]; then
+	if [ $_SILENT == true ] || [ $_LOGGER_ERR_ONLY == true ]; then
 		return 0
 	fi
 

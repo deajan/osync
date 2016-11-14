@@ -4,7 +4,7 @@ PROGRAM="osync" # Rsync based two way sync engine with fault tolerance
 AUTHOR="(C) 2013-2016 by Orsiris de Jong"
 CONTACT="http://www.netpower.fr/osync - ozy@netpower.fr"
 PROGRAM_VERSION=1.2-beta2
-PROGRAM_BUILD=2016111401
+PROGRAM_BUILD=2016111403
 IS_STABLE=no
 
 # Execution order						#__WITH_PARANOIA_DEBUG
@@ -1003,6 +1003,7 @@ function _deleteLocal {
 							Logger "Moving deleted file [$replicaDir$files] to [$replicaDir$deletionDir]." "VERBOSE"
 							mv -f "$replicaDir$files" "$replicaDir$deletionDir"
 						fi
+						echo "$replicaDir$files" >> "$RUN_DIR/$PROGRAM.delete.$replicaType.$SCRIPT_PID"
 						if [ $? != 0 ]; then
 							Logger "Cannot move [$replicaDir$files] to deletion directory." "ERROR"
 							echo "$files" >> "${INITIATOR[$__replicaDir]}${INITIATOR[$__stateDir]}/$replicaType${INITIATOR[$__failedDeletedListFile]}"
@@ -1680,6 +1681,43 @@ function SoftDelete {
 	fi
 }
 
+function _SummaryFromFile {
+	local summaryFile="${1}"
+	local direction="${2}"
+
+	__CheckArguments 0 $# "${FUNCNAME[0]}" "$@"	#__WITH_PARANOIA_DEBUG
+
+	if [ -f "$summaryFile" ]; then
+		while read -r file; do
+			Logger "$direction $(echo $file | awk '{for (i=2; i<NF; i++) printf $i " "; print $NF}')" "ALWAYS"
+		done < "$summaryFile"
+	fi
+}
+
+function Summary {
+	__CheckArguments 0 $# "${FUNCNAME[0]}" "$@"	#__WITH_PARANOIA_DEBUG
+
+	local prefix
+
+	prefix="$_LOGGER_PREFIX"
+	_LOGGER_PREFIX=""
+
+	Logger "File attribute updates: INITIATOR << >> TARGET" "ALWAYS"
+
+	_SummaryFromFile "$RUN_DIR/$PROGRAM.attr-update.target.$SCRIPT_PID" ">>"
+	_SummaryFromFile "$RUN_DIR/$PROGRAM.attr-update.initiator.$SCRIPT_PID" "<<"
+
+	Logger "File transfers: INITIATOR << >> TARGET" "ALWAYS"
+	_SummaryFromFile "$RUN_DIR/$PROGRAM.update.target.$SCRIPT_PID" ">>"
+	_SummaryFromFile "$RUN_DIR/$PROGRAM.update.initiator.$SCRIPT_PID" "<<"
+
+	Logger "File deletions: INITIATOR << >> TARGET" "ALWAYS"
+	_SummaryFromFile "$RUN_DIR/$PROGRAM.attr-update.target.$SCRIPT_PID" ">>"
+	_SummaryFromFile "$RUN_DIR/$PROGRAM.attr-update.initiator.$SCRIPT_PID" "<<"
+
+	_LOGGER_PREFIX="$prefix"
+}
+
 function Init {
 	__CheckArguments 0 $# "${FUNCNAME[0]}" "$@"	#__WITH_PARANOIA_DEBUG
 
@@ -1815,7 +1853,7 @@ function Init {
 	## Set sync only function arguments for rsync
 	SYNC_OPTS="-u"
 
-	if [ $_VERBOSE == true ]; then
+	if [ $_VERBOSE == true ] || [ $_SUMMARY == true ]; then
 		SYNC_OPTS=$SYNC_OPTS" -i"
 	fi
 
@@ -1876,8 +1914,10 @@ function Usage {
 	echo ""
 	echo "[OPTIONS]"
 	echo "--dry             Will run osync without actually doing anything; just testing"
+	echo "--no-prefix       Will suppress time / date suffix from output"
 	echo "--silent          Will run osync without any output to stdout, used for cron jobs"
 	echo "--errors-only     Output only errors (can be combined with silent or verbose)"
+	echo "--summary         Outputs a list of transferred / deleted files at the end of the run"
 	echo "--verbose         Increases output"
 	echo "--stats           Adds rsync transfer statistics to verbose output"
 	echo "--partial         Allows rsync to keep partial downloads that can be resumed later (experimental)"
@@ -1951,7 +1991,6 @@ fi
 
 INITIATOR_LOCK_FILE_EXISTS=false
 TARGET_LOCK_FILE_EXISTS=false
-
 FORCE_UNLOCK=false
 no_maxtime=false
 opts=""
@@ -1964,6 +2003,7 @@ _QUICK_SYNC=0
 sync_on_changes=false
 _NOLOCKS=false
 osync_cmd=$0
+_SUMMARY=false
 
 if [ $# -eq 0 ]
 then
@@ -2043,8 +2083,15 @@ for i in "$@"; do
 		_NOLOCKS=true
 		;;
 		--errors-only)
-		_LOGGER_STDERR=True
-		_LOGGER_ERR_ONLY=True
+		#TODO: let err_only only output to stderr
+		#_LOGGER_STDERR=true
+		_LOGGER_ERR_ONLY=true
+		;;
+		--summary)
+		_SUMMARY=true
+		;;
+		--no-prefix)
+		_LOGGER_PREFIX=""
 		;;
 		*)
 		if [ $first == "0" ]; then
@@ -2098,59 +2145,59 @@ opts="${opts# *}"
 		LoadConfigFile "$ConfigFile"
 	fi
 
-	if [ "$LOGFILE" == "" ]; then
-		if [ -w /var/log ]; then
-			LOG_FILE="/var/log/$PROGRAM.$INSTANCE_ID.log"
-		elif ([ "$HOME" != "" ] && [ -w "$HOME" ]); then
-			LOG_FILE="$HOME/$PROGRAM.$INSTANCE_ID.log"
-		else
-			LOG_FILE="./$PROGRAM.$INSTANCE_ID.log"
-		fi
+if [ "$LOGFILE" == "" ]; then
+	if [ -w /var/log ]; then
+		LOG_FILE="/var/log/$PROGRAM.$INSTANCE_ID.log"
+	elif ([ "$HOME" != "" ] && [ -w "$HOME" ]); then
+		LOG_FILE="$HOME/$PROGRAM.$INSTANCE_ID.log"
 	else
-		LOG_FILE="$LOGFILE"
+		LOG_FILE="./$PROGRAM.$INSTANCE_ID.log"
 	fi
-	if [ ! -w "$(dirname $LOG_FILE)" ]; then
-		echo "Cannot write to log [$(dirname $LOG_FILE)]."
-	else
-		Logger "Script begin, logging to [$LOG_FILE]." "DEBUG"
+else
+	LOG_FILE="$LOGFILE"
+fi
+if [ ! -w "$(dirname $LOG_FILE)" ]; then
+	echo "Cannot write to log [$(dirname $LOG_FILE)]."
+else
+	Logger "Script begin, logging to [$LOG_FILE]." "DEBUG"
+fi
+
+if [ "$IS_STABLE" != "yes" ]; then
+	Logger "This is an unstable dev build [$PROGRAM_BUILD]. Please use with caution." "WARN"
 	fi
 
-	if [ "$IS_STABLE" != "yes" ]; then
-                Logger "This is an unstable dev build [$PROGRAM_BUILD]. Please use with caution." "WARN"
-        fi
-
-	GetLocalOS
-	InitLocalOSSettings
-	PreInit
-	Init
-	CheckEnvironment
-	PostInit
-	if [ $_QUICK_SYNC -lt 2 ]; then
-		CheckCurrentConfig
+GetLocalOS
+InitLocalOSSettings
+PreInit
+Init
+CheckEnvironment
+PostInit
+if [ $_QUICK_SYNC -lt 2 ]; then
+	CheckCurrentConfig
+fi
+CheckCurrentConfigAll
+DATE=$(date)
+Logger "-------------------------------------------------------------" "NOTICE"
+Logger "$DRY_WARNING $DATE - $PROGRAM $PROGRAM_VERSION script begin." "ALWAYS"
+Logger "-------------------------------------------------------------" "NOTICE"
+Logger "Sync task [$INSTANCE_ID] launched as $LOCAL_USER@$LOCAL_HOST (PID $SCRIPT_PID)" "NOTICE"
+if [ $sync_on_changes == true ]; then
+	SyncOnChanges
+else
+	GetRemoteOS
+	InitRemoteOSSettings
+	if [ $no_maxtime == true ]; then
+		SOFT_MAX_EXEC_TIME=0
+		HARD_MAX_EXEC_TIME=0
 	fi
-	CheckCurrentConfigAll
-
-	DATE=$(date)
-	Logger "-------------------------------------------------------------" "NOTICE"
-	Logger "$DRY_WARNING $DATE - $PROGRAM $PROGRAM_VERSION script begin." "NOTICE"
-	Logger "-------------------------------------------------------------" "NOTICE"
-	Logger "Sync task [$INSTANCE_ID] launched as $LOCAL_USER@$LOCAL_HOST (PID $SCRIPT_PID)" "NOTICE"
-
-	if [ $sync_on_changes == true ]; then
-		SyncOnChanges
-	else
-		GetRemoteOS
-		InitRemoteOSSettings
-
-		if [ $no_maxtime == true ]; then
-			SOFT_MAX_EXEC_TIME=0
-			HARD_MAX_EXEC_TIME=0
-		fi
-		CheckReplicaPaths
-		CheckDiskSpace
-		RunBeforeHook
-		Main
-		if [ $? == 0 ]; then
-			SoftDelete
-		fi
+	CheckReplicaPaths
+	CheckDiskSpace
+	RunBeforeHook
+	Main
+	if [ $? == 0 ]; then
+		SoftDelete
 	fi
+	if [ $_SUMMARY == true ]; then
+		Summary
+	fi
+fi
