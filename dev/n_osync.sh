@@ -4,7 +4,7 @@ PROGRAM="osync" # Rsync based two way sync engine with fault tolerance
 AUTHOR="(C) 2013-2016 by Orsiris de Jong"
 CONTACT="http://www.netpower.fr/osync - ozy@netpower.fr"
 PROGRAM_VERSION=1.2-beta2
-PROGRAM_BUILD=2016111505
+PROGRAM_BUILD=2016111507
 IS_STABLE=no
 
 # Execution order						#__WITH_PARANOIA_DEBUG
@@ -66,6 +66,14 @@ function TrapStop {
 
 function TrapQuit {
 	local exitcode
+
+	# Get ERROR / WARN alert flags from subprocesses that call Logger
+	if [ -f "$RUN_DIR/$PROGRAM.Logger.warn.$SCRIPT_PID" ]; then
+		WARN_ALERT=true
+	fi
+	if [ -f "$RUN_DIR/$PROGRAM.Logger.error.$SCRIPT_PID" ]; then
+		ERROR_ALERT=true
+	fi
 
 	if [ $ERROR_ALERT == true ]; then
 		UnlockReplicas
@@ -657,10 +665,10 @@ function treeList {
 	local replicaType="${2}" # replica type: initiator, target
 	local treeFilename="${3}" # filename to output tree (will be prefixed with $replicaType)
 
+	__CheckArguments 3 $# "${FUNCNAME[0]}" "$@"	#__WITH_PARANOIA_DEBUG
+
 	local escapedReplicaPath
 	local rsyncCmd
-
-	__CheckArguments 3 $# "${FUNCNAME[0]}" "$@"	#__WITH_PARANOIA_DEBUG
 
 	escapedReplicaPath=$(EscapeSpaces "$replicaPath")
 
@@ -700,6 +708,17 @@ function deleteList {
 
 	local cmd
 
+	local failedDeletionListFromReplica
+
+	if [ "$replicaType" == "${INITIATOR[$__type]}" ]; then
+		failedDeletionListFromReplica="${TARGET[$__type]}"
+	elif [ "$replicaType" == "${TARGET[$__type]}" ]; then
+		failedDeletionListFromReplica="${INITIATOR[$__type]}"
+	else
+		Logger "Bogus replicaType in [${FUNCNAME[0]}]." "CRITICAL"
+		exit 1
+	fi
+
 	Logger "Creating $replicaType replica deleted file list." "NOTICE"
 	if [ -f "${INITIATOR[$__replicaDir]}${INITIATOR[$__stateDir]}/$replicaType${INITIATOR[$__treeAfterFileNoSuffix]}" ]; then
 		## Same functionnality, comm is much faster than grep but is not available on every platform
@@ -715,10 +734,10 @@ function deleteList {
 		retval=$?
 
 		# Add delete failed file list to current delete list and then empty it
-		if [ -f "${INITIATOR[$__replicaDir]}${INITIATOR[$__stateDir]}/$replicaType${INITIATOR[$__failedDeletedListFile]}" ]; then
-			cat "${INITIATOR[$__replicaDir]}${INITIATOR[$__stateDir]}/$replicaType${INITIATOR[$__failedDeletedListFile]}" >> "${INITIATOR[$__replicaDir]}${INITIATOR[$__stateDir]}/$replicaType${INITIATOR[$__deletedListFile]}"
+		if [ -f "${INITIATOR[$__replicaDir]}${INITIATOR[$__stateDir]}/$failedDeletionListFromReplica${INITIATOR[$__failedDeletedListFile]}" ]; then
+			cat "${INITIATOR[$__replicaDir]}${INITIATOR[$__stateDir]}/$failedDeletionListFromReplica${INITIATOR[$__failedDeletedListFile]}" >> "${INITIATOR[$__replicaDir]}${INITIATOR[$__stateDir]}/$replicaType${INITIATOR[$__deletedListFile]}"
 			if [ $? == 0 ]; then
-				rm -f "${INITIATOR[$__replicaDir]}${INITIATOR[$__stateDir]}/$replicaType${INITIATOR[$__failedDeletedListFile]}"
+				rm -f "${INITIATOR[$__replicaDir]}${INITIATOR[$__stateDir]}/$failedDeletionListFromReplica${INITIATOR[$__failedDeletedListFile]}"
 			else
 				Logger "Cannot add failed deleted list to current deleted list for replica [$replicaType]." "ERROR"
 			fi
@@ -1151,12 +1170,12 @@ $SSH_CMD ERROR_ALERT=0 sync_on_changes=$sync_on_changes _DEBUG=$_DEBUG _DRYRUN=$
 						# In order to keep full path on soft deletion, create parent directories before move
 						parentdir="$(dirname "$files")"
 						if [ "$parentdir" != "." ]; then
+							Logger "Moving deleted file [$REPLICA_DIR$files] to [$REPLICA_DIR$DELETION_DIR/$parentdir]." "VERBOSE"
 							$COMMAND_SUDO mkdir -p "$REPLICA_DIR$DELETION_DIR/$parentdir"
 							$COMMAND_SUDO mv -f "$REPLICA_DIR$files" "$REPLICA_DIR$DELETION_DIR/$parentdir"
-							Logger "Moving deleted file [$REPLICA_DIR$files] to [$REPLICA_DIR$DELETION_DIR/$parentdir]." "VERBOSE"
 						else
-							$COMMAND_SUDO mv -f "$REPLICA_DIR$files" "$REPLICA_DIR$DELETION_DIR"
 							Logger "Moving deleted file [$REPLICA_DIR$files] to [$REPLICA_DIR$DELETION_DIR]." "VERBOSE"
+							$COMMAND_SUDO mv -f "$REPLICA_DIR$files" "$REPLICA_DIR$DELETION_DIR"
 						fi
 						if [ $? != 0 ]; then
 							Logger "Cannot move [$REPLICA_DIR$files] to deletion directory." "ERROR"
@@ -1170,10 +1189,9 @@ $SSH_CMD ERROR_ALERT=0 sync_on_changes=$sync_on_changes _DEBUG=$_DEBUG _DRYRUN=$
 			else
 				if [ $_DRYRUN == false ]; then
 					if [ -e "$REPLICA_DIR$files" ]; then
-						$COMMAND_SUDO rm -rf "$REPLICA_DIR$files"
-						$result=$?
 						Logger "Deleting [$REPLICA_DIR$files]." "VERBOSE"
-						if [ $result != 0 ]; then
+						$COMMAND_SUDO rm -rf "$REPLICA_DIR$files"
+						if [ $? != 0 ]; then
 							Logger "Cannot delete [$REPLICA_DIR$files]." "ERROR"
 							echo "$files" >> "$FAILED_DELETE_LIST"
 						else
