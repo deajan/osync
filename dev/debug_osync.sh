@@ -4,7 +4,7 @@ PROGRAM="osync" # Rsync based two way sync engine with fault tolerance
 AUTHOR="(C) 2013-2016 by Orsiris de Jong"
 CONTACT="http://www.netpower.fr/osync - ozy@netpower.fr"
 PROGRAM_VERSION=1.2-beta2
-PROGRAM_BUILD=2016111403
+PROGRAM_BUILD=2016111502
 IS_STABLE=no
 
 # Execution order						#__WITH_PARANOIA_DEBUG
@@ -45,7 +45,7 @@ IS_STABLE=no
 
 #### MINIMAL-FUNCTION-SET BEGIN ####
 
-## FUNC_BUILD=2016111402
+## FUNC_BUILD=2016111503
 ## BEGIN Generic bash functions written in 2013-2016 by Orsiris de Jong - http://www.netpower.fr - ozy@netpower.fr
 
 ## To use in a program, define the following variables:
@@ -97,7 +97,9 @@ if [ ! "$_DEBUG" == "yes" ]; then
 	SLEEP_TIME=.05 # Tested under linux and FreeBSD bash, #TODO tests on cygwin / msys
 	_VERBOSE=false
 else
-	SLEEP_TIME=1
+	if [ "$SLEEP_TIME" == "" ]; then
+		SLEEP_TIME=1
+	fi
 	trap 'TrapError ${LINENO} $?' ERR
 	_VERBOSE=true
 fi
@@ -186,7 +188,7 @@ function Logger {
 		ERROR_ALERT=true
 		return
 	elif [ "$level" == "WARN" ]; then
-		_Logger "$prefix\e[93m$value\e[0m" "$prefix$level:$value" "$level:$value"
+		_Logger "$prefix\e[33m$value\e[0m" "$prefix$level:$value" "$level:$value"
 		WARN_ALERT=true
 		return
 	elif [ "$level" == "NOTICE" ]; then
@@ -520,7 +522,7 @@ function TrapError {
 	local code="${2:-1}"
 
 	if [ $_SILENT == false ]; then
-		echo -e " /!\ ERROR in ${job}: Near line ${line}, exit code ${code}"
+		echo -e "\e[45m/!\ ERROR in ${job}: Near line ${line}, exit code ${code}\e[0m"
 	fi
 }
 
@@ -546,7 +548,7 @@ function LoadConfigFile {
 }
 
 function Spinner {
-	if [ $_SILENT == true ] || [ $_LOGGER_ERR_ONLY == true ]; then
+	if [ $_SILENT == true ] || [ "$_LOGGER_ERR_ONLY" == true ]; then
 		return 0
 	fi
 
@@ -960,8 +962,7 @@ function GetLocalOS {
 	local localOsVar
 
 	# There's no good way to tell if currently running in BusyBox shell. Using sluggish way.
-	ls --help 2>&1 | grep -i BusyBox > /dev/null
-	if [ $? == 0 ]; then
+	if ls --help 2>&1 | grep -i "BusyBox" > /dev/null; then
 		localOsVar="BusyBox"
 	else
 		localOsVar="$(uname -spio 2>&1)"
@@ -1006,47 +1007,35 @@ function GetLocalOS {
 function GetRemoteOS {
 	__CheckArguments 0 $# ${FUNCNAME[0]} "$@"	#__WITH_PARANOIA_DEBUG
 
-	local retval
-	local cmd
 	local remoteOsVar
 
-	if [ "$REMOTE_OPERATION" == "yes" ]; then
-		CheckConnectivity3rdPartyHosts
-		CheckConnectivityRemoteHost
+$SSH_CMD bash -s << 'ENDSSH' >> "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$SCRIPT_PID" 2>&1
 
-		cmd=$SSH_CMD' "ls --help 2>&1 | grep -i BusyBox > /dev/null"'
-		Logger "cmd: $cmd" "DEBUG"
-		eval "$cmd" &
-		WaitForTaskCompletion $! 120 240 ${FUNCNAME[0]}"-0" true $KEEP_LOGGING
-		retval=$?
-		if [ $retval == 0 ]; then
-			remoteOsVar="BusyBox"
-		else
-			cmd=$SSH_CMD' "uname -spio" > "'$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$SCRIPT_PID'" 2>&1'
-			Logger "cmd: $cmd" "DEBUG"
-			eval "$cmd" &
-			WaitForTaskCompletion $! 120 240 ${FUNCNAME[0]}"-1" true $KEEP_LOGGING
-			retval=$?
-			if [ $retval != 0 ]; then
-				cmd=$SSH_CMD' "uname -v" > "'$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$SCRIPT_PID'" 2>&1'
-				Logger "cmd: $cmd" "DEBUG"
-				eval "$cmd" &
-				WaitForTaskCompletion $! 120 240 ${FUNCNAME[0]}"-2" true $KEEP_LOGGING
-				retval=$?
-				if [ $retval != 0 ]; then
-					cmd=$SSH_CMD' "uname" > "'$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$SCRIPT_PID'" 2>&1'
-					Logger "cmd: $cmd" "DEBUG"
-					eval "$cmd" &
-					WaitForTaskCompletion $! 120 240 ${FUNCNAME[0]}"-3" true $KEEP_LOGGING
-					retval=$?
-					if [ $retval != 0 ]; then
-						Logger "Cannot Get remote OS type." "ERROR"
-					fi
-				fi
+function GetOs {
+	local localOsVar
+
+	# There's no good way to tell if currently running in BusyBox shell. Using sluggish way.
+	if ls --help 2>&1 | grep -i "BusyBox" > /dev/null; then
+		localOsVar="BusyBox"
+	else
+		localOsVar="$(uname -spio 2>&1)"
+		if [ $? != 0 ]; then
+			localOsVar="$(uname -v 2>&1)"
+			if [ $? != 0 ]; then
+				localOsVar="$(uname)"
 			fi
-			remoteOsVar=$(cat "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$SCRIPT_PID")
 		fi
+	fi
 
+	echo "$localOsVar"
+}
+
+GetOs
+
+ENDSSH
+
+	if [ -f "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$SCRIPT_PID" ]; then
+		remoteOsVar=$(cat "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$SCRIPT_PID")
 		case $remoteOsVar in
 			*"Linux"*)
 			REMOTE_OS="Linux"
@@ -1068,7 +1057,7 @@ function GetRemoteOS {
 			exit 1
 			;;
 			*)
-			if [ "$IGNORE_OS_TYPE" == "yes" ]; then		#DOC: Undocumented option
+			if [ "$IGNORE_OS_TYPE" == "yes" ]; then		#DOC: Undocumented debug only setting
 				Logger "Running on unknown remote OS [$remoteOsVar]." "WARN"
 				return
 			fi
@@ -1076,8 +1065,9 @@ function GetRemoteOS {
 			Logger "Remote OS said:\n$remoteOsVar" "CRITICAL"
 			exit 1
 		esac
-
 		Logger "Remote OS: [$remoteOsVar]." "DEBUG"
+	else
+		Logger "Cannot get Remote OS" "CRITICAL"
 	fi
 }
 
@@ -1411,7 +1401,7 @@ function PreInit {
 	RSYNC_ARGS="-rltD"
 	if [ "$_DRYRUN" == true ]; then
 		RSYNC_DRY_ARG="-n"
-		DRY_WARNING="/!\ DRY RUN"
+		DRY_WARNING="/!\ DRY RUN "
 	else
 		RSYNC_DRY_ARG=""
 	fi
@@ -1834,10 +1824,6 @@ function _CheckDiskSpaceLocal {
 	__CheckArguments 1 $# "${FUNCNAME[0]}" "$@"	#__WITH_PARANOIA_DEBUG
 
 	local diskSpace
-	local notation
-	local suffix
-	local suffixPresent
-	local multiplier=0
 
 	Logger "Checking minimum disk space in [$replica_path]." "NOTICE"
 
@@ -2101,12 +2087,12 @@ function _WriteLockFilesRemote {
 	CheckConnectivity3rdPartyHosts
 	CheckConnectivityRemoteHost
 
-	cmd=$SSH_CMD' "( set -o noclobber; echo '$SCRIPT_PID@$INSTANCE_ID' | '$COMMAND_SUDO' tee \"'$lockfile'\")" > /dev/null 2> $RUN_DIR/$PROGRAM.${FUNCNAME[0]}-$replicaType.$SCRIPT_PID'
+	cmd=$SSH_CMD' "( set -o noclobber; echo '$SCRIPT_PID@$INSTANCE_ID' | '$COMMAND_SUDO' tee \"'$lockfile'\")" > /dev/null 2> $RUN_DIR/$PROGRAM._WriteLockFilesRemote.$replicaType.$SCRIPT_PID'
 	Logger "cmd: $cmd" "DEBUG"
 	eval "$cmd"
 	if [ $? != 0 ]; then
 		Logger "Could not create lock file on remote $replicaType in [$lockfile]." "CRITICAL"
-		Loggxer "Command output:\n$(cat $RUN_DIR/$PROGRAM.${FUNCNAME[0]}-$replicaType.$SCRIPT_PID)" "NOTICE"
+		Loggxer "Command output:\n$(cat $RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$replicaType.$SCRIPT_PID)" "NOTICE"
 		return 1
 	else
 		Logger "Locked remote $replicaType replica in [$lockfile]." "DEBUG"
@@ -2354,7 +2340,7 @@ function syncAttrs {
 	local destReplica
 
 	if [ "$LOCAL_OS" == "BUSYBOX" ]; then
-		Logger "Skipping acl synchronization. Busybox doesn't have join command." "NOTICE"
+		Logger "Skipping acl synchronization. Busybox does not have join command." "NOTICE"
 		return 0
 	fi
 
@@ -2539,6 +2525,17 @@ function _deleteLocal {
 	local previousFile=""
 	local result
 
+	local deletionListFromReplica
+
+	if [ "$replicaType" == "${INITIATOR[$__type]}" ]; then
+		deletionListFromReplica="${TARGET[$__type]}"
+	elif [ "$replicaType" == "${TARGET[$__type]}" ]; then
+		deletionListFromReplica="${INITIATOR[$__type]}"
+	else
+		Logger "Bogus replicaType in [${FUNCNAME[0]}]." "CRITICAL"
+		exit 1
+	fi
+
 	if [ ! -d "$replicaDir$deletionDir" ] && [ $_DRYRUN == false ]; then
 		$COMMAND_SUDO mkdir -p "$replicaDir$deletionDir"
 		if [ $? != 0 ]; then
@@ -2568,10 +2565,11 @@ function _deleteLocal {
 							Logger "Moving deleted file [$replicaDir$files] to [$replicaDir$deletionDir]." "VERBOSE"
 							mv -f "$replicaDir$files" "$replicaDir$deletionDir"
 						fi
-						echo "$replicaDir$files" >> "$RUN_DIR/$PROGRAM.delete.$replicaType.$SCRIPT_PID"
 						if [ $? != 0 ]; then
 							Logger "Cannot move [$replicaDir$files] to deletion directory." "ERROR"
 							echo "$files" >> "${INITIATOR[$__replicaDir]}${INITIATOR[$__stateDir]}/$replicaType${INITIATOR[$__failedDeletedListFile]}"
+						else
+							echo "$files" >> "$RUN_DIR/$PROGRAM.delete.$replicaType.$SCRIPT_PID"
 						fi
 					fi
 				fi
@@ -2584,13 +2582,15 @@ function _deleteLocal {
 						if [ $result != 0 ]; then
 							Logger "Cannot delete [$replicaDir$files]." "ERROR"
 							echo "$files" >> "${INITIATOR[$__replicaDir]}${INITIATOR[$__stateDir]}/$replicaType${INITIATOR[$__failedDeletedListFile]}"
+						else
+							echo "$files" >> "$RUN_DIR/$PROGRAM.delete.$replicaType.$SCRIPT_PID"
 						fi
 					fi
 				fi
 			fi
 			previousFile="$files"
 		fi
-	done < "${INITIATOR[$__replicaDir]}${INITIATOR[$__stateDir]}/$replicaType${INITIATOR[$__deletedListFile]}"
+	done < "${INITIATOR[$__replicaDir]}${INITIATOR[$__stateDir]}/$deletionListFromReplica${INITIATOR[$__deletedListFile]}"
 }
 
 function _deleteRemote {
@@ -2602,14 +2602,29 @@ function _deleteRemote {
 	local escDestDir
 	local rsyncCmd
 
-	local escSourceFile
+	local failedDeleteList
+	local successDeleteList
+
+	local deletionListFromReplica
+
+	if [ "$replicaType" == "${INITIATOR[$__type]}" ]; then
+		deletionListFromReplica="${TARGET[$__type]}"
+	elif [ "$replicaType" == "${TARGET[$__type]}" ]; then
+		deletionListFromReplica="${INITIATOR[$__type]}"
+	else
+		Logger "Bogus replicaType in [${FUNCNAME[0]}]." "CRITICAL"
+		exit 1
+	fi
+
+	failedDeleteList="$(EscapeSpaces ${TARGET[$__replicaDir]}${TARGET[$__stateDir]}/$replicaType${TARGET[$__failedDeletedListFile]})"
+	successDeleteList="$(EscapeSpaces ${TARGET[$__replicaDir]}${TARGET[$__stateDir]}/$replicaType${TARGET[$__successDeletedListFile]})"
 
 	## This is a special coded function. Need to redelcare local functions on remote host, passing all needed variables as escaped arguments to ssh command.
 	## Anything beetween << ENDSSH and ENDSSH will be executed remotely
 
 	# Additionnaly, we need to copy the deletetion list to the remote state folder
 	escDestDir="$(EscapeSpaces "${TARGET[$__replicaDir]}${TARGET[$__stateDir]}")"
-	rsyncCmd="$(type -p $RSYNC_EXECUTABLE) --rsync-path=\"$RSYNC_PATH\" -e \"$RSYNC_SSH_CMD\" \"${INITIATOR[$__replicaDir]}${INITIATOR[$__stateDir]}/$replicaType${INITIATOR[$__deletedListFile]}\" $REMOTE_USER@$REMOTE_HOST:\"$escDestDir/\" >> $RUN_DIR/$PROGRAM.${FUNCNAME[0]}.precopy.$SCRIPT_PID 2>&1"
+	rsyncCmd="$(type -p $RSYNC_EXECUTABLE) --rsync-path=\"$RSYNC_PATH\" -e \"$RSYNC_SSH_CMD\" \"${INITIATOR[$__replicaDir]}${INITIATOR[$__stateDir]}/$deletionListFromReplica${INITIATOR[$__deletedListFile]}\" $REMOTE_USER@$REMOTE_HOST:\"$escDestDir/\" >> $RUN_DIR/$PROGRAM.${FUNCNAME[0]}.precopy.$SCRIPT_PID 2>&1"
 	Logger "RSYNC_CMD: $rsyncCmd" "DEBUG"
 	eval "$rsyncCmd" 2>> "$LOG_FILE"
 	if [ $? != 0 ]; then
@@ -2620,7 +2635,7 @@ function _deleteRemote {
 		exit 1
 	fi
 
-$SSH_CMD ERROR_ALERT=0 sync_on_changes=$sync_on_changes _DEBUG=$_DEBUG _DRYRUN=$_DRYRUN _VERBOSE=$_VERBOSE COMMAND_SUDO=$COMMAND_SUDO FILE_LIST="$(EscapeSpaces "${TARGET[$__replicaDir]}${TARGET[$__stateDir]}/$replicaType${INITIATOR[$__deletedListFile]}")" REPLICA_DIR="$(EscapeSpaces "$replicaDir")" SOFT_DELETE=$SOFT_DELETE DELETION_DIR="$(EscapeSpaces "$deletionDir")" FAILED_DELETE_LIST="$(EscapeSpaces "${TARGET[$__replicaDir]}${TARGET[$__stateDir]}/${INITIATOR[$__failedDeletedListFile]}")" 'bash -s' << 'ENDSSH' >> "$RUN_DIR/$PROGRAM.remote_deletion.$SCRIPT_PID" 2>&1
+$SSH_CMD ERROR_ALERT=0 sync_on_changes=$sync_on_changes _DEBUG=$_DEBUG _DRYRUN=$_DRYRUN _VERBOSE=$_VERBOSE COMMAND_SUDO=$COMMAND_SUDO FILE_LIST="$(EscapeSpaces "${TARGET[$__replicaDir]}${TARGET[$__stateDir]}/$deletionListFromReplica${INITIATOR[$__deletedListFile]}")" REPLICA_DIR="$(EscapeSpaces "$replicaDir")" SOFT_DELETE=$SOFT_DELETE DELETION_DIR="$(EscapeSpaces "$deletionDir")" FAILED_DELETE_LIST="$failedDeleteList" SUCCESS_DELETE_LIST="$successDeleteList" 'bash -s' << 'ENDSSH' >> "$RUN_DIR/$PROGRAM.remote_deletion.$SCRIPT_PID" 2>&1
 
 	## The following lines are executed remotely
 	function _logger {
@@ -2664,6 +2679,7 @@ $SSH_CMD ERROR_ALERT=0 sync_on_changes=$sync_on_changes _DEBUG=$_DEBUG _DRYRUN=$
 
 	## Empty earlier failed delete list
 	> "$FAILED_DELETE_LIST"
+	> "$SUCCESS_DELETE_LIST"
 
 	parentdir=
 	previousFile=""
@@ -2699,7 +2715,10 @@ $SSH_CMD ERROR_ALERT=0 sync_on_changes=$sync_on_changes _DEBUG=$_DEBUG _DRYRUN=$
 						fi
 						if [ $? != 0 ]; then
 							Logger "Cannot move [$REPLICA_DIR$files] to deletion directory." "ERROR"
+							# Using $files instead of $REPLICA_DIR$files here so the list is ready for next run
 							echo "$files" >> "$FAILED_DELETE_LIST"
+						else
+							echo "$files" >> "$SUCCESS_DELETE_LIST"
 						fi
 					fi
 				fi
@@ -2712,6 +2731,8 @@ $SSH_CMD ERROR_ALERT=0 sync_on_changes=$sync_on_changes _DEBUG=$_DEBUG _DRYRUN=$
 						if [ $result != 0 ]; then
 							Logger "Cannot delete [$REPLICA_DIR$files]." "ERROR"
 							echo "$files" >> "$FAILED_DELETE_LIST"
+						else
+							echo "$files" >> "$SUCCESS_DELETE_LIST"
 						fi
 					fi
 				fi
@@ -2721,14 +2742,12 @@ $SSH_CMD ERROR_ALERT=0 sync_on_changes=$sync_on_changes _DEBUG=$_DEBUG _DRYRUN=$
 	done < "$FILE_LIST"
 ENDSSH
 
-	#sleep 5
 	if [ -f "$RUN_DIR/$PROGRAM.remote_deletion.$SCRIPT_PID" ]; then
 		Logger "Remote Deletion:\n$(cat $RUN_DIR/$PROGRAM.remote_deletion.$SCRIPT_PID)" "VERBOSE"
 	fi
 
 	## Copy back the deleted failed file list
-	escSourceFile="$(EscapeSpaces "${TARGET[$__replicaDir]}${TARGET[$__stateDir]}/${INITIATOR[$__failedDeletedListFile]}")"
-	rsyncCmd="$(type -p $RSYNC_EXECUTABLE) --rsync-path=\"$RSYNC_PATH\" -e \"$RSYNC_SSH_CMD\" $REMOTE_USER@$REMOTE_HOST:\"$escSourceFile\" \"${INITIATOR[$__replicaDir]}${INITIATOR[$__stateDir]}\" > \"$RUN_DIR/$PROGRAM.remote_failed_deletion_list_copy.$SCRIPT_PID\""
+	rsyncCmd="$(type -p $RSYNC_EXECUTABLE) --rsync-path=\"$RSYNC_PATH\" -e \"$RSYNC_SSH_CMD\" $REMOTE_USER@$REMOTE_HOST:\"{$failedDeleteList,$successDeleteList}\" \"${INITIATOR[$__replicaDir]}${INITIATOR[$__stateDir]}\" > \"$RUN_DIR/$PROGRAM.remote_failed_deletion_list_copy.$SCRIPT_PID\""
 	Logger "RSYNC_CMD: $rsyncCmd" "DEBUG"
 	eval "$rsyncCmd" 2>> "$LOG_FILE"
 	result=$?
@@ -2744,7 +2763,7 @@ ENDSSH
 
 # delete_Propagation(replica type)
 function deletionPropagation {
-	local replicaType="${1}" # Contains replica type: initiator, target
+	local replicaType="${1}" # Contains replica type: initiator, target where to delete
 	__CheckArguments 1 $# "${FUNCNAME[0]}" "$@"	#__WITH_PARANOIA_DEBUG
 
 	local replicaDir
@@ -2752,14 +2771,12 @@ function deletionPropagation {
 
 	Logger "Propagating deletions to $replicaType replica." "NOTICE"
 
-	#TODO: deletionPropagation replicaType = source replica whereas _deleteXxxxxx replicaType = dest replica
-
 	if [ "$replicaType" == "${INITIATOR[$__type]}" ]; then
 		if [ $(arrayContains "${INITIATOR[$__type]}" "${SKIP_DELETION[@]}") -eq 0 ]; then
 			replicaDir="${INITIATOR[$__replicaDir]}"
 			deleteDir="${INITIATOR[$__deleteDir]}"
 
-			_deleteLocal "${TARGET[$__type]}" "$replicaDir" "$deleteDir"
+			_deleteLocal "${INITIATOR[$__type]}" "$replicaDir" "$deleteDir"
 			retval=$?
 			if [ $retval != 0 ]; then
 				Logger "Deletion on $replicaType replica failed." "CRITICAL"
@@ -2774,9 +2791,9 @@ function deletionPropagation {
 			deleteDir="${TARGET[$__deleteDir]}"
 
 			if [ "$REMOTE_OPERATION" == "yes" ]; then
-				_deleteRemote "${INITIATOR[$__type]}" "$replicaDir" "$deleteDir"
+				_deleteRemote "${TARGET[$__type]}" "$replicaDir" "$deleteDir"
 			else
-				_deleteLocal "${INITIATOR[$__type]}" "$replicaDir" "$deleteDir"
+				_deleteLocal "${TARGET[$__type]}" "$replicaDir" "$deleteDir"
 			fi
 			retval=$?
 			if [ $retval == 0 ]; then
@@ -2960,6 +2977,7 @@ function Sync {
 
 	## Step 2
 	if [ "$resumeInitiator" == "${SYNC_ACTION[2]}" ] || [ "$resumeTarget" == "${SYNC_ACTION[2]}" ]; then
+		#TODO(high) only -X and -A (xattr & acl) should trigger this 
 		if [ "$RSYNC_ATTR_ARGS" != "" ]; then
 			syncAttrs "${INITIATOR[$__replicaDir]}" "$TARGET_SYNC_DIR"
 			WaitForTaskCompletion $! $SOFT_MAX_EXEC_TIME $HARD_MAX_EXEC_TIME ${FUNCNAME[0]} false $KEEP_LOGGING
@@ -3020,12 +3038,12 @@ function Sync {
 	## Step 4a & 4b
 	if [ "$resumeInitiator" == "${SYNC_ACTION[4]}" ] || [ "$resumeTarget" == "${SYNC_ACTION[4]}" ]; then
 		if [ "$resumeInitiator" == "${SYNC_ACTION[4]}" ]; then
-			deletionPropagation "${TARGET[$__type]}" &
+			deletionPropagation "${INITIATOR[$__type]}" &
 			initiatorPid="$!"
 		fi
 
 		if [ "$resumeTarget" == "${SYNC_ACTION[4]}" ]; then
-			deletionPropagation "${INITIATOR[$__type]}" &
+			deletionPropagation "${TARGET[$__type]}" &
 			targetPid="$!"
 		fi
 
@@ -3247,14 +3265,15 @@ function SoftDelete {
 }
 
 function _SummaryFromFile {
-	local summaryFile="${1}"
-	local direction="${2}"
+	local replicaPath="${1}"
+	local summaryFile="${2}"
+	local direction="${3}"
 
-	__CheckArguments 0 $# "${FUNCNAME[0]}" "$@"	#__WITH_PARANOIA_DEBUG
+	__CheckArguments 2 $# "${FUNCNAME[0]}" "$@"	#__WITH_PARANOIA_DEBUG
 
 	if [ -f "$summaryFile" ]; then
 		while read -r file; do
-			Logger "$direction $(echo $file | awk '{for (i=2; i<NF; i++) printf $i " "; print $NF}')" "ALWAYS"
+			Logger "$direction $replicaPath$(echo $file | awk '{for (i=2; i<NF; i++) printf $i " "; print $NF}')" "ALWAYS"
 		done < "$summaryFile"
 	fi
 }
@@ -3267,18 +3286,23 @@ function Summary {
 	prefix="$_LOGGER_PREFIX"
 	_LOGGER_PREFIX=""
 
-	Logger "File attribute updates: INITIATOR << >> TARGET" "ALWAYS"
+	Logger "Attrib updates: INITIATOR << >> TARGET" "ALWAYS"
 
-	_SummaryFromFile "$RUN_DIR/$PROGRAM.attr-update.target.$SCRIPT_PID" ">>"
-	_SummaryFromFile "$RUN_DIR/$PROGRAM.attr-update.initiator.$SCRIPT_PID" "<<"
+	_SummaryFromFile "${TARGET[$__replicaDir]}" "$RUN_DIR/$PROGRAM.attr-update.target.$SCRIPT_PID" "~ >>"
+	_SummaryFromFile "${INITIATOR[$__replicaDir]}" "$RUN_DIR/$PROGRAM.attr-update.initiator.$SCRIPT_PID" "~ <<"
 
 	Logger "File transfers: INITIATOR << >> TARGET" "ALWAYS"
-	_SummaryFromFile "$RUN_DIR/$PROGRAM.update.target.$SCRIPT_PID" ">>"
-	_SummaryFromFile "$RUN_DIR/$PROGRAM.update.initiator.$SCRIPT_PID" "<<"
+	_SummaryFromFile "${TARGET[$__replicaDir]}" "$RUN_DIR/$PROGRAM.update.target.$SCRIPT_PID" "+ >>"
+	_SummaryFromFile "${INITIATOR[$__replicaDir]}" "$RUN_DIR/$PROGRAM.update.initiator.$SCRIPT_PID" "+ <<"
 
+	#WIP: remote deletion summary does not work
 	Logger "File deletions: INITIATOR << >> TARGET" "ALWAYS"
-	_SummaryFromFile "$RUN_DIR/$PROGRAM.attr-update.target.$SCRIPT_PID" ">>"
-	_SummaryFromFile "$RUN_DIR/$PROGRAM.attr-update.initiator.$SCRIPT_PID" "<<"
+	if [ "$REMOTE_OPERATION" == "yes" ]; then
+		_SummaryFromFile "${TARGET[$__replicaDir]}" "${INITIATOR[$__replicaDir]}${INITIATOR[$__stateDir]}/target${TARGET[$__successDeletedListFile]}" "- >>"
+	else
+		_SummaryFromFile "${TARGET[$__replicaDir]}" "$RUN_DIR/$PROGRAM.delete.target.$SCRIPT_PID" "- >>"
+	fi
+	_SummaryFromFile "${INITIATOR[$__replicaDir]}" "$RUN_DIR/$PROGRAM.delete.initiator.$SCRIPT_PID" "- <<"
 
 	_LOGGER_PREFIX="$prefix"
 }
@@ -3387,6 +3411,7 @@ function Init {
 	readonly __treeAfterFileNoSuffix=12
 	readonly __deletedListFile=13
 	readonly __failedDeletedListFile=14
+	readonly __successDeletedListFile=15
 
 	INITIATOR=()
 	INITIATOR[$__type]='initiator'
@@ -3404,6 +3429,7 @@ function Init {
 	INITIATOR[$__treeAfterFileNoSuffix]="-tree-after-$INSTANCE_ID"
 	INITIATOR[$__deletedListFile]="-deleted-list-$INSTANCE_ID$drySuffix"
 	INITIATOR[$__failedDeletedListFile]="-failed-delete-$INSTANCE_ID$drySuffix"
+	INITIATOR[$__successDeletedListFile]="-success-delete-$INSTANCE_ID$drySuffix"
 
 	TARGET=()
 	TARGET[$__type]='target'
@@ -3412,6 +3438,16 @@ function Init {
 	TARGET[$__stateDir]="$OSYNC_DIR/$stateDir"
 	TARGET[$__backupDir]="$OSYNC_DIR/$backupDir"
 	TARGET[$__deleteDir]="$OSYNC_DIR/$deleteDir"
+	TARGET[$__partialDir]="$OSYNC_DIR/$partialDir"											# unused
+	TARGET[$__initiatorLastActionFile]="$TARGET_SYNC_DIR$OSYNC_DIR/$stateDir/initiator-$lastAction-$INSTANCE_ID$drySuffix"		# unused
+	TARGET[$__targetLastActionFile]="$TARGET_SYNC_DIR$OSYNC_DIR/$stateDir/target-$lastAction-$INSTANCE_ID$drySuffix"		# unused
+	TARGET[$__resumeCount]="$TARGET_SYNC_DIR$OSYNC_DIR/$stateDir/$resumeCount-$INSTANCE_ID$drySuffix"				# unused
+	TARGET[$__treeCurrentFile]="-tree-current-$INSTANCE_ID$drySuffix"								# unused
+	TARGET[$__treeAfterFile]="-tree-after-$INSTANCE_ID$drySuffix"									# unused
+	TARGET[$__treeAfterFileNoSuffix]="-tree-after-$INSTANCE_ID"									# unused
+	TARGET[$__deletedListFile]="-deleted-list-$INSTANCE_ID$drySuffix"								# unused
+	TARGET[$__failedDeletedListFile]="-failed-delete-$INSTANCE_ID$drySuffix"
+	TARGET[$__successDeletedListFile]="-success-delete-$INSTANCE_ID$drySuffix"
 
 	PARTIAL_DIR="${INITIATOR[$__partialDir]}"
 
@@ -3634,7 +3670,6 @@ for i in "$@"; do
 		opts=$opts" --instance-id=\"$INSTANCE_ID\""
 		;;
 		--skip-deletion=*)
-		#SKIP_DELETION=${i##*=}
 		opts=$opts" --skip-deletion=\"${i##*=}\""
 		IFS=',' read -r -a SKIP_DELETION <<< ${i##*=}
 		;;
@@ -3743,7 +3778,7 @@ fi
 CheckCurrentConfigAll
 DATE=$(date)
 Logger "-------------------------------------------------------------" "NOTICE"
-Logger "$DRY_WARNING $DATE - $PROGRAM $PROGRAM_VERSION script begin." "ALWAYS"
+Logger "$DRY_WARNING$DATE - $PROGRAM $PROGRAM_VERSION script begin." "ALWAYS"
 Logger "-------------------------------------------------------------" "NOTICE"
 Logger "Sync task [$INSTANCE_ID] launched as $LOCAL_USER@$LOCAL_HOST (PID $SCRIPT_PID)" "NOTICE"
 if [ $sync_on_changes == true ]; then
