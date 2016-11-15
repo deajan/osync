@@ -1,4 +1,4 @@
-## FUNC_BUILD=2016071902-d
+## FUNC_BUILD=2016071902-e
 ## BEGIN Generic functions for osync & obackup written in 2013-2016 by Orsiris de Jong - http://www.netpower.fr - ozy@netpower.fr
 
 ## type -p does not work on platforms other than linux (bash). If if does not work, always assume output is not a zero exitcode
@@ -114,14 +114,20 @@ function Logger {
 	if [ "$level" == "CRITICAL" ]; then
 		_Logger "$prefix\e[41m$value\e[0m" "$prefix$level:$value" "$level:$value"
 		ERROR_ALERT=1
+		# ERROR_ALERT / WARN_ALERT isn't set in main when Logger is called from a su$
+		echo "1" > "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.error.$SCRIPT_PID"
 		return
 	elif [ "$level" == "ERROR" ]; then
 		_Logger "$prefix\e[91m$value\e[0m" "$prefix$level:$value" "$level:$value"
 		ERROR_ALERT=1
+		# ERROR_ALERT / WARN_ALERT isn't set in main when Logger is called from a su$
+		echo "1" > "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.error.$SCRIPT_PID"
 		return
 	elif [ "$level" == "WARN" ]; then
 		_Logger "$prefix\e[93m$value\e[0m" "$prefix$level:$value" "$level:$value"
 		WARN_ALERT=1
+		# ERROR_ALERT / WARN_ALERT isn't set in main when Logger is called from a su$
+		echo "1" > "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.warn.$SCRIPT_PID"
 		return
 	elif [ "$level" == "NOTICE" ]; then
 		_Logger "$prefix$value"
