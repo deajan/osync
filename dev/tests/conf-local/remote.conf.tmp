@@ -7,7 +7,7 @@
 ## ---------- GENERAL OPTIONS
 
 ## Sync job identification
-INSTANCE_ID="remote"
+INSTANCE_ID="local"
 
 ## Directories to synchronize.
 ## Initiator is the system osync runs on. The initiator directory must be a local path.
@@ -15,7 +15,7 @@ INITIATOR_SYNC_DIR="${HOME}/osync-tests/initiator"
 
 ## Target is the system osync synchronizes to (can be the same system as the initiator in case of local sync tasks). The target directory can be a local or remote path.
 #TARGET_SYNC_DIR="${HOME}/osync-tests/target"
-TARGET_SYNC_DIR="ssh://travis@localhost:22/${HOME}/osync-tests/target"
+TARGET_SYNC_DIR="ssh://root@localhost:49999/${HOME}/osync-tests/target"
 
 ## If the target system is remote, you can specify a RSA key (please use full path). If not defined, the default ~/.ssh/id_rsa will be used. See documentation for further information.
 SSH_RSA_PRIVATE_KEY="${HOME}/.ssh/id_rsa_local"
@@ -75,7 +75,7 @@ REMOTE_HOST_PING=no
 ## Check for internet access by pinging one or more 3rd party hosts before remote sync task. Leave empty if you don't want this check to be be performed. Failing to ping will stop sync.
 ## If you use this function, you should set more than one 3rd party host, and be sure you can ping them.
 ## Be aware some DNS like opendns redirect false hostnames. Also, this adds an extra execution time of a bit less than a minute.
-REMOTE_3RD_PARTY_HOSTS=""
+REMOTE_3RD_PARTY_HOSTS="www.kernel.org www.google.com"
 
 ## ---------- MISC OPTIONS
 
@@ -87,9 +87,9 @@ PRESERVE_GROUP=yes
 PRESERVE_EXECUTABILITY=yes
 
 ## Preserve ACLS. Make sure source and target FS can manage same ACLs or you'll get loads of errors.
-PRESERVE_ACL=yes
+PRESERVE_ACL=no
 ## Preserve Xattr. Make sure source and target FS can manage same Xattrs or you'll get loads of errors.
-PRESERVE_XATTR=yes
+PRESERVE_XATTR=no
 ## Transforms symlinks into referent files/dirs
 COPY_SYMLINKS=no
 ## Treat symlinked dirs	as dirs. CAUTION: This also follows symlinks outside of the replica root.
@@ -122,7 +122,7 @@ MAX_WAIT=7200
 ## Enabling this option will keep a backup of a file on the target replica if it gets updated from the source replica. Backups will be made to .osync_workdir/backups
 CONFLICT_BACKUP=yes
 ## Keep multiple backup versions of the same file. Warning, This can be very space consuming.
-CONFLICT_BACKUP_MULTIPLE=no
+CONFLICT_BACKUP_MULTIPLE=yes
 ## Osync will clean backup files after a given number of days. Setting this to 0 will disable cleaning and keep backups forever. Warning: This can be very space consuming.
 CONFLICT_BACKUP_DAYS=30
 ## If the same file exists on both replicas, newer version will be synced. However, if both files have the same timestamp but differ, CONFILCT_PREVALANCE sets winner replica.
