@@ -6,4 +6,5 @@ os:
     osx
 
 script:
-    dev/tests/run_tests.sh
+    TRAVIS_RUN=true dev/tests/run_tests.sh
+
