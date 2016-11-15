@@ -1,6 +1,6 @@
 #### MINIMAL-FUNCTION-SET BEGIN ####
 
-## FUNC_BUILD=2016111501
+## FUNC_BUILD=2016111502
 ## BEGIN Generic bash functions written in 2013-2016 by Orsiris de Jong - http://www.netpower.fr - ozy@netpower.fr
 
 ## To use in a program, define the following variables:
@@ -1434,7 +1434,7 @@ function PreInit {
 	RSYNC_ARGS="-rltD"
 	if [ "$_DRYRUN" == true ]; then
 		RSYNC_DRY_ARG="-n"
-		DRY_WARNING="/!\ DRY RUN"
+		DRY_WARNING="/!\ DRY RUN "
 	else
 		RSYNC_DRY_ARG=""
 	fi
