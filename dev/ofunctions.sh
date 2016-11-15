@@ -1,4 +1,4 @@
-## FUNC_BUILD=2016071902-e
+## FUNC_BUILD=2016071902-f
 ## BEGIN Generic functions for osync & obackup written in 2013-2016 by Orsiris de Jong - http://www.netpower.fr - ozy@netpower.fr
 
 ## type -p does not work on platforms other than linux (bash). If if does not work, always assume output is not a zero exitcode
@@ -1060,7 +1060,7 @@ function RsyncPatterns {
                 if [ "$RSYNC_INCLUDE_FROM" != "" ]; then
                         RsyncPatternsFromAdd "include" "$RSYNC_INCLUDE_FROM"
                 fi
-        elif [ "$RSYNC_PATTERN_FIRST" == "include" ]; then
+        elif [ "$RSYNC_PATTERN_FIRST" == "include" ] || [ "$_QUICK_SYNC" == "2" ]; then
                 RsyncPatternsAdd "include" "$RSYNC_INCLUDE_PATTERN"
                 if [ "$RSYNC_INCLUDE_FROM" != "" ]; then
                         RsyncPatternsFromAdd "include" "$RSYNC_INCLUDE_FROM"
