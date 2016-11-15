@@ -1,6 +1,6 @@
 #### MINIMAL-FUNCTION-SET BEGIN ####
 
-## FUNC_BUILD=2016111404
+## FUNC_BUILD=2016111501
 ## BEGIN Generic bash functions written in 2013-2016 by Orsiris de Jong - http://www.netpower.fr - ozy@netpower.fr
 
 ## To use in a program, define the following variables:
@@ -52,7 +52,9 @@ if [ ! "$_DEBUG" == "yes" ]; then
 	SLEEP_TIME=.05 # Tested under linux and FreeBSD bash, #TODO tests on cygwin / msys
 	_VERBOSE=false
 else
-	SLEEP_TIME=1
+	if [ "$SLEEP_TIME" == "" ]; then
+		SLEEP_TIME=1
+	fi
 	trap 'TrapError ${LINENO} $?' ERR
 	_VERBOSE=true
 fi
@@ -1024,7 +1026,7 @@ ENDSSH
 	fi
 }
 
-function OldGetRemoteOS {
+function oldGetRemoteOS {
 	__CheckArguments 0 $# ${FUNCNAME[0]} "$@"	#__WITH_PARANOIA_DEBUG
 
 	local retval
