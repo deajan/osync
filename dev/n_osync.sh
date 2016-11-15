@@ -4,7 +4,7 @@ PROGRAM="osync" # Rsync based two way sync engine with fault tolerance
 AUTHOR="(C) 2013-2016 by Orsiris de Jong"
 CONTACT="http://www.netpower.fr/osync - ozy@netpower.fr"
 PROGRAM_VERSION=1.2-beta2
-PROGRAM_BUILD=2016111507
+PROGRAM_BUILD=2016111508
 IS_STABLE=no
 
 # Execution order						#__WITH_PARANOIA_DEBUG
@@ -2207,6 +2207,10 @@ opts="${opts# *}"
 
 		if [ "$PRESERVE_XATTR" == "" ]; then
 			PRESERVE_XATTR="yes"
+		fi
+
+		if [ "$PATH_SEPARATOR_CHAR" == "" ]; then
+			PATH_SEPARATOR_CHAR=";"
 		fi
 
 		MIN_WAIT=30
