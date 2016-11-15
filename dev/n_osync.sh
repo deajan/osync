@@ -7,8 +7,6 @@ PROGRAM_VERSION=1.2-beta2
 PROGRAM_BUILD=2016111502
 IS_STABLE=no
 
-#TODO: remove local unused vars (multiplier etc)
-
 # Execution order						#__WITH_PARANOIA_DEBUG
 #	Function Name				Is parallel	#__WITH_PARANOIA_DEBUG
 
@@ -271,10 +269,6 @@ function _CheckDiskSpaceLocal {
 	__CheckArguments 1 $# "${FUNCNAME[0]}" "$@"	#__WITH_PARANOIA_DEBUG
 
 	local diskSpace
-	local notation
-	local suffix
-	local suffixPresent
-	local multiplier=0
 
 	Logger "Checking minimum disk space in [$replica_path]." "NOTICE"
 
