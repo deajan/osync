@@ -4,10 +4,9 @@ PROGRAM="osync" # Rsync based two way sync engine with fault tolerance
 AUTHOR="(C) 2013-2016 by Orsiris de Jong"
 CONTACT="http://www.netpower.fr/osync - ozy@netpower.fr"
 PROGRAM_VERSION=1.2-beta2
-PROGRAM_BUILD=2016111501
+PROGRAM_BUILD=2016111502
 IS_STABLE=no
 
-#TODO: space after dry warning message to remove
 #TODO: remove local unused vars (multiplier etc)
 
 # Execution order						#__WITH_PARANOIA_DEBUG
@@ -2230,7 +2229,7 @@ fi
 CheckCurrentConfigAll
 DATE=$(date)
 Logger "-------------------------------------------------------------" "NOTICE"
-Logger "$DRY_WARNING $DATE - $PROGRAM $PROGRAM_VERSION script begin." "ALWAYS"
+Logger "$DRY_WARNING$DATE - $PROGRAM $PROGRAM_VERSION script begin." "ALWAYS"
 Logger "-------------------------------------------------------------" "NOTICE"
 Logger "Sync task [$INSTANCE_ID] launched as $LOCAL_USER@$LOCAL_HOST (PID $SCRIPT_PID)" "NOTICE"
 if [ $sync_on_changes == true ]; then
