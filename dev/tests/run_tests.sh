@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-# osync test suite 2016111305
+# osync test suite 2016111501
 
 # 4 tests:
 # quicklocal
@@ -18,10 +18,13 @@
 # lock checks
 # file attribute tests
 
-#TODO: conflict resolution missing
 #TODO: lock checks missing
 #TODO: skip deletion tests
 #TODO: daemon mode tests
+#TODO: failed delete repropagation
+#TODO: check file contents on attribute updates
+
+#TODO: enable teardown after tests
 
 LARGE_FILESET_URL="http://ftp.drupal.org/files/projects/drupal-8.1.9.tar.gz"
 
@@ -67,6 +70,33 @@ osyncParameters[confLocal]="$CONF_DIR/$LOCAL_CONF"
 osyncParameters[confRemote]="$CONF_DIR/$REMOTE_CONF"
 #osyncParameters[daemonlocal]="$CONF_DIR/$LOCAL_CONF --on-changes"
 #osyncParameters[daemonlocal]="$CONF_DIR/$REMOTE_CONF --on-changes"
+
+function GetConfFileValue () {
+	local file="${1}"
+	local name="${2}"
+	local value
+
+	value=$(grep "^$name=" "$file")
+	if [ $? == 0 ]; then
+		value="${value##*=}"
+		echo "$value"
+	else
+		assertEquals "$name does not exist in [$file." "1" "0"
+	fi
+}
+
+function SetConfFileValue () {
+	local file="${1}"
+	local name="${2}"
+	local value="${3}"
+
+	if grep "^$name=" "$file" > /dev/null; then
+		sed -i.tmp "s/^$name=.*/$name=$value/" "$file"
+		assertEquals "Set $name to [$value]." "0" $?
+	else
+		assertEquals "$name does not exist in [$file]." "1" "0"
+	fi
+}
 
 function SetStableToYes () {
 	if grep "^IS_STABLE=YES" "$OSYNC_DIR/$OSYNC_EXECUTABLE" > /dev/null; then
@@ -238,6 +268,7 @@ function test_Deletetion () {
 		assertEquals "File [$TARGET_DIR/$OSYNC_DELETE_DIR/$(basename $iFile1)] has been soft deleted on target" "0" $?
 		[ -f "$iFile1" ]
 		assertEquals "File [$iFile1] is still in initiator" "1" $?
+		#TODO: WTF ?
 		[ -f "${iFile1/$INITIATOR_DIR/TARGET_DIR}" ]
 		assertEquals "File [${iFile1/$INITIATOR_DIR/TARGET_DIR}] is still in target" "1" $?
 
@@ -245,6 +276,7 @@ function test_Deletetion () {
 		assertEquals "File [$INITIATOR_DIR/$OSYNC_DELETE_DIR/$(basename $tFile1)] has been soft deleted on initiator" "0" $?
 		[ -f "$tFile1" ]
 		assertEquals "File [$tFile1] is still in target" "1" $?
+		#TODO: WTF ?
 		[ -f "${tFile1/$TARGET_DIR/INITIATOR_DIR}" ]
 		assertEquals "File [${tFile1/$TARGET_DIR/INITIATOR_DIR}] is still in initiator" "1" $?
 	done
@@ -307,7 +339,6 @@ function test_softdeletion_cleanup () {
 
 function test_FileAttributePropagation () {
 
-
 	if [ "$TRAVIS_RUN" == true ]; then
 		echo "Skipping FileAttributePropagation tests as travis does not support getfacl / setfacl"
 		return 0
@@ -317,8 +348,14 @@ function test_FileAttributePropagation () {
 		cd "$OSYNC_DIR"
 		PrepareLocalDirs
 
-		FileA="FileA"
-		FileB="FileB"
+		DirA="dir a"
+		DirB="dir b"
+
+		mkdir "$INITIATOR_DIR/$DirA"
+		mkdir "$TARGET_DIR/$DirB"
+
+		FileA="$DirA/FileA"
+		FileB="$DirB/FileB"
 
 		touch "$INITIATOR_DIR/$FileA"
 		touch "$TARGET_DIR/$FileB"
@@ -354,6 +391,105 @@ function test_FileAttributePropagation () {
 		getfacl -p "$INITIATOR_DIR/$FileB"
 	done
 }
+
+function test_ConflictBackups () {
+	for i in "${osyncParameters[@]}"; do
+		cd "$OSYNC_DIR"
+		PrepareLocalDirs
+
+		DirA="some dir"
+		DirB="some other dir"
+
+		mkdir -p "$INITIATOR_DIR/$DirA"
+		mkdir -p "$TARGET_DIR/$DirB"
+
+		FileA="$DirA/FileA"
+		FileB="$DirB/File B"
+
+		echo "$FileA" > "$INITIATOR_DIR/$FileA"
+		echo "$FileB" > "$TARGET_DIR/$FileB"
+
+		# First run
+		REMOTE_HOST_PING=no ./$OSYNC_EXECUTABLE $i
+		assertEquals "First deletion run with parameters [$i]." "0" $?
+
+		echo "$FileA+" > "$TARGET_DIR/$FileA"
+		echo "$FileB+" > "$INITIATOR_DIR/$FileB"
+
+		# Second run
+		REMOTE_HOST_PING=no ./$OSYNC_EXECUTABLE $i
+		assertEquals "First deletion run with parameters [$i]." "0" $?
+
+		[ -f "$INITIATOR_DIR/$OSYNC_BACKUP_DIR/$FileA" ]
+		assertEquals "Backup file is present in [$INITIATOR_DIR/$OSYNC_BACKUP_DIR/$FileA]." "0" $?
+
+		[ -f "$TARGET_DIR/$OSYNC_BACKUP_DIR/$FileB" ]
+		assertEquals "Backup file is present in [$TARGET_DIR/$OSYNC_BACKUP_DIR/$FileB]." "0" $?
+	done
+}
+
+function test_MultipleConflictBackups () {
+	local conflictBackupMultipleLocal
+	local conflictBackupMultipleRemote
+
+	# modify config files
+	conflictBackupMultipleLocal=$(GetConfFileValue "$CONF_DIR/$LOCAL_CONF" "CONFLICT_BACKUP_MULTIPLE")
+	conflictBackupMultipleRemote=$(GetConfFileValue "$CONF_DIR/$REMOTE_CONF" "CONFLICT_BACKUP_MULTIPLE")
+
+	SetConfFileValue "$CONF_DIR/$LOCAL_CONF" "CONFLICT_BACKUP_MULTIPLE" "yes"
+	SetConfFileValue "$CONF_DIR/$REMOTE_CONF" "CONFLICT_BACKUP_MULTIPLE" "yes"
+
+	for i in "${osyncParameters[@]}"; do
+
+
+
+		cd "$OSYNC_DIR"
+		PrepareLocalDirs
+
+		FileA="FileA"
+		FileB="FileB"
+
+		echo "$FileA" > "$INITIATOR_DIR/$FileA"
+		echo "$FileB" > "$TARGET_DIR/$FileB"
+
+		# First run
+		CONFLICT_BACKUP_MULTIPLE=yes REMOTE_HOST_PING=no ./$OSYNC_EXECUTABLE $i --errors-only --summary --no-prefix
+		assertEquals "First deletion run with parameters [$i]." "0" $?
+
+		echo "$FileA+" > "$TARGET_DIR/$FileA"
+		echo "$FileB+" > "$INITIATOR_DIR/$FileB"
+
+		# Second run
+		CONFLICT_BACKUP_MULTIPLE=yes REMOTE_HOST_PING=no ./$OSYNC_EXECUTABLE $i --errors-only --summary --no-prefix
+		assertEquals "First deletion run with parameters [$i]." "0" $?
+
+		echo "$FileA-" > "$TARGET_DIR/$FileA"
+		echo "$FileB-" > "$INITIATOR_DIR/$FileB"
+
+		# Third run
+		CONFLICT_BACKUP_MULTIPLE=yes REMOTE_HOST_PING=no ./$OSYNC_EXECUTABLE $i --errors-only --summary --no-prefix
+		assertEquals "First deletion run with parameters [$i]." "0" $?
+
+		echo "$FileA*" > "$TARGET_DIR/$FileA"
+		echo "$FileB*" > "$INITIATOR_DIR/$FileB"
+
+		# Fouth run
+		CONFLICT_BACKUP_MULTIPLE=yes REMOTE_HOST_PING=no ./$OSYNC_EXECUTABLE $i --errors-only --summary --no-prefix
+		assertEquals "First deletion run with parameters [$i]." "0" $?
+
+		# This test may fail only on 31th December at 23:59 :)
+		[ $(find "$INITIATOR_DIR/$OSYNC_BACKUP_DIR/" -type f -name "FileA.$(date '+%Y')*" | wc -l) -eq 3 ]
+		assertEquals "3 Backup files are present in [$INITIATOR_DIR/$OSYNC_BACKUP_DIR/]." "0" $?
+
+		[ $(find "$TARGET_DIR/$OSYNC_BACKUP_DIR/" -type f -name "FileB.$(date '+%Y')*" | wc -l) -eq 3 ]
+		assertEquals "3 Backup files are present in [$TARGET_DIR/$OSYNC_BACKUP_DIR/]." "0" $?
+	done
+
+	SetConfFileValue "$CONF_DIR/$LOCAL_CONF" "CONFLICT_BACKUP_MULTIPLE" "$conflictBackupMultipleLocal"
+	SetConfFileValue "$CONF_DIR/$REMOTE_CONF" "CONFLICT_BACKUP_MULTIPLE" "$conflictBackupMultipleRemote"
+
+}
+
 
 function test_WaitForTaskCompletion () {
 	local pids
