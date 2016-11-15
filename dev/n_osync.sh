@@ -4,7 +4,7 @@ PROGRAM="osync" # Rsync based two way sync engine with fault tolerance
 AUTHOR="(C) 2013-2016 by Orsiris de Jong"
 CONTACT="http://www.netpower.fr/osync - ozy@netpower.fr"
 PROGRAM_VERSION=1.1.5
-PROGRAM_BUILD=2016111502
+PROGRAM_BUILD=2016111503
 IS_STABLE=yes
 
 source "./ofunctions.sh"
@@ -1725,6 +1725,10 @@ opts="${opts# *}"
 
 		if [ "$HARD_MAX_EXEC_TIME" == "" ]; then
 			HARD_MAX_EXEC_TIME=0
+		fi
+
+		if [ "$PATH_SEPARATOR_CHAR" == "" ]; then
+			PATH_SEPARATOR_CHAR=";"
 		fi
 
 		MIN_WAIT=30
