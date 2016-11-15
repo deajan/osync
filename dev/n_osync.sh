@@ -4,7 +4,7 @@ PROGRAM="osync" # Rsync based two way sync engine with fault tolerance
 AUTHOR="(C) 2013-2016 by Orsiris de Jong"
 CONTACT="http://www.netpower.fr/osync - ozy@netpower.fr"
 PROGRAM_VERSION=1.2-beta2
-PROGRAM_BUILD=2016111503
+PROGRAM_BUILD=2016111504
 IS_STABLE=no
 
 # Execution order						#__WITH_PARANOIA_DEBUG
@@ -1911,8 +1911,8 @@ function Init {
 
 	## Conflict options
 	if [ "$CONFLICT_BACKUP" != "no" ]; then
-		INITIATOR_BACKUP="--backup --backup-dir=\"${INITIATOR[$__replicaDir]}${INITIATOR[$__backupDir]}\""
-		TARGET_BACKUP="--backup --backup-dir=\"${TARGET[$__replicaDir]}${TARGET[$__backupDir]}\""
+		INITIATOR_BACKUP="--backup --backup-dir=\"${INITIATOR[$__backupDir]}\""
+		TARGET_BACKUP="--backup --backup-dir=\"${TARGET[$__backupDir]}\""
 		if [ "$CONFLICT_BACKUP_MULTIPLE" == "yes" ]; then
 			INITIATOR_BACKUP="$INITIATOR_BACKUP --suffix .$(date +%Y.%m.%d-%H.%M.%S)"
 			TARGET_BACKUP="$TARGET_BACKUP --suffix .$(date +%Y.%m.%d-%H.%M.%S)"
