@@ -14,14 +14,13 @@
 # exclusions
 # conflict resolution initiator with backups / multiple backups
 # conflict resolution target with backups / multiple backups
-# deletion propagation
+# deletion propagation, failed deletion repropagation
 # lock checks
 # file attribute tests
 
 #TODO: lock checks missing
 #TODO: skip deletion tests
 #TODO: daemon mode tests
-#TODO: failed delete repropagation
 #TODO: check file contents on attribute updates
 
 #TODO: enable teardown after tests
@@ -54,8 +53,9 @@ else
 	SSH_PORT=49999
 fi
 
-INITIATOR_DIR="${HOME}/osync-tests/initiator"
-TARGET_DIR="${HOME}/osync-tests/target"
+OSYNC_TESTS_DIR="${HOME}/osync-tests"
+INITIATOR_DIR="$OSYNC_TESTS_DIR/initiator"
+TARGET_DIR="$OSYNC_TESTS_DIR/target"
 OSYNC_WORKDIR=".osync_workdir"
 OSYNC_STATE_DIR="$OSYNC_WORKDIR/state"
 OSYNC_DELETE_DIR="$OSYNC_WORKDIR/deleted"
@@ -166,7 +166,7 @@ function PrepareLocalDirs () {
 	mkdir -p "$INITIATOR_DIR"
 
 	if [ -d "$TARGET_DIR" ]; then
-		rm -rf "$TARGET_DIR"
+ 		rm -rf "$TARGET_DIR"
 	fi
 	mkdir -p "$TARGET_DIR"
 }
@@ -178,6 +178,7 @@ function oneTimeSetUp () {
 
 function oneTimeTearDown () {
 	SetStableToOrigin
+	#rm -rf "$OSYNC_TESTS_DIR"
 }
 
 function setUp () {
@@ -185,6 +186,7 @@ function setUp () {
         rm -rf "$TARGET_DIR"
 }
 
+# This test has to be done everytime in order for osync executable to be fresh
 function test_Merge () {
 	cd "$DEV_DIR"
 	./merge.sh
@@ -282,6 +284,68 @@ function test_Deletetion () {
 	done
 }
 
+function test_deletion_failure () {
+	for i in "${osyncParameters[@]}"; do
+		cd "$OSYNC_DIR"
+
+		PrepareLocalDirs
+
+		DirA="some directory with spaces"
+		DirB="another directoy/and sub directory"
+
+		mkdir -p "$INITIATOR_DIR/$DirA"
+		mkdir -p "$TARGET_DIR/$DirB"
+
+		FileA="$DirA/File A"
+		FileB="$DirB/File B"
+
+		touch "$INITIATOR_DIR/$FileA"
+		touch "$TARGET_DIR/$FileB"
+
+		REMOTE_HOST_PING=no ./$OSYNC_EXECUTABLE $i
+		assertEquals "First deletion run with parameters [$i]." "0" $?
+
+		rm -f "$INITIATOR_DIR/$FileA"
+		rm -f "$TARGET_DIR/$FileB"
+
+		# Prevent files from being deleted
+		chattr +i "$TARGET_DIR/$FileA"
+		chattr +i "$INITIATOR_DIR/$FileB"
+
+		# This shuold fail with exitcode 1
+		REMOTE_HOST_PING=no ./$OSYNC_EXECUTABLE $i
+		assertEquals "Second deletion run with parameters [$i]." "1" $?
+
+		[ -f "$TARGET_DIR/$FileA" ]
+		assertEquals "File [$TARGET_DIR/$FileA] is still present in deletion dir." "0" $?
+		[ ! -f "$TARGET_DIR/$OSYNC_DELETE_DIR/$FileA" ]
+		assertEquals "File [$TARGET_DIR/$OSYNC_DELETE_DIR/$FileA] is not present in deletion dir." "0" $?
+
+		[ -f "$INITIATOR_DIR/$FileB" ]
+		assertEquals "File [$INITIATOR_DIR/$FileB] is still present in deletion dir." "0" $?
+		[ ! -f "$INITIATOR_DIR/$OSYNC_DELETE_DIR/$FileB" ]
+		assertEquals "File [$INITIATOR_DIR/$OSYNC_DELETE_DIR/$FileB] is not present in deletion dir." "0" $?
+
+		# Allow files from being deleted
+		chattr -i "$TARGET_DIR/$FileA"
+		chattr -i "$INITIATOR_DIR/$FileB"
+
+		REMOTE_HOST_PING=no ./$OSYNC_EXECUTABLE $i
+		assertEquals "Third deletion run with parameters [$i]." "0" $?
+
+		[ ! -f "$TARGET_DIR/$FileA" ]
+		assertEquals "File [$TARGET_DIR/$FileA] is still present in deletion dir." "0" $?
+		[ -f "$TARGET_DIR/$OSYNC_DELETE_DIR/$FileA" ]
+		assertEquals "File [$TARGET_DIR/$OSYNC_DELETE_DIR/$FileA] is not present in deletion dir." "0" $?
+
+		[ ! -f "$INITIATOR_DIR/$FileB" ]
+		assertEquals "File [$INITIATOR_DIR/$FileB] is still present in deletion dir." "0" $?
+		[ -f "$INITIATOR_DIR/$OSYNC_DELETE_DIR/$FileB" ]
+		assertEquals "File [$INITIATOR_DIR/$OSYNC_DELETE_DIR/$FileB] is not present in deletion dir." "0" $?
+	done
+}
+
+
 function test_softdeletion_cleanup () {
 	declare -A files
 
@@ -303,7 +367,7 @@ function test_softdeletion_cleanup () {
 
 		# Create some deleted & backed up files, some new and some old
 		for file in "${files[@]}"; do
-			# Create directories first if they don't exist (deletion dir is created by osync, backup dir is created by rsync only when needed)
+			# Create directories first if they do not exist (deletion dir is created by osync, backup dir is created by rsync only when needed)
 			if [ ! -d "$(dirname $file)" ]; then
 				mkdir --parents "$(dirname $file)"
 			fi
