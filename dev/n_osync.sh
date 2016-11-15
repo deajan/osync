@@ -4,7 +4,7 @@ PROGRAM="osync" # Rsync based two way sync engine with fault tolerance
 AUTHOR="(C) 2013-2016 by Orsiris de Jong"
 CONTACT="http://www.netpower.fr/osync - ozy@netpower.fr"
 PROGRAM_VERSION=1.1.5
-PROGRAM_BUILD=2016111501
+PROGRAM_BUILD=2016111502
 IS_STABLE=yes
 
 source "./ofunctions.sh"
@@ -29,6 +29,14 @@ function TrapStop {
 
 function TrapQuit {
 	local exitcode=
+
+	# Get ERROR / WARN alert flags from subprocesses that call Logger
+	if [ -f "$RUN_DIR/$PROGRAM.Logger.warn.$SCRIPT_PID" ]; then
+		WARN_ALERT=1
+	fi
+	if [ -f "$RUN_DIR/$PROGRAM.Logger.error.$SCRIPT_PID" ]; then
+		ERROR_ALERT=1
+	fi
 
 	if [ $ERROR_ALERT -ne 0 ]; then
 		UnlockReplicas
