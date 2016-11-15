@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-# osync test suite 2016111504
+# osync test suite 2016111505
 
 # 4 tests:
 # quicklocal
@@ -577,6 +577,11 @@ function test_MultipleConflictBackups () {
 
 
 function test_WaitForTaskCompletion () {
+	if [ "$OSYNC_MIN_VERSION" != "1" ]; then
+		echo "Skipping WaitForTaskCompletion test because osync v1.1 does not support multiple pid monitoring"
+		return 0
+	fi
+
 	local pids
 
 	# Tests if wait for task completion works correctly
@@ -627,7 +632,14 @@ function test_WaitForTaskCompletion () {
 }
 
 function test_ParallelExec () {
+	if [ "$OSYNC_MIN_VERSION" != "1" ]; then
+		echo "Skipping ParallelExec test because osync v1.1 didn't have this"
+		return 0
+	fi
+
 	local cmd
+
+
 
 	# Test if parallelExec works correctly in array mode
 
@@ -669,6 +681,10 @@ function test_ParallelExec () {
 }
 
 function test_UpgradeConfRun () {
+	if [ "$OSYNC_MIN_VERSION" != "1" ]; then
+		echo "Skipping Upgrade script test because no further dev will happen on this for v1.1"
+		return 0
+	fi
 
         # Basic return code tests. Need to go deep into file presence testing
         cd "$OSYNC_DIR"
