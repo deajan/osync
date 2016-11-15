@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-# osync test suite 2016111501
+# osync test suite 2016111502
 
 # 4 tests:
 # quicklocal
@@ -285,6 +285,12 @@ function test_Deletetion () {
 }
 
 function test_deletion_failure () {
+
+	if [ "$TRAVIS_RUN" == true ]; then
+		echo "Skipping deletionFailure tests as travis does not support chattr."
+		return 0
+	fi
+
 	for i in "${osyncParameters[@]}"; do
 		cd "$OSYNC_DIR"
 
@@ -345,6 +351,9 @@ function test_deletion_failure () {
 	done
 }
 
+function test_skip_deletion () {
+	echo "Not implemented yet"
+}
 
 function test_softdeletion_cleanup () {
 	declare -A files
@@ -404,7 +413,7 @@ function test_softdeletion_cleanup () {
 function test_FileAttributePropagation () {
 
 	if [ "$TRAVIS_RUN" == true ]; then
-		echo "Skipping FileAttributePropagation tests as travis does not support getfacl / setfacl"
+		echo "Skipping FileAttributePropagation tests as travis does not support getfacl / setfacl."
 		return 0
 	fi
 
