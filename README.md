@@ -1,5 +1,4 @@
-osync
-=====
+# osync  [![Build Status](https://travis-ci.org/deajan/osync.svg?branch=v1.1-maint)](https://travis-ci.org/deajan/osync) [![GitHub Release](https://img.shields.io/github/release/deajan/osync.svg?label=Latest)](https://github.com/deajan/osync/releases/latest)
 
 A two way filesync script with fault tolerance, resume, soft deletion, conflictual file backups running on bash (linux, BSD and virtually any system supporting bash).
 File synchronization is bidirectional, based on rsync, can be run manually, as scheduled task, or triggered on file changes.
