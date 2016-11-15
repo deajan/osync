@@ -1,6 +1,6 @@
 #### MINIMAL-FUNCTION-SET BEGIN ####
 
-## FUNC_BUILD=2016111502
+## FUNC_BUILD=2016111503
 ## BEGIN Generic bash functions written in 2013-2016 by Orsiris de Jong - http://www.netpower.fr - ozy@netpower.fr
 
 ## To use in a program, define the following variables:
@@ -1022,85 +1022,7 @@ ENDSSH
 		esac
 		Logger "Remote OS: [$remoteOsVar]." "DEBUG"
 	else
-		Logge "Cannot get Remote OS" "CRITICAL"
-	fi
-}
-
-function oldGetRemoteOS {
-	__CheckArguments 0 $# ${FUNCNAME[0]} "$@"	#__WITH_PARANOIA_DEBUG
-
-	local retval
-	local cmd
-	local remoteOsVar
-
-	if [ "$REMOTE_OPERATION" == "yes" ]; then
-		CheckConnectivity3rdPartyHosts
-		CheckConnectivityRemoteHost
-
-		cmd=$SSH_CMD' "if [ ls --help 2>&1 | grep -i BusyBox > /dev/null ]; then exit 0; else exit 1"'
-		Logger "cmd: $cmd" "DEBUG"
-		eval "$cmd" &
-		WaitForTaskCompletion $! 120 240 ${FUNCNAME[0]}"-0" true $KEEP_LOGGING
-		retval=$?
-		if [ $retval == 0 ]; then
-			remoteOsVar="BusyBox"
-		else
-			cmd=$SSH_CMD' "uname -spio" > "'$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$SCRIPT_PID'" 2>&1'
-			Logger "cmd: $cmd" "DEBUG"
-			eval "$cmd" &
-			WaitForTaskCompletion $! 120 240 ${FUNCNAME[0]}"-1" true $KEEP_LOGGING
-			retval=$?
-			if [ $retval != 0 ]; then
-				cmd=$SSH_CMD' "uname -v" > "'$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$SCRIPT_PID'" 2>&1'
-				Logger "cmd: $cmd" "DEBUG"
-				eval "$cmd" &
-				WaitForTaskCompletion $! 120 240 ${FUNCNAME[0]}"-2" true $KEEP_LOGGING
-				retval=$?
-				if [ $retval != 0 ]; then
-					cmd=$SSH_CMD' "uname" > "'$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$SCRIPT_PID'" 2>&1'
-					Logger "cmd: $cmd" "DEBUG"
-					eval "$cmd" &
-					WaitForTaskCompletion $! 120 240 ${FUNCNAME[0]}"-3" true $KEEP_LOGGING
-					retval=$?
-					if [ $retval != 0 ]; then
-						Logger "Cannot Get remote OS type." "ERROR"
-					fi
-				fi
-			fi
-			remoteOsVar=$(cat "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$SCRIPT_PID")
-		fi
-
-		case $remoteOsVar in
-			*"Linux"*)
-			REMOTE_OS="Linux"
-			;;
-			*"BSD"*)
-			REMOTE_OS="BSD"
-			;;
-			*"MINGW32"*|*"CYGWIN"*)
-			REMOTE_OS="msys"
-			;;
-			*"Darwin"*)
-			REMOTE_OS="MacOSX"
-			;;
-			*"BusyBox"*)
-			REMOTE_OS="BUSYBOX"
-			;;
-			*"ssh"*|*"SSH"*)
-			Logger "Cannot connect to remote system." "CRITICAL"
-			exit 1
-			;;
-			*)
-			if [ "$IGNORE_OS_TYPE" == "yes" ]; then		#DOC: Undocumented option
-				Logger "Running on unknown remote OS [$remoteOsVar]." "WARN"
-				return
-			fi
-			Logger "Running on remote OS failed. Please report to the author if the OS is not supported." "CRITICAL"
-			Logger "Remote OS said:\n$remoteOsVar" "CRITICAL"
-			exit 1
-		esac
-
-		Logger "Remote OS: [$remoteOsVar]." "DEBUG"
+		Logger "Cannot get Remote OS" "CRITICAL"
 	fi
 }
 
