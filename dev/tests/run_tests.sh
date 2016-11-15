@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-# osync test suite 2016111502
+# osync test suite 2016111504
 
 # 4 tests:
 # quicklocal
@@ -174,6 +174,11 @@ function PrepareLocalDirs () {
 function oneTimeSetUp () {
 	source "$DEV_DIR/ofunctions.sh"
 	SetupSSH
+
+	# Get osync version
+	OSYNC_VERSION=$(grep "PROGRAM_VERSION" "$OSYNC_DIR/$OSYNC_EXECUTABLE")
+	OSYNC_VERSION="${OSYNC_VERSION##*=}"
+	OSYNC_MIN_VERSION="${OSYNC_VERSION:2:1}"
 }
 
 function oneTimeTearDown () {
@@ -270,7 +275,8 @@ function test_Deletetion () {
 		assertEquals "File [$TARGET_DIR/$OSYNC_DELETE_DIR/$(basename $iFile1)] has been soft deleted on target" "0" $?
 		[ -f "$iFile1" ]
 		assertEquals "File [$iFile1] is still in initiator" "1" $?
-		#TODO: WTF ?
+
+		# The variable substitution is not the best comprehensible code
 		[ -f "${iFile1/$INITIATOR_DIR/TARGET_DIR}" ]
 		assertEquals "File [${iFile1/$INITIATOR_DIR/TARGET_DIR}] is still in target" "1" $?
 
@@ -278,7 +284,7 @@ function test_Deletetion () {
 		assertEquals "File [$INITIATOR_DIR/$OSYNC_DELETE_DIR/$(basename $tFile1)] has been soft deleted on initiator" "0" $?
 		[ -f "$tFile1" ]
 		assertEquals "File [$tFile1] is still in target" "1" $?
-		#TODO: WTF ?
+
 		[ -f "${tFile1/$TARGET_DIR/INITIATOR_DIR}" ]
 		assertEquals "File [${tFile1/$TARGET_DIR/INITIATOR_DIR}] is still in initiator" "1" $?
 	done
@@ -505,12 +511,18 @@ function test_MultipleConflictBackups () {
 	local conflictBackupMultipleLocal
 	local conflictBackupMultipleRemote
 
+	local additionalParameters
+
 	# modify config files
 	conflictBackupMultipleLocal=$(GetConfFileValue "$CONF_DIR/$LOCAL_CONF" "CONFLICT_BACKUP_MULTIPLE")
 	conflictBackupMultipleRemote=$(GetConfFileValue "$CONF_DIR/$REMOTE_CONF" "CONFLICT_BACKUP_MULTIPLE")
 
 	SetConfFileValue "$CONF_DIR/$LOCAL_CONF" "CONFLICT_BACKUP_MULTIPLE" "yes"
 	SetConfFileValue "$CONF_DIR/$REMOTE_CONF" "CONFLICT_BACKUP_MULTIPLE" "yes"
+
+	if [ "$OSYNC_MIN_VERSION" != "1" ]; then
+		additionalParameters="--errors-only --summary --no-prefix"
+	fi
 
 	for i in "${osyncParameters[@]}"; do
 
@@ -526,28 +538,28 @@ function test_MultipleConflictBackups () {
 		echo "$FileB" > "$TARGET_DIR/$FileB"
 
 		# First run
-		CONFLICT_BACKUP_MULTIPLE=yes REMOTE_HOST_PING=no ./$OSYNC_EXECUTABLE $i --errors-only --summary --no-prefix
+		CONFLICT_BACKUP_MULTIPLE=yes REMOTE_HOST_PING=no ./$OSYNC_EXECUTABLE $i $additionalParameters
 		assertEquals "First deletion run with parameters [$i]." "0" $?
 
 		echo "$FileA+" > "$TARGET_DIR/$FileA"
 		echo "$FileB+" > "$INITIATOR_DIR/$FileB"
 
 		# Second run
-		CONFLICT_BACKUP_MULTIPLE=yes REMOTE_HOST_PING=no ./$OSYNC_EXECUTABLE $i --errors-only --summary --no-prefix
+		CONFLICT_BACKUP_MULTIPLE=yes REMOTE_HOST_PING=no ./$OSYNC_EXECUTABLE $i $additionalParameters
 		assertEquals "First deletion run with parameters [$i]." "0" $?
 
 		echo "$FileA-" > "$TARGET_DIR/$FileA"
 		echo "$FileB-" > "$INITIATOR_DIR/$FileB"
 
 		# Third run
-		CONFLICT_BACKUP_MULTIPLE=yes REMOTE_HOST_PING=no ./$OSYNC_EXECUTABLE $i --errors-only --summary --no-prefix
+		CONFLICT_BACKUP_MULTIPLE=yes REMOTE_HOST_PING=no ./$OSYNC_EXECUTABLE $i $additionalParameters
 		assertEquals "First deletion run with parameters [$i]." "0" $?
 
 		echo "$FileA*" > "$TARGET_DIR/$FileA"
 		echo "$FileB*" > "$INITIATOR_DIR/$FileB"
 
 		# Fouth run
-		CONFLICT_BACKUP_MULTIPLE=yes REMOTE_HOST_PING=no ./$OSYNC_EXECUTABLE $i --errors-only --summary --no-prefix
+		CONFLICT_BACKUP_MULTIPLE=yes REMOTE_HOST_PING=no ./$OSYNC_EXECUTABLE $i $additionalParameters
 		assertEquals "First deletion run with parameters [$i]." "0" $?
 
 		# This test may fail only on 31th December at 23:59 :)
