@@ -1,3 +1,5 @@
+# osync  [![Build Status](https://travis-ci.org/deajan/osync.svg?branch=v1.1-maint)](https://travis-ci.org/deajan/osync) [![GitHub Release](https://img.shields.io/github/release/deajan/osync.svg?label=Latest)](https://github.com/deajan/osync/releases/latest)
+
 osync
 =====
 
