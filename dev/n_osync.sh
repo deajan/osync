@@ -4,7 +4,7 @@ PROGRAM="osync" # Rsync based two way sync engine with fault tolerance
 AUTHOR="(C) 2013-2016 by Orsiris de Jong"
 CONTACT="http://www.netpower.fr/osync - ozy@netpower.fr"
 PROGRAM_VERSION=1.2-beta2
-PROGRAM_BUILD=2016111508
+PROGRAM_BUILD=2016111601
 IS_STABLE=no
 
 # Execution order						#__WITH_PARANOIA_DEBUG
@@ -158,6 +158,8 @@ function CheckCurrentConfig {
 function CheckCurrentConfigAll {
         __CheckArguments 0 $# "${FUNCNAME[0]}" "$@"    #__WITH_PARANOIA_DEBUG
 
+	local tmp
+
         if [ "$INSTANCE_ID" == "" ]; then
                 Logger "No INSTANCE_ID defined in config file." "CRITICAL"
                 exit 1
@@ -179,9 +181,13 @@ function CheckCurrentConfigAll {
 		exit 1
 	fi
 
-	if [ "$SKIP_DELETION" != "" ] && [ $(arrayContains "${INITIATOR[$__type]}" "${SKIP_DELETION[@]}") -eq 0 ] && [ $(arrayContains "${TARGET[$__type]}" "${SKIP_DELETION[@]}") -eq 0 ]; then
-		Logger "Bogus skip deletion parameter." "CRITICAL"
-		exit 1
+	if [ "$SKIP_DELETION" != "" ]; then
+		tmp="$SKIP_DELETION"
+		IFS=',' read -r -a SKIP_DELETION <<< "$tmp"
+		if [ $(arrayContains "${INITIATOR[$__type]}" "${SKIP_DELETION[@]}") -eq 0 ] && [ $(arrayContains "${TARGET[$__type]}" "${SKIP_DELETION[@]}") -eq 0 ]; then
+			Logger "Bogus skip deletion parameter [$SKIP_DELETION]." "CRITICAL"
+			exit 1
+		fi
 	fi
 }
 
@@ -2133,7 +2139,7 @@ for i in "$@"; do
 		;;
 		--skip-deletion=*)
 		opts=$opts" --skip-deletion=\"${i##*=}\""
-		IFS=',' read -r -a SKIP_DELETION <<< ${i##*=}
+		SKIP_DELETION=${##*=}
 		;;
 		--on-changes)
 		sync_on_changes=true
