@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-# osync test suite 2016111601
+# osync test suite 2016111602
 
 # 4 tests:
 # quicklocal
@@ -19,9 +19,7 @@
 # file attribute tests
 
 #TODO: lock checks missing
-#TODO: skip deletion tests
 #TODO: daemon mode tests
-#TODO: check file contents on attribute updates
 
 #TODO: enable teardown after tests
 
@@ -356,7 +354,80 @@ function test_deletion_failure () {
 }
 
 function test_skip_deletion () {
-	echo "Not implemented yet"
+	local skipDeletionLocal
+	local skipDeletionRemote
+	local modes
+
+	if [ "$OSYNC_MIN_VERSION" == "1" ]; then
+		echo "Skipping SkipDeletion test because it wasn't implemented in osync v1.1."
+		return 0
+	fi
+
+	# Keep original values
+	skipDeletionLocal=$(GetConfFileValue "$CONF_DIR/$LOCAL_CONF" "SKIP_DELETION")
+	skipDeletionRemote=$(GetConfFileValue "$CONF_DIR/$REMOTE_CONF" "SKIP_DELETION")
+
+	modes=('initiator' 'target' 'initiator,target')
+
+	for mode in "${modes[@]}"; do
+
+		SetConfFileValue "$CONF_DIR/$LOCAL_CONF" "SKIP_DELETION" "$mode"
+		SetConfFileValue "$CONF_DIR/$REMOTE_CONF" "SKIP_DELETION" "$mode"
+
+		for i in "${osyncParameters[@]}"; do
+			cd "$OSYNC_DIR"
+			PrepareLocalDirs
+
+			DirA="another/one/bites/ de_dust"
+			DirB="phantom of /the opera"
+
+			mkdir -p "$INITIATOR_DIR/$DirA"
+			mkdir -p "$TARGET_DIR/$DirB"
+
+			FileA="$DirA/Iron Rhapsody"
+			FileB="$DirB/Bohemian Maiden"
+
+			touch "$INITIATOR_DIR/$FileA"
+			touch "$TARGET_DIR/$FileB"
+
+			# First run
+			REMOTE_HOST_PING=no SKIP_DELETION="$mode" ./$OSYNC_EXECUTABLE $i
+			assertEquals "First deletion run with parameters [$i]." "0" $?
+
+			rm -f "$INITIATOR_DIR/$FileA"
+			rm -f "$TARGET_DIR/$FileB"
+
+			# Second run
+			REMOTE_HOST_PING=no SKIP_DELETION="$mode" ./$OSYNC_EXECUTABLE $i
+			assertEquals "First deletion run with parameters [$i]." "0" $?
+
+			if [ "$mode" == "initiator" ]; then
+				[ -f "$TARGET_DIR/$FileA" ]
+				assertEquals "File [$TARGET_DIR/$FileA] still exists in mode $mode." "1" $?
+				[ -f "$INITIATOR_DIR/$FileB" ]
+				assertEquals "File [$INITIATOR_DIR/$FileB still exists in mode $mode." "0" $?
+
+			elif [ "$mode" == "target" ]; then
+				[ -f "$TARGET_DIR/$FileA" ]
+				assertEquals "File [$TARGET_DIR/$FileA] still exists in mode $mode." "0" $?
+				[ -f "$INITIATOR_DIR/$FileB" ]
+				assertEquals "File [$INITIATOR_DIR/$FileB still exists in mode $mode." "1" $?
+
+
+			elif [ "$mode" == "initiator,target" ]; then
+				[ -f "$TARGET_DIR/$FileA" ]
+				assertEquals "File [$TARGET_DIR/$FileA] still exists in mode $mode." "0" $?
+				[ -f "$INITIATOR_DIR/$FileB" ]
+				assertEquals "File [$INITIATOR_DIR/$FileB still exists in mode $mode." "0" $?
+			else
+				assertEquals "Bogus skip deletion mode" "0" "1"
+			fi
+		done
+	done
+
+	# Set original values back
+	SetConfFileValue "$CONF_DIR/$LOCAL_CONF" "SKIP_DELETION" "$skipDeletionLocal"
+	SetConfFileValue "$CONF_DIR/$REMOTE_CONF" "SKIP_DELETION" "$skipDeletionRemote"
 }
 
 function test_softdeletion_cleanup () {
