@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-# osync test suite 2016111506
+# osync test suite 2016111601
 
 # 4 tests:
 # quicklocal
@@ -38,6 +38,7 @@ OLD_CONF="old.conf"
 TMP_OLD_CONF="tmp.old.conf"
 
 OSYNC_EXECUTABLE="osync.sh"
+OSYNC_DEV_EXECUTABLE="dev/n_osync.sh"
 OSYNC_UPGRADE="upgrade-v1.0x-v1.2x.sh"
 TMP_FILE="$DEV_DIR/tmp"
 
@@ -60,6 +61,11 @@ OSYNC_WORKDIR=".osync_workdir"
 OSYNC_STATE_DIR="$OSYNC_WORKDIR/state"
 OSYNC_DELETE_DIR="$OSYNC_WORKDIR/deleted"
 OSYNC_BACKUP_DIR="$OSYNC_WORKDIR/backup"
+
+# Later populated variables
+OSYNC_VERSION=1.x.y
+OSYNC_MIN_VERSION=x
+OSYNC_IS_STABLE=maybe
 
 # Setup an array with all function modes
 declare -Ag osyncParameters
@@ -95,23 +101,6 @@ function SetConfFileValue () {
 		assertEquals "Set $name to [$value]." "0" $?
 	else
 		assertEquals "$name does not exist in [$file]." "1" "0"
-	fi
-}
-
-function SetStableToYes () {
-	if grep "^IS_STABLE=YES" "$OSYNC_DIR/$OSYNC_EXECUTABLE" > /dev/null; then
-		IS_STABLE=yes
-	else
-		IS_STABLE=no
-		sed -i.tmp 's/^IS_STABLE=no/IS_STABLE=yes/' "$OSYNC_DIR/$OSYNC_EXECUTABLE"
-		assertEquals "Set stable to yes" "0" $?
-	fi
-}
-
-function SetStableToOrigin () {
-	if [ "$IS_STABLE" == "no" ]; then
-		sed -i.tmp 's/^IS_STABLE=yes/IS_STABLE=no/' "$OSYNC_DIR/$OSYNC_EXECUTABLE"
-		assertEquals "Set stable to origin value" "0" $?
 	fi
 }
 
@@ -176,13 +165,20 @@ function oneTimeSetUp () {
 	SetupSSH
 
 	# Get osync version
-	OSYNC_VERSION=$(grep "PROGRAM_VERSION" "$OSYNC_DIR/$OSYNC_EXECUTABLE")
+	OSYNC_VERSION=$(GetConfFileValue "$OSYNC_DIR/$OSYNC_DEV_EXECUTABLE" "PROGRAM_VERSION")
 	OSYNC_VERSION="${OSYNC_VERSION##*=}"
 	OSYNC_MIN_VERSION="${OSYNC_VERSION:2:1}"
+
+	OSYNC_IS_STABLE=$(GetConfFileValue "$OSYNC_DIR/$OSYNC_DEV_EXECUTABLE" "IS_STABLE")
+
+	echo "Running with $OSYNC_VERSION ($OSYNC_MIN_VERSION) STABLE=$OSYNC_IS_STABLE"
 }
 
 function oneTimeTearDown () {
-	SetStableToOrigin
+	# Set osync version stable flag back to origin
+	SetConfFileValue "$OSYNC_DIR/$OSYNC_EXECUTABLE" "IS_STABLE" "$OSYNC_IS_STABLE"
+
+	#TODO: uncomment this when dev is done
 	#rm -rf "$OSYNC_TESTS_DIR"
 }
 
@@ -196,7 +192,9 @@ function test_Merge () {
 	cd "$DEV_DIR"
 	./merge.sh
 	assertEquals "Merging code" "0" $?
-	SetStableToYes
+
+	# Set osync version to stable while testing to avoid warning message
+	SetConfFileValue "$OSYNC_DIR/$OSYNC_EXECUTABLE" "IS_STABLE" "yes"
 }
 
 function test_LargeFileSet () {
