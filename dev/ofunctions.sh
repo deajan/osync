@@ -1,6 +1,6 @@
 #### MINIMAL-FUNCTION-SET BEGIN ####
 
-## FUNC_BUILD=2016111505
+## FUNC_BUILD=2016111701
 ## BEGIN Generic bash functions written in 2013-2016 by Orsiris de Jong - http://www.netpower.fr - ozy@netpower.fr
 
 ## To use in a program, define the following variables:
@@ -14,6 +14,7 @@
 ## Logger sets {ERROR|WARN}_ALERT variable when called with critical / error / warn loglevel
 ## When called from subprocesses, variable of main process can't be set. Status needs to be get via $RUN_DIR/$PROGRAM.Logger.{error|warn}.$SCRIPT_PID
 
+#TODO: Rewrite Logger so we can decide what to send to stdout, stderr and logfile
 #TODO: Windows checks, check sendmail & mailsend
 
 if ! type "$BASH" > /dev/null; then
@@ -55,8 +56,8 @@ if [ ! "$_DEBUG" == "yes" ]; then
 	SLEEP_TIME=.05 # Tested under linux and FreeBSD bash, #TODO tests on cygwin / msys
 	_VERBOSE=false
 else
-	if [ "$SLEEP_TIME" == "" ]; then
-		SLEEP_TIME=1
+	if [ "$SLEEP_TIME" == "" ]; then # Set SLEEP_TIME as environment variable when runinng with bash -x in order to avoid spamming console
+		SLEEP_TIME=.05
 	fi
 	trap 'TrapError ${LINENO} $?' ERR
 	_VERBOSE=true
