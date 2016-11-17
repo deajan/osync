@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-# osync test suite 2016111701
+# osync test suite 2016111705
 
 # 4 tests:
 # quicklocal
@@ -22,11 +22,7 @@
 # function test
 # WaitForTaskCompletion
 # ParallelExec
-
-# daemon mode tests
-#TODO: daemon mode tests
-
-#TODO: enable teardown after tests
+# daemon mode tests for both config files
 
 LARGE_FILESET_URL="http://ftp.drupal.org/files/projects/drupal-8.1.9.tar.gz"
 
@@ -77,8 +73,10 @@ osyncParameters[quickLocal]="--initiator=$INITIATOR_DIR --target=$TARGET_DIR --i
 osyncParameters[quickRemote]="--initiator=$INITIATOR_DIR --target=ssh://localhost:$SSH_PORT/$TARGET_DIR --rsakey=${HOME}/.ssh/id_rsa_local --instance-id=quickremote"
 osyncParameters[confLocal]="$CONF_DIR/$LOCAL_CONF"
 osyncParameters[confRemote]="$CONF_DIR/$REMOTE_CONF"
-#osyncParameters[daemonlocal]="$CONF_DIR/$LOCAL_CONF --on-changes"
-#osyncParameters[daemonlocal]="$CONF_DIR/$REMOTE_CONF --on-changes"
+
+declare -Ag osyncDaemonParameters
+osyncDaemonParameters[daemonlocal]="$CONF_DIR/$LOCAL_CONF --on-changes"
+osyncDaemonParameters[daemonremote]="$CONF_DIR/$REMOTE_CONF --on-changes"
 
 function GetConfFileValue () {
 	local file="${1}"
@@ -164,6 +162,8 @@ function PrepareLocalDirs () {
 }
 
 function oneTimeSetUp () {
+	START_TIME=$SECONDS
+
 	source "$DEV_DIR/ofunctions.sh"
 	SetupSSH
 
@@ -182,7 +182,10 @@ function oneTimeTearDown () {
 	SetConfFileValue "$OSYNC_DIR/$OSYNC_EXECUTABLE" "IS_STABLE" "$OSYNC_IS_STABLE"
 
 	#TODO: uncomment this when dev is done
-	#rm -rf "$OSYNC_TESTS_DIR"
+	rm -rf "$OSYNC_TESTS_DIR"
+
+	ELAPSED_TIME=$(($SECONDS - $START_TIME))
+	echo "It took $ELAPSED_TIME seconds to run these tests."
 }
 
 function setUp () {
@@ -868,7 +871,6 @@ function test_UpgradeConfRun () {
 
         # Basic return code tests. Need to go deep into file presence testing
         cd "$OSYNC_DIR"
-
 	PrepareLocalDirs
 
         # Make a security copy of the old config file
@@ -883,5 +885,59 @@ function test_UpgradeConfRun () {
         rm -f "$CONF_DIR/$TMP_OLD_CONF.save"
 }
 
+function test_DaemonMode () {
 
+	if [ "$TRAVIS_RUN" == true ]; then
+		echo "Skipping daemon mode tests as no inotifywait present in travis yet."
+		return 0
+	fi
+
+	for i in "${osyncDaemonParameters[@]}"; do
+
+		cd "$OSYNC_DIR"
+		PrepareLocalDirs
+
+		FileA="FileA"
+		FileB="FileB"
+		FileC="FileC"
+
+		touch "$INITIATOR_DIR/$FileA"
+		touch "$TARGET_DIR/$FileB"
+
+		./$OSYNC_EXECUTABLE "$CONF_DIR/$LOCAL_CONF" --on-changes &
+		pid=$!
+
+		# Trivial value of 2xMIN_WAIT from config files
+		echo "Sleeping for 120s"
+		sleep 120
+
+		[ -f "$TARGET_DIR/$FileB" ]
+		assertEquals "File [$TARGET_DIR/$FileB] should be synced." "0" $?
+		[ -f "$INITIATOR_DIR/$FileA" ]
+		assertEquals "File [$INITIATOR_DIR/$FileB] should be synced." "0" $?
+
+		touch "$INITIATOR_DIR/$FileC"
+		rm -f "$INITIATOR_DIR/$FileA"
+		rm -f "$TARGET_DIR/$FileB"
+
+		echo "Sleeping for 120s"
+		sleep 120
+
+		[ ! -f "$TARGET_DIR/$FileB" ]
+		assertEquals "File [$TARGET_DIR/$FileB] should be deleted." "0" $?
+		[ ! -f "$INITIATOR_DIR/$FileA" ]
+		assertEquals "File [$INITIATOR_DIR/$FileA] should be deleted." "0" $?
+
+		[ -f "$TARGET_DIR/$OSYNC_DELETE_DIR/$FileA" ]
+		assertEquals "File [$TARGET_DIR/$OSYNC_DELETE_DIR/$FileA] should be in soft deletion dir." "0" $?
+		[ -f "$INITIATOR_DIR/$OSYNC_DELETE_DIR/$FileB" ]
+		assertEquals "File [$INITIATOR_DIR/$OSYNC_DELETE_DIR/$FileB] should be in soft deletion dir." "0" $?
+
+		[ -f "$TARGET_DIR/$FileC" ]
+		assertEquals "$File [$TARGET_DIR/$FileC] should be synced." "0" $?
+
+		kill $pid
+	done
+
+}
 . "$TESTS_DIR/shunit2/shunit2"
