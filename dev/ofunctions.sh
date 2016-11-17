@@ -1,6 +1,6 @@
 #### MINIMAL-FUNCTION-SET BEGIN ####
 
-## FUNC_BUILD=2016111703
+## FUNC_BUILD=2016111704
 ## BEGIN Generic bash functions written in 2013-2016 by Orsiris de Jong - http://www.netpower.fr - ozy@netpower.fr
 
 ## To use in a program, define the following variables:
@@ -196,86 +196,6 @@ function Logger {
 	fi
 }
 
-# Sub function of Logger
-function new_Logger {
-	local svalue="${1}" # What to log to stdout
-	local lvalue="${2:-$svalue}" # What to log to logfile, defaults to screen value
-	local svalue="${3}" # What to log to stderr
-
-	echo -e "$lvalue" >> "$LOG_FILE"
-	CURRENT_LOG="$CURRENT_LOG"$'\n'"$lvalue"
-
-	if [ $_LOGGER_STDERR == true ] && [ "$evalue" != "" ]; then
-		cat <<< "$evalue" 1>&2
-	elif [ "$_LOGGER_SILENT" == false ]; then
-		echo -e "$svalue"
-	fi
-}
-
-# General log function with log levels:
-# CRITICAL, ERROR, WARN are colored in stdout, prefixed in stderr
-# NOTICE is standard level
-# VERBOSE is only sent to stdout / stderr if _LOGGER_VERBOSE=true
-# DEBUG & PARANOIA_DEBUG are only sent if _DEBUG=yes
-function newLogger {
-	local value="${1}" # Sentence to log (in double quotes)
-	local level="${2}" # Log level: PARANOIA_DEBUG, DEBUG, VERBOSE, NOTICE, WARN, ERROR, CRITIAL
-
-	if [ "$_LOGGER_PREFIX" == "time" ]; then
-		prefix="TIME: $SECONDS - "
-	elif [ "$_LOGGER_PREFIX" == "date" ]; then
-		prefix="$(date) - "
-	else
-		prefix=""
-	fi
-
-	if [ "$level" == "CRITICAL" ]; then
-		_Logger "$prefix\e[41m$value\e[0m" "$prefix$level:$value" "$level:$value"
-		ERROR_ALERT=true
-		# ERROR_ALERT / WARN_ALERT isn't set in main when Logger is called from a subprocess. Need to keep this flag.
-		echo "1" > "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.error.$SCRIPT_PID"
-		return
-	elif [ "$level" == "ERROR" ]; then
-		_Logger "$prefix\e[91m$value\e[0m" "$prefix$level:$value" "$level:$value"
-		ERROR_ALERT=true
-		echo "1" > "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.error.$SCRIPT_PID"
-		return
-	elif [ "$level" == "WARN" ]; then
-		_Logger "$prefix\e[33m$value\e[0m" "$prefix$level:$value" "$level:$value"
-		WARN_ALERT=true
-		echo "1" > "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.warn.$SCRIPT_PID"
-		return
-	elif [ "$level" == "NOTICE" ]; then
-		if [ "$_LOGGER_ERR_ONLY" != true ]; then
-			_Logger "$prefix$value"
-		fi
-		return
-	elif [ "$level" == "VERBOSE" ]; then
-		if [ $_LOGGER_VERBOSE == true ]; then
-			_Logger "$prefix$value"
-		fi
-		return
-	elif [ "$level" == "ALWAYS" ]; then
-		if [ $_LOGGER_SILENT != true ]; then
-			_Logger "$prefix$value" "$prefix$level:$value" "$level:$value"
-		fi
-		return
-	elif [ "$level" == "DEBUG" ]; then
-		if [ "$_DEBUG" == "yes" ]; then
-			_Logger "$prefix$value"
-			return
-		fi
-	elif [ "$level" == "PARANOIA_DEBUG" ]; then		#__WITH_PARANOIA_DEBUG
-		if [ "$_PARANOIA_DEBUG" == "yes" ]; then	#__WITH_PARANOIA_DEBUG
-			_Logger "$prefix$value"			#__WITH_PARANOIA_DEBUG
-			return					#__WITH_PARANOIA_DEBUG
-		fi						#__WITH_PARANOIA_DEBUG
-	else
-		_Logger "\e[41mLogger function called without proper loglevel [$level].\e[0m"
-		_Logger "Value was: $prefix$value"
-	fi
-}
-
 # QuickLogger subfunction, can be called directly
 function _QuickLogger {
 	local value="${1}"
@@ -359,10 +279,10 @@ function SendAlert {
 
 	__CheckArguments 0-1 $# ${FUNCNAME[0]} "$@"	#__WITH_PARANOIA_DEBUG
 
-	local attachment=
-	local attachmentFile=
-	local subject=
-	local body=
+	local attachment
+	local attachmentFile
+	local subject
+	local body
 
 	if [ "$DESTINATION_MAILS" == "" ]; then
 		return 0
@@ -390,6 +310,7 @@ function SendAlert {
 	if [ -e "$RUN_DIR/$PROGRAM._Logger.$SCRIPT_PID" ]; then
 		body="$MAIL_ALERT_MSG"$'\n\n'"$(cat $RUN_DIR/$PROGRAM._Logger.$SCRIPT_PID)"
 	fi
+	exit
 
 	if [ $ERROR_ALERT == true ]; then
 		subject="Error alert for $INSTANCE_ID"
