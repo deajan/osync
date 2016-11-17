@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-# osync test suite 2016111703
+# osync test suite 2016111704
 
 # 4 tests:
 # quicklocal
@@ -162,6 +162,8 @@ function PrepareLocalDirs () {
 }
 
 function oneTimeSetUp () {
+	START_TIME=$SECONDS
+
 	source "$DEV_DIR/ofunctions.sh"
 	SetupSSH
 
@@ -181,6 +183,9 @@ function oneTimeTearDown () {
 
 	#TODO: uncomment this when dev is done
 	rm -rf "$OSYNC_TESTS_DIR"
+
+	ELAPSED_TIME=$(($SECONDS - $START_TIME))
+	echo "It took $ELAPSED_TIME seconds to run these tests."
 }
 
 function setUp () {
