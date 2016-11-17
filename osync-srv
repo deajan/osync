@@ -46,7 +46,7 @@ start() {
 	for cfgfile in $confdir/*.conf
 	do
 		if [ -f $progpath/$progexec ]; then
-			$progpath/$progexec $cfgfile --on-changes > /dev/null 2>&1 &
+			$progpath/$progexec $cfgfile --on-changes --errors-only > /dev/null 2>&1 &
 		else
 			echo "Cannot find $prog executable in $progpath"
 			exit 1
