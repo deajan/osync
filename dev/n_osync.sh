@@ -4,7 +4,7 @@ PROGRAM="osync" # Rsync based two way sync engine with fault tolerance
 AUTHOR="(C) 2013-2016 by Orsiris de Jong"
 CONTACT="http://www.netpower.fr/osync - ozy@netpower.fr"
 PROGRAM_VERSION=1.2-beta3
-PROGRAM_BUILD=2016111703
+PROGRAM_BUILD=2016111704
 IS_STABLE=no
 
 # Execution order						#__WITH_PARANOIA_DEBUG
@@ -80,7 +80,6 @@ function TrapQuit {
 		if [ "$RUN_AFTER_CMD_ON_ERROR" == "yes" ]; then
 			RunAfterHook
 		fi
-		CleanUp
 		Logger "$PROGRAM finished with errors." "ERROR"
 		if [ "$_DEBUG" != "yes" ]
 		then
@@ -94,7 +93,6 @@ function TrapQuit {
 		if [ "$RUN_AFTER_CMD_ON_ERROR" == "yes" ]; then
 			RunAfterHook
 		fi
-		CleanUp
 		Logger "$PROGRAM finished with warnings." "WARN"
 		if [ "$_DEBUG" != "yes" ]
 		then
@@ -106,11 +104,11 @@ function TrapQuit {
 	else
 		UnlockReplicas
 		RunAfterHook
-		CleanUp
 		Logger "$PROGRAM finished." "NOTICE"
 		exitcode=0
 	fi
 
+	CleanUp
 	KillChilds $$ > /dev/null 2>&1
 
 	exit $exitcode
