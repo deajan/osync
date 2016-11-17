@@ -4,7 +4,7 @@ PROGRAM="osync" # Rsync based two way sync engine with fault tolerance
 AUTHOR="(C) 2013-2016 by Orsiris de Jong"
 CONTACT="http://www.netpower.fr/osync - ozy@netpower.fr"
 PROGRAM_VERSION=1.2-beta2
-PROGRAM_BUILD=2016111701
+PROGRAM_BUILD=2016111702
 IS_STABLE=no
 
 # Execution order						#__WITH_PARANOIA_DEBUG
@@ -429,17 +429,21 @@ function _CheckLocksLocal {
 		if [ "$lockInstanceID" == "" ]; then
 			Logger "Invalid instance id [$lockInstanceID] in local replica." "CRITICAL"
 			exit 1
+
+		Logger "Local $replicaType  lock is: [$lockPid@$lockInstanceID]." "DEBUG"
+
 		fi
 		kill -0 $lockPid > /dev/null 2>&1
 		if [ $? != 0 ]; then
-			Logger "There is a local dead osync lock with pid [$lockPid]. Instance [$lockInstanceID] no longer running. Resuming." "NOTICE"
+			Logger "There is a local dead osync lock [$lockPid@$lockInstanceID] that is no longer running. Resuming." "NOTICE"
 			if [ "$replicaType" == "${INITIATOR[$__type]}" ]; then
+				# REPLICA_OVERWRITE_LOCK disables noclobber option in WriteLock functions
 				INITIATOR_OVERWRITE_LOCK=true
 			elif [ "$replicaType" == "${TARGET[$__type]}" ]; then
 				TARGET_OVERWRITE_LOCK=true
 			fi
 		else
-			Logger "There is already a local instance [$lockInstanceID] of osync running with pid [$lockPid] for this replica. Cannot start." "CRITICAL"
+			Logger "There is already a local instance [$lockPid@$lockInstanceID] of osync running for this replica. Cannot start." "CRITICAL"
 			exit 1
 		fi
 	fi
@@ -479,19 +483,19 @@ function _CheckLocksRemote {
 			exit 1
 		fi
 
-		Logger "Remote lock is: $lockPid@$lockInstanceID" "DEBUG"
+		Logger "Remote lock is: [$lockPid@$lockInstanceID]" "DEBUG"
 
 		kill -0 $lockPid > /dev/null 2>&1
 		if [ $? != 0 ]; then
 			if [ "$lockInstanceID" == "$INSTANCE_ID" ]; then
-				Logger "There is a remote dead osync lock on target replica that corresponds to this initiator sync id [$lockInstanceID]. Pid [$lockPid] no longer running. Resuming." "NOTICE"
+				Logger "There is a remote dead osync lock [$lockPid@lockInstanceID] on target replica that corresponds to this initiator INSTANCE_ID. Pid [$lockPid] no longer running. Resuming." "NOTICE"
 				TARGET_OVERWRITE_LOCK=true
 			else
 				if [ "$FORCE_STRANGER_LOCK_RESUME" == "yes" ]; then
-					Logger "There is a remote dead osync lock on target replica that does not correspond to this initiator sync-id [$lockInstanceID]. Forcing resume." "WARN"
+					Logger "There is a remote (maybe dead) osync lock [$lockPid@$lockInstanceID] on target replica that does not correspond to this initiator INSTANCE_ID. Forcing resume." "WARN"
 					TARGET_OVERWRITE_LOCK=true
 				else
-					Logger "There is a remote dead osync lock on target replica that does not correspond to this initiator sync-id [$lockInstanceID]. Will not resume." "CRITICAL"
+					Logger "There is a remote (maybe dead) osync lock [$lockPid@$lockInstanceID] on target replica that does not correspond to this initiator INSTANCE_ID. Will not resume." "CRITICAL"
 					exit 1
 				fi
 			fi
