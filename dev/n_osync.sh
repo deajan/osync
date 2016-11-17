@@ -4,7 +4,7 @@ PROGRAM="osync" # Rsync based two way sync engine with fault tolerance
 AUTHOR="(C) 2013-2016 by Orsiris de Jong"
 CONTACT="http://www.netpower.fr/osync - ozy@netpower.fr"
 PROGRAM_VERSION=1.2-beta2
-PROGRAM_BUILD=2016111601
+PROGRAM_BUILD=2016111701
 IS_STABLE=no
 
 # Execution order						#__WITH_PARANOIA_DEBUG
@@ -409,27 +409,37 @@ function CreateStateDirs {
 
 function _CheckLocksLocal {
 	local lockfile="${1}"
-	__CheckArguments 1 $# "${FUNCNAME[0]}" "$@"	#__WITH_PARANOIA_DEBUG
+	local replicaType="${2}"
 
-	local lockfile_content
-	local lock_pid
-	local lock_instance_id
+	__CheckArguments 2 $# "${FUNCNAME[0]}" "$@"	#__WITH_PARANOIA_DEBUG
 
-	if [ -f "$lockfile" ]; then
-		lockfile_content=$(cat $lockfile)
-		Logger "Master lock pid present: $lockfile_content" "DEBUG"
-		lock_pid=${lockfile_content%@*}
-		lock_instance_id=${lockfile_content#*@}
-		kill -9 $lock_pid > /dev/null 2>&1
+	local lockfileContent
+	local lockPid
+	local lockInstanceID
+
+	if [ -s "$lockfile" ]; then
+		lockfileContent=$(cat $lockfile)
+		Logger "Master lock pid present: $lockfileContent" "DEBUG"
+		lockPid=${lockfileContent%@*}
+		if [ $(IsInteger $lockPid) -ne 1 ]; then
+			Logger "Invalid pid [$lockPid] in local replica." "CRITICAL"
+			exit 1
+		fi
+		lockInstanceID=${lockfileContent#*@}
+		if [ "$lockInstanceID" == "" ]; then
+			Logger "Invalid instance id [$lockInstanceID] in local replica." "CRITICAL"
+			exit 1
+		fi
+		kill -0 $lockPid > /dev/null 2>&1
 		if [ $? != 0 ]; then
-			Logger "There is a dead osync lock in [$lockfile]. Instance [$lock_pid] no longer running. Resuming." "NOTICE"
-			#rm "$lockfile"
-			#if [ $? != 0 ]; then
-			#	Logger "Cannot remove lock in [$lockfile]." "CRITICAL"
-			#	exit 1
-			#fi
+			Logger "There is a local dead osync lock with pid [$lockPid]. Instance [$lockInstanceID] no longer running. Resuming." "NOTICE"
+			if [ "$replicaType" == "${INITIATOR[$__type]}" ]; then
+				INITIATOR_OVERWRITE_LOCK=true
+			elif [ "$replicaType" == "${TARGET[$__type]}" ]; then
+				TARGET_OVERWRITE_LOCK=true
+			fi
 		else
-			Logger "There is already a local instance of osync running [$lock_pid] for this replica. Cannot start." "CRITICAL"
+			Logger "There is already a local instance [$lockInstanceID] of osync running with pid [$lockPid] for this replica. Cannot start." "CRITICAL"
 			exit 1
 		fi
 	fi
@@ -440,9 +450,9 @@ function _CheckLocksRemote {
 	__CheckArguments 1 $# "${FUNCNAME[0]}" "$@"	#__WITH_PARANOIA_DEBUG
 
 	local cmd
-	local lock_pid
-	local lock_instance_id
-	local lockfile_content
+	local lockPid
+	local lockInstanceID
+	local lockfileContent
 
 	CheckConnectivity3rdPartyHosts
 	CheckConnectivityRemoteHost
@@ -451,34 +461,42 @@ function _CheckLocksRemote {
 	Logger "cmd: $cmd" "DEBUG"
 	eval "$cmd"
 	if [ $? != 0 ]; then
-		if [ -f "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$SCRIPT_PID" ]; then
-			lockfile_content=$(cat $RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$SCRIPT_PID)
-		else
-			Logger "Cannot get remote lockfile." "CRITICAL"
-			exit 1
-		fi
+		Logger "Cannot check remote replica lock." "CRITICAL"
+		exit 1
 	fi
 
-	lock_pid=${lockfile_content%@*}
-	lock_instance_id=${lockfile_content#*@}
+	if [ -s "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$SCRIPT_PID" ]; then
+		lockfileContent="$(cat $RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$SCRIPT_PID)"
 
-	if [ "$lock_pid" != "" ] && [ "$lock_instance_id" != "" ]; then
-		Logger "Remote lock is: $lock_pid@$lock_instance_id" "DEBUG"
+		lockPid=${lockfileContent%@*}
+		if [ $(IsInteger $lockPid) -ne 1 ]; then
+			Logger "Invalid pid [$lockPid] in remote replica lock." "CRITICAL"
+			exit 1
+		fi
+		lockInstanceID=${lockfileContent#*@}
+		if [ "$lockInstanceID" == "" ]; then
+			Logger "Invalid instance id [$lockInstanceID] in remote replica." "CRITICAL"
+			exit 1
+		fi
 
-		kill -0 $lock_pid > /dev/null 2>&1
+		Logger "Remote lock is: $lockPid@$lockInstanceID" "DEBUG"
+
+		kill -0 $lockPid > /dev/null 2>&1
 		if [ $? != 0 ]; then
-			if [ "$lock_instance_id" == "$INSTANCE_ID" ]; then
-				Logger "There is a dead osync lock on target replica that corresponds to this initiator sync id [$lock_instance_id]. Instance [$lock_pid] no longer running. Resuming." "NOTICE"
+			if [ "$lockInstanceID" == "$INSTANCE_ID" ]; then
+				Logger "There is a remote dead osync lock on target replica that corresponds to this initiator sync id [$lockInstanceID]. Pid [$lockPid] no longer running. Resuming." "NOTICE"
+				TARGET_OVERWRITE_LOCK=true
 			else
 				if [ "$FORCE_STRANGER_LOCK_RESUME" == "yes" ]; then
-					Logger "WARNING: There is a dead osync lock on target replica that does not correspond to this initiator sync-id [$lock_instance_id]. Forcing resume." "WARN"
+					Logger "There is a remote dead osync lock on target replica that does not correspond to this initiator sync-id [$lockInstanceID]. Forcing resume." "WARN"
+					TARGET_OVERWRITE_LOCK=true
 				else
-					Logger "There is a dead osync lock on target replica that does not correspond to this initiator sync-id [$lock_instance_id]. Will not resume." "CRITICAL"
+					Logger "There is a remote dead osync lock on target replica that does not correspond to this initiator sync-id [$lockInstanceID]. Will not resume." "CRITICAL"
 					exit 1
 				fi
 			fi
 		else
-			Logger "There is already a local instance of osync that locks target replica [$lock_pid@$lock_instance_id]. Cannot start." "CRITICAL"
+			Logger "There is already a local instance of osync that locks target replica [$lockPid@$lockInstanceID]. Cannot start." "CRITICAL"
 			exit 1
 		fi
 	fi
@@ -500,10 +518,10 @@ function CheckLocks {
 			exit 1
 		fi
 	else
-		_CheckLocksLocal "${INITIATOR[$__lockFile]}" &
+		_CheckLocksLocal "${INITIATOR[$__lockFile]}" "${INITIATOR[$__type]}" &
 		pids="$!"
 		if [ "$REMOTE_OPERATION" != "yes" ]; then
-			_CheckLocksLocal "${TARGET[$__lockFile]}" &
+			_CheckLocksLocal "${TARGET[$__lockFile]}" "${INITIATOR[$__type]}" &
 			pids="$pids;$!"
 		else
 			_CheckLocksRemote "${TARGET[$__lockFile]}" &
@@ -521,10 +539,14 @@ function CheckLocks {
 function _WriteLockFilesLocal {
 	local lockfile="${1}"
 	local replicaType="${2}"
-	__CheckArguments 2 $# "${FUNCNAME[0]}" "$@"	#__WITH_PARANOIA_DEBUG
+	local overwrite="${3:-false}"
+
+	__CheckArguments 3 $# "${FUNCNAME[0]}" "$@"	#__WITH_PARANOIA_DEBUG
 
 	(
-		set -o noclobber
+		if [ $overwrite == true ]; then
+			set -o noclobber
+		fi
 		$COMMAND_SUDO echo "$SCRIPT_PID@$INSTANCE_ID" > "$lockfile" 2> "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}-$replicaType.$SCRIPT_PID"
 	)
 	if [ $?	!= 0 ]; then
@@ -539,19 +561,23 @@ function _WriteLockFilesLocal {
 function _WriteLockFilesRemote {
 	local lockfile="${1}"
 	local replicaType="${2}"
-	__CheckArguments 2 $# "${FUNCNAME[0]}" "$@"	#__WITH_PARANOIA_DEBUG
+	local overwrite="${3-false}"
+
+	__CheckArguments 3 $# "${FUNCNAME[0]}" "$@"	#__WITH_PARANOIA_DEBUG
 
 	local cmd
 
 	CheckConnectivity3rdPartyHosts
 	CheckConnectivityRemoteHost
 
-	cmd=$SSH_CMD' "( set -o noclobber; echo '$SCRIPT_PID@$INSTANCE_ID' | '$COMMAND_SUDO' tee \"'$lockfile'\")" > /dev/null 2> $RUN_DIR/$PROGRAM._WriteLockFilesRemote.$replicaType.$SCRIPT_PID'
+	cmd=$SSH_CMD' "( if [ $overwrite == true ]; then set -o noclobber; fi; echo '$SCRIPT_PID@$INSTANCE_ID' | '$COMMAND_SUDO' tee \"'$lockfile'\")" > /dev/null 2> $RUN_DIR/$PROGRAM._WriteLockFilesRemote.$replicaType.$SCRIPT_PID'
+	#WIP
+	#cmd=$SSH_CMD' "( set -o noclobber; echo '$SCRIPT_PID@$INSTANCE_ID' | '$COMMAND_SUDO' tee \"'$lockfile'\")" > /dev/null 2> $RUN_DIR/$PROGRAM._WriteLockFilesRemote.$replicaType.$SCRIPT_PID'
 	Logger "cmd: $cmd" "DEBUG"
 	eval "$cmd"
 	if [ $? != 0 ]; then
 		Logger "Could not create lock file on remote $replicaType in [$lockfile]." "CRITICAL"
-		Loggxer "Command output:\n$(cat $RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$replicaType.$SCRIPT_PID)" "NOTICE"
+		Logger "Command output:\n$(cat $RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$replicaType.$SCRIPT_PID)" "NOTICE"
 		return 1
 	else
 		Logger "Locked remote $replicaType replica in [$lockfile]." "DEBUG"
@@ -566,14 +592,14 @@ function WriteLockFiles {
 	local pidArray
 	local pid
 
-	_WriteLockFilesLocal "${INITIATOR[$__lockFile]}" "${INITIATOR[$__type]}"&
+	_WriteLockFilesLocal "${INITIATOR[$__lockFile]}" "${INITIATOR[$__type]}" $INITIATOR_LOCK_OVERWRITE &
 	initiatorPid="$!"
 
 	if [ "$REMOTE_OPERATION" != "yes" ]; then
-		_WriteLockFilesLocal "${TARGET[$__lockFile]}" "${TARGET[$__type]}" &
+		_WriteLockFilesLocal "${TARGET[$__lockFile]}" "${TARGET[$__type]}" $TARGET_LOCK_OVERWRITE &
 		targetPid="$!"
 	else
-		_WriteLockFilesRemote "${TARGET[$__lockFile]}" "${TARGET[$__type]}" &
+		_WriteLockFilesRemote "${TARGET[$__lockFile]}" "${TARGET[$__type]}" $TARGET_LOCK_OVERWRITE &
 		targetPid="$!"
 	fi
 
