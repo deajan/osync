@@ -32,11 +32,11 @@ Microsoft Windows is supported via MSYS or Cygwin.
 Osync has been designed to not delete any data, but rather make backups of conflictual files or soft deletes.
 Nevertheless, you should always have a neat backup of your data before trying a new sync tool.
 
-You can download the latest stable release of Osync at https://github.com/deajan/osync/archive/v1.1.2.tar.gz
+You can download the latest stable release of osync at https://github.com/deajan/osync/archive/stable.tar.gz
 
 You may also get the last development version at https://github.com/deajan/osync with the following command
 
-	$ git clone -b "v1.2-maint" https://github.com/deajan/osync
+	$ git clone https://github.com/deajan/osync
 	$ cd osync
 	$ sh install.sh
 
