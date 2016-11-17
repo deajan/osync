@@ -7,12 +7,14 @@ KNOWN ISSUES
 RECENT CHANGES
 --------------
 
-XX Xxx 2016: osync v1.2-RC1 released
-! apk --no-cache add bash git rsync openssh-client
-! apk --no-cache add sendmail
-! apk --no-cache add openssl if tls or ssl support in sendmail
+dd MMM 2016: osync v1.2-beta3 released
 
-! New two columns status output with --2col
+- Improved locking / unlocking replicas
+	- Fixed killing local pid that has lock bug introduced in v1.2 rewrite
+	- Allow remote unlocking when INSTANCE_ID of lock matches local INSTANCE_ID
+- Fixed failed deletions re-propagation bug introduced in v1.2 rewrite
+- Faster remote OS detection
+- New output switches, --no-prefix, --summary, --errors-only
 - Added busybox (and Android Termux) support
         - More portable file size functions
         - More portable compression program commands
@@ -20,17 +22,18 @@ XX Xxx 2016: osync v1.2-RC1 released
         - Added busybox sendmail support
 	- Added tls and ssl support for sendmail
 - Added --skip-deletion support in config and quicksync modes
-- Prevent lock file racing condition
-! Added ssh password file support (needs sshpass doc)
-- Improved unit tests
-        ! Added conflict resolution tests
+- Added possibility to skip deletion on initiator or target replica
+- Prevent lock file racing condition (thanks to https://github.com/allter)
+- Added ssh password file support
+- Hugely improved unit tests
+        - Added conflict resolution tests
         - Added softdeletion tests
 	- Added softdeletion cleanup tests
-        ! Added lock tests
-        ! Added skip-deletion tests
+        - Added lock tests
+        - Added skip-deletion tests
 	- Added configuration file tests
 	- Added upgrade script test
-! documentation update, statefulness
+- Simplified logger
 
 17 Oct 2016: osync v1.2-beta2 released
 - osync now propagates symlink deletions and moves symlinks without referrents to deletion dir
@@ -52,10 +55,8 @@ XX Xxx 2016: osync v1.2-RC1 released
 - Improved batch runner
 - Made keep logging value configurable and not mandatory
 - Fixed handling of processes in uninterruptible sleep state
-! update doc on sudoers paths
 - Parallelized sync functions
 	- Rewrite sync resume process
-	- !doc about bandwidth
 - Added options to ignore permissions, ownership and groups
 - Refactored WaitFor... functions into one
 - Improved execution speed
@@ -68,7 +69,19 @@ XX Xxx 2016: osync v1.2-RC1 released
 - Added KillAllChilds function to accept multiple pids
 - Improved logging
 
-XX xxx 2016: osync v1.1.3 released
+17 Nov 2016: osync v1.1.5 released
+- Backported unit tests from v1.2-beta allowing to fix the following
+	- Allow quicksync mode to specify rsync include / exclude patterns as environment variables
+	- Added default path separator char in quicksync mode for multiple includes / exclusions
+	- Local runs should not check for remote connectivity
+	- Fixed backups go into root of replica instead of .osync_wordir/backups
+	- Fixed error alerts cannot be triggered from subprocesses
+	- Fixed remote locked targets are unlocked in any case
+
+10 Nov 2016: osync v1.1.4 released
+- Fixed a corner case with sending alerts with logfile attachments when osync is used by multiple users
+
+02 Sep 2016: osync v1.1.3 released
 - Fixed installer for CYGWIN / MSYS environment
 
 28 Aug 2016: osync v1.1.2 released
@@ -77,7 +90,6 @@ XX xxx 2016: osync v1.1.3 released
 - Fixed soft deletion when SUDO_EXEC is enabled
 
 06 Aug 2016: osync v1.1.1 released
-
 - Fixed bogus rsync pattern file adding
 - Fixed soft deletion always enabled on target
 - Fixed problem with attributes file list function
