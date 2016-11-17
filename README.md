@@ -36,11 +36,12 @@ Installation
 osync has been designed to not delete any data, but rather make backups of conflictual files or soft deletes.
 Nevertheless, you should always have a neat backup of your data before trying a new sync tool.
 
-You can download the latest stable release of osync at https://github.com/deajan/osync/archive/v1.1.3.tar.gz
+You can download the latest stable release of osync at https://github.com/deajan/osync/archive/stable.tar.gz
 
 You may also get the last development version at https://github.com/deajan/osync with the following command
 
-	$ git clone -b "v1.1-maint" https://github.com/deajan/osync
+	$ git clone https://github.com/deajan/osync
+	$ cd osync
 	$ sh install.sh
 
 osync will install itself to /usr/local/bin and an example configuration file will be installed to /etc/osync
@@ -53,7 +54,9 @@ If bash is not your default shell, you may invoke it using
 On *BSD and BusyBox, be sure to have bash installed.
 On MSYS, On top of your basic install, you need msys-rsync and msys-coreutils-ext packages.
 
-## Upgrade from v1.0x
+Archlinux packages are available at https://aur.archlinux.org/packages/osync/ (thanks to Shadowigor, https://github.com/shadowigor)
+
+## Upgrade from v1.0x and v1.1x
 
 Since osync v1.1 the config file format has changed in semantics and adds new config options.
 Also, master is now called initiator and slave is now called target.
@@ -75,11 +78,19 @@ QuickSync example
 	# osync.sh --initiator="/path/to/dir1" --target="/path/to/remote dir2"
 	# osync.sh --initiator="/path/to/another dir" --target="ssh://user@host.com:22//path/to/dir2" --rsakey=/home/user/.ssh/id_rsa_private_key_example.com
 
+Summary mode
+------------
+osync may output only file changes and errors with the following
+
+	# osync.sh --initiator="/path/to/dir1" --target="/path/to/dir" --summary --errors-only --no-prefix
+
+This also works in configuration file mode.
+
 QuickSync with minimal options
 ------------------------------
 In order to run osync the quickest (without transferring file attributes, without softdeletion, without prior space checks and without remote connectivity checks, you may use the following:
 
-	# MINIMUM_SPACE=0 PRESERVE_PERMISSIONS=no PRESERVE_OWNER=no PRESERVE_GROUP=no PRESERVE_EXECUTABILITY=no SOFT_DELETE_DAYS=0 CONFLICT_BACKUP_DAYS=0 REMOTE_HOST_PING=no osync.sh --initiator="/path/to/another dir" --target="ssh://user@host.com:22//path/to/dir2" --rsakey=/home/user/.ssh/id_rsa_private_key_example.com
+	# MINIMUM_SPACE=0 PRESERVE_ACL=no PRESERVE_XATTR=no SOFT_DELETE_DAYS=0 CONFLICT_BACKUP_DAYS=0 REMOTE_HOST_PING=no osync.sh --initiator="/path/to/another dir" --target="ssh://user@host.com:22//path/to/dir2" --rsakey=/home/user/.ssh/id_rsa_private_key_example.com
 
 All the settings described here may also be configured in the conf file.
 
