@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-# osync test suite 2016111506
+# osync test suite 2016111701
 
 # 4 tests:
 # quicklocal
@@ -9,19 +9,22 @@
 # confremote
 
 # for each test:
-# files with spaces, subdirs
-# largefileset (...large ?)
-# exclusions
-# conflict resolution initiator with backups / multiple backups
-# conflict resolution target with backups / multiple backups
-# deletion propagation, failed deletion repropagation
-# lock checks
-# file attribute tests
+# 	files with spaces, subdirs
+# 	largefileset (...large ?)
+# 	exclusions
+# 	conflict resolution initiator with backups / multiple backups
+# 	conflict resolution target with backups / multiple backups
+# 	deletion propagation, failed deletion repropagation, skip deletion
+# 	replica lock checks
+#	file attribute tests
+# 	local / remote locking resume tests
 
-#TODO: lock checks missing
-#TODO: skip deletion tests
+# function test
+# WaitForTaskCompletion
+# ParallelExec
+
+# daemon mode tests
 #TODO: daemon mode tests
-#TODO: check file contents on attribute updates
 
 #TODO: enable teardown after tests
 
@@ -38,6 +41,7 @@ OLD_CONF="old.conf"
 TMP_OLD_CONF="tmp.old.conf"
 
 OSYNC_EXECUTABLE="osync.sh"
+OSYNC_DEV_EXECUTABLE="dev/n_osync.sh"
 OSYNC_UPGRADE="upgrade-v1.0x-v1.2x.sh"
 TMP_FILE="$DEV_DIR/tmp"
 
@@ -61,10 +65,15 @@ OSYNC_STATE_DIR="$OSYNC_WORKDIR/state"
 OSYNC_DELETE_DIR="$OSYNC_WORKDIR/deleted"
 OSYNC_BACKUP_DIR="$OSYNC_WORKDIR/backup"
 
+# Later populated variables
+OSYNC_VERSION=1.x.y
+OSYNC_MIN_VERSION=x
+OSYNC_IS_STABLE=maybe
+
 # Setup an array with all function modes
 declare -Ag osyncParameters
 
-osyncParameters[quicklocal]="--initiator=$INITIATOR_DIR --target=$TARGET_DIR --instance-id=quicklocal"
+osyncParameters[quickLocal]="--initiator=$INITIATOR_DIR --target=$TARGET_DIR --instance-id=quicklocal"
 osyncParameters[quickRemote]="--initiator=$INITIATOR_DIR --target=ssh://localhost:$SSH_PORT/$TARGET_DIR --rsakey=${HOME}/.ssh/id_rsa_local --instance-id=quickremote"
 osyncParameters[confLocal]="$CONF_DIR/$LOCAL_CONF"
 osyncParameters[confRemote]="$CONF_DIR/$REMOTE_CONF"
@@ -95,23 +104,6 @@ function SetConfFileValue () {
 		assertEquals "Set $name to [$value]." "0" $?
 	else
 		assertEquals "$name does not exist in [$file]." "1" "0"
-	fi
-}
-
-function SetStableToYes () {
-	if grep "^IS_STABLE=YES" "$OSYNC_DIR/$OSYNC_EXECUTABLE" > /dev/null; then
-		IS_STABLE=yes
-	else
-		IS_STABLE=no
-		sed -i.tmp 's/^IS_STABLE=no/IS_STABLE=yes/' "$OSYNC_DIR/$OSYNC_EXECUTABLE"
-		assertEquals "Set stable to yes" "0" $?
-	fi
-}
-
-function SetStableToOrigin () {
-	if [ "$IS_STABLE" == "no" ]; then
-		sed -i.tmp 's/^IS_STABLE=yes/IS_STABLE=no/' "$OSYNC_DIR/$OSYNC_EXECUTABLE"
-		assertEquals "Set stable to origin value" "0" $?
 	fi
 }
 
@@ -176,13 +168,20 @@ function oneTimeSetUp () {
 	SetupSSH
 
 	# Get osync version
-	OSYNC_VERSION=$(grep "PROGRAM_VERSION" "$OSYNC_DIR/$OSYNC_EXECUTABLE")
+	OSYNC_VERSION=$(GetConfFileValue "$OSYNC_DIR/$OSYNC_DEV_EXECUTABLE" "PROGRAM_VERSION")
 	OSYNC_VERSION="${OSYNC_VERSION##*=}"
 	OSYNC_MIN_VERSION="${OSYNC_VERSION:2:1}"
+
+	OSYNC_IS_STABLE=$(GetConfFileValue "$OSYNC_DIR/$OSYNC_DEV_EXECUTABLE" "IS_STABLE")
+
+	echo "Running with $OSYNC_VERSION ($OSYNC_MIN_VERSION) STABLE=$OSYNC_IS_STABLE"
 }
 
 function oneTimeTearDown () {
-	SetStableToOrigin
+	# Set osync version stable flag back to origin
+	SetConfFileValue "$OSYNC_DIR/$OSYNC_EXECUTABLE" "IS_STABLE" "$OSYNC_IS_STABLE"
+
+	#TODO: uncomment this when dev is done
 	#rm -rf "$OSYNC_TESTS_DIR"
 }
 
@@ -196,10 +195,12 @@ function test_Merge () {
 	cd "$DEV_DIR"
 	./merge.sh
 	assertEquals "Merging code" "0" $?
-	SetStableToYes
+
+	# Set osync version to stable while testing to avoid warning message
+	SetConfFileValue "$OSYNC_DIR/$OSYNC_EXECUTABLE" "IS_STABLE" "yes"
 }
 
-function test_LargeFileSet () {
+function nope_test_LargeFileSet () {
 	for i in "${osyncParameters[@]}"; do
 		cd "$OSYNC_DIR"
 
@@ -217,7 +218,7 @@ function test_LargeFileSet () {
 	done
 }
 
-function test_Exclusions () {
+function nope_test_Exclusions () {
 	# Will sync except php files
 	# RSYNC_EXCLUDE_PATTERN="*.php" is set at runtime for quicksync and in config files for other runs
 
@@ -246,7 +247,7 @@ function test_Exclusions () {
 	done
 }
 
-function test_Deletetion () {
+function nope_test_Deletetion () {
 	local iFile1="$INITIATOR_DIR/ific"
 	local iFile2="$INITIATOR_DIR/ifoc"
 	local tFile1="$TARGET_DIR/tfic"
@@ -290,7 +291,7 @@ function test_Deletetion () {
 	done
 }
 
-function test_deletion_failure () {
+function nope_test_deletion_failure () {
 
 	if [ "$TRAVIS_RUN" == true ]; then
 		echo "Skipping deletionFailure tests as travis does not support chattr."
@@ -357,11 +358,84 @@ function test_deletion_failure () {
 	done
 }
 
-function test_skip_deletion () {
-	echo "Not implemented yet"
+function nope_test_skip_deletion () {
+	local skipDeletionLocal
+	local skipDeletionRemote
+	local modes
+
+	if [ "$OSYNC_MIN_VERSION" == "1" ]; then
+		echo "Skipping SkipDeletion test because it wasn't implemented in osync v1.1."
+		return 0
+	fi
+
+	# Keep original values
+	skipDeletionLocal=$(GetConfFileValue "$CONF_DIR/$LOCAL_CONF" "SKIP_DELETION")
+	skipDeletionRemote=$(GetConfFileValue "$CONF_DIR/$REMOTE_CONF" "SKIP_DELETION")
+
+	modes=('initiator' 'target' 'initiator,target')
+
+	for mode in "${modes[@]}"; do
+
+		SetConfFileValue "$CONF_DIR/$LOCAL_CONF" "SKIP_DELETION" "$mode"
+		SetConfFileValue "$CONF_DIR/$REMOTE_CONF" "SKIP_DELETION" "$mode"
+
+		for i in "${osyncParameters[@]}"; do
+			cd "$OSYNC_DIR"
+			PrepareLocalDirs
+
+			DirA="another/one/bites/ de_dust"
+			DirB="phantom of /the opera"
+
+			mkdir -p "$INITIATOR_DIR/$DirA"
+			mkdir -p "$TARGET_DIR/$DirB"
+
+			FileA="$DirA/Iron Rhapsody"
+			FileB="$DirB/Bohemian Maiden"
+
+			touch "$INITIATOR_DIR/$FileA"
+			touch "$TARGET_DIR/$FileB"
+
+			# First run
+			REMOTE_HOST_PING=no SKIP_DELETION="$mode" ./$OSYNC_EXECUTABLE $i
+			assertEquals "First deletion run with parameters [$i]." "0" $?
+
+			rm -f "$INITIATOR_DIR/$FileA"
+			rm -f "$TARGET_DIR/$FileB"
+
+			# Second run
+			REMOTE_HOST_PING=no SKIP_DELETION="$mode" ./$OSYNC_EXECUTABLE $i
+			assertEquals "First deletion run with parameters [$i]." "0" $?
+
+			if [ "$mode" == "initiator" ]; then
+				[ -f "$TARGET_DIR/$FileA" ]
+				assertEquals "File [$TARGET_DIR/$FileA] still exists in mode $mode." "1" $?
+				[ -f "$INITIATOR_DIR/$FileB" ]
+				assertEquals "File [$INITIATOR_DIR/$FileB still exists in mode $mode." "0" $?
+
+			elif [ "$mode" == "target" ]; then
+				[ -f "$TARGET_DIR/$FileA" ]
+				assertEquals "File [$TARGET_DIR/$FileA] still exists in mode $mode." "0" $?
+				[ -f "$INITIATOR_DIR/$FileB" ]
+				assertEquals "File [$INITIATOR_DIR/$FileB still exists in mode $mode." "1" $?
+
+
+			elif [ "$mode" == "initiator,target" ]; then
+				[ -f "$TARGET_DIR/$FileA" ]
+				assertEquals "File [$TARGET_DIR/$FileA] still exists in mode $mode." "0" $?
+				[ -f "$INITIATOR_DIR/$FileB" ]
+				assertEquals "File [$INITIATOR_DIR/$FileB still exists in mode $mode." "0" $?
+			else
+				assertEquals "Bogus skip deletion mode" "0" "1"
+			fi
+		done
+	done
+
+	# Set original values back
+	SetConfFileValue "$CONF_DIR/$LOCAL_CONF" "SKIP_DELETION" "$skipDeletionLocal"
+	SetConfFileValue "$CONF_DIR/$REMOTE_CONF" "SKIP_DELETION" "$skipDeletionRemote"
 }
 
-function test_softdeletion_cleanup () {
+function nope_test_softdeletion_cleanup () {
 	declare -A files
 
 	files[deletedFileInitiator]="$INITIATOR_DIR/$OSYNC_DELETE_DIR/someDeletedFileInitiator"
@@ -416,7 +490,7 @@ function test_softdeletion_cleanup () {
 
 }
 
-function test_FileAttributePropagation () {
+function nope_test_FileAttributePropagation () {
 
 	if [ "$TRAVIS_RUN" == true ]; then
 		echo "Skipping FileAttributePropagation tests as travis does not support getfacl / setfacl."
@@ -471,7 +545,7 @@ function test_FileAttributePropagation () {
 	done
 }
 
-function test_ConflictBackups () {
+function nope_test_ConflictBackups () {
 	for i in "${osyncParameters[@]}"; do
 		cd "$OSYNC_DIR"
 		PrepareLocalDirs
@@ -507,7 +581,7 @@ function test_ConflictBackups () {
 	done
 }
 
-function test_MultipleConflictBackups () {
+function nope_test_MultipleConflictBackups () {
 	local conflictBackupMultipleLocal
 	local conflictBackupMultipleRemote
 
@@ -525,8 +599,6 @@ function test_MultipleConflictBackups () {
 	fi
 
 	for i in "${osyncParameters[@]}"; do
-
-
 
 		cd "$OSYNC_DIR"
 		PrepareLocalDirs
@@ -575,8 +647,116 @@ function test_MultipleConflictBackups () {
 
 }
 
+function test_Locking () {
+	local forceStrangerUnlockLocal
+	local forceStrangerUnlockRemote
 
-function test_WaitForTaskCompletion () {
+# local not running = resume
+# remote same instance_id = resume
+# remote different instance_id = stop
+# remote dfiffent instance_id + FORCE_STRANGER_LOCK_RESUME = resume
+
+	# Initiator lock present should always be resumed if pid does not run
+	for i in "${osyncParameters[@]}"; do
+
+		cd "$OSYNC_DIR"
+		PrepareLocalDirs
+
+		mkdir -p "$INITIATOR_DIR/$OSYNC_WORKDIR"
+		echo 65536 > "$INITIATOR_DIR/$OSYNC_WORKDIR/lock"
+
+		REMOTE_HOST_PING=no ./$OSYNC_EXECUTABLE $i
+		assertEquals "Should be able to resume when initiator has lock without running pid." "0" $?
+
+		echo $$ > "$INITIATOR_DIR/$OSYNC_WORKDIR/lock"
+
+		REMOTE_HOST_PING=no ./$OSYNC_EXECUTABLE $i
+		assertEquals "Should never be able to resume when initiator has lock with running pid." "1" $?
+	done
+
+	# Target lock present should be resumed if instance ID is the same as current one
+	PrepareLocalDirs
+	mkdir -p "$TARGET_DIR/$OSYNC_WORKDIR"
+	echo 65536@quicklocal > "$TARGET_DIR/$OSYNC_WORKDIR/lock"
+
+	REMOTE_HOST_PING=no ./$OSYNC_EXECUTABLE ${osyncParameters[quickLocal]}
+	assertEquals "Should be able to resume locked target with same instance_id in quickLocal mode." "0" $?
+
+	PrepareLocalDirs
+	mkdir -p "$TARGET_DIR/$OSYNC_WORKDIR"
+	echo 65536@local > "$TARGET_DIR/$OSYNC_WORKDIR/lock"
+
+	REMOTE_HOST_PING=no ./$OSYNC_EXECUTABLE ${osyncParameters[confLocal]}
+	assertEquals "Should be able to resume locked target with same instance_id in confLocal mode." "0" $?
+
+	PrepareLocalDirs
+	mkdir -p "$TARGET_DIR/$OSYNC_WORKDIR"
+	echo 65536@quickremote > "$TARGET_DIR/$OSYNC_WORKDIR/lock"
+
+	REMOTE_HOST_PING=no ./$OSYNC_EXECUTABLE ${osyncParameters[quickRemote]}
+	assertEquals "Should be able to resume locked target with same instance_id in quickRemote mode." "0" $?
+
+	PrepareLocalDirs
+	mkdir -p "$TARGET_DIR/$OSYNC_WORKDIR"
+	echo 65536@remote > "$TARGET_DIR/$OSYNC_WORKDIR/lock"
+
+	REMOTE_HOST_PING=no ./$OSYNC_EXECUTABLE ${osyncParameters[confRemote]}
+	assertEquals "Should be able to resume locked target with same instance_id in confRemote mode." "0" $?
+
+	# Remote Target lock present should not be resumed if instance ID is NOT the same as current one, local target lock is resumed
+	PrepareLocalDirs
+	mkdir -p "$TARGET_DIR/$OSYNC_WORKDIR"
+	echo 65536@bogusinstance > "$TARGET_DIR/$OSYNC_WORKDIR/lock"
+
+	REMOTE_HOST_PING=no ./$OSYNC_EXECUTABLE ${osyncParameters[quickLocal]}
+	assertEquals "Should be able to resume locked local target with bogus instance id in quickLocal mode." "0" $?
+
+	PrepareLocalDirs
+	mkdir -p "$TARGET_DIR/$OSYNC_WORKDIR"
+	echo 65536@bogusinstance > "$TARGET_DIR/$OSYNC_WORKDIR/lock"
+
+	REMOTE_HOST_PING=no ./$OSYNC_EXECUTABLE ${osyncParameters[confLocal]}
+	assertEquals "Should be able to resume locked local target with bogus instance_id in confLocal mode." "0" $?
+
+	PrepareLocalDirs
+	mkdir -p "$TARGET_DIR/$OSYNC_WORKDIR"
+	echo 65536@bogusinstance > "$TARGET_DIR/$OSYNC_WORKDIR/lock"
+
+	REMOTE_HOST_PING=no ./$OSYNC_EXECUTABLE ${osyncParameters[quickRemote]}
+	assertEquals "Should not be able to resume remote locked target with bogus instance_id in quickRemote mode." "1" $?
+
+	PrepareLocalDirs
+	mkdir -p "$TARGET_DIR/$OSYNC_WORKDIR"
+	echo 65536@bogusinstance > "$TARGET_DIR/$OSYNC_WORKDIR/lock"
+
+	REMOTE_HOST_PING=no ./$OSYNC_EXECUTABLE ${osyncParameters[confRemote]}
+	assertEquals "Should not be able to resume remote locked target with bgous instance_id in confRemote mode." "1" $?
+
+	# Target lock present should be resumed if instance ID is NOT the same as current one but FORCE_STRANGER_UNLOCK=yes
+
+	forceStrangerUnlockLocal=$(GetConfFileValue "$CONF_DIR/$LOCAL_CONF" "FORCE_STRANGER_LOCK_RESUME")
+	forceStrangerUnlockRemote=$(GetConfFileValue "$CONF_DIR/$REMOTE_CONF" "FORCE_STRANGER_LOCK_RESUME")
+
+	SetConfFileValue "$CONF_DIR/$LOCAL_CONF" "FORCE_STRANGER_LOCK_RESUME" "yes"
+	SetConfFileValue "$CONF_DIR/$REMOTE_CONF" "FORCE_STRANGER_LOCK_RESUME" "yes"
+
+	for i in "${osyncParameters[@]}"; do
+
+		cd "$OSYNC_DIR"
+		PrepareLocalDirs
+
+		mkdir -p "$INITIATOR_DIR/$OSYNC_WORKDIR"
+		echo 65536@bogusinstance > "$INITIATOR_DIR/$OSYNC_WORKDIR/lock"
+
+		FORCE_STRANGER_UNLOCK=yes REMOTE_HOST_PING=no ./$OSYNC_EXECUTABLE $i
+		assertEquals "Should be able to resume when target has lock with different instance id but FORCE_STRANGER_UNLOCK=yes." "0" $?
+	done
+
+	SetConfFileValue "$CONF_DIR/$LOCAL_CONF" "FORCE_STRANGER_LOCK_RESUME" "$forceStrangerUnlockLocal"
+	SetConfFileValue "$CONF_DIR/$REMOTE_CONF" "FORCE_STRANGER_LOCK_RESUME" "$forceStrangerUnlockRemote"
+}
+
+function nope_test_WaitForTaskCompletion () {
 	if [ "$OSYNC_MIN_VERSION" == "1" ]; then
 		echo "Skipping WaitForTaskCompletion test because osync v1.1 does not support multiple pid monitoring"
 		return 0
@@ -631,7 +811,7 @@ function test_WaitForTaskCompletion () {
 	assertEquals "WaitForTaskCompletion test 5" "2" $?
 }
 
-function test_ParallelExec () {
+function nope_test_ParallelExec () {
 	if [ "$OSYNC_MIN_VERSION" == "1" ]; then
 		echo "Skipping ParallelExec test because osync v1.1 didn't have this"
 		return 0
@@ -680,7 +860,7 @@ function test_ParallelExec () {
 
 }
 
-function test_UpgradeConfRun () {
+function nope_test_UpgradeConfRun () {
 	if [ "$OSYNC_MIN_VERSION" == "1" ]; then
 		echo "Skipping Upgrade script test because no further dev will happen on this for v1.1"
 		return 0
