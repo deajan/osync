@@ -33,7 +33,9 @@ dd MMM 2016: osync v1.2-beta3 released
         - Added skip-deletion tests
 	- Added configuration file tests
 	- Added upgrade script test
+	- Added basic daemon mode tests
 - Simplified logger
+- All fixes from v1.1.5
 
 17 Oct 2016: osync v1.2-beta2 released
 - osync now propagates symlink deletions and moves symlinks without referrents to deletion dir
