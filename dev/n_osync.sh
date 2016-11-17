@@ -3,8 +3,8 @@
 PROGRAM="osync" # Rsync based two way sync engine with fault tolerance
 AUTHOR="(C) 2013-2016 by Orsiris de Jong"
 CONTACT="http://www.netpower.fr/osync - ozy@netpower.fr"
-PROGRAM_VERSION=1.2-beta2
-PROGRAM_BUILD=2016111702
+PROGRAM_VERSION=1.2-beta3
+PROGRAM_BUILD=2016111703
 IS_STABLE=no
 
 # Execution order						#__WITH_PARANOIA_DEBUG
@@ -2175,14 +2175,11 @@ for i in "$@"; do
 		sync_on_changes=true
 		_NOLOCKS=true
 		_LOGGER_PREFIX="date"
-		_LOGGER_STDERR=true
 		;;
 		--no-locks)
 		_NOLOCKS=true
 		;;
 		--errors-only)
-		#TODO: let err_only only output to stderr
-		#_LOGGER_STDERR=true
 		_LOGGER_ERR_ONLY=true
 		;;
 		--summary)

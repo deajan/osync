@@ -1,13 +1,14 @@
 #### MINIMAL-FUNCTION-SET BEGIN ####
 
-## FUNC_BUILD=2016111701
+## FUNC_BUILD=2016111703
 ## BEGIN Generic bash functions written in 2013-2016 by Orsiris de Jong - http://www.netpower.fr - ozy@netpower.fr
 
 ## To use in a program, define the following variables:
 ## PROGRAM=program-name
 ## INSTANCE_ID=program-instance-name
 ## _DEBUG=yes/no
-## _LOGGER_STDERR=true/false
+## _LOGGER_LOGGER_SILENT=true/false
+## _LOGGER_LOGGER_VERBOSE=true/false
 ## _LOGGER_ERR_ONLY=true/false
 ## _LOGGER_PREFIX="date"/"time"/""
 
@@ -30,10 +31,10 @@ MAIL_ALERT_MSG="Execution of $PROGRAM instance $INSTANCE_ID on $(date) has warni
 
 # Environment variables that can be overriden by programs
 _DRYRUN=false
-_SILENT=false
-_VERBOSE=false
+_LOGGER_SILENT=false
+_LOGGER_VERBOSE=false
+_LOGGER_ERR_ONLY=false
 _LOGGER_PREFIX="date"
-_LOGGER_STDERR=false
 if [ "$KEEP_LOGGING" == "" ]; then
         KEEP_LOGGING=1801
 fi
@@ -41,9 +42,6 @@ fi
 # Initial error status, logging 'WARN', 'ERROR' or 'CRITICAL' will enable alerts flags
 ERROR_ALERT=false
 WARN_ALERT=false
-
-# Log from current run
-CURRENT_LOG=""
 
 ## allow function call checks			#__WITH_PARANOIA_DEBUG
 if [ "$_PARANOIA_DEBUG" == "yes" ];then		#__WITH_PARANOIA_DEBUG
@@ -54,13 +52,13 @@ fi						#__WITH_PARANOIA_DEBUG
 if [ ! "$_DEBUG" == "yes" ]; then
 	_DEBUG=no
 	SLEEP_TIME=.05 # Tested under linux and FreeBSD bash, #TODO tests on cygwin / msys
-	_VERBOSE=false
+	_LOGGER_VERBOSE=false
 else
 	if [ "$SLEEP_TIME" == "" ]; then # Set SLEEP_TIME as environment variable when runinng with bash -x in order to avoid spamming console
 		SLEEP_TIME=.05
 	fi
 	trap 'TrapError ${LINENO} $?' ERR
-	_VERBOSE=true
+	_LOGGER_VERBOSE=true
 fi
 
 SCRIPT_PID=$$
@@ -107,16 +105,109 @@ function Dummy {
 
 # Sub function of Logger
 function _Logger {
+	local logValue="${1}"		# Log to file
+	local stdValue="${2}"		# Log to screeen
+	local toStderr="${3:-false}"	# Log to stderr instead of stdout
+
+	echo -e "$logValue" >> "$LOG_FILE"
+	# Current log file
+	echo -e "$logValue" >> "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$SCRIPT_PID"
+
+	if [ "$stdValue" != "" ] && [ "$_LOGGER_SILENT" != true ]; then
+		if [ $toStderr == true ]; then
+			# Force stderr color in subshell
+			(>&2 echo -e "$stdValue")
+
+		else
+			echo -e "$stdValue"
+		fi
+	fi
+}
+
+# General log function with log levels:
+
+# Environment variables
+# _LOGGER_SILENT: Disables any output to stdout & stderr
+# _LOGGER_STD_ERR: Disables any output to stdout except for ALWAYS loglevel
+# _LOGGER_VERBOSE: Allows VERBOSE loglevel messages to be sent to stdout
+
+# Loglevels
+# Except for VERBOSE, all loglevels are ALWAYS sent to log file
+
+# CRITICAL, ERROR, WARN sent to stderr, color depending on level, level also logged
+# NOTICE sent to stdout
+# VERBOSE sent to stdout if _LOGGER_VERBOSE = true
+# ALWAYS is sent to stdout unless _LOGGER_SILENT = true
+# DEBUG & PARANOIA_DEBUG are only sent to stdout if _DEBUG=yes
+function Logger {
+	local value="${1}" # Sentence to log (in double quotes)
+	local level="${2}" # Log level
+
+	if [ "$_LOGGER_PREFIX" == "time" ]; then
+		prefix="TIME: $SECONDS - "
+	elif [ "$_LOGGER_PREFIX" == "date" ]; then
+		prefix="$(date) - "
+	else
+		prefix=""
+	fi
+
+	if [ "$level" == "CRITICAL" ]; then
+		_Logger "$prefix($level):$value" "$prefix\e[41m$value\e[0m" true
+		ERROR_ALERT=true
+		# ERROR_ALERT / WARN_ALERT isn't set in main when Logger is called from a subprocess. Need to keep this flag.
+		echo "1" > "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.error.$SCRIPT_PID"
+		return
+	elif [ "$level" == "ERROR" ]; then
+		_Logger "$prefix($level):$value" "$prefix\e[91m$value\e[0m" true
+		ERROR_ALERT=true
+		echo "1" > "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.error.$SCRIPT_PID"
+		return
+	elif [ "$level" == "WARN" ]; then
+		_Logger "$prefix($level):$value" "$prefix\e[33m$value\e[0m" true
+		WARN_ALERT=true
+		echo "1" > "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.warn.$SCRIPT_PID"
+		return
+	elif [ "$level" == "NOTICE" ]; then
+		if [ "$_LOGGER_ERR_ONLY" != true ]; then
+			_Logger "$prefix$value" "$prefix$value"
+		fi
+		return
+	elif [ "$level" == "VERBOSE" ]; then
+		if [ $_LOGGER_VERBOSE == true ]; then
+			_Logger "$prefix:$value" "$prefix$value"
+		fi
+		return
+	elif [ "$level" == "ALWAYS" ]; then
+		_Logger  "$prefix$value" "$prefix$value"
+		return
+	elif [ "$level" == "DEBUG" ]; then
+		if [ "$_DEBUG" == "yes" ]; then
+			_Logger "$prefix$value" "$prefix$value"
+			return
+		fi
+	elif [ "$level" == "PARANOIA_DEBUG" ]; then			#__WITH_PARANOIA_DEBUG
+		if [ "$_PARANOIA_DEBUG" == "yes" ]; then		#__WITH_PARANOIA_DEBUG
+			_Logger "$prefix$value" "$prefix$value"		#__WITH_PARANOIA_DEBUG
+			return						#__WITH_PARANOIA_DEBUG
+		fi							#__WITH_PARANOIA_DEBUG
+	else
+		_Logger "\e[41mLogger function called without proper loglevel [$level].\e[0m"
+		_Logger "Value was: $prefix$value"
+	fi
+}
+
+# Sub function of Logger
+function new_Logger {
 	local svalue="${1}" # What to log to stdout
 	local lvalue="${2:-$svalue}" # What to log to logfile, defaults to screen value
-	local evalue="${3}" # What to log to stderr
+	local svalue="${3}" # What to log to stderr
 
 	echo -e "$lvalue" >> "$LOG_FILE"
 	CURRENT_LOG="$CURRENT_LOG"$'\n'"$lvalue"
 
 	if [ $_LOGGER_STDERR == true ] && [ "$evalue" != "" ]; then
 		cat <<< "$evalue" 1>&2
-	elif [ "$_SILENT" == false ]; then
+	elif [ "$_LOGGER_SILENT" == false ]; then
 		echo -e "$svalue"
 	fi
 }
@@ -124,9 +215,9 @@ function _Logger {
 # General log function with log levels:
 # CRITICAL, ERROR, WARN are colored in stdout, prefixed in stderr
 # NOTICE is standard level
-# VERBOSE is only sent to stdout / stderr if _VERBOSE=true
+# VERBOSE is only sent to stdout / stderr if _LOGGER_VERBOSE=true
 # DEBUG & PARANOIA_DEBUG are only sent if _DEBUG=yes
-function Logger {
+function newLogger {
 	local value="${1}" # Sentence to log (in double quotes)
 	local level="${2}" # Log level: PARANOIA_DEBUG, DEBUG, VERBOSE, NOTICE, WARN, ERROR, CRITIAL
 
@@ -160,12 +251,12 @@ function Logger {
 		fi
 		return
 	elif [ "$level" == "VERBOSE" ]; then
-		if [ $_VERBOSE == true ]; then
+		if [ $_LOGGER_VERBOSE == true ]; then
 			_Logger "$prefix$value"
 		fi
 		return
 	elif [ "$level" == "ALWAYS" ]; then
-		if [ $_SILENT != true ]; then
+		if [ $_LOGGER_SILENT != true ]; then
 			_Logger "$prefix$value" "$prefix$level:$value" "$level:$value"
 		fi
 		return
@@ -205,7 +296,7 @@ function QuickLogger {
 
 	__CheckArguments 1 $# ${FUNCNAME[0]} "$@"	#__WITH_PARANOIA_DEBUG
 
-	if [ $_SILENT == true ]; then
+	if [ $_LOGGER_SILENT == true ]; then
 		_QuickLogger "$value" "log"
 	else
 		_QuickLogger "$value" "stdout"
@@ -296,7 +387,9 @@ function SendAlert {
 	else
 		attachment=true
 	fi
-	body="$MAIL_ALERT_MSG"$'\n\n'"$CURRENT_LOG"
+	if [ -e "$RUN_DIR/$PROGRAM._Logger.$SCRIPT_PID" ]; then
+		body="$MAIL_ALERT_MSG"$'\n\n'"$(cat $RUN_DIR/$PROGRAM._Logger.$SCRIPT_PID)"
+	fi
 
 	if [ $ERROR_ALERT == true ]; then
 		subject="Error alert for $INSTANCE_ID"
@@ -484,7 +577,7 @@ function TrapError {
 	local line="$1"
 	local code="${2:-1}"
 
-	if [ $_SILENT == false ]; then
+	if [ $_LOGGER_SILENT == false ]; then
 		echo -e "\e[45m/!\ ERROR in ${job}: Near line ${line}, exit code ${code}\e[0m"
 	fi
 }
@@ -511,7 +604,7 @@ function LoadConfigFile {
 }
 
 function Spinner {
-	if [ $_SILENT == true ] || [ "$_LOGGER_ERR_ONLY" == true ]; then
+	if [ $_LOGGER_SILENT == true ] || [ "$_LOGGER_ERR_ONLY" == true ]; then
 		return 0
 	fi
 
@@ -1054,7 +1147,7 @@ function RunLocalCommand {
 		Logger "Command failed." "ERROR"
 	fi
 
-	if [ $_VERBOSE == true ] || [ $retval -ne 0 ]; then
+	if [ $_LOGGER_VERBOSE == true ] || [ $retval -ne 0 ]; then
 		Logger "Command output:\n$(cat $RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$SCRIPT_PID)" "NOTICE"
 	fi
 
@@ -1089,7 +1182,7 @@ function RunRemoteCommand {
 		Logger "Command failed." "ERROR"
 	fi
 
-	if [ -f "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$SCRIPT_PID" ] && ([ $_VERBOSE == true ] || [ $retval -ne 0 ])
+	if [ -f "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$SCRIPT_PID" ] && ([ $_LOGGER_VERBOSE == true ] || [ $retval -ne 0 ])
 	then
 		Logger "Command output:\n$(cat $RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$SCRIPT_PID)" "NOTICE"
 	fi
