@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-# osync test suite 2016111704
+# osync test suite 2016111705
 
 # 4 tests:
 # quicklocal
@@ -886,6 +886,12 @@ function test_UpgradeConfRun () {
 }
 
 function test_DaemonMode () {
+
+	if [ "$TRAVIS_RUN" == true ]; then
+		echo "Skipping daemon mode tests as no inotifywait present in travis yet."
+		return 0
+	fi
+
 	for i in "${osyncDaemonParameters[@]}"; do
 
 		cd "$OSYNC_DIR"
