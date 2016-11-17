@@ -3,11 +3,11 @@
 PROGRAM="osync" # Rsync based two way sync engine with fault tolerance
 AUTHOR="(C) 2013-2016 by Orsiris de Jong"
 CONTACT="http://www.netpower.fr/osync - ozy@netpower.fr"
-PROGRAM_VERSION=1.1.4
-PROGRAM_BUILD=2016090201
+PROGRAM_VERSION=1.1.5
+PROGRAM_BUILD=2016111701
 IS_STABLE=yes
 
-## FUNC_BUILD=2016071902-d
+## FUNC_BUILD=2016071902-g
 ## BEGIN Generic functions for osync & obackup written in 2013-2016 by Orsiris de Jong - http://www.netpower.fr - ozy@netpower.fr
 
 ## type -p does not work on platforms other than linux (bash). If if does not work, always assume output is not a zero exitcode
@@ -118,14 +118,20 @@ function Logger {
 	if [ "$level" == "CRITICAL" ]; then
 		_Logger "$prefix\e[41m$value\e[0m" "$prefix$level:$value" "$level:$value"
 		ERROR_ALERT=1
+		# ERROR_ALERT / WARN_ALERT isn't set in main when Logger is called from a su$
+		echo "1" > "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.error.$SCRIPT_PID"
 		return
 	elif [ "$level" == "ERROR" ]; then
 		_Logger "$prefix\e[91m$value\e[0m" "$prefix$level:$value" "$level:$value"
 		ERROR_ALERT=1
+		# ERROR_ALERT / WARN_ALERT isn't set in main when Logger is called from a su$
+		echo "1" > "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.error.$SCRIPT_PID"
 		return
 	elif [ "$level" == "WARN" ]; then
 		_Logger "$prefix\e[93m$value\e[0m" "$prefix$level:$value" "$level:$value"
 		WARN_ALERT=1
+		# ERROR_ALERT / WARN_ALERT isn't set in main when Logger is called from a su$
+		echo "1" > "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.warn.$SCRIPT_PID"
 		return
 	elif [ "$level" == "NOTICE" ]; then
 		_Logger "$prefix$value"
@@ -285,7 +291,7 @@ function SendAlert {
 	fi
 
 	# Windows specific
-        if type "mailsend.exe" > /dev/null 2>&1 ; then
+	if type "mailsend.exe" > /dev/null 2>&1 ; then
 
 		if [ "$SMTP_ENCRYPTION" != "tls" ] && [ "$SMTP_ENCRYPTION" != "ssl" ]  && [ "$SMTP_ENCRYPTION" != "none" ]; then
 			Logger "Bogus smtp encryption, assuming none." "WARN"
@@ -298,14 +304,14 @@ function SendAlert {
 		if [ "$SMTP_USER" != "" ] && [ "$SMTP_USER" != "" ]; then
 			auth_string="-auth -user \"$SMTP_USER\" -pass \"$SMTP_PASSWORD\""
 		fi
-                $(type mailsend.exe) -f $SENDER_MAIL -t "$DESTINATION_MAILS" -sub "$subject" -M "$MAIL_ALERT_MSG" -attach "$attachment" -smtp "$SMTP_SERVER" -port "$SMTP_PORT" $encryption_string $auth_string
-                if [ $? != 0 ]; then
-                        Logger "Cannot send mail via $(type mailsend.exe) !!!" "WARN"
-                else
-                        Logger "Sent mail using mailsend.exe command with attachment." "NOTICE"
-                        return 0
-                fi
-        fi
+		$(type mailsend.exe) -f $SENDER_MAIL -t "$DESTINATION_MAILS" -sub "$subject" -M "$MAIL_ALERT_MSG" -attach "$attachment" -smtp "$SMTP_SERVER" -port "$SMTP_PORT" $encryption_string $auth_string
+		if [ $? != 0 ]; then
+			Logger "Cannot send mail via $(type mailsend.exe) !!!" "WARN"
+		else
+			Logger "Sent mail using mailsend.exe command with attachment." "NOTICE"
+			return 0
+		fi
+	fi
 
 	# Windows specific, kept for compatibility (sendemail from http://caspian.dotconf.net/menu/Software/SendEmail/)
 	if type sendemail > /dev/null 2>&1 ; then
@@ -424,7 +430,7 @@ function SendEmail {
 	fi
 
 	# Windows specific
-        if type "mailsend.exe" > /dev/null 2>&1 ; then
+	if type "mailsend.exe" > /dev/null 2>&1 ; then
 		if [ "$sender_email" == "" ]; then
 			Logger "Missing sender email." "ERROR"
 			return 1
@@ -448,14 +454,14 @@ function SendEmail {
 		if [ "$smtp_user" != "" ] && [ "$smtp_password" != "" ]; then
 			auth_string="-auth -user \"$smtp_user\" -pass \"$smtp_password\""
 		fi
-                $(type mailsend.exe) -f "$sender_email" -t "$destination_mails" -sub "$subject" -M "$message" -attach "$attachment" -smtp "$smtp_server" -port "$smtp_port" $encryption_string $auth_string
-                if [ $? != 0 ]; then
-                        Logger "Cannot send mail via $(type mailsend.exe) !!!" "WARN"
-                else
-                        Logger "Sent mail using mailsend.exe command with attachment." "NOTICE"
-                        return 0
-                fi
-        fi
+		$(type mailsend.exe) -f "$sender_email" -t "$destination_mails" -sub "$subject" -M "$message" -attach "$attachment" -smtp "$smtp_server" -port "$smtp_port" $encryption_string $auth_string
+		if [ $? != 0 ]; then
+			Logger "Cannot send mail via $(type mailsend.exe) !!!" "WARN"
+		else
+			Logger "Sent mail using mailsend.exe command with attachment." "NOTICE"
+			return 0
+		fi
+	fi
 
 	# pfSense specific
 	if [ -f /usr/local/bin/mail.php ]; then
@@ -537,7 +543,7 @@ function Spinner {
 
 # obsolete, use StripQuotes
 function SedStripQuotes {
-        echo $(echo $1 | sed "s/^\([\"']\)\(.*\)\1\$/\2/g")
+	echo $(echo $1 | sed "s/^\([\"']\)\(.*\)\1\$/\2/g")
 }
 
 # Usage: var=$(StripSingleQuotes "$var")
@@ -943,7 +949,7 @@ function RsyncPatternsAdd {
 	local pattern_type="${1}"	# exclude or include
 	local pattern="${2}"
 
-	local rest=
+	local rest
 
 	# Disable globbing so wildcards from exclusions do not get expanded
 	set -f
@@ -969,213 +975,222 @@ function RsyncPatternsAdd {
 }
 
 function RsyncPatternsFromAdd {
-        local pattern_type="${1}"
-        local pattern_from="${2}"
+	local pattern_type="${1}"
+	local pattern_from="${2}"
 
-        ## Check if the exclude list has a full path, and if not, add the config file path if there is one
-        if [ "$(basename $pattern_from)" == "$pattern_from" ]; then
-                pattern_from="$(dirname $CONFIG_FILE)/$pattern_from"
-        fi
+	## Check if the exclude list has a full path, and if not, add the config file path if there is one
+	if [ "$(basename $pattern_from)" == "$pattern_from" ]; then
+		pattern_from="$(dirname $CONFIG_FILE)/$pattern_from"
+	fi
 
-        if [ -e "$pattern_from" ]; then
-                RSYNC_PATTERNS="$RSYNC_PATTERNS --"$pattern_type"-from=\"$pattern_from\""
-        fi
+	if [ -e "$pattern_from" ]; then
+		RSYNC_PATTERNS="$RSYNC_PATTERNS --"$pattern_type"-from=\"$pattern_from\""
+	fi
 }
 
 function RsyncPatterns {
 
-        if [ "$RSYNC_PATTERN_FIRST" == "exclude" ]; then
-                RsyncPatternsAdd "exclude" "$RSYNC_EXCLUDE_PATTERN"
-                if [ "$RSYNC_EXCLUDE_FROM" != "" ]; then
-                        RsyncPatternsFromAdd "exclude" "$RSYNC_EXCLUDE_FROM"
-                fi
-                RsyncPatternsAdd "$RSYNC_INCLUDE_PATTERN" "include"
-                if [ "$RSYNC_INCLUDE_FROM" != "" ]; then
-                        RsyncPatternsFromAdd "include" "$RSYNC_INCLUDE_FROM"
-                fi
-        elif [ "$RSYNC_PATTERN_FIRST" == "include" ]; then
-                RsyncPatternsAdd "include" "$RSYNC_INCLUDE_PATTERN"
-                if [ "$RSYNC_INCLUDE_FROM" != "" ]; then
-                        RsyncPatternsFromAdd "include" "$RSYNC_INCLUDE_FROM"
-                fi
-                RsyncPatternsAdd "exclude" "$RSYNC_EXCLUDE_PATTERN"
-                if [ "$RSYNC_EXCLUDE_FROM" != "" ]; then
-                        RsyncPatternsFromAdd "exclude" "$RSYNC_EXCLUDE_FROM"
-                fi
-        else
-                Logger "Bogus RSYNC_PATTERN_FIRST value in config file. Will not use rsync patterns." "WARN"
-        fi
+       if [ "$RSYNC_PATTERN_FIRST" == "exclude" ]; then
+		if [ "$RSYNC_EXCLUDE_PATTERN" != "" ]; then
+			RsyncPatternsAdd "exclude" "$RSYNC_EXCLUDE_PATTERN"
+		fi
+		if [ "$RSYNC_EXCLUDE_FROM" != "" ]; then
+			RsyncPatternsFromAdd "exclude" "$RSYNC_EXCLUDE_FROM"
+		fi
+		if [ "$RSYNC_INCLUDE_PATTERN" != "" ]; then
+			RsyncPatternsAdd "$RSYNC_INCLUDE_PATTERN" "include"
+		fi
+		if [ "$RSYNC_INCLUDE_FROM" != "" ]; then
+			RsyncPatternsFromAdd "include" "$RSYNC_INCLUDE_FROM"
+		fi
+	# Use default include first for quicksync runs
+	elif [ "$RSYNC_PATTERN_FIRST" == "include" ] || [ "$_QUICK_SYNC" == "2" ]; then
+		if [ "$RSYNC_INCLUDE_PATTERN" != "" ]; then
+			RsyncPatternsAdd "include" "$RSYNC_INCLUDE_PATTERN"
+		fi
+		if [ "$RSYNC_INCLUDE_FROM" != "" ]; then
+			RsyncPatternsFromAdd "include" "$RSYNC_INCLUDE_FROM"
+		fi
+		if [ "$RSYNC_EXCLUDE_PATTERN" != "" ]; then
+			RsyncPatternsAdd "exclude" "$RSYNC_EXCLUDE_PATTERN"
+		fi
+		if [ "$RSYNC_EXCLUDE_FROM" != "" ]; then
+			RsyncPatternsFromAdd "exclude" "$RSYNC_EXCLUDE_FROM"
+		fi
+	else
+		Logger "Bogus RSYNC_PATTERN_FIRST value in config file. Will not use rsync patterns." "WARN"
+	fi
 }
 
 function PreInit {
 
 	## SSH compression
-        if [ "$SSH_COMPRESSION" != "no" ]; then
-                SSH_COMP=-C
-        else
-                SSH_COMP=
-        fi
+	if [ "$SSH_COMPRESSION" != "no" ]; then
+		SSH_COMP=-C
+	else
+		SSH_COMP=
+	fi
 
 	## Ignore SSH known host verification
 	if [ "$SSH_IGNORE_KNOWN_HOSTS" == "yes" ]; then
 		SSH_OPTS="-o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no"
 	fi
 
-        ## Support for older config files without RSYNC_EXECUTABLE option
-        if [ "$RSYNC_EXECUTABLE" == "" ]; then
-                RSYNC_EXECUTABLE=rsync
-        fi
+	## Support for older config files without RSYNC_EXECUTABLE option
+	if [ "$RSYNC_EXECUTABLE" == "" ]; then
+		RSYNC_EXECUTABLE=rsync
+	fi
 
-        ## Sudo execution option
-        if [ "$SUDO_EXEC" == "yes" ]; then
-                if [ "$RSYNC_REMOTE_PATH" != "" ]; then
-                        RSYNC_PATH="sudo $RSYNC_REMOTE_PATH/$RSYNC_EXECUTABLE"
-                else
-                        RSYNC_PATH="sudo $RSYNC_EXECUTABLE"
-                fi
-                COMMAND_SUDO="sudo"
-        else
-                if [ "$RSYNC_REMOTE_PATH" != "" ]; then
-                        RSYNC_PATH="$RSYNC_REMOTE_PATH/$RSYNC_EXECUTABLE"
-                else
-                        RSYNC_PATH="$RSYNC_EXECUTABLE"
-                fi
-                COMMAND_SUDO=""
-        fi
+	## Sudo execution option
+	if [ "$SUDO_EXEC" == "yes" ]; then
+		if [ "$RSYNC_REMOTE_PATH" != "" ]; then
+			RSYNC_PATH="sudo $RSYNC_REMOTE_PATH/$RSYNC_EXECUTABLE"
+		else
+			RSYNC_PATH="sudo $RSYNC_EXECUTABLE"
+		fi
+		COMMAND_SUDO="sudo"
+	else
+		if [ "$RSYNC_REMOTE_PATH" != "" ]; then
+			RSYNC_PATH="$RSYNC_REMOTE_PATH/$RSYNC_EXECUTABLE"
+		else
+			RSYNC_PATH="$RSYNC_EXECUTABLE"
+		fi
+		COMMAND_SUDO=""
+	fi
 
 	 ## Set rsync default arguments
-        RSYNC_ARGS="-rltD"
+	RSYNC_ARGS="-rltD"
 	RSYNC_ATTR_ARGS="-pgo"
 	if [ "$_DRYRUN" -eq 1 ]; then
 		RSYNC_DRY_ARG="-n"
-                DRY_WARNING="/!\ DRY RUN"
+		DRY_WARNING="/!\ DRY RUN"
 	else
 		RSYNC_DRY_ARG=""
 	fi
 
-        if [ "$PRESERVE_ACL" == "yes" ]; then
-                RSYNC_ATTR_ARGS=$RSYNC_ATTR_ARGS" -A"
-        fi
-        if [ "$PRESERVE_XATTR" == "yes" ]; then
-                RSYNC_ATTR_ARGS=$RSYNC_ATTR_ARGS" -X"
-        fi
-        if [ "$RSYNC_COMPRESS" == "yes" ]; then
-                RSYNC_ARGS=$RSYNC_ARGS" -z"
-        fi
-        if [ "$COPY_SYMLINKS" == "yes" ]; then
-                RSYNC_ARGS=$RSYNC_ARGS" -L"
-        fi
-        if [ "$KEEP_DIRLINKS" == "yes" ]; then
-                RSYNC_ARGS=$RSYNC_ARGS" -K"
-        fi
-        if [ "$PRESERVE_HARDLINKS" == "yes" ]; then
-                RSYNC_ARGS=$RSYNC_ARGS" -H"
-        fi
-        if [ "$CHECKSUM" == "yes" ]; then
-                RSYNC_TYPE_ARGS=$RSYNC_TYPE_ARGS" --checksum"
-        fi
-        if [ "$BANDWIDTH" != "" ] && [ "$BANDWIDTH" != "0" ]; then
-                RSYNC_ARGS=$RSYNC_ARGS" --bwlimit=$BANDWIDTH"
-        fi
+	if [ "$PRESERVE_ACL" == "yes" ]; then
+		RSYNC_ATTR_ARGS=$RSYNC_ATTR_ARGS" -A"
+	fi
+	if [ "$PRESERVE_XATTR" == "yes" ]; then
+		RSYNC_ATTR_ARGS=$RSYNC_ATTR_ARGS" -X"
+	fi
+	if [ "$RSYNC_COMPRESS" == "yes" ]; then
+		RSYNC_ARGS=$RSYNC_ARGS" -z"
+	fi
+	if [ "$COPY_SYMLINKS" == "yes" ]; then
+		RSYNC_ARGS=$RSYNC_ARGS" -L"
+	fi
+	if [ "$KEEP_DIRLINKS" == "yes" ]; then
+		RSYNC_ARGS=$RSYNC_ARGS" -K"
+	fi
+	if [ "$PRESERVE_HARDLINKS" == "yes" ]; then
+		RSYNC_ARGS=$RSYNC_ARGS" -H"
+	fi
+	if [ "$CHECKSUM" == "yes" ]; then
+		RSYNC_TYPE_ARGS=$RSYNC_TYPE_ARGS" --checksum"
+	fi
+	if [ "$BANDWIDTH" != "" ] && [ "$BANDWIDTH" != "0" ]; then
+		RSYNC_ARGS=$RSYNC_ARGS" --bwlimit=$BANDWIDTH"
+	fi
 
-        if [ "$PARTIAL" == "yes" ]; then
-                RSYNC_ARGS=$RSYNC_ARGS" --partial --partial-dir=\"$PARTIAL_DIR\""
-                RSYNC_PARTIAL_EXCLUDE="--exclude=\"$PARTIAL_DIR\""
-        fi
+	if [ "$PARTIAL" == "yes" ]; then
+		RSYNC_ARGS=$RSYNC_ARGS" --partial --partial-dir=\"$PARTIAL_DIR\""
+		RSYNC_PARTIAL_EXCLUDE="--exclude=\"$PARTIAL_DIR\""
+	fi
 
 	if [ "$DELTA_COPIES" != "no" ]; then
-                RSYNC_ARGS=$RSYNC_ARGS" --no-whole-file"
-        else
-            	RSYNC_ARGS=$RSYNC_ARGS" --whole-file"
-        fi
+		RSYNC_ARGS=$RSYNC_ARGS" --no-whole-file"
+	else
+		RSYNC_ARGS=$RSYNC_ARGS" --whole-file"
+	fi
 
 	 ## Set compression executable and extension
-        COMPRESSION_LEVEL=3
-        if type xz > /dev/null 2>&1
-        then
-                COMPRESSION_PROGRAM="| xz -$COMPRESSION_LEVEL"
-                COMPRESSION_EXTENSION=.xz
-        elif type lzma > /dev/null 2>&1
-        then
-                COMPRESSION_PROGRAM="| lzma -$COMPRESSION_LEVEL"
-                COMPRESSION_EXTENSION=.lzma
-        elif type pigz > /dev/null 2>&1
-        then
-                COMPRESSION_PROGRAM="| pigz -$COMPRESSION_LEVEL"
-              	COMPRESSION_EXTENSION=.gz
+	COMPRESSION_LEVEL=3
+	if type xz > /dev/null 2>&1
+	then
+		COMPRESSION_PROGRAM="| xz -$COMPRESSION_LEVEL"
+		COMPRESSION_EXTENSION=.xz
+	elif type lzma > /dev/null 2>&1
+	then
+		COMPRESSION_PROGRAM="| lzma -$COMPRESSION_LEVEL"
+		COMPRESSION_EXTENSION=.lzma
+	elif type pigz > /dev/null 2>&1
+	then
+		COMPRESSION_PROGRAM="| pigz -$COMPRESSION_LEVEL"
+		COMPRESSION_EXTENSION=.gz
 		# obackup specific
-                COMPRESSION_OPTIONS=--rsyncable
-        elif type gzip > /dev/null 2>&1
-        then
-                COMPRESSION_PROGRAM="| gzip -$COMPRESSION_LEVEL"
-                COMPRESSION_EXTENSION=.gz
+		COMPRESSION_OPTIONS=--rsyncable
+	elif type gzip > /dev/null 2>&1
+	then
+		COMPRESSION_PROGRAM="| gzip -$COMPRESSION_LEVEL"
+		COMPRESSION_EXTENSION=.gz
 		# obackup specific
-                COMPRESSION_OPTIONS=--rsyncable
-        else
-                COMPRESSION_PROGRAM=
-                COMPRESSION_EXTENSION=
-        fi
-        ALERT_LOG_FILE="$ALERT_LOG_FILE$COMPRESSION_EXTENSION"
+		COMPRESSION_OPTIONS=--rsyncable
+	else
+		COMPRESSION_PROGRAM=
+		COMPRESSION_EXTENSION=
+	fi
+	ALERT_LOG_FILE="$ALERT_LOG_FILE$COMPRESSION_EXTENSION"
 }
 
 function PostInit {
 
 	# Define remote commands
-        SSH_CMD="$(type -p ssh) $SSH_COMP -i $SSH_RSA_PRIVATE_KEY $SSH_OPTS $REMOTE_USER@$REMOTE_HOST -p $REMOTE_PORT"
-        SCP_CMD="$(type -p scp) $SSH_COMP -i $SSH_RSA_PRIVATE_KEY -P $REMOTE_PORT"
-        RSYNC_SSH_CMD="$(type -p ssh) $SSH_COMP -i $SSH_RSA_PRIVATE_KEY $SSH_OPTS -p $REMOTE_PORT"
+	SSH_CMD="$(type -p ssh) $SSH_COMP -i $SSH_RSA_PRIVATE_KEY $SSH_OPTS $REMOTE_USER@$REMOTE_HOST -p $REMOTE_PORT"
+	SCP_CMD="$(type -p scp) $SSH_COMP -i $SSH_RSA_PRIVATE_KEY -P $REMOTE_PORT"
+	RSYNC_SSH_CMD="$(type -p ssh) $SSH_COMP -i $SSH_RSA_PRIVATE_KEY $SSH_OPTS -p $REMOTE_PORT"
 }
 
 function InitLocalOSSettings {
 
-        ## If running under Msys, some commands do not run the same way
-        ## Using mingw version of find instead of windows one
-        ## Getting running processes is quite different
-        ## Ping command is not the same
-        if [ "$LOCAL_OS" == "msys" ]; then
-                FIND_CMD=$(dirname $BASH)/find
-                # PROCESS_TEST_CMD assumes there is a variable $pid
+	## If running under Msys, some commands do not run the same way
+	## Using mingw version of find instead of windows one
+	## Getting running processes is quite different
+	## Ping command is not the same
+	if [ "$LOCAL_OS" == "msys" ]; then
+		FIND_CMD=$(dirname $BASH)/find
+		# PROCESS_TEST_CMD assumes there is a variable $pid
 		# Tested on MSYS and cygwin
-                PROCESS_TEST_CMD='ps -a | awk "{\$1=\$1}\$1" | awk "{print \$1}" | grep $pid'
-                PING_CMD='$SYSTEMROOT\system32\ping -n 2'
-        else
-                FIND_CMD=find
-                # PROCESS_TEST_CMD assumes there is a variable $pid
-                PROCESS_TEST_CMD='ps -p$pid'
-                PING_CMD="ping -c 2 -i .2"
-        fi
+		PROCESS_TEST_CMD='ps -a | awk "{\$1=\$1}\$1" | awk "{print \$1}" | grep $pid'
+		PING_CMD='$SYSTEMROOT\system32\ping -n 2'
+	else
+		FIND_CMD=find
+		# PROCESS_TEST_CMD assumes there is a variable $pid
+		PROCESS_TEST_CMD='ps -p$pid'
+		PING_CMD="ping -c 2 -i .2"
+	fi
 
-        ## Stat command has different syntax on Linux and FreeBSD/MacOSX
-        if [ "$LOCAL_OS" == "MacOSX" ] || [ "$LOCAL_OS" == "BSD" ]; then
-                STAT_CMD="stat -f \"%Sm\""
+	## Stat command has different syntax on Linux and FreeBSD/MacOSX
+	if [ "$LOCAL_OS" == "MacOSX" ] || [ "$LOCAL_OS" == "BSD" ]; then
+		STAT_CMD="stat -f \"%Sm\""
 		STAT_CTIME_MTIME_CMD="stat -f %N;%c;%m"
-        else
-                STAT_CMD="stat --format %y"
+	else
+		STAT_CMD="stat --format %y"
 		STAT_CTIME_MTIME_CMD="stat -c %n;%Z;%Y"
-        fi
+	fi
 }
 
 function InitRemoteOSSettings {
 
-        ## MacOSX does not use the -E parameter like Linux or BSD does (-E is mapped to extended attrs instead of preserve executability)
-        if [ "$LOCAL_OS" != "MacOSX" ] && [ "$REMOTE_OS" != "MacOSX" ]; then
-                RSYNC_ATTR_ARGS=$RSYNC_ATTR_ARGS" -E"
-        fi
+	## MacOSX does not use the -E parameter like Linux or BSD does (-E is mapped to extended attrs instead of preserve executability)
+	if [ "$LOCAL_OS" != "MacOSX" ] && [ "$REMOTE_OS" != "MacOSX" ]; then
+		RSYNC_ATTR_ARGS=$RSYNC_ATTR_ARGS" -E"
+	fi
 
-        if [ "$REMOTE_OS" == "msys" ]; then
-                REMOTE_FIND_CMD=$(dirname $BASH)/find
-        else
-                REMOTE_FIND_CMD=find
-        fi
+	if [ "$REMOTE_OS" == "msys" ]; then
+		REMOTE_FIND_CMD=$(dirname $BASH)/find
+	else
+		REMOTE_FIND_CMD=find
+	fi
 
-        ## Stat command has different syntax on Linux and FreeBSD/MacOSX
-        if [ "$LOCAL_OS" == "MacOSX" ] || [ "$LOCAL_OS" == "BSD" ]; then
-                REMOTE_STAT_CMD="stat -f \"%Sm\""
+	## Stat command has different syntax on Linux and FreeBSD/MacOSX
+	if [ "$LOCAL_OS" == "MacOSX" ] || [ "$LOCAL_OS" == "BSD" ]; then
+		REMOTE_STAT_CMD="stat -f \"%Sm\""
 		REMOTE_STAT_CTIME_MTIME_CMD="stat -f \\\"%N;%c;%m\\\""
-        else
-                REMOTE_STAT_CMD="stat --format %y"
+	else
+		REMOTE_STAT_CMD="stat --format %y"
 		REMOTE_STAT_CTIME_MTIME_CMD="stat -c \\\"%n;%Z;%Y\\\""
-        fi
+	fi
 
 }
 
@@ -1201,6 +1216,14 @@ function TrapStop {
 
 function TrapQuit {
 	local exitcode=
+
+	# Get ERROR / WARN alert flags from subprocesses that call Logger
+	if [ -f "$RUN_DIR/$PROGRAM.Logger.warn.$SCRIPT_PID" ]; then
+		WARN_ALERT=1
+	fi
+	if [ -f "$RUN_DIR/$PROGRAM.Logger.error.$SCRIPT_PID" ]; then
+		ERROR_ALERT=1
+	fi
 
 	if [ $ERROR_ALERT -ne 0 ]; then
 		UnlockReplicas
@@ -1537,7 +1560,7 @@ function _CheckLocksRemote {
 	Logger "cmd: $cmd" "DEBUG"
 	eval "$cmd" &
 	WaitForTaskCompletion $! 720 1800 ${FUNCNAME[0]}
-	if [ $? != 0 ]; then
+	if [ $? == 0 ]; then
 		if [ -f "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$SCRIPT_PID" ]; then
 			lockfile_content=$(cat $RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$SCRIPT_PID)
 		else
@@ -2204,8 +2227,6 @@ function Sync {
 	local resume_sync=
 
 	Logger "Starting synchronization task." "NOTICE"
-	CheckConnectivity3rdPartyHosts
-	CheckConnectivityRemoteHost
 
 	if [ -f "${INITIATOR[7]}" ] && [ "$RESUME_SYNC" != "no" ]; then
 		resume_sync=$(cat "${INITIATOR[7]}")
@@ -2603,14 +2624,12 @@ function Init {
 	fi
 
 	## Add Rsync include / exclude patterns
-	if [ $_QUICK_SYNC -lt 2 ]; then
-		RsyncPatterns
-	fi
+	RsyncPatterns
 
 	## Conflict options
 	if [ "$CONFLICT_BACKUP" != "no" ]; then
-		INITIATOR_BACKUP="--backup --backup-dir=\"${INITIATOR[1]}${INITIATOR[4]}\""
-		TARGET_BACKUP="--backup --backup-dir=\"${TARGET[1]}${TARGET[4]}\""
+		INITIATOR_BACKUP="--backup --backup-dir=\"${INITIATOR[4]}\""
+		TARGET_BACKUP="--backup --backup-dir=\"${TARGET[4]}\""
 		if [ "$CONFLICT_BACKUP_MULTIPLE" == "yes" ]; then
 			INITIATOR_BACKUP="$INITIATOR_BACKUP --suffix .$(date +%Y.%m.%d-%H.%M.%S)"
 			TARGET_BACKUP="$TARGET_BACKUP --suffix .$(date +%Y.%m.%d-%H.%M.%S)"
@@ -2852,6 +2871,10 @@ opts="${opts# *}"
 
 		if [ "$HARD_MAX_EXEC_TIME" == "" ]; then
 			HARD_MAX_EXEC_TIME=0
+		fi
+
+		if [ "$PATH_SEPARATOR_CHAR" == "" ]; then
+			PATH_SEPARATOR_CHAR=";"
 		fi
 
 		MIN_WAIT=30
