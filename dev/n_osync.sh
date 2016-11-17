@@ -4,7 +4,7 @@ PROGRAM="osync" # Rsync based two way sync engine with fault tolerance
 AUTHOR="(C) 2013-2016 by Orsiris de Jong"
 CONTACT="http://www.netpower.fr/osync - ozy@netpower.fr"
 PROGRAM_VERSION=1.1.5
-PROGRAM_BUILD=2016111505
+PROGRAM_BUILD=2016111701
 IS_STABLE=yes
 
 source "./ofunctions.sh"
@@ -389,7 +389,7 @@ function _CheckLocksRemote {
 	Logger "cmd: $cmd" "DEBUG"
 	eval "$cmd" &
 	WaitForTaskCompletion $! 720 1800 ${FUNCNAME[0]}
-	if [ $? != 0 ]; then
+	if [ $? == 0 ]; then
 		if [ -f "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$SCRIPT_PID" ]; then
 			lockfile_content=$(cat $RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$SCRIPT_PID)
 		else
