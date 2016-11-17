@@ -1135,7 +1135,7 @@ function _deleteRemote {
 		exit 1
 	fi
 
-$SSH_CMD ERROR_ALERT=0 sync_on_changes=$sync_on_changes _DEBUG=$_DEBUG _DRYRUN=$_DRYRUN _VERBOSE=$_VERBOSE COMMAND_SUDO=$COMMAND_SUDO FILE_LIST="$(EscapeSpaces "${TARGET[$__replicaDir]}${TARGET[$__stateDir]}/$deletionListFromReplica${INITIATOR[$__deletedListFile]}")" REPLICA_DIR="$(EscapeSpaces "$replicaDir")" SOFT_DELETE=$SOFT_DELETE DELETION_DIR="$(EscapeSpaces "$deletionDir")" FAILED_DELETE_LIST="$failedDeleteList" SUCCESS_DELETE_LIST="$successDeleteList" 'bash -s' << 'ENDSSH' >> "$RUN_DIR/$PROGRAM.remote_deletion.$SCRIPT_PID" 2>&1
+$SSH_CMD ERROR_ALERT=0 sync_on_changes=$sync_on_changes _DEBUG=$_DEBUG _DRYRUN=$_DRYRUN _LOGGER_VERBOSE=$_LOGGER_VERBOSE COMMAND_SUDO=$COMMAND_SUDO FILE_LIST="$(EscapeSpaces "${TARGET[$__replicaDir]}${TARGET[$__stateDir]}/$deletionListFromReplica${INITIATOR[$__deletedListFile]}")" REPLICA_DIR="$(EscapeSpaces "$replicaDir")" SOFT_DELETE=$SOFT_DELETE DELETION_DIR="$(EscapeSpaces "$deletionDir")" FAILED_DELETE_LIST="$failedDeleteList" SUCCESS_DELETE_LIST="$successDeleteList" 'bash -s' << 'ENDSSH' >> "$RUN_DIR/$PROGRAM.remote_deletion.$SCRIPT_PID" 2>&1
 
 	## The following lines are executed remotely
 	function _logger {
@@ -1162,7 +1162,7 @@ $SSH_CMD ERROR_ALERT=0 sync_on_changes=$sync_on_changes _DEBUG=$_DEBUG _DRYRUN=$
 			_logger "$prefix$value"
 			return
 		elif [ "$level" == "VERBOSE" ]; then
-			if [ $_VERBOSE == true ]; then
+			if [ $_LOGGER_VERBOSE == true ]; then
 				_logger "$prefix$value"
 			fi
 			return
@@ -1650,7 +1650,7 @@ function _SoftDeleteLocal {
 			Logger "Removing files older than $changeTime days on $replicaType replica for $deletionType deletion." "NOTICE"
 		fi
 
-		if [ $_VERBOSE == true ]; then
+		if [ $_LOGGER_VERBOSE == true ]; then
 			# Cannot launch log function from xargs, ugly hack
 			$COMMAND_SUDO $FIND_CMD "$replicaDeletionPath/" -type f -ctime +$changeTime -print0 | xargs -0 -I {} echo "Will delete file {}" >> "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$SCRIPT_PID"
 			Logger "Command output:\n$(cat $RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$SCRIPT_PID)" "VERBOSE"
@@ -1701,7 +1701,7 @@ function _SoftDeleteRemote {
 		Logger "Removing files older than $changeTime days on $replicaType replica for $deletionType deletion." "NOTICE"
 	fi
 
-	if [ $_VERBOSE == true ]; then
+	if [ $_LOGGER_VERBOSE == true ]; then
 		# Cannot launch log function from xargs, ugly hack
 		cmd=$SSH_CMD' "if [ -d \"'$replicaDeletionPath'\" ]; then '$COMMAND_SUDO' '$REMOTE_FIND_CMD' \"'$replicaDeletionPath'/\" -type f -ctime +'$changeTime' -print0 | xargs -0 -I {} echo Will delete file {} && '$COMMAND_SUDO' '$REMOTE_FIND_CMD' \"'$replicaDeletionPath'/\" -type d -empty -ctime '$changeTime' -print0 | xargs -0 -I {} echo Will delete directory {}; else echo \"The $replicaType replica dir [$replicaDeletionPath] does not exist. Skipping cleaning of old files.\"; fi" > "'$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$SCRIPT_PID'" 2>&1'
 		Logger "cmd: $cmd" "DEBUG"
@@ -1952,7 +1952,7 @@ function Init {
 	## Set sync only function arguments for rsync
 	SYNC_OPTS="-u"
 
-	if [ $_VERBOSE == true ] || [ $_SUMMARY == true ]; then
+	if [ $_LOGGER_VERBOSE == true ] || [ $_SUMMARY == true ]; then
 		SYNC_OPTS=$SYNC_OPTS" -i"
 	fi
 
@@ -2117,11 +2117,11 @@ for i in "$@"; do
 		opts=$opts" --dry"
 		;;
 		--silent)
-		_SILENT=true
+		_LOGGER_SILENT=true
 		opts=$opts" --silent"
 		;;
 		--verbose)
-		_VERBOSE=true
+		_LOGGER_VERBOSE=true
 		opts=$opts" --verbose"
 		;;
 		--stats)
