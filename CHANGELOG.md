@@ -7,7 +7,19 @@ KNOWN ISSUES
 RECENT CHANGES
 --------------
 
-02 Sep 2016:
+17 Nov 2016: osync v1.1.5 released
+- Backported unit tests from v1.2-beta allowing to fix the following
+	- Allow quicksync mode to specify rsync include / exclude patterns as environment variables
+	- Added default path separator char in quicksync mode for multiple includes / exclusions
+	- Local runs should not check for remote connectivity
+	- Fixed backups go into root of replica instead of .osync_wordir/backups
+	- Fixed error alerts cannot be triggered from subprocesses
+	- Fixed remote locked targets are unlocked in any case
+
+10 Nov 2016: osync v1.1.4 released
+- Fixed a corner case with sending alerts with logfile attachments when osync is used by multiple users
+
+02 Sep 2016: osync v1.1.3 released
 - Fixed directories containing spaces with bash >= 4.3
 - Fixed installer for CYGWIN / MSYS environment
 
@@ -17,7 +29,6 @@ RECENT CHANGES
 - Fixed soft deletion when SUDO_EXEC is enabled
 
 06 Aug 2016: osync v1.1.1 released
-
 - Fixed bogus rsync pattern additions
 - Fixed soft deletion always enabled on target
 - Fixed problem with attributes file list function
