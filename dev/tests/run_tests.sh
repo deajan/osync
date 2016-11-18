@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-# osync test suite 2016111801
+# osync test suite 2016111802
 
 # 4 tests:
 # quicklocal
@@ -68,16 +68,26 @@ OSYNC_IS_STABLE=maybe
 
 # Setup an array with all function modes
 #declare -Ag osyncParameters
+
+readonly $__quickLocal=0
+readonly $__quickRemote=1
+readonly $__confLocal=2
+readonly $__confRemote=3
+
 osyncParameters=()
-osyncParameters[0]="--initiator=$INITIATOR_DIR --target=$TARGET_DIR --instance-id=quicklocal"
-osyncParameters[1]="--initiator=$INITIATOR_DIR --target=ssh://localhost:$SSH_PORT/$TARGET_DIR --rsakey=${HOME}/.ssh/id_rsa_local --instance-id=quickremote"
-osyncParameters[2]="$CONF_DIR/$LOCAL_CONF"
-osyncParameters[3]="$CONF_DIR/$REMOTE_CONF"
+osyncParameters[$__quickLocal]="--initiator=$INITIATOR_DIR --target=$TARGET_DIR --instance-id=quicklocal"
+osyncParameters[$__quickRemote]="--initiator=$INITIATOR_DIR --target=ssh://localhost:$SSH_PORT/$TARGET_DIR --rsakey=${HOME}/.ssh/id_rsa_local --instance-id=quickremote"
+osyncParameters[$__confLocal]="$CONF_DIR/$LOCAL_CONF"
+osyncParameters[$__confRemote]="$CONF_DIR/$REMOTE_CONF"
 
 #declare -Ag osyncDaemonParameters
 osyncDaemonParameters=()
-osyncDaemonParameters[0]="$CONF_DIR/$LOCAL_CONF --on-changes"
-osyncDaemonParameters[1]="$CONF_DIR/$REMOTE_CONF --on-changes"
+
+readonly $__local
+readonly $__remote
+
+osyncDaemonParameters[$__local]="$CONF_DIR/$LOCAL_CONF --on-changes"
+osyncDaemonParameters[$__remote]="$CONF_DIR/$REMOTE_CONF --on-changes"
 
 function GetConfFileValue () {
 	local file="${1}"
@@ -683,28 +693,28 @@ function test_Locking () {
 	mkdir -p "$TARGET_DIR/$OSYNC_WORKDIR"
 	echo 65536@quicklocal > "$TARGET_DIR/$OSYNC_WORKDIR/lock"
 
-	REMOTE_HOST_PING=no ./$OSYNC_EXECUTABLE ${osyncParameters[quickLocal]}
+	REMOTE_HOST_PING=no ./$OSYNC_EXECUTABLE ${osyncParameters[$__quickLocal]}
 	assertEquals "Should be able to resume locked target with same instance_id in quickLocal mode." "0" $?
 
 	PrepareLocalDirs
 	mkdir -p "$TARGET_DIR/$OSYNC_WORKDIR"
 	echo 65536@local > "$TARGET_DIR/$OSYNC_WORKDIR/lock"
 
-	REMOTE_HOST_PING=no ./$OSYNC_EXECUTABLE ${osyncParameters[confLocal]}
+	REMOTE_HOST_PING=no ./$OSYNC_EXECUTABLE ${osyncParameters[$__confLocal]}
 	assertEquals "Should be able to resume locked target with same instance_id in confLocal mode." "0" $?
 
 	PrepareLocalDirs
 	mkdir -p "$TARGET_DIR/$OSYNC_WORKDIR"
 	echo 65536@quickremote > "$TARGET_DIR/$OSYNC_WORKDIR/lock"
 
-	REMOTE_HOST_PING=no ./$OSYNC_EXECUTABLE ${osyncParameters[quickRemote]}
+	REMOTE_HOST_PING=no ./$OSYNC_EXECUTABLE ${osyncParameters[$__quickRemote]}
 	assertEquals "Should be able to resume locked target with same instance_id in quickRemote mode." "0" $?
 
 	PrepareLocalDirs
 	mkdir -p "$TARGET_DIR/$OSYNC_WORKDIR"
 	echo 65536@remote > "$TARGET_DIR/$OSYNC_WORKDIR/lock"
 
-	REMOTE_HOST_PING=no ./$OSYNC_EXECUTABLE ${osyncParameters[confRemote]}
+	REMOTE_HOST_PING=no ./$OSYNC_EXECUTABLE ${osyncParameters[$__confRemote]}
 	assertEquals "Should be able to resume locked target with same instance_id in confRemote mode." "0" $?
 
 	# Remote Target lock present should not be resumed if instance ID is NOT the same as current one, local target lock is resumed
@@ -712,28 +722,28 @@ function test_Locking () {
 	mkdir -p "$TARGET_DIR/$OSYNC_WORKDIR"
 	echo 65536@bogusinstance > "$TARGET_DIR/$OSYNC_WORKDIR/lock"
 
-	REMOTE_HOST_PING=no ./$OSYNC_EXECUTABLE ${osyncParameters[quickLocal]}
+	REMOTE_HOST_PING=no ./$OSYNC_EXECUTABLE ${osyncParameters[$__quickLocal]}
 	assertEquals "Should be able to resume locked local target with bogus instance id in quickLocal mode." "0" $?
 
 	PrepareLocalDirs
 	mkdir -p "$TARGET_DIR/$OSYNC_WORKDIR"
 	echo 65536@bogusinstance > "$TARGET_DIR/$OSYNC_WORKDIR/lock"
 
-	REMOTE_HOST_PING=no ./$OSYNC_EXECUTABLE ${osyncParameters[confLocal]}
+	REMOTE_HOST_PING=no ./$OSYNC_EXECUTABLE ${osyncParameters[$__confLocal]}
 	assertEquals "Should be able to resume locked local target with bogus instance_id in confLocal mode." "0" $?
 
 	PrepareLocalDirs
 	mkdir -p "$TARGET_DIR/$OSYNC_WORKDIR"
 	echo 65536@bogusinstance > "$TARGET_DIR/$OSYNC_WORKDIR/lock"
 
-	REMOTE_HOST_PING=no ./$OSYNC_EXECUTABLE ${osyncParameters[quickRemote]}
+	REMOTE_HOST_PING=no ./$OSYNC_EXECUTABLE ${osyncParameters[$__quickRemote]}
 	assertEquals "Should not be able to resume remote locked target with bogus instance_id in quickRemote mode." "1" $?
 
 	PrepareLocalDirs
 	mkdir -p "$TARGET_DIR/$OSYNC_WORKDIR"
 	echo 65536@bogusinstance > "$TARGET_DIR/$OSYNC_WORKDIR/lock"
 
-	REMOTE_HOST_PING=no ./$OSYNC_EXECUTABLE ${osyncParameters[confRemote]}
+	REMOTE_HOST_PING=no ./$OSYNC_EXECUTABLE ${osyncParameters[$__confRemote]}
 	assertEquals "Should not be able to resume remote locked target with bgous instance_id in confRemote mode." "1" $?
 
 	# Target lock present should be resumed if instance ID is NOT the same as current one but FORCE_STRANGER_UNLOCK=yes
