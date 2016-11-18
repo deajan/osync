@@ -4,7 +4,7 @@ PROGRAM="osync" # Rsync based two way sync engine with fault tolerance
 AUTHOR="(C) 2013-2016 by Orsiris de Jong"
 CONTACT="http://www.netpower.fr/osync - ozy@netpower.fr"
 PROGRAM_VERSION=1.2-beta3
-PROGRAM_BUILD=2016111704
+PROGRAM_BUILD=2016111801
 IS_STABLE=no
 
 # Execution order						#__WITH_PARANOIA_DEBUG
@@ -284,15 +284,24 @@ function _CheckDiskSpaceLocal {
 
 	Logger "Checking minimum disk space in [$replica_path]." "NOTICE"
 
-	diskSpace=$(df "$replica_path" | tail -1 | awk '{print $4}')
-
-	# Ugly fix for df in some busybox environments that can only show human formats
-        if [ $(IsInteger $diskSpace) -eq 0 ]; then
-		diskSpace=$(HumanToNumeric $diskSpace)
+	# Check for -P portability switch
+	if df -P; then
+		diskSpace=$(df -P "$replica_path" | tail -1 | awk '{print $4}')
+	else
+		diskSpace=$(df "$replica_path" | tail -1 | awk '{print $4}')
 	fi
 
-	if [ $diskSpace -lt $MINIMUM_SPACE ]; then
-		Logger "There is not enough free space on replica [$replica_path] ($diskSpace KB)." "WARN"
+	if [ $? != 0 ]; then
+		Logger "Cannot get free space." "ERROR"
+	else
+		# Ugly fix for df in some busybox environments that can only show human formats
+		if [ $(IsInteger $diskSpace) -eq 0 ]; then
+			diskSpace=$(HumanToNumeric $diskSpace)
+		fi
+
+		if [ $diskSpace -lt $MINIMUM_SPACE ]; then
+			Logger "There is not enough free space on replica [$replica_path] ($diskSpace KB)." "WARN"
+		fi
 	fi
 }
 
