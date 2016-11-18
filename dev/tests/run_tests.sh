@@ -69,10 +69,10 @@ OSYNC_IS_STABLE=maybe
 # Setup an array with all function modes
 #declare -Ag osyncParameters
 
-readonly $__quickLocal=0
-readonly $__quickRemote=1
-readonly $__confLocal=2
-readonly $__confRemote=3
+readonly __quickLocal=0
+readonly __quickRemote=1
+readonly __confLocal=2
+readonly __confRemote=3
 
 osyncParameters=()
 osyncParameters[$__quickLocal]="--initiator=$INITIATOR_DIR --target=$TARGET_DIR --instance-id=quicklocal"
@@ -83,8 +83,8 @@ osyncParameters[$__confRemote]="$CONF_DIR/$REMOTE_CONF"
 #declare -Ag osyncDaemonParameters
 osyncDaemonParameters=()
 
-readonly $__local
-readonly $__remote
+readonly __local
+readonly __remote
 
 osyncDaemonParameters[$__local]="$CONF_DIR/$LOCAL_CONF --on-changes"
 osyncDaemonParameters[$__remote]="$CONF_DIR/$REMOTE_CONF --on-changes"
@@ -450,12 +450,13 @@ function test_skip_deletion () {
 }
 
 function test_softdeletion_cleanup () {
-	declare -A files
+	#declare -A files
 
-	files[deletedFileInitiator]="$INITIATOR_DIR/$OSYNC_DELETE_DIR/someDeletedFileInitiator"
-	files[deletedFileTarget]="$TARGET_DIR/$OSYNC_DELETE_DIR/someDeletedFileTarget"
-	files[backedUpFileInitiator]="$INITIATOR_DIR/$OSYNC_BACKUP_DIR/someBackedUpFileInitiator"
-	files[backedUpFileTarget]="$TARGET_DIR/$OSYNC_BACKUP_DIR/someBackedUpFileTarget"
+	files=()
+	files[0]="$INITIATOR_DIR/$OSYNC_DELETE_DIR/someDeletedFileInitiator"
+	files[1]="$TARGET_DIR/$OSYNC_DELETE_DIR/someDeletedFileTarget"
+	files[2]="$INITIATOR_DIR/$OSYNC_BACKUP_DIR/someBackedUpFileInitiator"
+	files[3]="$TARGET_DIR/$OSYNC_BACKUP_DIR/someBackedUpFileTarget"
 
 	for i in "${osyncParameters[@]}"; do
 		cd "$OSYNC_DIR"
@@ -533,10 +534,10 @@ function test_FileAttributePropagation () {
 
 		sleep 1
 
-		getfacl -p "$INITIATOR_DIR/$FileA" | grep "other::r--" > /dev/null
+		getfacl "$INITIATOR_DIR/$FileA" | grep "other::r--" > /dev/null
 		assertEquals "Check getting ACL on initiator." "0" $?
 
-		getfacl -p "$TARGET_DIR/$FileB" | grep "other::r--" > /dev/null
+		getfacl "$TARGET_DIR/$FileB" | grep "other::r--" > /dev/null
 		assertEquals "Check getting ACL on target." "0" $?
 
 		setfacl -m o:r-x "$INITIATOR_DIR/$FileA"
@@ -548,14 +549,11 @@ function test_FileAttributePropagation () {
 		REMOTE_HOST_PING=no ./$OSYNC_EXECUTABLE $i
 		assertEquals "First deletion run with parameters [$i]." "0" $?
 
-		getfacl -p "$TARGET_DIR/$FileA" | grep "other::r-x" > /dev/null
+		getfacl "$TARGET_DIR/$FileA" | grep "other::r-x" > /dev/null
 		assertEquals "ACLs matched original value on target." "0" $?
 
-		getfacl -p "$INITIATOR_DIR/$FileB" | grep "other::-w-" > /dev/null
+		getfacl "$INITIATOR_DIR/$FileB" | grep "other::-w-" > /dev/null
 		assertEquals "ACLs matched original value on initiator." "0" $?
-
-		getfacl -p "$TARGET_DIR/$FileA"
-		getfacl -p "$INITIATOR_DIR/$FileB"
 	done
 }
 
