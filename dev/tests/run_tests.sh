@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-# osync test suite 2016111705
+# osync test suite 2016111801
 
 # 4 tests:
 # quicklocal
@@ -67,16 +67,17 @@ OSYNC_MIN_VERSION=x
 OSYNC_IS_STABLE=maybe
 
 # Setup an array with all function modes
-declare -Ag osyncParameters
+#declare -Ag osyncParameters
+osyncParameters=()
+osyncParameters[0]="--initiator=$INITIATOR_DIR --target=$TARGET_DIR --instance-id=quicklocal"
+osyncParameters[1]="--initiator=$INITIATOR_DIR --target=ssh://localhost:$SSH_PORT/$TARGET_DIR --rsakey=${HOME}/.ssh/id_rsa_local --instance-id=quickremote"
+osyncParameters[2]="$CONF_DIR/$LOCAL_CONF"
+osyncParameters[3]="$CONF_DIR/$REMOTE_CONF"
 
-osyncParameters[quickLocal]="--initiator=$INITIATOR_DIR --target=$TARGET_DIR --instance-id=quicklocal"
-osyncParameters[quickRemote]="--initiator=$INITIATOR_DIR --target=ssh://localhost:$SSH_PORT/$TARGET_DIR --rsakey=${HOME}/.ssh/id_rsa_local --instance-id=quickremote"
-osyncParameters[confLocal]="$CONF_DIR/$LOCAL_CONF"
-osyncParameters[confRemote]="$CONF_DIR/$REMOTE_CONF"
-
-declare -Ag osyncDaemonParameters
-osyncDaemonParameters[daemonlocal]="$CONF_DIR/$LOCAL_CONF --on-changes"
-osyncDaemonParameters[daemonremote]="$CONF_DIR/$REMOTE_CONF --on-changes"
+#declare -Ag osyncDaemonParameters
+osyncDaemonParameters=()
+osyncDaemonParameters[0]="$CONF_DIR/$LOCAL_CONF --on-changes"
+osyncDaemonParameters[1]="$CONF_DIR/$REMOTE_CONF --on-changes"
 
 function GetConfFileValue () {
 	local file="${1}"
@@ -120,7 +121,7 @@ function DownloadLargeFileSet() {
 	local destinationPath="${1}"
 
 	cd "$OSYNC_DIR"
-	wget -q "$LARGE_FILESET_URL" > /dev/null
+	wget -q --no-check-certificate "$LARGE_FILESET_URL" > /dev/null
 	assertEquals "Download [$LARGE_FILESET_URL]." "0" $?
 
 	tar xvf "$(basename $LARGE_FILESET_URL)" -C "$destinationPath" > /dev/null
