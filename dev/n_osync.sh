@@ -285,7 +285,7 @@ function _CheckDiskSpaceLocal {
 	Logger "Checking minimum disk space in [$replica_path]." "NOTICE"
 
 	# Check for -P portability switch
-	if df -P; then
+	if df -P > /dev/null 2>&1; then
 		diskSpace=$(df -P "$replica_path" | tail -1 | awk '{print $4}')
 	else
 		diskSpace=$(df "$replica_path" | tail -1 | awk '{print $4}')
@@ -317,7 +317,7 @@ function _CheckDiskSpaceRemote {
 	CheckConnectivity3rdPartyHosts
 	CheckConnectivityRemoteHost
 
-	cmd=$SSH_CMD' "'$COMMAND_SUDO' df \"'$replica_path'\"" > "'$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$SCRIPT_PID'" 2>&1'
+	cmd=$SSH_CMD' "'$COMMAND_SUDO' if df -P > /dev/null 2>&1; then df -P \"'$replica_path'\"; else df \"'$replica_path'\"; fi" > "'$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$SCRIPT_PID'" 2>&1'
 	Logger "cmd: $cmd" "DEBUG"
 	eval "$cmd"
 	if [ $? != 0 ]; then
