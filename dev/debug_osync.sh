@@ -3,8 +3,8 @@
 PROGRAM="osync" # Rsync based two way sync engine with fault tolerance
 AUTHOR="(C) 2013-2016 by Orsiris de Jong"
 CONTACT="http://www.netpower.fr/osync - ozy@netpower.fr"
-PROGRAM_VERSION=1.2-beta2
-PROGRAM_BUILD=2016111502
+PROGRAM_VERSION=1.2-beta3
+PROGRAM_BUILD=2016111704
 IS_STABLE=no
 
 # Execution order						#__WITH_PARANOIA_DEBUG
@@ -45,17 +45,22 @@ IS_STABLE=no
 
 #### MINIMAL-FUNCTION-SET BEGIN ####
 
-## FUNC_BUILD=2016111503
+## FUNC_BUILD=2016111705
 ## BEGIN Generic bash functions written in 2013-2016 by Orsiris de Jong - http://www.netpower.fr - ozy@netpower.fr
 
 ## To use in a program, define the following variables:
 ## PROGRAM=program-name
 ## INSTANCE_ID=program-instance-name
 ## _DEBUG=yes/no
-## _LOGGER_STDERR=true/false
+## _LOGGER_LOGGER_SILENT=true/false
+## _LOGGER_LOGGER_VERBOSE=true/false
 ## _LOGGER_ERR_ONLY=true/false
 ## _LOGGER_PREFIX="date"/"time"/""
 
+## Logger sets {ERROR|WARN}_ALERT variable when called with critical / error / warn loglevel
+## When called from subprocesses, variable of main process can't be set. Status needs to be get via $RUN_DIR/$PROGRAM.Logger.{error|warn}.$SCRIPT_PID
+
+#TODO: Rewrite Logger so we can decide what to send to stdout, stderr and logfile
 #TODO: Windows checks, check sendmail & mailsend
 
 if ! type "$BASH" > /dev/null; then
@@ -71,10 +76,10 @@ MAIL_ALERT_MSG="Execution of $PROGRAM instance $INSTANCE_ID on $(date) has warni
 
 # Environment variables that can be overriden by programs
 _DRYRUN=false
-_SILENT=false
-_VERBOSE=false
+_LOGGER_SILENT=false
+_LOGGER_VERBOSE=false
+_LOGGER_ERR_ONLY=false
 _LOGGER_PREFIX="date"
-_LOGGER_STDERR=false
 if [ "$KEEP_LOGGING" == "" ]; then
         KEEP_LOGGING=1801
 fi
@@ -82,9 +87,6 @@ fi
 # Initial error status, logging 'WARN', 'ERROR' or 'CRITICAL' will enable alerts flags
 ERROR_ALERT=false
 WARN_ALERT=false
-
-# Log from current run
-CURRENT_LOG=""
 
 ## allow function call checks			#__WITH_PARANOIA_DEBUG
 if [ "$_PARANOIA_DEBUG" == "yes" ];then		#__WITH_PARANOIA_DEBUG
@@ -95,13 +97,13 @@ fi						#__WITH_PARANOIA_DEBUG
 if [ ! "$_DEBUG" == "yes" ]; then
 	_DEBUG=no
 	SLEEP_TIME=.05 # Tested under linux and FreeBSD bash, #TODO tests on cygwin / msys
-	_VERBOSE=false
+	_LOGGER_VERBOSE=false
 else
-	if [ "$SLEEP_TIME" == "" ]; then
-		SLEEP_TIME=1
+	if [ "$SLEEP_TIME" == "" ]; then # Set SLEEP_TIME as environment variable when runinng with bash -x in order to avoid spamming console
+		SLEEP_TIME=.05
 	fi
 	trap 'TrapError ${LINENO} $?' ERR
-	_VERBOSE=true
+	_LOGGER_VERBOSE=true
 fi
 
 SCRIPT_PID=$$
@@ -148,28 +150,43 @@ function Dummy {
 
 # Sub function of Logger
 function _Logger {
-	local svalue="${1}" # What to log to stdout
-	local lvalue="${2:-$svalue}" # What to log to logfile, defaults to screen value
-	local evalue="${3}" # What to log to stderr
+	local logValue="${1}"		# Log to file
+	local stdValue="${2}"		# Log to screeen
+	local toStderr="${3:-false}"	# Log to stderr instead of stdout
 
-	echo -e "$lvalue" >> "$LOG_FILE"
-	CURRENT_LOG="$CURRENT_LOG"$'\n'"$lvalue"
+	echo -e "$logValue" >> "$LOG_FILE"
+	# Current log file
+	echo -e "$logValue" >> "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$SCRIPT_PID"
 
-	if [ $_LOGGER_STDERR == true ] && [ "$evalue" != "" ]; then
-		cat <<< "$evalue" 1>&2
-	elif [ "$_SILENT" == false ]; then
-		echo -e "$svalue"
+	if [ "$stdValue" != "" ] && [ "$_LOGGER_SILENT" != true ]; then
+		if [ $toStderr == true ]; then
+			# Force stderr color in subshell
+			(>&2 echo -e "$stdValue")
+
+		else
+			echo -e "$stdValue"
+		fi
 	fi
 }
 
 # General log function with log levels:
-# CRITICAL, ERROR, WARN are colored in stdout, prefixed in stderr
-# NOTICE is standard level
-# VERBOSE is only sent to stdout / stderr if _VERBOSE=true
-# DEBUG & PARANOIA_DEBUG are only sent if _DEBUG=yes
+
+# Environment variables
+# _LOGGER_SILENT: Disables any output to stdout & stderr
+# _LOGGER_STD_ERR: Disables any output to stdout except for ALWAYS loglevel
+# _LOGGER_VERBOSE: Allows VERBOSE loglevel messages to be sent to stdout
+
+# Loglevels
+# Except for VERBOSE, all loglevels are ALWAYS sent to log file
+
+# CRITICAL, ERROR, WARN sent to stderr, color depending on level, level also logged
+# NOTICE sent to stdout
+# VERBOSE sent to stdout if _LOGGER_VERBOSE = true
+# ALWAYS is sent to stdout unless _LOGGER_SILENT = true
+# DEBUG & PARANOIA_DEBUG are only sent to stdout if _DEBUG=yes
 function Logger {
 	local value="${1}" # Sentence to log (in double quotes)
-	local level="${2}" # Log level: PARANOIA_DEBUG, DEBUG, VERBOSE, NOTICE, WARN, ERROR, CRITIAL
+	local level="${2}" # Log level
 
 	if [ "$_LOGGER_PREFIX" == "time" ]; then
 		prefix="TIME: $SECONDS - "
@@ -180,42 +197,44 @@ function Logger {
 	fi
 
 	if [ "$level" == "CRITICAL" ]; then
-		_Logger "$prefix\e[41m$value\e[0m" "$prefix$level:$value" "$level:$value"
+		_Logger "$prefix($level):$value" "$prefix\e[41m$value\e[0m" true
 		ERROR_ALERT=true
+		# ERROR_ALERT / WARN_ALERT isn't set in main when Logger is called from a subprocess. Need to keep this flag.
+		echo "1" > "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.error.$SCRIPT_PID"
 		return
 	elif [ "$level" == "ERROR" ]; then
-		_Logger "$prefix\e[91m$value\e[0m" "$prefix$level:$value" "$level:$value"
+		_Logger "$prefix($level):$value" "$prefix\e[91m$value\e[0m" true
 		ERROR_ALERT=true
+		echo "1" > "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.error.$SCRIPT_PID"
 		return
 	elif [ "$level" == "WARN" ]; then
-		_Logger "$prefix\e[33m$value\e[0m" "$prefix$level:$value" "$level:$value"
+		_Logger "$prefix($level):$value" "$prefix\e[33m$value\e[0m" true
 		WARN_ALERT=true
+		echo "1" > "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.warn.$SCRIPT_PID"
 		return
 	elif [ "$level" == "NOTICE" ]; then
 		if [ "$_LOGGER_ERR_ONLY" != true ]; then
-			_Logger "$prefix$value"
+			_Logger "$prefix$value" "$prefix$value"
 		fi
 		return
 	elif [ "$level" == "VERBOSE" ]; then
-		if [ $_VERBOSE == true ]; then
-			_Logger "$prefix$value"
+		if [ $_LOGGER_VERBOSE == true ]; then
+			_Logger "$prefix:$value" "$prefix$value"
 		fi
 		return
 	elif [ "$level" == "ALWAYS" ]; then
-		if [ $_SILENT != true ]; then
-			_Logger "$prefix$value" "$prefix$level:$value" "$level:$value"
-		fi
+		_Logger  "$prefix$value" "$prefix$value"
 		return
 	elif [ "$level" == "DEBUG" ]; then
 		if [ "$_DEBUG" == "yes" ]; then
-			_Logger "$prefix$value"
+			_Logger "$prefix$value" "$prefix$value"
 			return
 		fi
-	elif [ "$level" == "PARANOIA_DEBUG" ]; then		#__WITH_PARANOIA_DEBUG
-		if [ "$_PARANOIA_DEBUG" == "yes" ]; then	#__WITH_PARANOIA_DEBUG
-			_Logger "$prefix$value"			#__WITH_PARANOIA_DEBUG
-			return					#__WITH_PARANOIA_DEBUG
-		fi						#__WITH_PARANOIA_DEBUG
+	elif [ "$level" == "PARANOIA_DEBUG" ]; then			#__WITH_PARANOIA_DEBUG
+		if [ "$_PARANOIA_DEBUG" == "yes" ]; then		#__WITH_PARANOIA_DEBUG
+			_Logger "$prefix$value" "$prefix$value"		#__WITH_PARANOIA_DEBUG
+			return						#__WITH_PARANOIA_DEBUG
+		fi							#__WITH_PARANOIA_DEBUG
 	else
 		_Logger "\e[41mLogger function called without proper loglevel [$level].\e[0m"
 		_Logger "Value was: $prefix$value"
@@ -242,7 +261,7 @@ function QuickLogger {
 
 	__CheckArguments 1 $# ${FUNCNAME[0]} "$@"	#__WITH_PARANOIA_DEBUG
 
-	if [ $_SILENT == true ]; then
+	if [ $_LOGGER_SILENT == true ]; then
 		_QuickLogger "$value" "log"
 	else
 		_QuickLogger "$value" "stdout"
@@ -305,10 +324,10 @@ function SendAlert {
 
 	__CheckArguments 0-1 $# ${FUNCNAME[0]} "$@"	#__WITH_PARANOIA_DEBUG
 
-	local attachment=
-	local attachmentFile=
-	local subject=
-	local body=
+	local attachment
+	local attachmentFile
+	local subject
+	local body
 
 	if [ "$DESTINATION_MAILS" == "" ]; then
 		return 0
@@ -333,7 +352,9 @@ function SendAlert {
 	else
 		attachment=true
 	fi
-	body="$MAIL_ALERT_MSG"$'\n\n'"$CURRENT_LOG"
+	if [ -e "$RUN_DIR/$PROGRAM._Logger.$SCRIPT_PID" ]; then
+		body="$MAIL_ALERT_MSG"$'\n\n'"$(cat $RUN_DIR/$PROGRAM._Logger.$SCRIPT_PID)"
+	fi
 
 	if [ $ERROR_ALERT == true ]; then
 		subject="Error alert for $INSTANCE_ID"
@@ -521,7 +542,7 @@ function TrapError {
 	local line="$1"
 	local code="${2:-1}"
 
-	if [ $_SILENT == false ]; then
+	if [ $_LOGGER_SILENT == false ]; then
 		echo -e "\e[45m/!\ ERROR in ${job}: Near line ${line}, exit code ${code}\e[0m"
 	fi
 }
@@ -548,7 +569,7 @@ function LoadConfigFile {
 }
 
 function Spinner {
-	if [ $_SILENT == true ] || [ "$_LOGGER_ERR_ONLY" == true ]; then
+	if [ $_LOGGER_SILENT == true ] || [ "$_LOGGER_ERR_ONLY" == true ]; then
 		return 0
 	fi
 
@@ -1091,7 +1112,7 @@ function RunLocalCommand {
 		Logger "Command failed." "ERROR"
 	fi
 
-	if [ $_VERBOSE == true ] || [ $retval -ne 0 ]; then
+	if [ $_LOGGER_VERBOSE == true ] || [ $retval -ne 0 ]; then
 		Logger "Command output:\n$(cat $RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$SCRIPT_PID)" "NOTICE"
 	fi
 
@@ -1126,7 +1147,7 @@ function RunRemoteCommand {
 		Logger "Command failed." "ERROR"
 	fi
 
-	if [ -f "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$SCRIPT_PID" ] && ([ $_VERBOSE == true ] || [ $retval -ne 0 ])
+	if [ -f "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$SCRIPT_PID" ] && ([ $_LOGGER_VERBOSE == true ] || [ $retval -ne 0 ])
 	then
 		Logger "Command output:\n$(cat $RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$SCRIPT_PID)" "NOTICE"
 	fi
@@ -1622,12 +1643,19 @@ function TrapStop {
 function TrapQuit {
 	local exitcode
 
+	# Get ERROR / WARN alert flags from subprocesses that call Logger
+	if [ -f "$RUN_DIR/$PROGRAM.Logger.warn.$SCRIPT_PID" ]; then
+		WARN_ALERT=true
+	fi
+	if [ -f "$RUN_DIR/$PROGRAM.Logger.error.$SCRIPT_PID" ]; then
+		ERROR_ALERT=true
+	fi
+
 	if [ $ERROR_ALERT == true ]; then
 		UnlockReplicas
 		if [ "$RUN_AFTER_CMD_ON_ERROR" == "yes" ]; then
 			RunAfterHook
 		fi
-		CleanUp
 		Logger "$PROGRAM finished with errors." "ERROR"
 		if [ "$_DEBUG" != "yes" ]
 		then
@@ -1641,7 +1669,6 @@ function TrapQuit {
 		if [ "$RUN_AFTER_CMD_ON_ERROR" == "yes" ]; then
 			RunAfterHook
 		fi
-		CleanUp
 		Logger "$PROGRAM finished with warnings." "WARN"
 		if [ "$_DEBUG" != "yes" ]
 		then
@@ -1653,11 +1680,11 @@ function TrapQuit {
 	else
 		UnlockReplicas
 		RunAfterHook
-		CleanUp
 		Logger "$PROGRAM finished." "NOTICE"
 		exitcode=0
 	fi
 
+	CleanUp
 	KillChilds $$ > /dev/null 2>&1
 
 	exit $exitcode
@@ -1705,6 +1732,8 @@ function CheckCurrentConfig {
 function CheckCurrentConfigAll {
 	__CheckArguments 0 $# "${FUNCNAME[0]}" "$@"    #__WITH_PARANOIA_DEBUG
 
+	local tmp
+
 	if [ "$INSTANCE_ID" == "" ]; then
 		Logger "No INSTANCE_ID defined in config file." "CRITICAL"
 		exit 1
@@ -1726,9 +1755,13 @@ function CheckCurrentConfigAll {
 		exit 1
 	fi
 
-	if [ "$SKIP_DELETION" != "" ] && [ $(arrayContains "${INITIATOR[$__type]}" "${SKIP_DELETION[@]}") -eq 0 ] && [ $(arrayContains "${TARGET[$__type]}" "${SKIP_DELETION[@]}") -eq 0 ]; then
-		Logger "Bogus skip deletion parameter." "CRITICAL"
-		exit 1
+	if [ "$SKIP_DELETION" != "" ]; then
+		tmp="$SKIP_DELETION"
+		IFS=',' read -r -a SKIP_DELETION <<< "$tmp"
+		if [ $(arrayContains "${INITIATOR[$__type]}" "${SKIP_DELETION[@]}") -eq 0 ] && [ $(arrayContains "${TARGET[$__type]}" "${SKIP_DELETION[@]}") -eq 0 ]; then
+			Logger "Bogus skip deletion parameter [$SKIP_DELETION]." "CRITICAL"
+			exit 1
+		fi
 	fi
 }
 
@@ -1950,27 +1983,41 @@ function CreateStateDirs {
 
 function _CheckLocksLocal {
 	local lockfile="${1}"
-	__CheckArguments 1 $# "${FUNCNAME[0]}" "$@"	#__WITH_PARANOIA_DEBUG
+	local replicaType="${2}"
 
-	local lockfile_content
-	local lock_pid
-	local lock_instance_id
+	__CheckArguments 2 $# "${FUNCNAME[0]}" "$@"	#__WITH_PARANOIA_DEBUG
 
-	if [ -f "$lockfile" ]; then
-		lockfile_content=$(cat $lockfile)
-		Logger "Master lock pid present: $lockfile_content" "DEBUG"
-		lock_pid=${lockfile_content%@*}
-		lock_instance_id=${lockfile_content#*@}
-		kill -9 $lock_pid > /dev/null 2>&1
+	local lockfileContent
+	local lockPid
+	local lockInstanceID
+
+	if [ -s "$lockfile" ]; then
+		lockfileContent=$(cat $lockfile)
+		Logger "Master lock pid present: $lockfileContent" "DEBUG"
+		lockPid=${lockfileContent%@*}
+		if [ $(IsInteger $lockPid) -ne 1 ]; then
+			Logger "Invalid pid [$lockPid] in local replica." "CRITICAL"
+			exit 1
+		fi
+		lockInstanceID=${lockfileContent#*@}
+		if [ "$lockInstanceID" == "" ]; then
+			Logger "Invalid instance id [$lockInstanceID] in local replica." "CRITICAL"
+			exit 1
+
+		Logger "Local $replicaType  lock is: [$lockPid@$lockInstanceID]." "DEBUG"
+
+		fi
+		kill -0 $lockPid > /dev/null 2>&1
 		if [ $? != 0 ]; then
-			Logger "There is a dead osync lock in [$lockfile]. Instance [$lock_pid] no longer running. Resuming." "NOTICE"
-			#rm "$lockfile"
-			#if [ $? != 0 ]; then
-			#	Logger "Cannot remove lock in [$lockfile]." "CRITICAL"
-			#	exit 1
-			#fi
+			Logger "There is a local dead osync lock [$lockPid@$lockInstanceID] that is no longer running. Resuming." "NOTICE"
+			if [ "$replicaType" == "${INITIATOR[$__type]}" ]; then
+				# REPLICA_OVERWRITE_LOCK disables noclobber option in WriteLock functions
+				INITIATOR_OVERWRITE_LOCK=true
+			elif [ "$replicaType" == "${TARGET[$__type]}" ]; then
+				TARGET_OVERWRITE_LOCK=true
+			fi
 		else
-			Logger "There is already a local instance of osync running [$lock_pid] for this replica. Cannot start." "CRITICAL"
+			Logger "There is already a local instance [$lockPid@$lockInstanceID] of osync running for this replica. Cannot start." "CRITICAL"
 			exit 1
 		fi
 	fi
@@ -1981,9 +2028,9 @@ function _CheckLocksRemote {
 	__CheckArguments 1 $# "${FUNCNAME[0]}" "$@"	#__WITH_PARANOIA_DEBUG
 
 	local cmd
-	local lock_pid
-	local lock_instance_id
-	local lockfile_content
+	local lockPid
+	local lockInstanceID
+	local lockfileContent
 
 	CheckConnectivity3rdPartyHosts
 	CheckConnectivityRemoteHost
@@ -1992,34 +2039,42 @@ function _CheckLocksRemote {
 	Logger "cmd: $cmd" "DEBUG"
 	eval "$cmd"
 	if [ $? != 0 ]; then
-		if [ -f "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$SCRIPT_PID" ]; then
-			lockfile_content=$(cat $RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$SCRIPT_PID)
-		else
-			Logger "Cannot get remote lockfile." "CRITICAL"
-			exit 1
-		fi
+		Logger "Cannot check remote replica lock." "CRITICAL"
+		exit 1
 	fi
 
-	lock_pid=${lockfile_content%@*}
-	lock_instance_id=${lockfile_content#*@}
+	if [ -s "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$SCRIPT_PID" ]; then
+		lockfileContent="$(cat $RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$SCRIPT_PID)"
 
-	if [ "$lock_pid" != "" ] && [ "$lock_instance_id" != "" ]; then
-		Logger "Remote lock is: $lock_pid@$lock_instance_id" "DEBUG"
+		lockPid=${lockfileContent%@*}
+		if [ $(IsInteger $lockPid) -ne 1 ]; then
+			Logger "Invalid pid [$lockPid] in remote replica lock." "CRITICAL"
+			exit 1
+		fi
+		lockInstanceID=${lockfileContent#*@}
+		if [ "$lockInstanceID" == "" ]; then
+			Logger "Invalid instance id [$lockInstanceID] in remote replica." "CRITICAL"
+			exit 1
+		fi
 
-		kill -0 $lock_pid > /dev/null 2>&1
+		Logger "Remote lock is: [$lockPid@$lockInstanceID]" "DEBUG"
+
+		kill -0 $lockPid > /dev/null 2>&1
 		if [ $? != 0 ]; then
-			if [ "$lock_instance_id" == "$INSTANCE_ID" ]; then
-				Logger "There is a dead osync lock on target replica that corresponds to this initiator sync id [$lock_instance_id]. Instance [$lock_pid] no longer running. Resuming." "NOTICE"
+			if [ "$lockInstanceID" == "$INSTANCE_ID" ]; then
+				Logger "There is a remote dead osync lock [$lockPid@lockInstanceID] on target replica that corresponds to this initiator INSTANCE_ID. Pid [$lockPid] no longer running. Resuming." "NOTICE"
+				TARGET_OVERWRITE_LOCK=true
 			else
 				if [ "$FORCE_STRANGER_LOCK_RESUME" == "yes" ]; then
-					Logger "WARNING: There is a dead osync lock on target replica that does not correspond to this initiator sync-id [$lock_instance_id]. Forcing resume." "WARN"
+					Logger "There is a remote (maybe dead) osync lock [$lockPid@$lockInstanceID] on target replica that does not correspond to this initiator INSTANCE_ID. Forcing resume." "WARN"
+					TARGET_OVERWRITE_LOCK=true
 				else
-					Logger "There is a dead osync lock on target replica that does not correspond to this initiator sync-id [$lock_instance_id]. Will not resume." "CRITICAL"
+					Logger "There is a remote (maybe dead) osync lock [$lockPid@$lockInstanceID] on target replica that does not correspond to this initiator INSTANCE_ID. Will not resume." "CRITICAL"
 					exit 1
 				fi
 			fi
 		else
-			Logger "There is already a local instance of osync that locks target replica [$lock_pid@$lock_instance_id]. Cannot start." "CRITICAL"
+			Logger "There is already a local instance of osync that locks target replica [$lockPid@$lockInstanceID]. Cannot start." "CRITICAL"
 			exit 1
 		fi
 	fi
@@ -2041,10 +2096,10 @@ function CheckLocks {
 			exit 1
 		fi
 	else
-		_CheckLocksLocal "${INITIATOR[$__lockFile]}" &
+		_CheckLocksLocal "${INITIATOR[$__lockFile]}" "${INITIATOR[$__type]}" &
 		pids="$!"
 		if [ "$REMOTE_OPERATION" != "yes" ]; then
-			_CheckLocksLocal "${TARGET[$__lockFile]}" &
+			_CheckLocksLocal "${TARGET[$__lockFile]}" "${INITIATOR[$__type]}" &
 			pids="$pids;$!"
 		else
 			_CheckLocksRemote "${TARGET[$__lockFile]}" &
@@ -2062,10 +2117,14 @@ function CheckLocks {
 function _WriteLockFilesLocal {
 	local lockfile="${1}"
 	local replicaType="${2}"
-	__CheckArguments 2 $# "${FUNCNAME[0]}" "$@"	#__WITH_PARANOIA_DEBUG
+	local overwrite="${3:-false}"
+
+	__CheckArguments 3 $# "${FUNCNAME[0]}" "$@"	#__WITH_PARANOIA_DEBUG
 
 	(
-		set -o noclobber
+		if [ $overwrite == true ]; then
+			set -o noclobber
+		fi
 		$COMMAND_SUDO echo "$SCRIPT_PID@$INSTANCE_ID" > "$lockfile" 2> "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}-$replicaType.$SCRIPT_PID"
 	)
 	if [ $?	!= 0 ]; then
@@ -2080,19 +2139,23 @@ function _WriteLockFilesLocal {
 function _WriteLockFilesRemote {
 	local lockfile="${1}"
 	local replicaType="${2}"
-	__CheckArguments 2 $# "${FUNCNAME[0]}" "$@"	#__WITH_PARANOIA_DEBUG
+	local overwrite="${3-false}"
+
+	__CheckArguments 3 $# "${FUNCNAME[0]}" "$@"	#__WITH_PARANOIA_DEBUG
 
 	local cmd
 
 	CheckConnectivity3rdPartyHosts
 	CheckConnectivityRemoteHost
 
-	cmd=$SSH_CMD' "( set -o noclobber; echo '$SCRIPT_PID@$INSTANCE_ID' | '$COMMAND_SUDO' tee \"'$lockfile'\")" > /dev/null 2> $RUN_DIR/$PROGRAM._WriteLockFilesRemote.$replicaType.$SCRIPT_PID'
+	cmd=$SSH_CMD' "( if [ $overwrite == true ]; then set -o noclobber; fi; echo '$SCRIPT_PID@$INSTANCE_ID' | '$COMMAND_SUDO' tee \"'$lockfile'\")" > /dev/null 2> $RUN_DIR/$PROGRAM._WriteLockFilesRemote.$replicaType.$SCRIPT_PID'
+	#WIP
+	#cmd=$SSH_CMD' "( set -o noclobber; echo '$SCRIPT_PID@$INSTANCE_ID' | '$COMMAND_SUDO' tee \"'$lockfile'\")" > /dev/null 2> $RUN_DIR/$PROGRAM._WriteLockFilesRemote.$replicaType.$SCRIPT_PID'
 	Logger "cmd: $cmd" "DEBUG"
 	eval "$cmd"
 	if [ $? != 0 ]; then
 		Logger "Could not create lock file on remote $replicaType in [$lockfile]." "CRITICAL"
-		Loggxer "Command output:\n$(cat $RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$replicaType.$SCRIPT_PID)" "NOTICE"
+		Logger "Command output:\n$(cat $RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$replicaType.$SCRIPT_PID)" "NOTICE"
 		return 1
 	else
 		Logger "Locked remote $replicaType replica in [$lockfile]." "DEBUG"
@@ -2107,14 +2170,14 @@ function WriteLockFiles {
 	local pidArray
 	local pid
 
-	_WriteLockFilesLocal "${INITIATOR[$__lockFile]}" "${INITIATOR[$__type]}"&
+	_WriteLockFilesLocal "${INITIATOR[$__lockFile]}" "${INITIATOR[$__type]}" $INITIATOR_LOCK_OVERWRITE &
 	initiatorPid="$!"
 
 	if [ "$REMOTE_OPERATION" != "yes" ]; then
-		_WriteLockFilesLocal "${TARGET[$__lockFile]}" "${TARGET[$__type]}" &
+		_WriteLockFilesLocal "${TARGET[$__lockFile]}" "${TARGET[$__type]}" $TARGET_LOCK_OVERWRITE &
 		targetPid="$!"
 	else
-		_WriteLockFilesRemote "${TARGET[$__lockFile]}" "${TARGET[$__type]}" &
+		_WriteLockFilesRemote "${TARGET[$__lockFile]}" "${TARGET[$__type]}" $TARGET_LOCK_OVERWRITE &
 		targetPid="$!"
 	fi
 
@@ -2212,10 +2275,10 @@ function treeList {
 	local replicaType="${2}" # replica type: initiator, target
 	local treeFilename="${3}" # filename to output tree (will be prefixed with $replicaType)
 
+	__CheckArguments 3 $# "${FUNCNAME[0]}" "$@"	#__WITH_PARANOIA_DEBUG
+
 	local escapedReplicaPath
 	local rsyncCmd
-
-	__CheckArguments 3 $# "${FUNCNAME[0]}" "$@"	#__WITH_PARANOIA_DEBUG
 
 	escapedReplicaPath=$(EscapeSpaces "$replicaPath")
 
@@ -2255,6 +2318,17 @@ function deleteList {
 
 	local cmd
 
+	local failedDeletionListFromReplica
+
+	if [ "$replicaType" == "${INITIATOR[$__type]}" ]; then
+		failedDeletionListFromReplica="${TARGET[$__type]}"
+	elif [ "$replicaType" == "${TARGET[$__type]}" ]; then
+		failedDeletionListFromReplica="${INITIATOR[$__type]}"
+	else
+		Logger "Bogus replicaType in [${FUNCNAME[0]}]." "CRITICAL"
+		exit 1
+	fi
+
 	Logger "Creating $replicaType replica deleted file list." "NOTICE"
 	if [ -f "${INITIATOR[$__replicaDir]}${INITIATOR[$__stateDir]}/$replicaType${INITIATOR[$__treeAfterFileNoSuffix]}" ]; then
 		## Same functionnality, comm is much faster than grep but is not available on every platform
@@ -2270,10 +2344,10 @@ function deleteList {
 		retval=$?
 
 		# Add delete failed file list to current delete list and then empty it
-		if [ -f "${INITIATOR[$__replicaDir]}${INITIATOR[$__stateDir]}/$replicaType${INITIATOR[$__failedDeletedListFile]}" ]; then
-			cat "${INITIATOR[$__replicaDir]}${INITIATOR[$__stateDir]}/$replicaType${INITIATOR[$__failedDeletedListFile]}" >> "${INITIATOR[$__replicaDir]}${INITIATOR[$__stateDir]}/$replicaType${INITIATOR[$__deletedListFile]}"
+		if [ -f "${INITIATOR[$__replicaDir]}${INITIATOR[$__stateDir]}/$failedDeletionListFromReplica${INITIATOR[$__failedDeletedListFile]}" ]; then
+			cat "${INITIATOR[$__replicaDir]}${INITIATOR[$__stateDir]}/$failedDeletionListFromReplica${INITIATOR[$__failedDeletedListFile]}" >> "${INITIATOR[$__replicaDir]}${INITIATOR[$__stateDir]}/$replicaType${INITIATOR[$__deletedListFile]}"
 			if [ $? == 0 ]; then
-				rm -f "${INITIATOR[$__replicaDir]}${INITIATOR[$__stateDir]}/$replicaType${INITIATOR[$__failedDeletedListFile]}"
+				rm -f "${INITIATOR[$__replicaDir]}${INITIATOR[$__stateDir]}/$failedDeletionListFromReplica${INITIATOR[$__failedDeletedListFile]}"
 			else
 				Logger "Cannot add failed deleted list to current deleted list for replica [$replicaType]." "ERROR"
 			fi
@@ -2635,7 +2709,7 @@ function _deleteRemote {
 		exit 1
 	fi
 
-$SSH_CMD ERROR_ALERT=0 sync_on_changes=$sync_on_changes _DEBUG=$_DEBUG _DRYRUN=$_DRYRUN _VERBOSE=$_VERBOSE COMMAND_SUDO=$COMMAND_SUDO FILE_LIST="$(EscapeSpaces "${TARGET[$__replicaDir]}${TARGET[$__stateDir]}/$deletionListFromReplica${INITIATOR[$__deletedListFile]}")" REPLICA_DIR="$(EscapeSpaces "$replicaDir")" SOFT_DELETE=$SOFT_DELETE DELETION_DIR="$(EscapeSpaces "$deletionDir")" FAILED_DELETE_LIST="$failedDeleteList" SUCCESS_DELETE_LIST="$successDeleteList" 'bash -s' << 'ENDSSH' >> "$RUN_DIR/$PROGRAM.remote_deletion.$SCRIPT_PID" 2>&1
+$SSH_CMD ERROR_ALERT=0 sync_on_changes=$sync_on_changes _DEBUG=$_DEBUG _DRYRUN=$_DRYRUN _LOGGER_VERBOSE=$_LOGGER_VERBOSE COMMAND_SUDO=$COMMAND_SUDO FILE_LIST="$(EscapeSpaces "${TARGET[$__replicaDir]}${TARGET[$__stateDir]}/$deletionListFromReplica${INITIATOR[$__deletedListFile]}")" REPLICA_DIR="$(EscapeSpaces "$replicaDir")" SOFT_DELETE=$SOFT_DELETE DELETION_DIR="$(EscapeSpaces "$deletionDir")" FAILED_DELETE_LIST="$failedDeleteList" SUCCESS_DELETE_LIST="$successDeleteList" 'bash -s' << 'ENDSSH' >> "$RUN_DIR/$PROGRAM.remote_deletion.$SCRIPT_PID" 2>&1
 
 	## The following lines are executed remotely
 	function _logger {
@@ -2662,7 +2736,7 @@ $SSH_CMD ERROR_ALERT=0 sync_on_changes=$sync_on_changes _DEBUG=$_DEBUG _DRYRUN=$
 			_logger "$prefix$value"
 			return
 		elif [ "$level" == "VERBOSE" ]; then
-			if [ $_VERBOSE == true ]; then
+			if [ $_LOGGER_VERBOSE == true ]; then
 				_logger "$prefix$value"
 			fi
 			return
@@ -2706,12 +2780,12 @@ $SSH_CMD ERROR_ALERT=0 sync_on_changes=$sync_on_changes _DEBUG=$_DEBUG _DRYRUN=$
 						# In order to keep full path on soft deletion, create parent directories before move
 						parentdir="$(dirname "$files")"
 						if [ "$parentdir" != "." ]; then
+							Logger "Moving deleted file [$REPLICA_DIR$files] to [$REPLICA_DIR$DELETION_DIR/$parentdir]." "VERBOSE"
 							$COMMAND_SUDO mkdir -p "$REPLICA_DIR$DELETION_DIR/$parentdir"
 							$COMMAND_SUDO mv -f "$REPLICA_DIR$files" "$REPLICA_DIR$DELETION_DIR/$parentdir"
-							Logger "Moving deleted file [$REPLICA_DIR$files] to [$REPLICA_DIR$DELETION_DIR/$parentdir]." "VERBOSE"
 						else
-							$COMMAND_SUDO mv -f "$REPLICA_DIR$files" "$REPLICA_DIR$DELETION_DIR"
 							Logger "Moving deleted file [$REPLICA_DIR$files] to [$REPLICA_DIR$DELETION_DIR]." "VERBOSE"
+							$COMMAND_SUDO mv -f "$REPLICA_DIR$files" "$REPLICA_DIR$DELETION_DIR"
 						fi
 						if [ $? != 0 ]; then
 							Logger "Cannot move [$REPLICA_DIR$files] to deletion directory." "ERROR"
@@ -2725,10 +2799,9 @@ $SSH_CMD ERROR_ALERT=0 sync_on_changes=$sync_on_changes _DEBUG=$_DEBUG _DRYRUN=$
 			else
 				if [ $_DRYRUN == false ]; then
 					if [ -e "$REPLICA_DIR$files" ]; then
-						$COMMAND_SUDO rm -rf "$REPLICA_DIR$files"
-						$result=$?
 						Logger "Deleting [$REPLICA_DIR$files]." "VERBOSE"
-						if [ $result != 0 ]; then
+						$COMMAND_SUDO rm -rf "$REPLICA_DIR$files"
+						if [ $? != 0 ]; then
 							Logger "Cannot delete [$REPLICA_DIR$files]." "ERROR"
 							echo "$files" >> "$FAILED_DELETE_LIST"
 						else
@@ -2977,8 +3050,7 @@ function Sync {
 
 	## Step 2
 	if [ "$resumeInitiator" == "${SYNC_ACTION[2]}" ] || [ "$resumeTarget" == "${SYNC_ACTION[2]}" ]; then
-		#TODO(high) only -X and -A (xattr & acl) should trigger this 
-		if [ "$RSYNC_ATTR_ARGS" != "" ]; then
+		if [[ "$RSYNC_ATTR_ARGS" == *"-X"* ]] || [[ "$RSYNC_ATTR_ARGS" == *"-A"* ]]; then
 			syncAttrs "${INITIATOR[$__replicaDir]}" "$TARGET_SYNC_DIR"
 			WaitForTaskCompletion $! $SOFT_MAX_EXEC_TIME $HARD_MAX_EXEC_TIME ${FUNCNAME[0]} false $KEEP_LOGGING
 			if [ $? != 0 ]; then
@@ -3152,7 +3224,7 @@ function _SoftDeleteLocal {
 			Logger "Removing files older than $changeTime days on $replicaType replica for $deletionType deletion." "NOTICE"
 		fi
 
-		if [ $_VERBOSE == true ]; then
+		if [ $_LOGGER_VERBOSE == true ]; then
 			# Cannot launch log function from xargs, ugly hack
 			$COMMAND_SUDO $FIND_CMD "$replicaDeletionPath/" -type f -ctime +$changeTime -print0 | xargs -0 -I {} echo "Will delete file {}" >> "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$SCRIPT_PID"
 			Logger "Command output:\n$(cat $RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$SCRIPT_PID)" "VERBOSE"
@@ -3203,7 +3275,7 @@ function _SoftDeleteRemote {
 		Logger "Removing files older than $changeTime days on $replicaType replica for $deletionType deletion." "NOTICE"
 	fi
 
-	if [ $_VERBOSE == true ]; then
+	if [ $_LOGGER_VERBOSE == true ]; then
 		# Cannot launch log function from xargs, ugly hack
 		cmd=$SSH_CMD' "if [ -d \"'$replicaDeletionPath'\" ]; then '$COMMAND_SUDO' '$REMOTE_FIND_CMD' \"'$replicaDeletionPath'/\" -type f -ctime +'$changeTime' -print0 | xargs -0 -I {} echo Will delete file {} && '$COMMAND_SUDO' '$REMOTE_FIND_CMD' \"'$replicaDeletionPath'/\" -type d -empty -ctime '$changeTime' -print0 | xargs -0 -I {} echo Will delete directory {}; else echo \"The $replicaType replica dir [$replicaDeletionPath] does not exist. Skipping cleaning of old files.\"; fi" > "'$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$SCRIPT_PID'" 2>&1'
 		Logger "cmd: $cmd" "DEBUG"
@@ -3269,7 +3341,7 @@ function _SummaryFromFile {
 	local summaryFile="${2}"
 	local direction="${3}"
 
-	__CheckArguments 2 $# "${FUNCNAME[0]}" "$@"	#__WITH_PARANOIA_DEBUG
+	__CheckArguments 3 $# "${FUNCNAME[0]}" "$@"	#__WITH_PARANOIA_DEBUG
 
 	if [ -f "$summaryFile" ]; then
 		while read -r file; do
@@ -3454,7 +3526,7 @@ function Init {
 	## Set sync only function arguments for rsync
 	SYNC_OPTS="-u"
 
-	if [ $_VERBOSE == true ] || [ $_SUMMARY == true ]; then
+	if [ $_LOGGER_VERBOSE == true ] || [ $_SUMMARY == true ]; then
 		SYNC_OPTS=$SYNC_OPTS" -i"
 	fi
 
@@ -3467,8 +3539,8 @@ function Init {
 
 	## Conflict options
 	if [ "$CONFLICT_BACKUP" != "no" ]; then
-		INITIATOR_BACKUP="--backup --backup-dir=\"${INITIATOR[$__replicaDir]}${INITIATOR[$__backupDir]}\""
-		TARGET_BACKUP="--backup --backup-dir=\"${TARGET[$__replicaDir]}${TARGET[$__backupDir]}\""
+		INITIATOR_BACKUP="--backup --backup-dir=\"${INITIATOR[$__backupDir]}\""
+		TARGET_BACKUP="--backup --backup-dir=\"${TARGET[$__backupDir]}\""
 		if [ "$CONFLICT_BACKUP_MULTIPLE" == "yes" ]; then
 			INITIATOR_BACKUP="$INITIATOR_BACKUP --suffix .$(date +%Y.%m.%d-%H.%M.%S)"
 			TARGET_BACKUP="$TARGET_BACKUP --suffix .$(date +%Y.%m.%d-%H.%M.%S)"
@@ -3619,11 +3691,11 @@ for i in "$@"; do
 		opts=$opts" --dry"
 		;;
 		--silent)
-		_SILENT=true
+		_LOGGER_SILENT=true
 		opts=$opts" --silent"
 		;;
 		--verbose)
-		_VERBOSE=true
+		_LOGGER_VERBOSE=true
 		opts=$opts" --verbose"
 		;;
 		--stats)
@@ -3671,20 +3743,17 @@ for i in "$@"; do
 		;;
 		--skip-deletion=*)
 		opts=$opts" --skip-deletion=\"${i##*=}\""
-		IFS=',' read -r -a SKIP_DELETION <<< ${i##*=}
+		SKIP_DELETION=${##*=}
 		;;
 		--on-changes)
 		sync_on_changes=true
 		_NOLOCKS=true
 		_LOGGER_PREFIX="date"
-		_LOGGER_STDERR=true
 		;;
 		--no-locks)
 		_NOLOCKS=true
 		;;
 		--errors-only)
-		#TODO: let err_only only output to stderr
-		#_LOGGER_STDERR=true
 		_LOGGER_ERR_ONLY=true
 		;;
 		--summary)
@@ -3737,6 +3806,18 @@ opts="${opts# *}"
 
 		if [ "$HARD_MAX_EXEC_TIME" == "" ]; then
 			HARD_MAX_EXEC_TIME=0
+		fi
+
+		if [ "$PRESERVE_ACL" == "" ]; then
+			PRESERVE_ACL="yes"
+		fi
+
+		if [ "$PRESERVE_XATTR" == "" ]; then
+			PRESERVE_XATTR="yes"
+		fi
+
+		if [ "$PATH_SEPARATOR_CHAR" == "" ]; then
+			PATH_SEPARATOR_CHAR=";"
 		fi
 
 		MIN_WAIT=30
