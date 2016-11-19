@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-# osync test suite 2016111901
+# osync test suite 2016111902
 
 # 4 tests:
 # quicklocal
@@ -127,6 +127,17 @@ function SetupSSH {
 	fi
 }
 
+function RemoveSSH {
+	local pubkey
+
+	if [ -f "${HOME}/.ssh/id_rsa_local" ]; then
+
+		pubkey=$(cat "${HOME}/.ssh/id_rsa_local.pub")
+		sed -i.bak "#$pubkey#d" "${HOME}/.ssh/authorized_keys"
+		rm -f "${HOME}/.ssh/{id_rsa_local.pub,id_rsa_local}"
+	fi
+}
+
 function DownloadLargeFileSet() {
 	local destinationPath="${1}"
 
@@ -191,6 +202,8 @@ function oneTimeSetUp () {
 function oneTimeTearDown () {
 	# Set osync version stable flag back to origin
 	SetConfFileValue "$OSYNC_DIR/$OSYNC_EXECUTABLE" "IS_STABLE" "$OSYNC_IS_STABLE"
+
+	RemoveSSH
 
 	#TODO: uncomment this when dev is done
 	rm -rf "$OSYNC_TESTS_DIR"
@@ -546,7 +559,7 @@ function test_FileAttributePropagation () {
 		assertEquals "Set ACL on target" "0" $?
 
 		# Second run
-		REMOTE_HOST_PING=no ./$OSYNC_EXECUTABLE $i
+		PRESERVE_ACL=yes PRESERVE_XATTR=yes REMOTE_HOST_PING=no ./$OSYNC_EXECUTABLE $i
 		assertEquals "First deletion run with parameters [$i]." "0" $?
 
 		getfacl "$TARGET_DIR/$FileA" | grep "other::r-x" > /dev/null
@@ -949,4 +962,15 @@ function test_DaemonMode () {
 	done
 
 }
+
+function test_NoRemoteAccessTest {
+	RemoveSSH
+
+        cd "$OSYNC_DIR"
+	PrepareLocalDirs
+
+	REMOTE_HOST_PING=no ./$OSYNC_EXECUTABLE ${osyncParameters[$__confLocal]}
+	assertEquals "Basic local test without remote access." "0" $?
+}
+
 . "$TESTS_DIR/shunit2/shunit2"
