@@ -547,7 +547,7 @@ function _WriteLockFilesLocal {
 	local replicaType="${2}"
 	local overwrite="${3:-false}"
 
-	__CheckArguments 3 $# "${FUNCNAME[0]}" "$@"	#__WITH_PARANOIA_DEBUG
+	__CheckArguments 2-3 $# "${FUNCNAME[0]}" "$@"	#__WITH_PARANOIA_DEBUG
 
 	(
 		if [ $overwrite == true ]; then
@@ -569,7 +569,7 @@ function _WriteLockFilesRemote {
 	local replicaType="${2}"
 	local overwrite="${3-false}"
 
-	__CheckArguments 3 $# "${FUNCNAME[0]}" "$@"	#__WITH_PARANOIA_DEBUG
+	__CheckArguments 2-3 $# "${FUNCNAME[0]}" "$@"	#__WITH_PARANOIA_DEBUG
 
 	local cmd
 
