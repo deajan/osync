@@ -984,6 +984,10 @@ function GetLocalOS {
 function GetRemoteOS {
 	__CheckArguments 0 $# ${FUNCNAME[0]} "$@"	#__WITH_PARANOIA_DEBUG
 
+	if [ "$REMOTE_OPERATION" != "yes" ]; then
+		return 0
+	fi
+
 	local remoteOsVar
 
 $SSH_CMD bash -s << 'ENDSSH' >> "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$SCRIPT_PID" 2>&1
