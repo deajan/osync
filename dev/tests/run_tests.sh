@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-# osync test suite 2016111802
+# osync test suite 2016111901
 
 # 4 tests:
 # quicklocal
@@ -24,7 +24,7 @@
 # ParallelExec
 # daemon mode tests for both config files
 
-LARGE_FILESET_URL="http://ftp.drupal.org/files/projects/drupal-8.1.9.tar.gz"
+LARGE_FILESET_URL="http://ftp.drupal.org/files/projects/drupal-8.2.2.tar.gz"
 
 OSYNC_DIR="$(pwd)"
 OSYNC_DIR=${OSYNC_DIR%%/dev*}
@@ -529,7 +529,7 @@ function test_FileAttributePropagation () {
 		touch "$TARGET_DIR/$FileB"
 
 		# First run
-		REMOTE_HOST_PING=no ./$OSYNC_EXECUTABLE $i
+		PRESERVE_ACL=yes PRESERVE_XATTR=yes REMOTE_HOST_PING=no ./$OSYNC_EXECUTABLE $i
 		assertEquals "First deletion run with parameters [$i]." "0" $?
 
 		sleep 1
