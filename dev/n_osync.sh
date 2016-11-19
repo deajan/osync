@@ -2236,14 +2236,6 @@ opts="${opts# *}"
 			HARD_MAX_EXEC_TIME=0
 		fi
 
-		if [ "$PRESERVE_ACL" == "" ]; then
-			PRESERVE_ACL="yes"
-		fi
-
-		if [ "$PRESERVE_XATTR" == "" ]; then
-			PRESERVE_XATTR="yes"
-		fi
-
 		if [ "$PATH_SEPARATOR_CHAR" == "" ]; then
 			PATH_SEPARATOR_CHAR=";"
 		fi
