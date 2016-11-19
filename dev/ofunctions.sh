@@ -1,6 +1,6 @@
 #### MINIMAL-FUNCTION-SET BEGIN ####
 
-## FUNC_BUILD=2016111705
+## FUNC_BUILD=2016111901
 ## BEGIN Generic bash functions written in 2013-2016 by Orsiris de Jong - http://www.netpower.fr - ozy@netpower.fr
 
 ## To use in a program, define the following variables:
@@ -376,7 +376,7 @@ function SendEmail {
 		mail_no_attachment=0
 	fi
 
-	if [ "$LOCAL_OS" == "BUSYBOX" ]; then
+	if [ "$LOCAL_OS" == "Busybox" ] || [ "$LOCAL_OS" == "Android" ]; then
 		if type sendmail > /dev/null 2>&1; then
 			if [ "$ENCRYPTION" == "tls" ]; then
 				echo -e "Subject:$subject\r\n$message" | $(type -p sendmail) -f "$SenderMail" -H "exec openssl s_client -quiet -tls1_2 -starttls smtp -connect $smtpServer:$smtpPort" -au"$smtpUser" -ap"$smtpPassword" "$destinationMails"
@@ -644,9 +644,6 @@ function WaitForTaskCompletion {
 			if [ $(IsInteger $pid) -eq 1 ]; then
 				if kill -0 $pid > /dev/null 2>&1; then
 					# Handle uninterruptible sleep state or zombies by ommiting them from running process array (How to kill that is already dead ? :)
-					#TODO(high): have this tested on *BSD, Mac, Win & busybox.
-					#TODO(high): propagate changes to ParallelExec
-					#pidState=$(ps -p$pid -o state= 2 > /dev/null)
 					pidState="$(eval $PROCESS_STATE_CMD)"
 					if [ "$pidState" != "D" ] && [ "$pidState" != "Z" ]; then
 						newPidsArray+=($pid)
@@ -951,6 +948,10 @@ function GetLocalOS {
 	fi
 
 	case $localOsVar in
+		# Android uname contains both linux and android, keep it before linux entry
+		*"Android"*)
+		LOCAL_OS="Android"
+		;;
 		*"Linux"*)
 		LOCAL_OS="Linux"
 		;;
@@ -964,7 +965,7 @@ function GetLocalOS {
 		LOCAL_OS="MacOSX"
 		;;
 		*"BusyBox"*)
-		LOCAL_OS="BUSYBOX"
+		LOCAL_OS="BusyBox"
 		;;
 		*)
 		if [ "$IGNORE_OS_TYPE" == "yes" ]; then		#TODO(doc): Undocumented option
@@ -1013,6 +1014,9 @@ ENDSSH
 	if [ -f "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$SCRIPT_PID" ]; then
 		remoteOsVar=$(cat "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$SCRIPT_PID")
 		case $remoteOsVar in
+			*"Android"*)
+			REMOTE_OS="Android"
+			;;
 			*"Linux"*)
 			REMOTE_OS="Linux"
 			;;
@@ -1026,7 +1030,7 @@ ENDSSH
 			REMOTE_OS="MacOSX"
 			;;
 			*"BusyBox"*)
-			REMOTE_OS="BUSYBOX"
+			REMOTE_OS="BusyBox"
 			;;
 			*"ssh"*|*"SSH"*)
 			Logger "Cannot connect to remote system." "CRITICAL"
@@ -1434,7 +1438,7 @@ function PreInit {
 	fi
 
 	## Busybox fix (Termux xz command doesn't support compression at all)
-	if [ "$LOCAL_OS" == "BUSYBOX" ] || [ "$REMOTE_OS" == "BUSYBOX" ]; then
+	if [ "$LOCAL_OS" == "BusyBox" ] || [ "$REMOTE_OS" == "Busybox" ] || [ "$LOCAL_OS" == "Android" ] || [ "$REMOTE_OS" == "Android" ]; then
 		compressionString=""
 		if type gzip > /dev/null 2>&1
 		then
@@ -1511,10 +1515,13 @@ function InitLocalOSSettings {
 		PING_CMD="ping -c 2 -i .2"
 	fi
 
-	if [ "$LOCAL_OS" == "BUSYBOX" ]; then
+	if [ "$LOCAL_OS" == "BusyBox" ] || [ "$LOCAL_OS" == "Android" ]; then
 		PROCESS_STATE_CMD="echo none"
+		DF_CMD="df"
 	else
 		PROCESS_STATE_CMD='ps -p$pid -o state= 2 > /dev/null'
+		# CentOS 5 needs -P for one line output
+		DF_CMD="df -P"
 	fi
 
 	## Stat command has different syntax on Linux and FreeBSD/MacOSX
