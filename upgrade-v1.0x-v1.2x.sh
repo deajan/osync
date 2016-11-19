@@ -7,7 +7,7 @@ CONTACT="http://www.netpower.fr/osync - ozy@netpower.fr"
 OLD_PROGRAM_VERSION="v1.0x-v1.1x"
 NEW_PROGRAM_VERSION="v1.2x"
 CONFIG_FILE_VERSION=2016111201
-PROGRAM_BUILD=2016101701
+PROGRAM_BUILD=2016111901
 
 ## type -p does not work on platforms other than linux (bash). If if does not work, always assume output is not a zero exitcode
 if ! type "$BASH" > /dev/null; then
@@ -166,7 +166,7 @@ function Init {
 	FAILED_DELETE_LIST_FILENAME="-failed-delete-$SYNC_ID"
 
 	if [ "${SLAVE_SYNC_DIR:0:6}" == "ssh://" ]; then
-		REMOTE_SYNC="yes"
+		REMOTE_OPERATION="yes"
 
 		# remove leadng 'ssh://'
 		uri=${SLAVE_SYNC_DIR#ssh://*}
@@ -217,7 +217,7 @@ function Usage {
 }
 
 function CheckEnvironment {
-	if [ "$REMOTE_SYNC" == "yes" ]; then
+	if [ "$REMOTE_OPERATION" == "yes" ]; then
 		if ! type -p ssh > /dev/null 2>&1
 		then
 			Logger "ssh not present. Cannot start sync." "CRITICAL"
@@ -443,7 +443,7 @@ ENDSSH
 
 function RenameStateFiles {
 	_RenameStateFilesLocal "$MASTER_SYNC_DIR/$OSYNC_DIR/$STATE_DIR"
-	if [ "$REMOTE_SYNC" != "yes" ]; then
+	if [ "$REMOTE_OPERATION" != "yes" ]; then
 		_RenameStateFilesLocal "$SLAVE_SYNC_DIR/$OSYNC_DIR/$STATE_DIR"
 	else
 		_RenameStateFilesRemote "$SLAVE_SYNC_DIR/$OSYNC_DIR/$STATE_DIR"
@@ -474,6 +474,7 @@ function RewriteOldConfigFiles {
 	sed -i'.tmp' 's/^CONFLICT_PREVALANCE=master/CONFLICT_PREVALANCE=initiator/g' "$config_file"
 	sed -i'.tmp' 's/^CONFLICT_PREVALANCE=slave/CONFLICT_PREVALANCE=target/g' "$config_file"
 	sed -i'.tmp' 's/^SYNC_ID=/INSTANCE_ID=/g' "$config_file"
+	sed -i'.tmp' 's/^REMOTE_SYNC=.*//g' "$config_file"
 
 	rm -f "$config_file.tmp"
 }
