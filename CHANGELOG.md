@@ -7,7 +7,13 @@ KNOWN ISSUES
 RECENT CHANGES
 --------------
 
-dd MMM 2016: osync v1.2-beta3 released
+19 nov 2016: osync v1.2-beta3 re-release
+
+- Fixed blocker bug where local tests tried GetRemoteOS Anyway
+- Fixed CentOS 5 compatibility bug for checking disk space introduced in beta3
+- More Android / Busybox compatibility
+
+18 Nov 2016: osync v1.2-beta3 released
 
 - Improved locking / unlocking replicas
 	- Fixed killing local pid that has lock bug introduced in v1.2 rewrite
