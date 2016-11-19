@@ -4,14 +4,14 @@ PROGRAM="osync" # Rsync based two way sync engine with fault tolerance
 AUTHOR="(C) 2013-2016 by Orsiris de Jong"
 CONTACT="http://www.netpower.fr/osync - ozy@netpower.fr"
 PROGRAM_VERSION=1.2-beta3
-PROGRAM_BUILD=2016111704
+PROGRAM_BUILD=2016111902
 IS_STABLE=no
 
 
 
 #### MINIMAL-FUNCTION-SET BEGIN ####
 
-## FUNC_BUILD=2016111705
+## FUNC_BUILD=2016111901
 ## BEGIN Generic bash functions written in 2013-2016 by Orsiris de Jong - http://www.netpower.fr - ozy@netpower.fr
 
 ## To use in a program, define the following variables:
@@ -371,7 +371,7 @@ function SendEmail {
 		mail_no_attachment=0
 	fi
 
-	if [ "$LOCAL_OS" == "BUSYBOX" ]; then
+	if [ "$LOCAL_OS" == "Busybox" ] || [ "$LOCAL_OS" == "Android" ]; then
 		if type sendmail > /dev/null 2>&1; then
 			if [ "$ENCRYPTION" == "tls" ]; then
 				echo -e "Subject:$subject\r\n$message" | $(type -p sendmail) -f "$SenderMail" -H "exec openssl s_client -quiet -tls1_2 -starttls smtp -connect $smtpServer:$smtpPort" -au"$smtpUser" -ap"$smtpPassword" "$destinationMails"
@@ -635,9 +635,6 @@ function WaitForTaskCompletion {
 			if [ $(IsInteger $pid) -eq 1 ]; then
 				if kill -0 $pid > /dev/null 2>&1; then
 					# Handle uninterruptible sleep state or zombies by ommiting them from running process array (How to kill that is already dead ? :)
-					#TODO(high): have this tested on *BSD, Mac, Win & busybox.
-					#TODO(high): propagate changes to ParallelExec
-					#pidState=$(ps -p$pid -o state= 2 > /dev/null)
 					pidState="$(eval $PROCESS_STATE_CMD)"
 					if [ "$pidState" != "D" ] && [ "$pidState" != "Z" ]; then
 						newPidsArray+=($pid)
@@ -929,6 +926,10 @@ function GetLocalOS {
 	fi
 
 	case $localOsVar in
+		# Android uname contains both linux and android, keep it before linux entry
+		*"Android"*)
+		LOCAL_OS="Android"
+		;;
 		*"Linux"*)
 		LOCAL_OS="Linux"
 		;;
@@ -942,7 +943,7 @@ function GetLocalOS {
 		LOCAL_OS="MacOSX"
 		;;
 		*"BusyBox"*)
-		LOCAL_OS="BUSYBOX"
+		LOCAL_OS="BusyBox"
 		;;
 		*)
 		if [ "$IGNORE_OS_TYPE" == "yes" ]; then		#TODO(doc): Undocumented option
@@ -959,6 +960,10 @@ function GetLocalOS {
 #### MINIMAL-FUNCTION-SET END ####
 
 function GetRemoteOS {
+
+	if [ "$REMOTE_OPERATION" != "yes" ]; then
+		return 0
+	fi
 
 	local remoteOsVar
 
@@ -990,6 +995,9 @@ ENDSSH
 	if [ -f "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$SCRIPT_PID" ]; then
 		remoteOsVar=$(cat "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$SCRIPT_PID")
 		case $remoteOsVar in
+			*"Android"*)
+			REMOTE_OS="Android"
+			;;
 			*"Linux"*)
 			REMOTE_OS="Linux"
 			;;
@@ -1003,7 +1011,7 @@ ENDSSH
 			REMOTE_OS="MacOSX"
 			;;
 			*"BusyBox"*)
-			REMOTE_OS="BUSYBOX"
+			REMOTE_OS="BusyBox"
 			;;
 			*"ssh"*|*"SSH"*)
 			Logger "Cannot connect to remote system." "CRITICAL"
@@ -1352,7 +1360,7 @@ function PreInit {
 	fi
 
 	## Busybox fix (Termux xz command doesn't support compression at all)
-	if [ "$LOCAL_OS" == "BUSYBOX" ] || [ "$REMOTE_OS" == "BUSYBOX" ]; then
+	if [ "$LOCAL_OS" == "BusyBox" ] || [ "$REMOTE_OS" == "Busybox" ] || [ "$LOCAL_OS" == "Android" ] || [ "$REMOTE_OS" == "Android" ]; then
 		compressionString=""
 		if type gzip > /dev/null 2>&1
 		then
@@ -1427,10 +1435,13 @@ function InitLocalOSSettings {
 		PING_CMD="ping -c 2 -i .2"
 	fi
 
-	if [ "$LOCAL_OS" == "BUSYBOX" ]; then
+	if [ "$LOCAL_OS" == "BusyBox" ] || [ "$LOCAL_OS" == "Android" ]; then
 		PROCESS_STATE_CMD="echo none"
+		DF_CMD="df"
 	else
 		PROCESS_STATE_CMD='ps -p$pid -o state= 2 > /dev/null'
+		# CentOS 5 needs -P for one line output
+		DF_CMD="df -P"
 	fi
 
 	## Stat command has different syntax on Linux and FreeBSD/MacOSX
@@ -1723,15 +1734,19 @@ function _CheckDiskSpaceLocal {
 
 	Logger "Checking minimum disk space in [$replica_path]." "NOTICE"
 
-	diskSpace=$(df "$replica_path" | tail -1 | awk '{print $4}')
+	diskSpace=$($DF_CMD "$replica_path" | tail -1 | awk '{print $4}')
 
-	# Ugly fix for df in some busybox environments that can only show human formats
-	if [ $(IsInteger $diskSpace) -eq 0 ]; then
-		diskSpace=$(HumanToNumeric $diskSpace)
-	fi
+	if [ $? != 0 ]; then
+		Logger "Cannot get free space." "ERROR"
+	else
+		# Ugly fix for df in some busybox environments that can only show human formats
+		if [ $(IsInteger $diskSpace) -eq 0 ]; then
+			diskSpace=$(HumanToNumeric $diskSpace)
+		fi
 
-	if [ $diskSpace -lt $MINIMUM_SPACE ]; then
-		Logger "There is not enough free space on replica [$replica_path] ($diskSpace KB)." "WARN"
+		if [ $diskSpace -lt $MINIMUM_SPACE ]; then
+			Logger "There is not enough free space on replica [$replica_path] ($diskSpace KB)." "WARN"
+		fi
 	fi
 }
 
@@ -1746,7 +1761,7 @@ function _CheckDiskSpaceRemote {
 	CheckConnectivity3rdPartyHosts
 	CheckConnectivityRemoteHost
 
-	cmd=$SSH_CMD' "'$COMMAND_SUDO' df \"'$replica_path'\"" > "'$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$SCRIPT_PID'" 2>&1'
+	cmd=$SSH_CMD' "'$COMMAND_SUDO' '$DF_CMD' \"'$replica_path'\"" > "'$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$SCRIPT_PID'" 2>&1'
 	Logger "cmd: $cmd" "DEBUG"
 	eval "$cmd"
 	if [ $? != 0 ]; then
@@ -2257,7 +2272,7 @@ function syncAttrs {
 	local escDestDir
 	local destReplica
 
-	if [ "$LOCAL_OS" == "BUSYBOX" ]; then
+	if [ "$LOCAL_OS" == "BusyBox" ] || [ "$LOCAL_OS" == "Android" ] || [ "$REMOTE_OS" == "BusyBox" ] || [ "$REMOTE_OS" == "Android" ]; then
 		Logger "Skipping acl synchronization. Busybox does not have join command." "NOTICE"
 		return 0
 	fi
@@ -3050,7 +3065,7 @@ function _SoftDeleteLocal {
 
 	local retval
 
-	if [ "$LOCAL_OS" == "BUSYBOX" ]; then
+	if [ "$LOCAL_OS" == "Busybox" ] || [ "$LOCAL_OS" == "Android" ]; then
 		Logger "Skipping $deletionType deletion on $replicaType. Busybox find -ctime not supported." "NOTICE"
 		return 0
 	fi
@@ -3098,7 +3113,7 @@ function _SoftDeleteRemote {
 
 	local retval
 
-	if [ "$REMOTE_OS" == "BUSYBOX" ]; then
+	if [ "$REMOTE_OS" == "BusyBox" ] || [ "$REMOTE_OS" == "Android" ]; then
 		Logger "Skipping $deletionType deletion on $replicaType. Busybox find -ctime not supported." "NOTICE"
 		return 0
 	fi
@@ -3636,14 +3651,6 @@ opts="${opts# *}"
 
 		if [ "$HARD_MAX_EXEC_TIME" == "" ]; then
 			HARD_MAX_EXEC_TIME=0
-		fi
-
-		if [ "$PRESERVE_ACL" == "" ]; then
-			PRESERVE_ACL="yes"
-		fi
-
-		if [ "$PRESERVE_XATTR" == "" ]; then
-			PRESERVE_XATTR="yes"
 		fi
 
 		if [ "$PATH_SEPARATOR_CHAR" == "" ]; then
