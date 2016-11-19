@@ -229,7 +229,7 @@ function test_Merge () {
 	SetConfFileValue "$OSYNC_DIR/$OSYNC_EXECUTABLE" "IS_STABLE" "yes"
 }
 
-function nope_test_LargeFileSet () {
+function test_LargeFileSet () {
 	for i in "${osyncParameters[@]}"; do
 		cd "$OSYNC_DIR"
 
@@ -247,7 +247,7 @@ function nope_test_LargeFileSet () {
 	done
 }
 
-function nope_test_Exclusions () {
+function test_Exclusions () {
 	# Will sync except php files
 	# RSYNC_EXCLUDE_PATTERN="*.php" is set at runtime for quicksync and in config files for other runs
 
@@ -276,7 +276,7 @@ function nope_test_Exclusions () {
 	done
 }
 
-function nope_test_Deletetion () {
+function test_Deletetion () {
 	local iFile1="$INITIATOR_DIR/ific"
 	local iFile2="$INITIATOR_DIR/ifoc"
 	local tFile1="$TARGET_DIR/tfic"
@@ -320,7 +320,7 @@ function nope_test_Deletetion () {
 	done
 }
 
-function nope_test_deletion_failure () {
+function test_deletion_failure () {
 
 	if [ "$TRAVIS_RUN" == true ]; then
 		echo "Skipping deletionFailure tests as travis does not support chattr."
@@ -387,7 +387,7 @@ function nope_test_deletion_failure () {
 	done
 }
 
-function nope_test_skip_deletion () {
+function test_skip_deletion () {
 	local skipDeletionLocal
 	local skipDeletionRemote
 	local modes
@@ -464,7 +464,7 @@ function nope_test_skip_deletion () {
 	SetConfFileValue "$CONF_DIR/$REMOTE_CONF" "SKIP_DELETION" "$skipDeletionRemote"
 }
 
-function nope_test_softdeletion_cleanup () {
+function test_softdeletion_cleanup () {
 	#declare -A files
 
 	files=()
@@ -520,7 +520,7 @@ function nope_test_softdeletion_cleanup () {
 
 }
 
-function nope_test_FileAttributePropagation () {
+function test_FileAttributePropagation () {
 
 	if [ "$TRAVIS_RUN" == true ]; then
 		echo "Skipping FileAttributePropagation tests as travis does not support getfacl / setfacl."
@@ -572,7 +572,7 @@ function nope_test_FileAttributePropagation () {
 	done
 }
 
-function nope_test_ConflictBackups () {
+function test_ConflictBackups () {
 	for i in "${osyncParameters[@]}"; do
 		cd "$OSYNC_DIR"
 		PrepareLocalDirs
@@ -608,7 +608,7 @@ function nope_test_ConflictBackups () {
 	done
 }
 
-function nope_test_MultipleConflictBackups () {
+function test_MultipleConflictBackups () {
 	local conflictBackupMultipleLocal
 	local conflictBackupMultipleRemote
 
@@ -674,7 +674,7 @@ function nope_test_MultipleConflictBackups () {
 
 }
 
-function nope_test_Locking () {
+function test_Locking () {
 	local forceStrangerUnlockLocal
 	local forceStrangerUnlockRemote
 
@@ -783,7 +783,7 @@ function nope_test_Locking () {
 	SetConfFileValue "$CONF_DIR/$REMOTE_CONF" "FORCE_STRANGER_LOCK_RESUME" "$forceStrangerUnlockRemote"
 }
 
-function nope_test_WaitForTaskCompletion () {
+function test_WaitForTaskCompletion () {
 	if [ "$OSYNC_MIN_VERSION" == "1" ]; then
 		echo "Skipping WaitForTaskCompletion test because osync v1.1 does not support multiple pid monitoring"
 		return 0
@@ -838,7 +838,7 @@ function nope_test_WaitForTaskCompletion () {
 	assertEquals "WaitForTaskCompletion test 5" "2" $?
 }
 
-function nope_test_ParallelExec () {
+function test_ParallelExec () {
 	if [ "$OSYNC_MIN_VERSION" == "1" ]; then
 		echo "Skipping ParallelExec test because osync v1.1 didn't have this"
 		return 0
@@ -887,7 +887,7 @@ function nope_test_ParallelExec () {
 
 }
 
-function nope_test_UpgradeConfRun () {
+function test_UpgradeConfRun () {
 	if [ "$OSYNC_MIN_VERSION" == "1" ]; then
 		echo "Skipping Upgrade script test because no further dev will happen on this for v1.1"
 		return 0
