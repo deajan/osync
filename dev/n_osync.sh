@@ -4,7 +4,7 @@ PROGRAM="osync" # Rsync based two way sync engine with fault tolerance
 AUTHOR="(C) 2013-2016 by Orsiris de Jong"
 CONTACT="http://www.netpower.fr/osync - ozy@netpower.fr"
 PROGRAM_VERSION=1.2-beta3
-PROGRAM_BUILD=2016111801
+PROGRAM_BUILD=2016111901
 IS_STABLE=no
 
 # Execution order						#__WITH_PARANOIA_DEBUG
@@ -284,12 +284,7 @@ function _CheckDiskSpaceLocal {
 
 	Logger "Checking minimum disk space in [$replica_path]." "NOTICE"
 
-	# Check for -P portability switch
-	if df -P > /dev/null 2>&1; then
-		diskSpace=$(df -P "$replica_path" | tail -1 | awk '{print $4}')
-	else
-		diskSpace=$(df "$replica_path" | tail -1 | awk '{print $4}')
-	fi
+	diskSpace=$($DF_CMD "$replica_path" | tail -1 | awk '{print $4}')
 
 	if [ $? != 0 ]; then
 		Logger "Cannot get free space." "ERROR"
@@ -317,7 +312,7 @@ function _CheckDiskSpaceRemote {
 	CheckConnectivity3rdPartyHosts
 	CheckConnectivityRemoteHost
 
-	cmd=$SSH_CMD' "'$COMMAND_SUDO' if df -P > /dev/null 2>&1; then df -P \"'$replica_path'\"; else df \"'$replica_path'\"; fi" > "'$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$SCRIPT_PID'" 2>&1'
+	cmd=$SSH_CMD' "'$COMMAND_SUDO' '$DF_CMD' \"'$replica_path'\"" > "'$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$SCRIPT_PID'" 2>&1'
 	Logger "cmd: $cmd" "DEBUG"
 	eval "$cmd"
 	if [ $? != 0 ]; then
