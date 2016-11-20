@@ -1164,7 +1164,7 @@ function CheckConnectivityRemoteHost {
 
 	local retval
 
-	if [ "$_PARANOIA_DEBUG" != "yes" ]; then # Do not loose time in paranoia debug
+	if [ "$_PARANOIA_DEBUG" != "yes" ]; then # Do not loose time in paranoia debug		#__WITH_PARANOIA_DEBUG
 
 		if [ "$REMOTE_HOST_PING" != "no" ] && [ "$REMOTE_OPERATION" != "no" ]; then
 			eval "$PING_CMD $REMOTE_HOST > /dev/null 2>&1" &
@@ -1175,7 +1175,7 @@ function CheckConnectivityRemoteHost {
 				return $retval
 			fi
 		fi
-	fi
+	fi											#__WITH_PARANOIA_DEBUG
 }
 
 function CheckConnectivity3rdPartyHosts {
@@ -1184,7 +1184,7 @@ function CheckConnectivity3rdPartyHosts {
 	local remote3rdPartySuccess
 	local retval
 
-	if [ "$_PARANOIA_DEBUG" != "yes" ]; then # Do not loose time in paranoia debug
+	if [ "$_PARANOIA_DEBUG" != "yes" ]; then # Do not loose time in paranoia debug		#__WITH_PARANOIA_DEBUG
 
 		if [ "$REMOTE_3RD_PARTY_HOSTS" != "" ]; then
 			remote3rdPartySuccess=false
@@ -1207,7 +1207,7 @@ function CheckConnectivity3rdPartyHosts {
 				return 0
 			fi
 		fi
-	fi
+	fi											#__WITH_PARANOIA_DEBUG
 }
 
 #__BEGIN_WITH_PARANOIA_DEBUG
