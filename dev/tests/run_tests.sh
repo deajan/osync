@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-# osync test suite 2016111902
+# osync test suite 20161112001
 
 # 4 tests:
 # quicklocal
@@ -208,7 +208,7 @@ function oneTimeTearDown () {
 	RemoveSSH
 
 	#TODO: uncomment this when dev is done
-	rm -rf "$OSYNC_TESTS_DIR"
+	#rm -rf "$OSYNC_TESTS_DIR"
 
 	ELAPSED_TIME=$(($SECONDS - $START_TIME))
 	echo "It took $ELAPSED_TIME seconds to run these tests."
@@ -533,9 +533,13 @@ function test_FileAttributePropagation () {
 
 		DirA="dir a"
 		DirB="dir b"
+		DirC="dir c"
+		DirD="dir d"
 
 		mkdir "$INITIATOR_DIR/$DirA"
 		mkdir "$TARGET_DIR/$DirB"
+		mkdir "$INITIATOR_DIR/$DirC"
+		mkdir "$TARGET_DIR/$DirD"
 
 		FileA="$DirA/FileA"
 		FileB="$DirB/FileB"
@@ -555,10 +559,21 @@ function test_FileAttributePropagation () {
 		getfacl "$TARGET_DIR/$FileB" | grep "other::r--" > /dev/null
 		assertEquals "Check getting ACL on target." "0" $?
 
+		getfacl "$INITIATOR_DIR/$DirC" | grep "other::r-x" > /dev/null
+		assertEquals "Check getting ACL on initiator subdirectory." "0" $?
+
+		getfacl "$TARGET_DIR/$DirD" | grep "other::r-x" > /dev/null
+		assertEquals "Check getting ACL on target subdirectory." "0" $?
+
 		setfacl -m o:r-x "$INITIATOR_DIR/$FileA"
 		assertEquals "Set ACL on initiator" "0" $?
 		setfacl -m o:-w- "$TARGET_DIR/$FileB"
 		assertEquals "Set ACL on target" "0" $?
+
+		setfacl -m o:rwx "$INITIATOR_DIR/$DirC"
+		assertEquals "Set ACL on initiator directory" "0" $?
+		setfacl -m o:-wx "$TARGET_DIR/$DirD"
+		assertEquals "Set ACL on target directory" "0" $?
 
 		# Second run
 		PRESERVE_ACL=yes PRESERVE_XATTR=yes REMOTE_HOST_PING=no ./$OSYNC_EXECUTABLE $i
@@ -569,6 +584,12 @@ function test_FileAttributePropagation () {
 
 		getfacl "$INITIATOR_DIR/$FileB" | grep "other::-w-" > /dev/null
 		assertEquals "ACLs matched original value on initiator." "0" $?
+
+		getfacl "$TARGET_DIR/$DirC" | grep "other::rwx" > /dev/null
+		assertEquals "ACLs matched original value on target subdirectory." "0" $?
+
+		getfacl "$INITIATOR_DIR/$DirD" | grep "other::-wx" > /dev/null
+		assertEquals "ACLs matched original value on initiator subdirectory." "0" $?
 	done
 }
 
