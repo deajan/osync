@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-# osync test suite 20161112001
+# osync test suite 20161112002
 
 # 4 tests:
 # quicklocal
@@ -144,10 +144,15 @@ function DownloadLargeFileSet() {
 	local destinationPath="${1}"
 
 	cd "$OSYNC_DIR"
-	wget -q --no-check-certificate "$LARGE_FILESET_URL" > /dev/null
-	assertEquals "Download [$LARGE_FILESET_URL]." "0" $?
+	if type wget > /dev/null 2>&1; then
+		wget -q --no-check-certificate "$LARGE_FILESET_URL" > /dev/null
+		assertEquals "Download [$LARGE_FILESET_URL] with wget." "0" $?
+	elif type curl > /dev/null 2>&1; then
+		curl -O -L "$LARGE_FILESET_URL" > /dev/null 2>&1
+		assertEquals "Download [$LARGE_FILESET_URL] with curl." "0" $?
+	fi
 
-	tar xvf "$(basename $LARGE_FILESET_URL)" -C "$destinationPath" > /dev/null
+	tar xf "$(basename $LARGE_FILESET_URL)" -C "$destinationPath"
 	assertEquals "Extract $(basename $LARGE_FILESET_URL)" "0" $?
 
 	rm -f "$(basename $LARGE_FILESET_URL)"
