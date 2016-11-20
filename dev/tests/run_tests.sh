@@ -1,6 +1,7 @@
+
 #!/usr/bin/env bash
 
-# osync test suite 20161112003
+# osync test suite 20161112004
 
 # 4 tests:
 # quicklocal
@@ -25,7 +26,8 @@
 # daemon mode tests for both config files
 
 #TODO: on BSD, remount UFS with ACL support using mount -o acls /
-# setfacl -m everyone@:rwx:fd:allow file
+# setfacl needs double ':' to be compatible with both linux and BSD
+# setfacl -m o::rwx file
 
 LARGE_FILESET_URL="http://ftp.drupal.org/files/projects/drupal-8.2.2.tar.gz"
 
@@ -586,14 +588,14 @@ function test_FileAttributePropagation () {
 		getfacl "$TARGET_DIR/$DirD" | grep "other::r-x" > /dev/null
 		assertEquals "Check getting ACL on target subdirectory." "0" $?
 
-		setfacl -m o:r-x "$INITIATOR_DIR/$FileA"
+		setfacl -m o::r-x "$INITIATOR_DIR/$FileA"
 		assertEquals "Set ACL on initiator" "0" $?
-		setfacl -m o:-w- "$TARGET_DIR/$FileB"
+		setfacl -m o::-w- "$TARGET_DIR/$FileB"
 		assertEquals "Set ACL on target" "0" $?
 
-		setfacl -m o:rwx "$INITIATOR_DIR/$DirC"
+		setfacl -m o::rwx "$INITIATOR_DIR/$DirC"
 		assertEquals "Set ACL on initiator directory" "0" $?
-		setfacl -m o:-wx "$TARGET_DIR/$DirD"
+		setfacl -m o::-wx "$TARGET_DIR/$DirD"
 		assertEquals "Set ACL on target directory" "0" $?
 
 		# Second run
