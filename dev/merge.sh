@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-## MERGE 2016090601
+## MERGE 2016112001
 
 ## Merges ofunctions.sh and n_program.sh into program.sh
 ## Adds installer
@@ -76,8 +76,10 @@ function CleanDebug {
 #    s/.*\n//        # delete the part before pattern2
 #}
 #p
+#	sed -n '/'$PARANOIA_DEBUG_BEGIN'/{p; :a; N; /'$PARANOIA_DEBUG_END'/!ba; s/.*\n//}; p' debug_$PROGRAM.sh | grep -v "$PARANOIA_DEBUG_LINE" > ../$PROGRAM.sh
 
-	sed -n '/'$PARANOIA_DEBUG_BEGIN'/{p; :a; N; /'$PARANOIA_DEBUG_END'/!ba; s/.*\n//}; p' debug_$PROGRAM.sh | grep -v "$PARANOIA_DEBUG_LINE" > ../$PROGRAM.sh
+	# Way simpler version of the above, compatible with BSD
+	sed '/'$PARANOIA_DEBUG_BEGIN'/,/'$PARANOIA_DEBUG_END'/d' debug_$PROGRAM.sh | grep -v "$PARANOIA_DEBUG_LINE" > ../$PROGRAM.sh
 	if [ $? != 0 ]; then
 		QuickLogger "Cannot remove PARANOIA_DEBUG code from standard build." "stdout"
 		exit 1
