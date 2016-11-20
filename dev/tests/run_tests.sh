@@ -120,7 +120,7 @@ function SetConfFileValue () {
 
 function SetupSSH {
 	echo -e  'y\n'| ssh-keygen -t rsa -b 2048 -N "" -f "${HOME}/.ssh/id_rsa_local"
-	if ! grep "$(${HOME}/.ssh/id_rsa_local.pub)" "${HOME}/.ssh/authorized_keys"; then
+	if ! grep "$(cat ${HOME}/.ssh/id_rsa_local.pub)" "${HOME}/.ssh/authorized_keys"; then
 		cat "${HOME}/.ssh/id_rsa_local.pub" >> "${HOME}/.ssh/authorized_keys"
 	fi
 	chmod 600 "${HOME}/.ssh/authorized_keys"
@@ -236,7 +236,7 @@ function test_Merge () {
 	SetConfFileValue "$OSYNC_DIR/$OSYNC_EXECUTABLE" "IS_STABLE" "yes"
 }
 
-function test_LargeFileSet () {
+function nope_test_LargeFileSet () {
 	for i in "${osyncParameters[@]}"; do
 		cd "$OSYNC_DIR"
 
@@ -254,7 +254,7 @@ function test_LargeFileSet () {
 	done
 }
 
-function test_Exclusions () {
+function nope_test_Exclusions () {
 	# Will sync except php files
 	# RSYNC_EXCLUDE_PATTERN="*.php" is set at runtime for quicksync and in config files for other runs
 
@@ -283,7 +283,7 @@ function test_Exclusions () {
 	done
 }
 
-function test_Deletetion () {
+function nope_test_Deletetion () {
 	local iFile1="$INITIATOR_DIR/ific"
 	local iFile2="$INITIATOR_DIR/ifoc"
 	local tFile1="$TARGET_DIR/tfic"
@@ -394,7 +394,7 @@ function test_deletion_failure () {
 	done
 }
 
-function test_skip_deletion () {
+function nope_test_skip_deletion () {
 	local skipDeletionLocal
 	local skipDeletionRemote
 	local modes
@@ -471,7 +471,7 @@ function test_skip_deletion () {
 	SetConfFileValue "$CONF_DIR/$REMOTE_CONF" "SKIP_DELETION" "$skipDeletionRemote"
 }
 
-function test_softdeletion_cleanup () {
+function nope_test_softdeletion_cleanup () {
 	#declare -A files
 
 	files=()
@@ -527,7 +527,7 @@ function test_softdeletion_cleanup () {
 
 }
 
-function test_FileAttributePropagation () {
+function nope_test_FileAttributePropagation () {
 
 	if [ "$TRAVIS_RUN" == true ]; then
 		echo "Skipping FileAttributePropagation tests as travis does not support getfacl / setfacl."
@@ -600,7 +600,7 @@ function test_FileAttributePropagation () {
 	done
 }
 
-function test_ConflictBackups () {
+function nope_test_ConflictBackups () {
 	for i in "${osyncParameters[@]}"; do
 		cd "$OSYNC_DIR"
 		PrepareLocalDirs
@@ -636,7 +636,7 @@ function test_ConflictBackups () {
 	done
 }
 
-function test_MultipleConflictBackups () {
+function nope_test_MultipleConflictBackups () {
 	local conflictBackupMultipleLocal
 	local conflictBackupMultipleRemote
 
@@ -702,7 +702,7 @@ function test_MultipleConflictBackups () {
 
 }
 
-function test_Locking () {
+function nope_test_Locking () {
 	local forceStrangerUnlockLocal
 	local forceStrangerUnlockRemote
 
@@ -811,7 +811,7 @@ function test_Locking () {
 	SetConfFileValue "$CONF_DIR/$REMOTE_CONF" "FORCE_STRANGER_LOCK_RESUME" "$forceStrangerUnlockRemote"
 }
 
-function test_WaitForTaskCompletion () {
+function nope_test_WaitForTaskCompletion () {
 	if [ "$OSYNC_MIN_VERSION" == "1" ]; then
 		echo "Skipping WaitForTaskCompletion test because osync v1.1 does not support multiple pid monitoring"
 		return 0
@@ -866,7 +866,7 @@ function test_WaitForTaskCompletion () {
 	assertEquals "WaitForTaskCompletion test 5" "2" $?
 }
 
-function test_ParallelExec () {
+function nope_test_ParallelExec () {
 	if [ "$OSYNC_MIN_VERSION" == "1" ]; then
 		echo "Skipping ParallelExec test because osync v1.1 didn't have this"
 		return 0
@@ -915,7 +915,7 @@ function test_ParallelExec () {
 
 }
 
-function test_UpgradeConfRun () {
+function nope_test_UpgradeConfRun () {
 	if [ "$OSYNC_MIN_VERSION" == "1" ]; then
 		echo "Skipping Upgrade script test because no further dev will happen on this for v1.1"
 		return 0
@@ -937,7 +937,7 @@ function test_UpgradeConfRun () {
         rm -f "$CONF_DIR/$TMP_OLD_CONF.save"
 }
 
-function test_DaemonMode () {
+function nope_test_DaemonMode () {
 
 	if [ "$TRAVIS_RUN" == true ]; then
 		echo "Skipping daemon mode tests as no inotifywait present in travis yet."
@@ -993,7 +993,7 @@ function test_DaemonMode () {
 
 }
 
-function test_NoRemoteAccessTest () {
+function nope_test_NoRemoteAccessTest () {
 	RemoveSSH
 
         cd "$OSYNC_DIR"
