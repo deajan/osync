@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-# osync test suite 2016111705
+# osync test suite 20161112001
 
 # 4 tests:
 # quicklocal
@@ -24,7 +24,7 @@
 # ParallelExec
 # daemon mode tests for both config files
 
-LARGE_FILESET_URL="http://ftp.drupal.org/files/projects/drupal-8.1.9.tar.gz"
+LARGE_FILESET_URL="http://ftp.drupal.org/files/projects/drupal-8.2.2.tar.gz"
 
 OSYNC_DIR="$(pwd)"
 OSYNC_DIR=${OSYNC_DIR%%/dev*}
@@ -67,16 +67,27 @@ OSYNC_MIN_VERSION=x
 OSYNC_IS_STABLE=maybe
 
 # Setup an array with all function modes
-declare -Ag osyncParameters
+#declare -Ag osyncParameters
 
-osyncParameters[quickLocal]="--initiator=$INITIATOR_DIR --target=$TARGET_DIR --instance-id=quicklocal"
-osyncParameters[quickRemote]="--initiator=$INITIATOR_DIR --target=ssh://localhost:$SSH_PORT/$TARGET_DIR --rsakey=${HOME}/.ssh/id_rsa_local --instance-id=quickremote"
-osyncParameters[confLocal]="$CONF_DIR/$LOCAL_CONF"
-osyncParameters[confRemote]="$CONF_DIR/$REMOTE_CONF"
+readonly __quickLocal=0
+readonly __quickRemote=1
+readonly __confLocal=2
+readonly __confRemote=3
 
-declare -Ag osyncDaemonParameters
-osyncDaemonParameters[daemonlocal]="$CONF_DIR/$LOCAL_CONF --on-changes"
-osyncDaemonParameters[daemonremote]="$CONF_DIR/$REMOTE_CONF --on-changes"
+osyncParameters=()
+osyncParameters[$__quickLocal]="--initiator=$INITIATOR_DIR --target=$TARGET_DIR --instance-id=quicklocal"
+osyncParameters[$__quickRemote]="--initiator=$INITIATOR_DIR --target=ssh://localhost:$SSH_PORT/$TARGET_DIR --rsakey=${HOME}/.ssh/id_rsa_local --instance-id=quickremote"
+osyncParameters[$__confLocal]="$CONF_DIR/$LOCAL_CONF"
+osyncParameters[$__confRemote]="$CONF_DIR/$REMOTE_CONF"
+
+#declare -Ag osyncDaemonParameters
+osyncDaemonParameters=()
+
+readonly __local
+readonly __remote
+
+osyncDaemonParameters[$__local]="$CONF_DIR/$LOCAL_CONF --on-changes"
+osyncDaemonParameters[$__remote]="$CONF_DIR/$REMOTE_CONF --on-changes"
 
 function GetConfFileValue () {
 	local file="${1}"
@@ -98,7 +109,9 @@ function SetConfFileValue () {
 	local value="${3}"
 
 	if grep "^$name=" "$file" > /dev/null; then
+		# Using -i.tmp for BSD compat
 		sed -i.tmp "s/^$name=.*/$name=$value/" "$file"
+		rm -f "$file.tmp"
 		assertEquals "Set $name to [$value]." "0" $?
 	else
 		assertEquals "$name does not exist in [$file]." "1" "0"
@@ -116,11 +129,22 @@ function SetupSSH {
 	fi
 }
 
+function RemoveSSH {
+	local pubkey
+
+	if [ -f "${HOME}/.ssh/id_rsa_local" ]; then
+
+		pubkey=$(cat "${HOME}/.ssh/id_rsa_local.pub")
+		sed -i.bak "#$pubkey#d" "${HOME}/.ssh/authorized_keys"
+		rm -f "${HOME}/.ssh/{id_rsa_local.pub,id_rsa_local}"
+	fi
+}
+
 function DownloadLargeFileSet() {
 	local destinationPath="${1}"
 
 	cd "$OSYNC_DIR"
-	wget -q "$LARGE_FILESET_URL" > /dev/null
+	wget -q --no-check-certificate "$LARGE_FILESET_URL" > /dev/null
 	assertEquals "Download [$LARGE_FILESET_URL]." "0" $?
 
 	tar xvf "$(basename $LARGE_FILESET_URL)" -C "$destinationPath" > /dev/null
@@ -181,8 +205,10 @@ function oneTimeTearDown () {
 	# Set osync version stable flag back to origin
 	SetConfFileValue "$OSYNC_DIR/$OSYNC_EXECUTABLE" "IS_STABLE" "$OSYNC_IS_STABLE"
 
+	RemoveSSH
+
 	#TODO: uncomment this when dev is done
-	rm -rf "$OSYNC_TESTS_DIR"
+	#rm -rf "$OSYNC_TESTS_DIR"
 
 	ELAPSED_TIME=$(($SECONDS - $START_TIME))
 	echo "It took $ELAPSED_TIME seconds to run these tests."
@@ -439,12 +465,13 @@ function test_skip_deletion () {
 }
 
 function test_softdeletion_cleanup () {
-	declare -A files
+	#declare -A files
 
-	files[deletedFileInitiator]="$INITIATOR_DIR/$OSYNC_DELETE_DIR/someDeletedFileInitiator"
-	files[deletedFileTarget]="$TARGET_DIR/$OSYNC_DELETE_DIR/someDeletedFileTarget"
-	files[backedUpFileInitiator]="$INITIATOR_DIR/$OSYNC_BACKUP_DIR/someBackedUpFileInitiator"
-	files[backedUpFileTarget]="$TARGET_DIR/$OSYNC_BACKUP_DIR/someBackedUpFileTarget"
+	files=()
+	files[0]="$INITIATOR_DIR/$OSYNC_DELETE_DIR/someDeletedFileInitiator"
+	files[1]="$TARGET_DIR/$OSYNC_DELETE_DIR/someDeletedFileTarget"
+	files[2]="$INITIATOR_DIR/$OSYNC_BACKUP_DIR/someBackedUpFileInitiator"
+	files[3]="$TARGET_DIR/$OSYNC_BACKUP_DIR/someBackedUpFileTarget"
 
 	for i in "${osyncParameters[@]}"; do
 		cd "$OSYNC_DIR"
@@ -506,9 +533,13 @@ function test_FileAttributePropagation () {
 
 		DirA="dir a"
 		DirB="dir b"
+		DirC="dir c"
+		DirD="dir d"
 
 		mkdir "$INITIATOR_DIR/$DirA"
 		mkdir "$TARGET_DIR/$DirB"
+		mkdir "$INITIATOR_DIR/$DirC"
+		mkdir "$TARGET_DIR/$DirD"
 
 		FileA="$DirA/FileA"
 		FileB="$DirB/FileB"
@@ -517,34 +548,48 @@ function test_FileAttributePropagation () {
 		touch "$TARGET_DIR/$FileB"
 
 		# First run
-		REMOTE_HOST_PING=no ./$OSYNC_EXECUTABLE $i
+		PRESERVE_ACL=yes PRESERVE_XATTR=yes REMOTE_HOST_PING=no ./$OSYNC_EXECUTABLE $i
 		assertEquals "First deletion run with parameters [$i]." "0" $?
 
 		sleep 1
 
-		getfacl -p "$INITIATOR_DIR/$FileA" | grep "other::r--" > /dev/null
+		getfacl "$INITIATOR_DIR/$FileA" | grep "other::r--" > /dev/null
 		assertEquals "Check getting ACL on initiator." "0" $?
 
-		getfacl -p "$TARGET_DIR/$FileB" | grep "other::r--" > /dev/null
+		getfacl "$TARGET_DIR/$FileB" | grep "other::r--" > /dev/null
 		assertEquals "Check getting ACL on target." "0" $?
+
+		getfacl "$INITIATOR_DIR/$DirC" | grep "other::r-x" > /dev/null
+		assertEquals "Check getting ACL on initiator subdirectory." "0" $?
+
+		getfacl "$TARGET_DIR/$DirD" | grep "other::r-x" > /dev/null
+		assertEquals "Check getting ACL on target subdirectory." "0" $?
 
 		setfacl -m o:r-x "$INITIATOR_DIR/$FileA"
 		assertEquals "Set ACL on initiator" "0" $?
 		setfacl -m o:-w- "$TARGET_DIR/$FileB"
 		assertEquals "Set ACL on target" "0" $?
 
+		setfacl -m o:rwx "$INITIATOR_DIR/$DirC"
+		assertEquals "Set ACL on initiator directory" "0" $?
+		setfacl -m o:-wx "$TARGET_DIR/$DirD"
+		assertEquals "Set ACL on target directory" "0" $?
+
 		# Second run
-		REMOTE_HOST_PING=no ./$OSYNC_EXECUTABLE $i
+		PRESERVE_ACL=yes PRESERVE_XATTR=yes REMOTE_HOST_PING=no ./$OSYNC_EXECUTABLE $i
 		assertEquals "First deletion run with parameters [$i]." "0" $?
 
-		getfacl -p "$TARGET_DIR/$FileA" | grep "other::r-x" > /dev/null
+		getfacl "$TARGET_DIR/$FileA" | grep "other::r-x" > /dev/null
 		assertEquals "ACLs matched original value on target." "0" $?
 
-		getfacl -p "$INITIATOR_DIR/$FileB" | grep "other::-w-" > /dev/null
+		getfacl "$INITIATOR_DIR/$FileB" | grep "other::-w-" > /dev/null
 		assertEquals "ACLs matched original value on initiator." "0" $?
 
-		getfacl -p "$TARGET_DIR/$FileA"
-		getfacl -p "$INITIATOR_DIR/$FileB"
+		getfacl "$TARGET_DIR/$DirC" | grep "other::rwx" > /dev/null
+		assertEquals "ACLs matched original value on target subdirectory." "0" $?
+
+		getfacl "$INITIATOR_DIR/$DirD" | grep "other::-wx" > /dev/null
+		assertEquals "ACLs matched original value on initiator subdirectory." "0" $?
 	done
 }
 
@@ -682,28 +727,28 @@ function test_Locking () {
 	mkdir -p "$TARGET_DIR/$OSYNC_WORKDIR"
 	echo 65536@quicklocal > "$TARGET_DIR/$OSYNC_WORKDIR/lock"
 
-	REMOTE_HOST_PING=no ./$OSYNC_EXECUTABLE ${osyncParameters[quickLocal]}
+	REMOTE_HOST_PING=no ./$OSYNC_EXECUTABLE ${osyncParameters[$__quickLocal]}
 	assertEquals "Should be able to resume locked target with same instance_id in quickLocal mode." "0" $?
 
 	PrepareLocalDirs
 	mkdir -p "$TARGET_DIR/$OSYNC_WORKDIR"
 	echo 65536@local > "$TARGET_DIR/$OSYNC_WORKDIR/lock"
 
-	REMOTE_HOST_PING=no ./$OSYNC_EXECUTABLE ${osyncParameters[confLocal]}
+	REMOTE_HOST_PING=no ./$OSYNC_EXECUTABLE ${osyncParameters[$__confLocal]}
 	assertEquals "Should be able to resume locked target with same instance_id in confLocal mode." "0" $?
 
 	PrepareLocalDirs
 	mkdir -p "$TARGET_DIR/$OSYNC_WORKDIR"
 	echo 65536@quickremote > "$TARGET_DIR/$OSYNC_WORKDIR/lock"
 
-	REMOTE_HOST_PING=no ./$OSYNC_EXECUTABLE ${osyncParameters[quickRemote]}
+	REMOTE_HOST_PING=no ./$OSYNC_EXECUTABLE ${osyncParameters[$__quickRemote]}
 	assertEquals "Should be able to resume locked target with same instance_id in quickRemote mode." "0" $?
 
 	PrepareLocalDirs
 	mkdir -p "$TARGET_DIR/$OSYNC_WORKDIR"
 	echo 65536@remote > "$TARGET_DIR/$OSYNC_WORKDIR/lock"
 
-	REMOTE_HOST_PING=no ./$OSYNC_EXECUTABLE ${osyncParameters[confRemote]}
+	REMOTE_HOST_PING=no ./$OSYNC_EXECUTABLE ${osyncParameters[$__confRemote]}
 	assertEquals "Should be able to resume locked target with same instance_id in confRemote mode." "0" $?
 
 	# Remote Target lock present should not be resumed if instance ID is NOT the same as current one, local target lock is resumed
@@ -711,28 +756,28 @@ function test_Locking () {
 	mkdir -p "$TARGET_DIR/$OSYNC_WORKDIR"
 	echo 65536@bogusinstance > "$TARGET_DIR/$OSYNC_WORKDIR/lock"
 
-	REMOTE_HOST_PING=no ./$OSYNC_EXECUTABLE ${osyncParameters[quickLocal]}
+	REMOTE_HOST_PING=no ./$OSYNC_EXECUTABLE ${osyncParameters[$__quickLocal]}
 	assertEquals "Should be able to resume locked local target with bogus instance id in quickLocal mode." "0" $?
 
 	PrepareLocalDirs
 	mkdir -p "$TARGET_DIR/$OSYNC_WORKDIR"
 	echo 65536@bogusinstance > "$TARGET_DIR/$OSYNC_WORKDIR/lock"
 
-	REMOTE_HOST_PING=no ./$OSYNC_EXECUTABLE ${osyncParameters[confLocal]}
+	REMOTE_HOST_PING=no ./$OSYNC_EXECUTABLE ${osyncParameters[$__confLocal]}
 	assertEquals "Should be able to resume locked local target with bogus instance_id in confLocal mode." "0" $?
 
 	PrepareLocalDirs
 	mkdir -p "$TARGET_DIR/$OSYNC_WORKDIR"
 	echo 65536@bogusinstance > "$TARGET_DIR/$OSYNC_WORKDIR/lock"
 
-	REMOTE_HOST_PING=no ./$OSYNC_EXECUTABLE ${osyncParameters[quickRemote]}
+	REMOTE_HOST_PING=no ./$OSYNC_EXECUTABLE ${osyncParameters[$__quickRemote]}
 	assertEquals "Should not be able to resume remote locked target with bogus instance_id in quickRemote mode." "1" $?
 
 	PrepareLocalDirs
 	mkdir -p "$TARGET_DIR/$OSYNC_WORKDIR"
 	echo 65536@bogusinstance > "$TARGET_DIR/$OSYNC_WORKDIR/lock"
 
-	REMOTE_HOST_PING=no ./$OSYNC_EXECUTABLE ${osyncParameters[confRemote]}
+	REMOTE_HOST_PING=no ./$OSYNC_EXECUTABLE ${osyncParameters[$__confRemote]}
 	assertEquals "Should not be able to resume remote locked target with bgous instance_id in confRemote mode." "1" $?
 
 	# Target lock present should be resumed if instance ID is NOT the same as current one but FORCE_STRANGER_UNLOCK=yes
@@ -940,4 +985,15 @@ function test_DaemonMode () {
 	done
 
 }
+
+function test_NoRemoteAccessTest () {
+	RemoveSSH
+
+        cd "$OSYNC_DIR"
+	PrepareLocalDirs
+
+	REMOTE_HOST_PING=no ./$OSYNC_EXECUTABLE ${osyncParameters[$__confLocal]}
+	assertEquals "Basic local test without remote access." "0" $?
+}
+
 . "$TESTS_DIR/shunit2/shunit2"
