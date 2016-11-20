@@ -528,30 +528,30 @@ function Spinner {
 		return 0
 	fi
 
-	case $toggle
+	case $_OFUNCTIONS_SPINNER_TOGGLE
 	in
 	1)
 	echo -n " \ "
 	echo -ne "\r"
-	toggle="2"
+	_OFUNCTIONS_SPINNER_TOGGLE=2
 	;;
 
 	2)
 	echo -n " | "
 	echo -ne "\r"
-	toggle="3"
+	_OFUNCTIONS_SPINNER_TOGGLE=3
 	;;
 
 	3)
 	echo -n " / "
 	echo -ne "\r"
-	toggle="4"
+	_OFUNCTIONS_SPINNER_TOGGLE=4
 	;;
 
 	*)
 	echo -n " - "
 	echo -ne "\r"
-	toggle="1"
+	_OFUNCTIONS_SPINNER_TOGGLE=1
 	;;
 	esac
 }
