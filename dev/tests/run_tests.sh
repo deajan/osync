@@ -24,6 +24,9 @@
 # ParallelExec
 # daemon mode tests for both config files
 
+#TODO: on BSD, remount UFS with ACL support using mount -o acls /
+# setfacl -m everyone@:rwx:fd:allow file
+
 LARGE_FILESET_URL="http://ftp.drupal.org/files/projects/drupal-8.2.2.tar.gz"
 
 OSYNC_DIR="$(pwd)"
@@ -198,6 +201,17 @@ function oneTimeSetUp () {
 	source "$DEV_DIR/ofunctions.sh"
 	SetupSSH
 
+	GetLocalOS
+
+	#TODO: Assuming that macos has the same syntax than bsd here
+	if [ "$LOCAL_OS" == "BSD" ] || [ "$LOCAL_OS" == "MacOSX" ]; then
+		IMMUTABLE_ON_CMD="chflags schg"
+		IMMUTABLE_OFF_CMD="chflags noschg"
+	else
+		IMMUTABLE_ON_CMD="chattr +i"
+		IMMUTABLE_OFF_CMD="chattr -i"
+	fi
+
 	# Get osync version
 	OSYNC_VERSION=$(GetConfFileValue "$OSYNC_DIR/$OSYNC_DEV_EXECUTABLE" "PROGRAM_VERSION")
 	OSYNC_VERSION="${OSYNC_VERSION##*=}"
@@ -236,7 +250,7 @@ function test_Merge () {
 	SetConfFileValue "$OSYNC_DIR/$OSYNC_EXECUTABLE" "IS_STABLE" "yes"
 }
 
-function nope_test_LargeFileSet () {
+function test_LargeFileSet () {
 	for i in "${osyncParameters[@]}"; do
 		cd "$OSYNC_DIR"
 
@@ -254,7 +268,7 @@ function nope_test_LargeFileSet () {
 	done
 }
 
-function nope_test_Exclusions () {
+function test_Exclusions () {
 	# Will sync except php files
 	# RSYNC_EXCLUDE_PATTERN="*.php" is set at runtime for quicksync and in config files for other runs
 
@@ -283,7 +297,7 @@ function nope_test_Exclusions () {
 	done
 }
 
-function nope_test_Deletetion () {
+function test_Deletetion () {
 	local iFile1="$INITIATOR_DIR/ific"
 	local iFile2="$INITIATOR_DIR/ifoc"
 	local tFile1="$TARGET_DIR/tfic"
@@ -358,8 +372,8 @@ function test_deletion_failure () {
 		rm -f "$TARGET_DIR/$FileB"
 
 		# Prevent files from being deleted
-		chattr +i "$TARGET_DIR/$FileA"
-		chattr +i "$INITIATOR_DIR/$FileB"
+		$IMMUTABLE_ON_CMD "$TARGET_DIR/$FileA"
+		$IMMUTABLE_ON_CMD "$INITIATOR_DIR/$FileB"
 
 		# This shuold fail with exitcode 1
 		REMOTE_HOST_PING=no ./$OSYNC_EXECUTABLE $i
@@ -376,8 +390,8 @@ function test_deletion_failure () {
 		assertEquals "File [$INITIATOR_DIR/$OSYNC_DELETE_DIR/$FileB] is not present in deletion dir." "0" $?
 
 		# Allow files from being deleted
-		chattr -i "$TARGET_DIR/$FileA"
-		chattr -i "$INITIATOR_DIR/$FileB"
+		$IMMUTABLE_OFF_CMD "$TARGET_DIR/$FileA"
+		$IMMUTABLE_OFF_CMD "$INITIATOR_DIR/$FileB"
 
 		REMOTE_HOST_PING=no ./$OSYNC_EXECUTABLE $i
 		assertEquals "Third deletion run with parameters [$i]." "0" $?
@@ -394,7 +408,7 @@ function test_deletion_failure () {
 	done
 }
 
-function nope_test_skip_deletion () {
+function test_skip_deletion () {
 	local skipDeletionLocal
 	local skipDeletionRemote
 	local modes
@@ -471,7 +485,7 @@ function nope_test_skip_deletion () {
 	SetConfFileValue "$CONF_DIR/$REMOTE_CONF" "SKIP_DELETION" "$skipDeletionRemote"
 }
 
-function nope_test_softdeletion_cleanup () {
+function test_softdeletion_cleanup () {
 	#declare -A files
 
 	files=()
@@ -527,7 +541,7 @@ function nope_test_softdeletion_cleanup () {
 
 }
 
-function nope_test_FileAttributePropagation () {
+function test_FileAttributePropagation () {
 
 	if [ "$TRAVIS_RUN" == true ]; then
 		echo "Skipping FileAttributePropagation tests as travis does not support getfacl / setfacl."
@@ -600,7 +614,7 @@ function nope_test_FileAttributePropagation () {
 	done
 }
 
-function nope_test_ConflictBackups () {
+function test_ConflictBackups () {
 	for i in "${osyncParameters[@]}"; do
 		cd "$OSYNC_DIR"
 		PrepareLocalDirs
@@ -636,7 +650,7 @@ function nope_test_ConflictBackups () {
 	done
 }
 
-function nope_test_MultipleConflictBackups () {
+function test_MultipleConflictBackups () {
 	local conflictBackupMultipleLocal
 	local conflictBackupMultipleRemote
 
@@ -702,7 +716,7 @@ function nope_test_MultipleConflictBackups () {
 
 }
 
-function nope_test_Locking () {
+function test_Locking () {
 	local forceStrangerUnlockLocal
 	local forceStrangerUnlockRemote
 
@@ -811,7 +825,7 @@ function nope_test_Locking () {
 	SetConfFileValue "$CONF_DIR/$REMOTE_CONF" "FORCE_STRANGER_LOCK_RESUME" "$forceStrangerUnlockRemote"
 }
 
-function nope_test_WaitForTaskCompletion () {
+function test_WaitForTaskCompletion () {
 	if [ "$OSYNC_MIN_VERSION" == "1" ]; then
 		echo "Skipping WaitForTaskCompletion test because osync v1.1 does not support multiple pid monitoring"
 		return 0
@@ -866,7 +880,7 @@ function nope_test_WaitForTaskCompletion () {
 	assertEquals "WaitForTaskCompletion test 5" "2" $?
 }
 
-function nope_test_ParallelExec () {
+function test_ParallelExec () {
 	if [ "$OSYNC_MIN_VERSION" == "1" ]; then
 		echo "Skipping ParallelExec test because osync v1.1 didn't have this"
 		return 0
@@ -915,7 +929,7 @@ function nope_test_ParallelExec () {
 
 }
 
-function nope_test_UpgradeConfRun () {
+function test_UpgradeConfRun () {
 	if [ "$OSYNC_MIN_VERSION" == "1" ]; then
 		echo "Skipping Upgrade script test because no further dev will happen on this for v1.1"
 		return 0
@@ -937,7 +951,7 @@ function nope_test_UpgradeConfRun () {
         rm -f "$CONF_DIR/$TMP_OLD_CONF.save"
 }
 
-function nope_test_DaemonMode () {
+function test_DaemonMode () {
 
 	if [ "$TRAVIS_RUN" == true ]; then
 		echo "Skipping daemon mode tests as no inotifywait present in travis yet."
@@ -993,7 +1007,7 @@ function nope_test_DaemonMode () {
 
 }
 
-function nope_test_NoRemoteAccessTest () {
+function test_NoRemoteAccessTest () {
 	RemoveSSH
 
         cd "$OSYNC_DIR"
