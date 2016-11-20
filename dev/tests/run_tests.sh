@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-# osync test suite 20161112002
+# osync test suite 20161112003
 
 # 4 tests:
 # quicklocal
@@ -120,12 +120,14 @@ function SetConfFileValue () {
 
 function SetupSSH {
 	echo -e  'y\n'| ssh-keygen -t rsa -b 2048 -N "" -f "${HOME}/.ssh/id_rsa_local"
-	cat "${HOME}/.ssh/id_rsa_local.pub" >> "${HOME}/.ssh/authorized_keys"
+	if ! grep "$(${HOME}/.ssh/id_rsa_local.pub)" "${HOME}/.ssh/authorized_keys"; then
+		cat "${HOME}/.ssh/id_rsa_local.pub" >> "${HOME}/.ssh/authorized_keys"
+	fi
 	chmod 600 "${HOME}/.ssh/authorized_keys"
 
 	# Add localhost to known hosts so self connect works
-	if [ -z $(ssh-keygen -F localhost) ]; then
-		ssh-keyscan -H localhost >> ~/.ssh/known_hosts
+	if [ -z "$(ssh-keygen -F localhost)" ]; then
+		ssh-keyscan -H localhost >> "${HOME}/.ssh/known_hosts"
 	fi
 }
 
