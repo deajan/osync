@@ -209,11 +209,13 @@ function oneTimeSetUp () {
 
 	#TODO: Assuming that macos has the same syntax than bsd here
 	if [ "$LOCAL_OS" == "BSD" ] || [ "$LOCAL_OS" == "MacOSX" ]; then
+		SUDO_CMD=""
 		IMMUTABLE_ON_CMD="chflags schg"
 		IMMUTABLE_OFF_CMD="chflags noschg"
 	else
 		IMMUTABLE_ON_CMD="chattr +i"
 		IMMUTABLE_OFF_CMD="chattr -i"
+		SUDO_CMD="sudo"
 	fi
 
 	# Get osync version
@@ -227,13 +229,10 @@ function oneTimeSetUp () {
 
 	# This will make travis fail because of missing stuff
 	touch fic
-	sudo chattr +i fic
-	mount -o remount,acl /
-	setfacl -m o::rwx fic
+	$SUDO_CMD chattr +i fic
+	$SUDO_CMD setfacl -m o::rwx fic
 	getfacl fic
-	mkdir test
-	( sleep 20 && touch test/fic ) &
-	inotifywait test
+	exit
 }
 
 function oneTimeTearDown () {
