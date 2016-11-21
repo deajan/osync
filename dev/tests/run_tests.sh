@@ -1,8 +1,11 @@
 #!/usr/bin/env bash
 
-# If stopped while running, config file values might be wrong
+## If this script is stopped while running, config file values and IS_STABLE value might be in inconsistent state
 
-# osync test suite 2016112103
+## On Mac OSX, this needs to be run as root in order to use sudo without password
+## From current terminal run sudo -s in order to get a new terminal as root
+
+# osync test suite 2016112105
 
 # 4 tests:
 # quicklocal
@@ -508,10 +511,10 @@ function test_softdeletion_cleanup () {
 
 			touch "$file.new"
 
-			if [ "$TRAVIS_RUN" != true ]; then
+			if [ "$TRAVIS_RUN" != true ] || [ "$LOCAL_OS" == "BSD" ] || [ "$LOCAL_OS" == "MacOSX" ]; then
 				CreateOldFile "$file.old"
 			else
-				echo "Skipping changing ctime on file because travis does not support debugfs"
+				echo "Skipping changing ctime on file because travis / bsd / macos does not support debugfs"
 			fi
 		done
 
@@ -523,7 +526,7 @@ function test_softdeletion_cleanup () {
 			[ -f "$file.new" ]
 			assertEquals "New softdeleted / backed up file [$file.new] exists." "0" $?
 
-			if [ "$TRAVIS_RUN" != true ]; then
+			if [ "$TRAVIS_RUN" != true ] || [ "$LOCAL_OS" == "BSD" ] || [ "$LOCAL_OS" == "MacOSX" ]; then
 				[ ! -f "$file.old" ]
 				assertEquals "Old softdeleted / backed up file [$file.old] is deleted permanently." "1" $?
 			else
@@ -539,6 +542,11 @@ function test_FileAttributePropagation () {
 
 	if [ "$TRAVIS_RUN" == true ]; then
 		echo "Skipping FileAttributePropagation tests as travis does not support getfacl / setfacl."
+		return 0
+	fi
+
+	if [ "$LOCAL_OS" == "MacOSX" ]; then
+		echo "Skipping FileAttributePropagation tests because Mac OSX does not support ACL."
 		return 0
 	fi
 
