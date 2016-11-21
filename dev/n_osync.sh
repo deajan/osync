@@ -4,7 +4,7 @@ PROGRAM="osync" # Rsync based two way sync engine with fault tolerance
 AUTHOR="(C) 2013-2016 by Orsiris de Jong"
 CONTACT="http://www.netpower.fr/osync - ozy@netpower.fr"
 PROGRAM_VERSION=1.2-beta3
-PROGRAM_BUILD=2016112103
+PROGRAM_BUILD=2016112104
 IS_STABLE=no
 
 # Execution order						#__WITH_PARANOIA_DEBUG
@@ -2052,9 +2052,16 @@ function SyncOnChanges {
 	local cmd
 	local retval
 
-	if ! type inotifywait > /dev/null 2>&1 ; then
-		Logger "No inotifywait command found. Cannot monitor changes." "CRITICAL"
-		exit 1
+	if [ "$LOCAL_OS" == "MacOSX" ]; then
+		if ! type fswatch > /dev/null 2>&1 ; then
+			Logger "No inotifywait command found. Cannot monitor changes." "CRITICAL"
+			exit 1
+		fi
+	else
+		if ! type inotifywait > /dev/null 2>&1 ; then
+			Logger "No inotifywait command found. Cannot monitor changes." "CRITICAL"
+			exit 1
+		fi
 	fi
 
 	Logger "#### Running osync in file monitor mode." "NOTICE"
@@ -2073,7 +2080,12 @@ function SyncOnChanges {
 		fi
 
 		Logger "#### Monitoring now." "NOTICE"
-		inotifywait --exclude $OSYNC_DIR $RSYNC_PATTERNS $RSYNC_PARTIAL_EXCLUDE -qq -r -e create -e modify -e delete -e move -e attrib --timeout "$MAX_WAIT" "$INITIATOR_SYNC_DIR" &
+		if [ "$LOCAL_OS" == "MacOSX" ]; then
+			#TODO: Mac fswatch doesn't have timeout switch, replace wait $! with WaitForTaskCompletion without warning nor spinner could sim this behavior, but trades on cpu perf, so SLEEP_TIME needs to be modded
+			fswatch --exclude $OSYNC_DIR $RSYNC_PATTERNS $RSYNC_PARTIAL_EXCLUDE -1 "$INITIATOR_SYNC_DIR" > /dev/null &
+		else
+			inotifywait --exclude $OSYNC_DIR $RSYNC_PATTERNS $RSYNC_PARTIAL_EXCLUDE -qq -r -e create -e modify -e delete -e move -e attrib --timeout "$MAX_WAIT" "$INITIATOR_SYNC_DIR" &
+		fi
 		wait $!
 		retval=$?
 		if [ $retval == 0 ]; then
