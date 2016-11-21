@@ -1248,7 +1248,7 @@ ENDSSH
 	if [ -f "$RUN_DIR/$PROGRAM.remote_deletion.$SCRIPT_PID" ]; then
 		loggerPrefix="$_LOGGER_PREFIX"
 		_LOGGER_PREFIX=""
-		Logger "$(cat $RUN_DIR/$PROGRAM.remote_deletion.$SCRIPT_PID)" "NOTICE"
+		Logger "$(cat $RUN_DIR/$PROGRAM.remote_deletion.$SCRIPT_PID)" "ERROR"
 		_LOGGER_PREFIX="$loggerPrefix"
 	fi
 
