@@ -1,9 +1,6 @@
 #!/usr/bin/env bash
 
-# WILL FAIL, travis test
-
-
-# osync test suite 20161112004
+# osync test suite 2016112101
 
 # 4 tests:
 # quicklocal
@@ -226,24 +223,6 @@ function oneTimeSetUp () {
 	OSYNC_IS_STABLE=$(GetConfFileValue "$OSYNC_DIR/$OSYNC_DEV_EXECUTABLE" "IS_STABLE")
 
 	echo "Running with $OSYNC_VERSION ($OSYNC_MIN_VERSION) STABLE=$OSYNC_IS_STABLE"
-
-	# This will make travis fail because of missing stuff
-	df
-	sudo touch /file
-	$SUDO_CMD chattr +i /file
-	echo "1"
-	$SUDO_CMD setfacl -m o::rwx /file
-	echo "2"
-	sudo setfacl -m o::rwx /file
-	echo "3"
-	sudo setfacl -m o:rwx /file
-	echo "4"
-	sudo mount -o remount,acl /
-	echo "5"
-	sudo setfacl -m o:rwx /file
-	echo "6"
-	getfacl fic
-	exit
 }
 
 function oneTimeTearDown () {
@@ -367,10 +346,10 @@ function test_Deletetion () {
 
 function test_deletion_failure () {
 
-	if [ "$TRAVIS_RUN" == true ]; then
-		echo "Skipping deletionFailure tests as travis does not support chattr."
-		return 0
-	fi
+	#if [ "$TRAVIS_RUN" == true ]; then
+	#	echo "Skipping deletionFailure tests as travis does not support chattr."
+	#	return 0
+	#fi
 
 	for i in "${osyncParameters[@]}"; do
 		cd "$OSYNC_DIR"
@@ -396,8 +375,8 @@ function test_deletion_failure () {
 		rm -f "$TARGET_DIR/$FileB"
 
 		# Prevent files from being deleted
-		$IMMUTABLE_ON_CMD "$TARGET_DIR/$FileA"
-		$IMMUTABLE_ON_CMD "$INITIATOR_DIR/$FileB"
+		$SUDO_CMD $IMMUTABLE_ON_CMD "$TARGET_DIR/$FileA"
+		$SUDO_CMD $IMMUTABLE_ON_CMD "$INITIATOR_DIR/$FileB"
 
 		# This shuold fail with exitcode 1
 		REMOTE_HOST_PING=no ./$OSYNC_EXECUTABLE $i
@@ -414,8 +393,8 @@ function test_deletion_failure () {
 		assertEquals "File [$INITIATOR_DIR/$OSYNC_DELETE_DIR/$FileB] is not present in deletion dir." "0" $?
 
 		# Allow files from being deleted
-		$IMMUTABLE_OFF_CMD "$TARGET_DIR/$FileA"
-		$IMMUTABLE_OFF_CMD "$INITIATOR_DIR/$FileB"
+		$SUDO_CMD $IMMUTABLE_OFF_CMD "$TARGET_DIR/$FileA"
+		$SUDO_CMD $IMMUTABLE_OFF_CMD "$INITIATOR_DIR/$FileB"
 
 		REMOTE_HOST_PING=no ./$OSYNC_EXECUTABLE $i
 		assertEquals "Third deletion run with parameters [$i]." "0" $?
@@ -977,10 +956,10 @@ function test_UpgradeConfRun () {
 
 function test_DaemonMode () {
 
-	if [ "$TRAVIS_RUN" == true ]; then
-		echo "Skipping daemon mode tests as no inotifywait present in travis yet."
-		return 0
-	fi
+	#if [ "$TRAVIS_RUN" == true ]; then
+	#	echo "Skipping daemon mode tests as no inotifywait present in travis yet."
+	#	return 0
+	#fi
 
 	for i in "${osyncDaemonParameters[@]}"; do
 
