@@ -227,7 +227,7 @@ function oneTimeSetUp () {
 
 	# This will make travis fail because of missing stuff
 	touch fic
-	chattr +i fic
+	sudo chattr +i fic
 	mount -o remount,acl /
 	setfacl -m o::rwx fic
 	getfacl fic
