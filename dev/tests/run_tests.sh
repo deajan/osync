@@ -108,7 +108,7 @@ function GetConfFileValue () {
 		value="${value##*=}"
 		echo "$value"
 	else
-		assertEquals "$name does not exist in [$file." "1" "0"
+		assertEquals "$name does not exist in [$file]." "1" "0"
 	fi
 }
 
