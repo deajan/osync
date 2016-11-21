@@ -228,18 +228,19 @@ function oneTimeSetUp () {
 	echo "Running with $OSYNC_VERSION ($OSYNC_MIN_VERSION) STABLE=$OSYNC_IS_STABLE"
 
 	# This will make travis fail because of missing stuff
-	touch fic
-	$SUDO_CMD chattr +i fic
+	df
+	sudo touch /file
+	$SUDO_CMD chattr +i /file
 	echo "1"
-	$SUDO_CMD setfacl -m o::rwx fic
+	$SUDO_CMD setfacl -m o::rwx /file
 	echo "2"
-	sudo setfacl -m o::rwx fic
+	sudo setfacl -m o::rwx /file
 	echo "3"
-	sudo setfacl -m o:rwx fic
+	sudo setfacl -m o:rwx /file
 	echo "4"
 	sudo mount -o remount,acl /
 	echo "5"
-	sudo setfacl -m o:rwx fic
+	sudo setfacl -m o:rwx /file
 	echo "6"
 	getfacl fic
 	exit
