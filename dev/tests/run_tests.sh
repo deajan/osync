@@ -1,6 +1,8 @@
 #!/usr/bin/env bash
 
-# osync test suite 2016112101
+# If stopped while running, config file values might be wrong
+
+# osync test suite 2016112102
 
 # 4 tests:
 # quicklocal
@@ -253,7 +255,7 @@ function test_Merge () {
 	SetConfFileValue "$OSYNC_DIR/$OSYNC_EXECUTABLE" "IS_STABLE" "yes"
 }
 
-function test_LargeFileSet () {
+function LargeFileSet () {
 	for i in "${osyncParameters[@]}"; do
 		cd "$OSYNC_DIR"
 
@@ -271,7 +273,7 @@ function test_LargeFileSet () {
 	done
 }
 
-function test_Exclusions () {
+function Exclusions () {
 	# Will sync except php files
 	# RSYNC_EXCLUDE_PATTERN="*.php" is set at runtime for quicksync and in config files for other runs
 
@@ -300,7 +302,7 @@ function test_Exclusions () {
 	done
 }
 
-function test_Deletetion () {
+function Deletetion () {
 	local iFile1="$INITIATOR_DIR/ific"
 	local iFile2="$INITIATOR_DIR/ifoc"
 	local tFile1="$TARGET_DIR/tfic"
@@ -345,11 +347,6 @@ function test_Deletetion () {
 }
 
 function test_deletion_failure () {
-
-	#if [ "$TRAVIS_RUN" == true ]; then
-	#	echo "Skipping deletionFailure tests as travis does not support chattr."
-	#	return 0
-	#fi
 
 	for i in "${osyncParameters[@]}"; do
 		cd "$OSYNC_DIR"
@@ -411,19 +408,13 @@ function test_deletion_failure () {
 	done
 }
 
-function test_skip_deletion () {
-	local skipDeletionLocal
-	local skipDeletionRemote
+function skip_deletion () {
 	local modes
 
 	if [ "$OSYNC_MIN_VERSION" == "1" ]; then
 		echo "Skipping SkipDeletion test because it wasn't implemented in osync v1.1."
 		return 0
 	fi
-
-	# Keep original values
-	skipDeletionLocal=$(GetConfFileValue "$CONF_DIR/$LOCAL_CONF" "SKIP_DELETION")
-	skipDeletionRemote=$(GetConfFileValue "$CONF_DIR/$REMOTE_CONF" "SKIP_DELETION")
 
 	modes=('initiator' 'target' 'initiator,target')
 
@@ -484,11 +475,11 @@ function test_skip_deletion () {
 	done
 
 	# Set original values back
-	SetConfFileValue "$CONF_DIR/$LOCAL_CONF" "SKIP_DELETION" "$skipDeletionLocal"
-	SetConfFileValue "$CONF_DIR/$REMOTE_CONF" "SKIP_DELETION" "$skipDeletionRemote"
+	SetConfFileValue "$CONF_DIR/$LOCAL_CONF" "SKIP_DELETION" ""
+	SetConfFileValue "$CONF_DIR/$REMOTE_CONF" "SKIP_DELETION" ""
 }
 
-function test_softdeletion_cleanup () {
+function softdeletion_cleanup () {
 	#declare -A files
 
 	files=()
@@ -544,7 +535,7 @@ function test_softdeletion_cleanup () {
 
 }
 
-function test_FileAttributePropagation () {
+function FileAttributePropagation () {
 
 	if [ "$TRAVIS_RUN" == true ]; then
 		echo "Skipping FileAttributePropagation tests as travis does not support getfacl / setfacl."
@@ -617,7 +608,7 @@ function test_FileAttributePropagation () {
 	done
 }
 
-function test_ConflictBackups () {
+function ConflictBackups () {
 	for i in "${osyncParameters[@]}"; do
 		cd "$OSYNC_DIR"
 		PrepareLocalDirs
@@ -653,7 +644,7 @@ function test_ConflictBackups () {
 	done
 }
 
-function test_MultipleConflictBackups () {
+function MultipleConflictBackups () {
 	local conflictBackupMultipleLocal
 	local conflictBackupMultipleRemote
 
@@ -719,7 +710,7 @@ function test_MultipleConflictBackups () {
 
 }
 
-function test_Locking () {
+function Locking () {
 	local forceStrangerUnlockLocal
 	local forceStrangerUnlockRemote
 
@@ -828,7 +819,7 @@ function test_Locking () {
 	SetConfFileValue "$CONF_DIR/$REMOTE_CONF" "FORCE_STRANGER_LOCK_RESUME" "$forceStrangerUnlockRemote"
 }
 
-function test_WaitForTaskCompletion () {
+function WaitForTaskCompletion () {
 	if [ "$OSYNC_MIN_VERSION" == "1" ]; then
 		echo "Skipping WaitForTaskCompletion test because osync v1.1 does not support multiple pid monitoring"
 		return 0
@@ -883,7 +874,7 @@ function test_WaitForTaskCompletion () {
 	assertEquals "WaitForTaskCompletion test 5" "2" $?
 }
 
-function test_ParallelExec () {
+function ParallelExec () {
 	if [ "$OSYNC_MIN_VERSION" == "1" ]; then
 		echo "Skipping ParallelExec test because osync v1.1 didn't have this"
 		return 0
@@ -932,7 +923,7 @@ function test_ParallelExec () {
 
 }
 
-function test_UpgradeConfRun () {
+function UpgradeConfRun () {
 	if [ "$OSYNC_MIN_VERSION" == "1" ]; then
 		echo "Skipping Upgrade script test because no further dev will happen on this for v1.1"
 		return 0
@@ -954,12 +945,7 @@ function test_UpgradeConfRun () {
         rm -f "$CONF_DIR/$TMP_OLD_CONF.save"
 }
 
-function test_DaemonMode () {
-
-	#if [ "$TRAVIS_RUN" == true ]; then
-	#	echo "Skipping daemon mode tests as no inotifywait present in travis yet."
-	#	return 0
-	#fi
+function DaemonMode () {
 
 	for i in "${osyncDaemonParameters[@]}"; do
 
@@ -1010,7 +996,7 @@ function test_DaemonMode () {
 
 }
 
-function test_NoRemoteAccessTest () {
+function NoRemoteAccessTest () {
 	RemoveSSH
 
         cd "$OSYNC_DIR"
