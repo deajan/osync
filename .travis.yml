@@ -5,6 +5,9 @@ os:
     linux
     osx
 
+before_install:
+    sudo apt-get install inotify-tools
+
 script:
     TRAVIS_RUN=true dev/tests/run_tests.sh
 
