@@ -2,7 +2,7 @@
 
 # If stopped while running, config file values might be wrong
 
-# osync test suite 2016112102
+# osync test suite 2016112103
 
 # 4 tests:
 # quicklocal
@@ -503,7 +503,7 @@ function test_softdeletion_cleanup () {
 		for file in "${files[@]}"; do
 			# Create directories first if they do not exist (deletion dir is created by osync, backup dir is created by rsync only when needed)
 			if [ ! -d "$(dirname $file)" ]; then
-				mkdir --parents "$(dirname $file)"
+				mkdir -p "$(dirname $file)"
 			fi
 
 			touch "$file.new"
