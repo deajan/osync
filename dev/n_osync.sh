@@ -2052,6 +2052,8 @@ function SyncOnChanges {
 	local cmd
 	local retval
 
+	local sleepTime
+
 	if [ "$LOCAL_OS" == "MacOSX" ]; then
 		if ! type fswatch > /dev/null 2>&1 ; then
 			Logger "No inotifywait command found. Cannot monitor changes." "CRITICAL"
@@ -2086,8 +2088,12 @@ function SyncOnChanges {
 		else
 			inotifywait --exclude $OSYNC_DIR $RSYNC_PATTERNS $RSYNC_PARTIAL_EXCLUDE -qq -r -e create -e modify -e delete -e move -e attrib --timeout "$MAX_WAIT" "$INITIATOR_SYNC_DIR" &
 		fi
-		wait $!
+		#wait $!
+		sleepTime=SLEEP_TIME
+		SLEEP_TIME=1
+		WaitForTaskCompletion $! 0 $MAX_WAIT ${FUNCNAME[0]} true 0 true
 		retval=$?
+		SLEEP_TIME=$sleepTime
 		if [ $retval == 0 ]; then
 			Logger "#### Changes detected, waiting $MIN_WAIT seconds before running next sync." "NOTICE"
 			sleep $MIN_WAIT
