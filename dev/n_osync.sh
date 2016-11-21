@@ -4,7 +4,7 @@ PROGRAM="osync" # Rsync based two way sync engine with fault tolerance
 AUTHOR="(C) 2013-2016 by Orsiris de Jong"
 CONTACT="http://www.netpower.fr/osync - ozy@netpower.fr"
 PROGRAM_VERSION=1.2-beta3
-PROGRAM_BUILD=2016112001
+PROGRAM_BUILD=2016112101
 IS_STABLE=no
 
 # Execution order						#__WITH_PARANOIA_DEBUG
@@ -1109,6 +1109,8 @@ function _deleteRemote {
 
 	local deletionListFromReplica
 
+	local loggerPrefix
+
 	if [ "$replicaType" == "${INITIATOR[$__type]}" ]; then
 		deletionListFromReplica="${TARGET[$__type]}"
 	elif [ "$replicaType" == "${TARGET[$__type]}" ]; then
@@ -1244,7 +1246,10 @@ $SSH_CMD ERROR_ALERT=0 sync_on_changes=$sync_on_changes _DEBUG=$_DEBUG _DRYRUN=$
 ENDSSH
 
 	if [ -f "$RUN_DIR/$PROGRAM.remote_deletion.$SCRIPT_PID" ]; then
-		Logger "Remote Deletion:\n$(cat $RUN_DIR/$PROGRAM.remote_deletion.$SCRIPT_PID)" "VERBOSE"
+		loggerPrefix="$_LOGGER_PREFIX"
+		_LOGGER_PREFIX=""
+		Logger "$(cat $RUN_DIR/$PROGRAM.remote_deletion.$SCRIPT_PID)" "NOTICE"
+		_LOGGER_PREFIX="$loggerPrefix"
 	fi
 
 	## Copy back the deleted failed file list
