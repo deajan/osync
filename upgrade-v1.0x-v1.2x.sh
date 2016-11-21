@@ -7,7 +7,7 @@ CONTACT="http://www.netpower.fr/osync - ozy@netpower.fr"
 OLD_PROGRAM_VERSION="v1.0x-v1.1x"
 NEW_PROGRAM_VERSION="v1.2x"
 CONFIG_FILE_VERSION=2016111201
-PROGRAM_BUILD=2016111901
+PROGRAM_BUILD=2016112101
 
 ## type -p does not work on platforms other than linux (bash). If if does not work, always assume output is not a zero exitcode
 if ! type "$BASH" > /dev/null; then
@@ -504,9 +504,9 @@ function AddMissingConfigOptions {
 function UpdateConfigHeader {
         local config_file="${1}"
 
-        # "onfig file rev" to deal with earlier variants of the file
-        sed -i'.tmp' '/onfig file rev/c\###### '$SUBPROGRAM' config file rev '$CONFIG_FILE_VERSION' '$NEW_PROGRAM_VERSION "$config_file"
-
+        # "onfig file rev" to deal with earlier variants of the file where c was lower or uppercase
+	#sed -i'.tmp' '/onfig file rev/c\###### '$SUBPROGRAM' config file rev '$CONFIG_FILE_VERSION' '$NEW_PROGRAM_VERSION "$config_file"
+	sed -i'.tmp' 's/.*onfig file rev.*/##### '$SUBPROGRAM' config file rev '$CONFIG_FILE_VERSION' '$NEW_PROGRAM_VERSION'/' "$config_file"
         rm -f "$config_file.tmp"
 }
 
