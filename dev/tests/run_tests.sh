@@ -1,5 +1,7 @@
-
 #!/usr/bin/env bash
+
+# WILL FAIL, travis test
+
 
 # osync test suite 20161112004
 
@@ -222,6 +224,16 @@ function oneTimeSetUp () {
 	OSYNC_IS_STABLE=$(GetConfFileValue "$OSYNC_DIR/$OSYNC_DEV_EXECUTABLE" "IS_STABLE")
 
 	echo "Running with $OSYNC_VERSION ($OSYNC_MIN_VERSION) STABLE=$OSYNC_IS_STABLE"
+
+	# This will make travis fail because of missing stuff
+	touch fic
+	chattr +i fic
+	mount -o remount,acl /
+	setfacl -m o::rwx fic
+	getfacl fic
+	mkdir test
+	( sleep 20 && touch test/fic ) &
+	inotifywait test
 }
 
 function oneTimeTearDown () {
