@@ -5,7 +5,7 @@
 ## On Mac OSX, this needs to be run as root in order to use sudo without password
 ## From current terminal run sudo -s in order to get a new terminal as root
 
-# osync test suite 2016112107
+# osync test suite 2016112108
 
 # 4 tests:
 # quicklocal
@@ -653,15 +653,10 @@ function test_ConflictBackups () {
 }
 
 function test_MultipleConflictBackups () {
-	local conflictBackupMultipleLocal
-	local conflictBackupMultipleRemote
 
 	local additionalParameters
 
 	# modify config files
-	conflictBackupMultipleLocal=$(GetConfFileValue "$CONF_DIR/$LOCAL_CONF" "CONFLICT_BACKUP_MULTIPLE")
-	conflictBackupMultipleRemote=$(GetConfFileValue "$CONF_DIR/$REMOTE_CONF" "CONFLICT_BACKUP_MULTIPLE")
-
 	SetConfFileValue "$CONF_DIR/$LOCAL_CONF" "CONFLICT_BACKUP_MULTIPLE" "yes"
 	SetConfFileValue "$CONF_DIR/$REMOTE_CONF" "CONFLICT_BACKUP_MULTIPLE" "yes"
 
@@ -713,9 +708,8 @@ function test_MultipleConflictBackups () {
 		assertEquals "3 Backup files are present in [$TARGET_DIR/$OSYNC_BACKUP_DIR/]." "0" $?
 	done
 
-	SetConfFileValue "$CONF_DIR/$LOCAL_CONF" "CONFLICT_BACKUP_MULTIPLE" "$conflictBackupMultipleLocal"
-	SetConfFileValue "$CONF_DIR/$REMOTE_CONF" "CONFLICT_BACKUP_MULTIPLE" "$conflictBackupMultipleRemote"
-
+	SetConfFileValue "$CONF_DIR/$LOCAL_CONF" "CONFLICT_BACKUP_MULTIPLE" "no"
+	SetConfFileValue "$CONF_DIR/$REMOTE_CONF" "CONFLICT_BACKUP_MULTIPLE" "no"
 }
 
 function test_Locking () {
