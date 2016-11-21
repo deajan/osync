@@ -255,7 +255,7 @@ function test_Merge () {
 	SetConfFileValue "$OSYNC_DIR/$OSYNC_EXECUTABLE" "IS_STABLE" "yes"
 }
 
-function LargeFileSet () {
+function test_LargeFileSet () {
 	for i in "${osyncParameters[@]}"; do
 		cd "$OSYNC_DIR"
 
@@ -273,7 +273,7 @@ function LargeFileSet () {
 	done
 }
 
-function Exclusions () {
+function test_Exclusions () {
 	# Will sync except php files
 	# RSYNC_EXCLUDE_PATTERN="*.php" is set at runtime for quicksync and in config files for other runs
 
@@ -302,7 +302,7 @@ function Exclusions () {
 	done
 }
 
-function Deletetion () {
+function test_Deletetion () {
 	local iFile1="$INITIATOR_DIR/ific"
 	local iFile2="$INITIATOR_DIR/ifoc"
 	local tFile1="$TARGET_DIR/tfic"
@@ -408,7 +408,7 @@ function test_deletion_failure () {
 	done
 }
 
-function skip_deletion () {
+function test_skip_deletion () {
 	local modes
 
 	if [ "$OSYNC_MIN_VERSION" == "1" ]; then
@@ -479,7 +479,7 @@ function skip_deletion () {
 	SetConfFileValue "$CONF_DIR/$REMOTE_CONF" "SKIP_DELETION" ""
 }
 
-function softdeletion_cleanup () {
+function test_softdeletion_cleanup () {
 	#declare -A files
 
 	files=()
@@ -535,7 +535,7 @@ function softdeletion_cleanup () {
 
 }
 
-function FileAttributePropagation () {
+function test_FileAttributePropagation () {
 
 	if [ "$TRAVIS_RUN" == true ]; then
 		echo "Skipping FileAttributePropagation tests as travis does not support getfacl / setfacl."
@@ -608,7 +608,7 @@ function FileAttributePropagation () {
 	done
 }
 
-function ConflictBackups () {
+function test_ConflictBackups () {
 	for i in "${osyncParameters[@]}"; do
 		cd "$OSYNC_DIR"
 		PrepareLocalDirs
@@ -644,7 +644,7 @@ function ConflictBackups () {
 	done
 }
 
-function MultipleConflictBackups () {
+function test_MultipleConflictBackups () {
 	local conflictBackupMultipleLocal
 	local conflictBackupMultipleRemote
 
@@ -710,7 +710,7 @@ function MultipleConflictBackups () {
 
 }
 
-function Locking () {
+function test_Locking () {
 	local forceStrangerUnlockLocal
 	local forceStrangerUnlockRemote
 
@@ -819,7 +819,7 @@ function Locking () {
 	SetConfFileValue "$CONF_DIR/$REMOTE_CONF" "FORCE_STRANGER_LOCK_RESUME" "$forceStrangerUnlockRemote"
 }
 
-function WaitForTaskCompletion () {
+function test_WaitForTaskCompletion () {
 	if [ "$OSYNC_MIN_VERSION" == "1" ]; then
 		echo "Skipping WaitForTaskCompletion test because osync v1.1 does not support multiple pid monitoring"
 		return 0
@@ -874,7 +874,7 @@ function WaitForTaskCompletion () {
 	assertEquals "WaitForTaskCompletion test 5" "2" $?
 }
 
-function ParallelExec () {
+function test_ParallelExec () {
 	if [ "$OSYNC_MIN_VERSION" == "1" ]; then
 		echo "Skipping ParallelExec test because osync v1.1 didn't have this"
 		return 0
@@ -923,7 +923,7 @@ function ParallelExec () {
 
 }
 
-function UpgradeConfRun () {
+function test_UpgradeConfRun () {
 	if [ "$OSYNC_MIN_VERSION" == "1" ]; then
 		echo "Skipping Upgrade script test because no further dev will happen on this for v1.1"
 		return 0
@@ -945,7 +945,7 @@ function UpgradeConfRun () {
         rm -f "$CONF_DIR/$TMP_OLD_CONF.save"
 }
 
-function DaemonMode () {
+function test_DaemonMode () {
 
 	for i in "${osyncDaemonParameters[@]}"; do
 
@@ -996,7 +996,7 @@ function DaemonMode () {
 
 }
 
-function NoRemoteAccessTest () {
+function test_NoRemoteAccessTest () {
 	RemoveSSH
 
         cd "$OSYNC_DIR"
