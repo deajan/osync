@@ -1,6 +1,6 @@
 #### MINIMAL-FUNCTION-SET BEGIN ####
 
-## FUNC_BUILD=2016112101
+## FUNC_BUILD=2016112102
 ## BEGIN Generic bash functions written in 2013-2016 by Orsiris de Jong - http://www.netpower.fr - ozy@netpower.fr
 
 ## To use in a program, define the following variables:
@@ -1405,6 +1405,8 @@ function PreInit {
 	if [ "$PRESERVE_GROUP" != "no" ]; then
 		RSYNC_ATTR_ARGS=$RSYNC_ATTR_ARGS" -g"
 	fi
+	if [ "$PRESERVE_EXECUTABILITY" != "no" ]; then
+		RSYNC_ATTR_ARGS=$RSYNC_ATTR_ARGS" --executability"
 	if [ "$PRESERVE_ACL" == "yes" ]; then
 		RSYNC_ATTR_ARGS=$RSYNC_ATTR_ARGS" -A"
 	fi
@@ -1547,13 +1549,6 @@ function InitLocalOSSettings {
 
 function InitRemoteOSSettings {
 	__CheckArguments 0 $# ${FUNCNAME[0]} "$@"    #__WITH_PARANOIA_DEBUG
-
-	## MacOSX does not use the -E parameter like Linux or BSD does (-E is mapped to extended attrs instead of preserve executability)
-	if [ "$PRESERVE_EXECUTABILITY" != "no" ];then
-		if [ "$LOCAL_OS" != "MacOSX" ] && [ "$REMOTE_OS" != "MacOSX" ]; then
-			RSYNC_ATTR_ARGS=$RSYNC_ATTR_ARGS" -E"
-		fi
-	fi
 
 	if [ "$REMOTE_OS" == "msys" ]; then
 		REMOTE_FIND_CMD=$(dirname $BASH)/find
