@@ -86,9 +86,9 @@ PRESERVE_GROUP=yes
 ## On MACOS X, does not work and will be ignored
 PRESERVE_EXECUTABILITY=yes
 
-## Preserve ACLS. Make sure source and target FS can manage same ACLs or you'll get loads of errors.
+## Preserve ACLS. Make sure source and target FS can handle ACL. Disabled on Mac OSX.
 PRESERVE_ACL=no
-## Preserve Xattr. Make sure source and target FS can manage same Xattrs or you'll get loads of errors.
+## Preserve Xattr. Make sure source and target FS can manage identical XATTRS. Disabled on Mac OSX.
 PRESERVE_XATTR=no
 ## Transforms symlinks into referent files/dirs
 COPY_SYMLINKS=no
