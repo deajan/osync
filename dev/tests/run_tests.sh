@@ -5,7 +5,7 @@
 ## On Mac OSX, this needs to be run as root in order to use sudo without password
 ## From current terminal run sudo -s in order to get a new terminal as root
 
-# osync test suite 2016112105
+# osync test suite 2016112106
 
 # 4 tests:
 # quicklocal
@@ -511,7 +511,7 @@ function test_softdeletion_cleanup () {
 
 			touch "$file.new"
 
-			if [ "$TRAVIS_RUN" != true ] || [ "$LOCAL_OS" == "BSD" ] || [ "$LOCAL_OS" == "MacOSX" ]; then
+			if [ "$TRAVIS_RUN" != true ] || [ "$LOCAL_OS" != "BSD" ] || [ "$LOCAL_OS" != "MacOSX" ]; then
 				CreateOldFile "$file.old"
 			else
 				echo "Skipping changing ctime on file because travis / bsd / macos does not support debugfs"
@@ -526,7 +526,7 @@ function test_softdeletion_cleanup () {
 			[ -f "$file.new" ]
 			assertEquals "New softdeleted / backed up file [$file.new] exists." "0" $?
 
-			if [ "$TRAVIS_RUN" != true ] || [ "$LOCAL_OS" == "BSD" ] || [ "$LOCAL_OS" == "MacOSX" ]; then
+			if [ "$TRAVIS_RUN" != true ] || [ "$LOCAL_OS" != "BSD" ] || [ "$LOCAL_OS" != "MacOSX" ]; then
 				[ ! -f "$file.old" ]
 				assertEquals "Old softdeleted / backed up file [$file.old] is deleted permanently." "1" $?
 			else
