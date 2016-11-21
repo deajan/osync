@@ -4,7 +4,7 @@ PROGRAM="osync" # Rsync based two way sync engine with fault tolerance
 AUTHOR="(C) 2013-2016 by Orsiris de Jong"
 CONTACT="http://www.netpower.fr/osync - ozy@netpower.fr"
 PROGRAM_VERSION=1.2-beta3
-PROGRAM_BUILD=2016112102
+PROGRAM_BUILD=2016112103
 IS_STABLE=no
 
 # Execution order						#__WITH_PARANOIA_DEBUG
@@ -2293,6 +2293,7 @@ if [ $sync_on_changes == true ]; then
 else
 	GetRemoteOS
 	InitRemoteOSSettings
+	InitRsyncSettings
 	if [ $no_maxtime == true ]; then
 		SOFT_MAX_EXEC_TIME=0
 		HARD_MAX_EXEC_TIME=0

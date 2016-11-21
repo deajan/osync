@@ -1,6 +1,6 @@
 #### MINIMAL-FUNCTION-SET BEGIN ####
 
-## FUNC_BUILD=2016112102
+## FUNC_BUILD=2016112103
 ## BEGIN Generic bash functions written in 2013-2016 by Orsiris de Jong - http://www.netpower.fr - ozy@netpower.fr
 
 ## To use in a program, define the following variables:
@@ -1386,68 +1386,12 @@ function PreInit {
 		COMMAND_SUDO=""
 	fi
 
-	 ## Set rsync default arguments
-	RSYNC_ARGS="-rltD"
-	if [ "$_DRYRUN" == true ]; then
-		RSYNC_DRY_ARG="-n"
-		DRY_WARNING="/!\ DRY RUN "
-	else
-		RSYNC_DRY_ARG=""
-	fi
-
-	RSYNC_ATTR_ARGS=""
-	if [ "$PRESERVE_PERMISSIONS" != "no" ]; then
-		RSYNC_ATTR_ARGS=$RSYNC_ATTR_ARGS" -p"
-	fi
-	if [ "$PRESERVE_OWNER" != "no" ]; then
-		RSYNC_ATTR_ARGS=$RSYNC_ATTR_ARGS" -o"
-	fi
-	if [ "$PRESERVE_GROUP" != "no" ]; then
-		RSYNC_ATTR_ARGS=$RSYNC_ATTR_ARGS" -g"
-	fi
-	if [ "$PRESERVE_EXECUTABILITY" != "no" ]; then
-		RSYNC_ATTR_ARGS=$RSYNC_ATTR_ARGS" --executability"
-	if [ "$PRESERVE_ACL" == "yes" ]; then
-		RSYNC_ATTR_ARGS=$RSYNC_ATTR_ARGS" -A"
-	fi
-	if [ "$PRESERVE_XATTR" == "yes" ]; then
-		RSYNC_ATTR_ARGS=$RSYNC_ATTR_ARGS" -X"
-	fi
-	if [ "$RSYNC_COMPRESS" == "yes" ]; then
-		RSYNC_ARGS=$RSYNC_ARGS" -z"
-	fi
-	if [ "$COPY_SYMLINKS" == "yes" ]; then
-		RSYNC_ARGS=$RSYNC_ARGS" -L"
-	fi
-	if [ "$KEEP_DIRLINKS" == "yes" ]; then
-		RSYNC_ARGS=$RSYNC_ARGS" -K"
-	fi
-	if [ "$PRESERVE_HARDLINKS" == "yes" ]; then
-		RSYNC_ARGS=$RSYNC_ARGS" -H"
-	fi
-	if [ "$CHECKSUM" == "yes" ]; then
-		RSYNC_TYPE_ARGS=$RSYNC_TYPE_ARGS" --checksum"
-	fi
-	if [ "$BANDWIDTH" != "" ] && [ "$BANDWIDTH" != "0" ]; then
-		RSYNC_ARGS=$RSYNC_ARGS" --bwlimit=$BANDWIDTH"
-	fi
-
-	if [ "$PARTIAL" == "yes" ]; then
-		RSYNC_ARGS=$RSYNC_ARGS" --partial --partial-dir=\"$PARTIAL_DIR\""
-		RSYNC_PARTIAL_EXCLUDE="--exclude=\"$PARTIAL_DIR\""
-	fi
-
-	if [ "$DELTA_COPIES" != "no" ]; then
-		RSYNC_ARGS=$RSYNC_ARGS" --no-whole-file"
-	else
-		RSYNC_ARGS=$RSYNC_ARGS" --whole-file"
-	fi
-
-	 ## Set compression executable and extension
+	## Set compression executable and extension
 	if [ "$(IsInteger $COMPRESSION_LEVEL)" -eq 0 ]; then
 		COMPRESSION_LEVEL=3
 	fi
 
+	#TODO: Remote OS isn't defined yet
 	## Busybox fix (Termux xz command doesn't support compression at all)
 	if [ "$LOCAL_OS" == "BusyBox" ] || [ "$REMOTE_OS" == "Busybox" ] || [ "$LOCAL_OS" == "Android" ] || [ "$REMOTE_OS" == "Android" ]; then
 		compressionString=""
@@ -1565,6 +1509,70 @@ function InitRemoteOSSettings {
 		REMOTE_STAT_CTIME_MTIME_CMD="stat -c \\\"%n;%Z;%Y\\\""
 	fi
 
+}
+
+function InitRsyncSettings {
+	__CheckArguments 0 $# ${FUNCNAME[0]} "$@"    #__WITH_PARANOIA_DEBUG
+
+	## Set rsync default arguments
+	RSYNC_ARGS="-rltD"
+	if [ "$_DRYRUN" == true ]; then
+		RSYNC_DRY_ARG="-n"
+		DRY_WARNING="/!\ DRY RUN "
+	else
+		RSYNC_DRY_ARG=""
+	fi
+
+	RSYNC_ATTR_ARGS=""
+	if [ "$PRESERVE_PERMISSIONS" != "no" ]; then
+		RSYNC_ATTR_ARGS=$RSYNC_ATTR_ARGS" -p"
+	fi
+	if [ "$PRESERVE_OWNER" != "no" ]; then
+		RSYNC_ATTR_ARGS=$RSYNC_ATTR_ARGS" -o"
+	fi
+	if [ "$PRESERVE_GROUP" != "no" ]; then
+		RSYNC_ATTR_ARGS=$RSYNC_ATTR_ARGS" -g"
+	fi
+	if [ "$PRESERVE_EXECUTABILITY" != "no" ]; then
+		RSYNC_ATTR_ARGS=$RSYNC_ATTR_ARGS" --executability"
+	fi
+	if [ "$LOCAL_OS" != "MacOSX" ] && [ "$REMOTE_OS" != "MacOSX" ]; then
+		if [ "$PRESERVE_ACL" == "yes" ]; then
+			RSYNC_ATTR_ARGS=$RSYNC_ATTR_ARGS" -A"
+		fi
+		if [ "$PRESERVE_XATTR" == "yes" ]; then
+			RSYNC_ATTR_ARGS=$RSYNC_ATTR_ARGS" -X"
+		fi
+	fi
+	if [ "$RSYNC_COMPRESS" == "yes" ]; then
+		RSYNC_ARGS=$RSYNC_ARGS" -z"
+	fi
+	if [ "$COPY_SYMLINKS" == "yes" ]; then
+		RSYNC_ARGS=$RSYNC_ARGS" -L"
+	fi
+	if [ "$KEEP_DIRLINKS" == "yes" ]; then
+		RSYNC_ARGS=$RSYNC_ARGS" -K"
+	fi
+	if [ "$PRESERVE_HARDLINKS" == "yes" ]; then
+		RSYNC_ARGS=$RSYNC_ARGS" -H"
+	fi
+	if [ "$CHECKSUM" == "yes" ]; then
+		RSYNC_TYPE_ARGS=$RSYNC_TYPE_ARGS" --checksum"
+	fi
+	if [ "$BANDWIDTH" != "" ] && [ "$BANDWIDTH" != "0" ]; then
+		RSYNC_ARGS=$RSYNC_ARGS" --bwlimit=$BANDWIDTH"
+	fi
+
+	if [ "$PARTIAL" == "yes" ]; then
+		RSYNC_ARGS=$RSYNC_ARGS" --partial --partial-dir=\"$PARTIAL_DIR\""
+		RSYNC_PARTIAL_EXCLUDE="--exclude=\"$PARTIAL_DIR\""
+	fi
+
+	if [ "$DELTA_COPIES" != "no" ]; then
+		RSYNC_ARGS=$RSYNC_ARGS" --no-whole-file"
+	else
+		RSYNC_ARGS=$RSYNC_ARGS" --whole-file"
+	fi
 }
 
 ## IFS debug function
