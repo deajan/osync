@@ -5,7 +5,7 @@
 ## On Mac OSX, this needs to be run as root in order to use sudo without password
 ## From current terminal run sudo -s in order to get a new terminal as root
 
-# osync test suite 2016112108
+# osync test suite 2016112201
 
 # 4 tests:
 # quicklocal
@@ -77,26 +77,6 @@ OSYNC_IS_STABLE=maybe
 
 # Setup an array with all function modes
 #declare -Ag osyncParameters
-
-readonly __quickLocal=0
-readonly __quickRemote=1
-readonly __confLocal=2
-readonly __confRemote=3
-
-osyncParameters=()
-osyncParameters[$__quickLocal]="--initiator=$INITIATOR_DIR --target=$TARGET_DIR --instance-id=quicklocal"
-osyncParameters[$__quickRemote]="--initiator=$INITIATOR_DIR --target=ssh://localhost:$SSH_PORT/$TARGET_DIR --rsakey=${HOME}/.ssh/id_rsa_local --instance-id=quickremote"
-osyncParameters[$__confLocal]="$CONF_DIR/$LOCAL_CONF"
-osyncParameters[$__confRemote]="$CONF_DIR/$REMOTE_CONF"
-
-#declare -Ag osyncDaemonParameters
-osyncDaemonParameters=()
-
-readonly __local
-readonly __remote
-
-osyncDaemonParameters[$__local]="$CONF_DIR/$LOCAL_CONF --on-changes"
-osyncDaemonParameters[$__remote]="$CONF_DIR/$REMOTE_CONF --on-changes"
 
 function GetConfFileValue () {
 	local file="${1}"
@@ -205,9 +185,33 @@ function oneTimeSetUp () {
 	START_TIME=$SECONDS
 
 	source "$DEV_DIR/ofunctions.sh"
-	SetupSSH
-
 	GetLocalOS
+
+	# Setup modes per test
+	readonly __quickLocal=0
+	readonly __quickRemote=1
+	readonly __confLocal=2
+	readonly __confRemote=3
+
+	osyncParameters=()
+	osyncParameters[$__quickLocal]="--initiator=$INITIATOR_DIR --target=$TARGET_DIR --instance-id=quicklocal"
+	osyncParameters[$__confLocal]="$CONF_DIR/$LOCAL_CONF"
+
+	osyncDaemonParameters=()
+
+	readonly __local
+	readonly __remote
+
+	osyncDaemonParameters[$__local]="$CONF_DIR/$LOCAL_CONF --on-changes"
+
+	if [ "$LOCAL_OS" != "msys" ]; then
+		osyncParameters[$__quickRemote]="--initiator=$INITIATOR_DIR --target=ssh://localhost:$SSH_PORT/$TARGET_DIR --rsakey=${HOME}/.ssh/id_rsa_local --instance-id=quickremote"
+		osyncParameters[$__confRemote]="$CONF_DIR/$REMOTE_CONF"
+
+		osyncDaemonParameters[$__remote]="$CONF_DIR/$REMOTE_CONF --on-changes"
+
+		SetupSSH
+	fi
 
 	#TODO: Assuming that macos has the same syntax than bsd here
 	if [ "$LOCAL_OS" == "BSD" ] || [ "$LOCAL_OS" == "MacOSX" ]; then
@@ -515,8 +519,8 @@ function test_softdeletion_cleanup () {
 
 			touch "$file.new"
 
-			if [ "$TRAVIS_RUN" == true ] || [ "$LOCAL_OS" == "BSD" ] || [ "$LOCAL_OS" == "MacOSX" ] || [ "$LOCAL_OS" == "WinNT10" ]; then
-				echo "Skipping changing ctime on file because travis / bsd / macos / Win10 does not support debugfs"
+			if [ "$TRAVIS_RUN" == true ] || [ "$LOCAL_OS" == "BSD" ] || [ "$LOCAL_OS" == "MacOSX" ] || [ "$LOCAL_OS" == "WinNT10" ] || [ "LOCAL_OS" == "msys" ]; then
+				echo "Skipping changing ctime on file because travis / bsd / macos / Win10 / msys / cygwin does not support debugfs"
 			else
 				CreateOldFile "$file.old"
 			fi
@@ -530,7 +534,7 @@ function test_softdeletion_cleanup () {
 			[ -f "$file.new" ]
 			assertEquals "New softdeleted / backed up file [$file.new] exists." "0" $?
 
-			if [ "$TRAVIS_RUN" == true ] || [ "$LOCAL_OS" == "BSD" ] || [ "$LOCAL_OS" == "MacOSX" ] || [ "$LOCAL_OS" == "WinNT10" ]; then
+			if [ "$TRAVIS_RUN" == true ] || [ "$LOCAL_OS" == "BSD" ] || [ "$LOCAL_OS" == "MacOSX" ] || [ "$LOCAL_OS" == "WinNT10" ] || [ "$LOCAL_OS" == "msys" ]; then
 				[ ! -f "$file.old" ]
 				assertEquals "Old softdeleted / backed up file [$file.old] is deleted permanently." "0" $?
 			else
@@ -952,7 +956,7 @@ function test_UpgradeConfRun () {
 }
 
 function test_DaemonMode () {
-	if [ "$LOCAL_OS" == "WinNT10" ]; then
+	if [ "$LOCAL_OS" == "WinNT10" ] || [ "$LOCAL_OS" == "msys" ]; then
 		echo "Skipping daemon mode test as Win10 does not have inotifywait support."
 		return 0
 	fi
@@ -999,7 +1003,7 @@ function test_DaemonMode () {
 		assertEquals "File [$INITIATOR_DIR/$OSYNC_DELETE_DIR/$FileB] should be in soft deletion dir." "0" $?
 
 		[ -f "$TARGET_DIR/$FileC" ]
-		assertEquals "$File [$TARGET_DIR/$FileC] should be synced." "0" $?
+		assertEquals "File [$TARGET_DIR/$FileC] should be synced." "0" $?
 
 		kill $pid
 	done
