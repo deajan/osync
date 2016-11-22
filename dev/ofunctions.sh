@@ -1,6 +1,6 @@
 #### MINIMAL-FUNCTION-SET BEGIN ####
 
-## FUNC_BUILD=2016112204
+## FUNC_BUILD=2016112205
 ## BEGIN Generic bash functions written in 2013-2016 by Orsiris de Jong - http://www.netpower.fr - ozy@netpower.fr
 
 ## To use in a program, define the following variables:
@@ -962,16 +962,14 @@ function GetLocalOS {
 		localOsVar="BusyBox"
 	else
 		# Detecting the special ubuntu userland in Windows 10 bash
-		if [ -f /proc/sys/kernel/osrelease ]; then
-			if grep -i Microsoft /proc/sys/kernel/osrelease > /dev/null; then
-				localOsVar="Microsoft"
-			else
-				localOsVar="$(uname -spio 2>&1)"
+		if grep -i Microsoft /proc/sys/kernel/osrelease > /dev/null 2>&1; then
+			localOsVar="Microsoft"
+		else
+			localOsVar="$(uname -spio 2>&1)"
+			if [ $? != 0 ]; then
+				localOsVar="$(uname -v 2>&1)"
 				if [ $? != 0 ]; then
-					localOsVar="$(uname -v 2>&1)"
-					if [ $? != 0 ]; then
-						localOsVar="$(uname)"
-					fi
+					localOsVar="$(uname)"
 				fi
 			fi
 		fi
@@ -1033,16 +1031,14 @@ function GetOs {
 		localOsVar="BusyBox"
 	else
 		# Detecting the special ubuntu userland in Windows 10 bash
-		if [ -f /proc/sys/kernel/osrelease ]; then
-			if grep -i Microsoft /proc/sys/kernel/osrelease > /dev/null; then
-				localOsVar="Microsoft"
-			else
-				localOsVar="$(uname -spio 2>&1)"
+		if grep -i Microsoft /proc/sys/kernel/osrelease > /dev/null 2>&1; then
+			localOsVar="Microsoft"
+		else
+			localOsVar="$(uname -spio 2>&1)"
+			if [ $? != 0 ]; then
+				localOsVar="$(uname -v 2>&1)"
 				if [ $? != 0 ]; then
-					localOsVar="$(uname -v 2>&1)"
-					if [ $? != 0 ]; then
-						localOsVar="$(uname)"
-					fi
+					localOsVar="$(uname)"
 				fi
 			fi
 		fi
