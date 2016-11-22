@@ -350,6 +350,10 @@ function test_Deletetion () {
 }
 
 function test_deletion_failure () {
+	if [ "$LOCAL_OS" == "WinNT10" ]; then
+		echo "Skipping deletion failure test as Win10 does not have chattr  support."
+		return 0
+	fi
 
 	for i in "${osyncParameters[@]}"; do
 		cd "$OSYNC_DIR"
@@ -511,8 +515,8 @@ function test_softdeletion_cleanup () {
 
 			touch "$file.new"
 
-			if [ "$TRAVIS_RUN" == true ] || [ "$LOCAL_OS" == "BSD" ] || [ "$LOCAL_OS" == "MacOSX" ]; then
-				echo "Skipping changing ctime on file because travis / bsd / macos does not support debugfs"
+			if [ "$TRAVIS_RUN" == true ] || [ "$LOCAL_OS" == "BSD" ] || [ "$LOCAL_OS" == "MacOSX" ] || [ "$LOCAL_OS" == "WinNT10" ]; then
+				echo "Skipping changing ctime on file because travis / bsd / macos / Win10 does not support debugfs"
 			else
 				CreateOldFile "$file.old"
 			fi
@@ -526,7 +530,7 @@ function test_softdeletion_cleanup () {
 			[ -f "$file.new" ]
 			assertEquals "New softdeleted / backed up file [$file.new] exists." "0" $?
 
-			if [ "$TRAVIS_RUN" == true ] || [ "$LOCAL_OS" == "BSD" ] || [ "$LOCAL_OS" == "MacOSX" ]; then
+			if [ "$TRAVIS_RUN" == true ] || [ "$LOCAL_OS" == "BSD" ] || [ "$LOCAL_OS" == "MacOSX" ] || [ "$LOCAL_OS" == "WinNT10" ];; then
 				[ ! -f "$file.old" ]
 				assertEquals "Old softdeleted / backed up file [$file.old] is deleted permanently." "0" $?
 			else
@@ -948,6 +952,10 @@ function test_UpgradeConfRun () {
 }
 
 function test_DaemonMode () {
+	if [ "$LOCAL_OS" == "WinNT10" ]; then
+		echo "Skipping daemon mode test as Win10 does not have inotifywait support."
+		return 0
+	fi
 
 	for i in "${osyncDaemonParameters[@]}"; do
 
