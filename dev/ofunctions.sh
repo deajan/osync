@@ -988,7 +988,7 @@ function GetLocalOS {
 		LOCAL_OS="msys"
 		;;
 		*"Microsoft"*)
-		LOCAL_OS)="WinNT10"
+		LOCAL_OS="WinNT10"
 		;;
 		*"Darwin"*)
 		LOCAL_OS="MacOSX"
