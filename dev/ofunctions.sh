@@ -1,6 +1,6 @@
 #### MINIMAL-FUNCTION-SET BEGIN ####
 
-## FUNC_BUILD=2016112203
+## FUNC_BUILD=2016112204
 ## BEGIN Generic bash functions written in 2013-2016 by Orsiris de Jong - http://www.netpower.fr - ozy@netpower.fr
 
 ## To use in a program, define the following variables:
@@ -960,15 +960,19 @@ function GetLocalOS {
 	# There's no good way to tell if currently running in BusyBox shell. Using sluggish way.
 	if ls --help 2>&1 | grep -i "BusyBox" > /dev/null; then
 		localOsVar="BusyBox"
-	# Detecting the special ubuntu userland in Windows 10 bash
-	elif [ -f /proc/sys/kernel/osrelease ]; then
-		localOsVar="$(cat /proc/sys/kernel/osrelease)"
 	else
-		localOsVar="$(uname -spio 2>&1)"
-		if [ $? != 0 ]; then
-			localOsVar="$(uname -v 2>&1)"
-			if [ $? != 0 ]; then
-				localOsVar="$(uname)"
+		# Detecting the special ubuntu userland in Windows 10 bash
+		if [ -f /proc/sys/kernel/osrelease ]; then
+			if grep -i Microsoft /proc/sys/kernel/osrelease > /dev/null; then
+				localOsVar="Microsoft"
+			else
+				localOsVar="$(uname -spio 2>&1)"
+				if [ $? != 0 ]; then
+					localOsVar="$(uname -v 2>&1)"
+					if [ $? != 0 ]; then
+						localOsVar="$(uname)"
+					fi
+				fi
 			fi
 		fi
 	fi
@@ -1027,19 +1031,22 @@ function GetOs {
 	# There's no good way to tell if currently running in BusyBox shell. Using sluggish way.
 	if ls --help 2>&1 | grep -i "BusyBox" > /dev/null; then
 		localOsVar="BusyBox"
-	elif [ -f /proc/sys/kernel/osrelease ]; then
-		localOsVar="$(cat /proc/sys/kernel/osrelease)"
-
 	else
-		localOsVar="$(uname -spio 2>&1)"
-		if [ $? != 0 ]; then
-			localOsVar="$(uname -v 2>&1)"
-			if [ $? != 0 ]; then
-				localOsVar="$(uname)"
+		# Detecting the special ubuntu userland in Windows 10 bash
+		if [ -f /proc/sys/kernel/osrelease ]; then
+			if grep -i Microsoft /proc/sys/kernel/osrelease > /dev/null; then
+				localOsVar="Microsoft"
+			else
+				localOsVar="$(uname -spio 2>&1)"
+				if [ $? != 0 ]; then
+					localOsVar="$(uname -v 2>&1)"
+					if [ $? != 0 ]; then
+						localOsVar="$(uname)"
+					fi
+				fi
 			fi
 		fi
 	fi
-
 	echo "$localOsVar"
 }
 
