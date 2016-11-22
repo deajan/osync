@@ -4,7 +4,7 @@ PROGRAM="osync" # Rsync based two way sync engine with fault tolerance
 AUTHOR="(C) 2013-2016 by Orsiris de Jong"
 CONTACT="http://www.netpower.fr/osync - ozy@netpower.fr"
 PROGRAM_VERSION=1.2-beta3
-PROGRAM_BUILD=2016112104
+PROGRAM_BUILD=2016112202
 IS_STABLE=no
 
 # Execution order						#__WITH_PARANOIA_DEBUG
@@ -2083,17 +2083,14 @@ function SyncOnChanges {
 
 		Logger "#### Monitoring now." "NOTICE"
 		if [ "$LOCAL_OS" == "MacOSX" ]; then
-			#TODO: Mac fswatch doesn't have timeout switch, replace wait $! with WaitForTaskCompletion without warning nor spinner could sim this behavior, but trades on cpu perf, so SLEEP_TIME needs to be modded
 			fswatch --exclude $OSYNC_DIR $RSYNC_PATTERNS $RSYNC_PARTIAL_EXCLUDE -1 "$INITIATOR_SYNC_DIR" > /dev/null &
+			# Mac fswatch doesn't have timeout switch, replacing wait $! with WaitForTaskCompletion without warning nor spinner and increased SLEEP_TIME to avoid cpu hogging. This sims wait $! with timeout
+			WaitForTaskCompletion $! 0 $MAX_WAIT ${FUNCNAME[0]} true 0 true false 1
 		else
 			inotifywait --exclude $OSYNC_DIR $RSYNC_PATTERNS $RSYNC_PARTIAL_EXCLUDE -qq -r -e create -e modify -e delete -e move -e attrib --timeout "$MAX_WAIT" "$INITIATOR_SYNC_DIR" &
+			wait $!
 		fi
-		#wait $!
-		sleepTime=SLEEP_TIME
-		SLEEP_TIME=1
-		WaitForTaskCompletion $! 0 $MAX_WAIT ${FUNCNAME[0]} true 0 true
 		retval=$?
-		SLEEP_TIME=$sleepTime
 		if [ $retval == 0 ]; then
 			Logger "#### Changes detected, waiting $MIN_WAIT seconds before running next sync." "NOTICE"
 			sleep $MIN_WAIT
