@@ -1,6 +1,6 @@
 #### MINIMAL-FUNCTION-SET BEGIN ####
 
-## FUNC_BUILD=2016112205
+## FUNC_BUILD=2016112206
 ## BEGIN Generic bash functions written in 2013-2016 by Orsiris de Jong - http://www.netpower.fr - ozy@netpower.fr
 
 ## To use in a program, define the following variables:
@@ -1569,13 +1569,15 @@ function InitRsyncSettings {
 	if [ "$PRESERVE_EXECUTABILITY" != "no" ]; then
 		RSYNC_ATTR_ARGS=$RSYNC_ATTR_ARGS" --executability"
 	fi
-	if [ "$LOCAL_OS" != "MacOSX" ] && [ "$REMOTE_OS" != "MacOSX" ]; then
+	if [ "$LOCAL_OS" != "MacOSX" ] && [ "$REMOTE_OS" != "MacOSX" ] && [ "$LOCAL_OS" != "msys" ] && [ "$REMOTE_OS" != "MacOSX" ]; then
 		if [ "$PRESERVE_ACL" == "yes" ]; then
 			RSYNC_ATTR_ARGS=$RSYNC_ATTR_ARGS" -A"
 		fi
 		if [ "$PRESERVE_XATTR" == "yes" ]; then
 			RSYNC_ATTR_ARGS=$RSYNC_ATTR_ARGS" -X"
 		fi
+	else
+		Logger "Disabling ACL and extended attributes synchronization on [$LOCAL_OS]." "NOTICE"
 	fi
 	if [ "$RSYNC_COMPRESS" == "yes" ]; then
 		RSYNC_ARGS=$RSYNC_ARGS" -z"
