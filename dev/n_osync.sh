@@ -4,7 +4,7 @@ PROGRAM="osync" # Rsync based two way sync engine with fault tolerance
 AUTHOR="(C) 2013-2016 by Orsiris de Jong"
 CONTACT="http://www.netpower.fr/osync - ozy@netpower.fr"
 PROGRAM_VERSION=1.2-beta3
-PROGRAM_BUILD=2016112202
+PROGRAM_BUILD=2016112203
 IS_STABLE=no
 
 # Execution order						#__WITH_PARANOIA_DEBUG
@@ -1787,9 +1787,9 @@ function _SummaryFromFile {
 function Summary {
 	__CheckArguments 0 $# "${FUNCNAME[0]}" "$@"	#__WITH_PARANOIA_DEBUG
 
-	local prefix
+	local loggerPrefix
 
-	prefix="$_LOGGER_PREFIX"
+	loggerPrefix="$_LOGGER_PREFIX"
 	_LOGGER_PREFIX=""
 
 	Logger "Attrib updates: INITIATOR << >> TARGET" "ALWAYS"
@@ -1810,7 +1810,7 @@ function Summary {
 	fi
 	_SummaryFromFile "${INITIATOR[$__replicaDir]}" "$RUN_DIR/$PROGRAM.delete.initiator.$SCRIPT_PID" "- <<"
 
-	_LOGGER_PREFIX="$prefix"
+	_LOGGER_PREFIX="$loggerPrefix"
 }
 
 function Init {
