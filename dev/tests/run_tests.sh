@@ -1,6 +1,11 @@
 #!/usr/bin/env bash
 
-# osync test suite 20161112001
+## If this script is stopped while running, config file values and IS_STABLE value might be in inconsistent state
+
+## On Mac OSX, this needs to be run as root in order to use sudo without password
+## From current terminal run sudo -s in order to get a new terminal as root
+
+# osync test suite 2016112108
 
 # 4 tests:
 # quicklocal
@@ -23,6 +28,10 @@
 # WaitForTaskCompletion
 # ParallelExec
 # daemon mode tests for both config files
+
+#TODO: on BSD, remount UFS with ACL support using mount -o acls /
+# setfacl needs double ':' to be compatible with both linux and BSD
+# setfacl -m o::rwx file
 
 LARGE_FILESET_URL="http://ftp.drupal.org/files/projects/drupal-8.2.2.tar.gz"
 
@@ -99,7 +108,7 @@ function GetConfFileValue () {
 		value="${value##*=}"
 		echo "$value"
 	else
-		assertEquals "$name does not exist in [$file." "1" "0"
+		assertEquals "$name does not exist in [$file]." "1" "0"
 	fi
 }
 
@@ -120,12 +129,14 @@ function SetConfFileValue () {
 
 function SetupSSH {
 	echo -e  'y\n'| ssh-keygen -t rsa -b 2048 -N "" -f "${HOME}/.ssh/id_rsa_local"
-	cat "${HOME}/.ssh/id_rsa_local.pub" >> "${HOME}/.ssh/authorized_keys"
+	if ! grep "$(cat ${HOME}/.ssh/id_rsa_local.pub)" "${HOME}/.ssh/authorized_keys"; then
+		cat "${HOME}/.ssh/id_rsa_local.pub" >> "${HOME}/.ssh/authorized_keys"
+	fi
 	chmod 600 "${HOME}/.ssh/authorized_keys"
 
 	# Add localhost to known hosts so self connect works
-	if [ -z $(ssh-keygen -F localhost) ]; then
-		ssh-keyscan -H localhost >> ~/.ssh/known_hosts
+	if [ -z "$(ssh-keygen -F localhost)" ]; then
+		ssh-keyscan -H localhost >> "${HOME}/.ssh/known_hosts"
 	fi
 }
 
@@ -144,10 +155,15 @@ function DownloadLargeFileSet() {
 	local destinationPath="${1}"
 
 	cd "$OSYNC_DIR"
-	wget -q --no-check-certificate "$LARGE_FILESET_URL" > /dev/null
-	assertEquals "Download [$LARGE_FILESET_URL]." "0" $?
+	if type wget > /dev/null 2>&1; then
+		wget -q --no-check-certificate "$LARGE_FILESET_URL" > /dev/null
+		assertEquals "Download [$LARGE_FILESET_URL] with wget." "0" $?
+	elif type curl > /dev/null 2>&1; then
+		curl -O -L "$LARGE_FILESET_URL" > /dev/null 2>&1
+		assertEquals "Download [$LARGE_FILESET_URL] with curl." "0" $?
+	fi
 
-	tar xvf "$(basename $LARGE_FILESET_URL)" -C "$destinationPath" > /dev/null
+	tar xf "$(basename $LARGE_FILESET_URL)" -C "$destinationPath"
 	assertEquals "Extract $(basename $LARGE_FILESET_URL)" "0" $?
 
 	rm -f "$(basename $LARGE_FILESET_URL)"
@@ -190,6 +206,19 @@ function oneTimeSetUp () {
 
 	source "$DEV_DIR/ofunctions.sh"
 	SetupSSH
+
+	GetLocalOS
+
+	#TODO: Assuming that macos has the same syntax than bsd here
+	if [ "$LOCAL_OS" == "BSD" ] || [ "$LOCAL_OS" == "MacOSX" ]; then
+		SUDO_CMD=""
+		IMMUTABLE_ON_CMD="chflags schg"
+		IMMUTABLE_OFF_CMD="chflags noschg"
+	else
+		IMMUTABLE_ON_CMD="chattr +i"
+		IMMUTABLE_OFF_CMD="chattr -i"
+		SUDO_CMD="sudo"
+	fi
 
 	# Get osync version
 	OSYNC_VERSION=$(GetConfFileValue "$OSYNC_DIR/$OSYNC_DEV_EXECUTABLE" "PROGRAM_VERSION")
@@ -322,11 +351,6 @@ function test_Deletetion () {
 
 function test_deletion_failure () {
 
-	if [ "$TRAVIS_RUN" == true ]; then
-		echo "Skipping deletionFailure tests as travis does not support chattr."
-		return 0
-	fi
-
 	for i in "${osyncParameters[@]}"; do
 		cd "$OSYNC_DIR"
 
@@ -351,8 +375,8 @@ function test_deletion_failure () {
 		rm -f "$TARGET_DIR/$FileB"
 
 		# Prevent files from being deleted
-		chattr +i "$TARGET_DIR/$FileA"
-		chattr +i "$INITIATOR_DIR/$FileB"
+		$SUDO_CMD $IMMUTABLE_ON_CMD "$TARGET_DIR/$FileA"
+		$SUDO_CMD $IMMUTABLE_ON_CMD "$INITIATOR_DIR/$FileB"
 
 		# This shuold fail with exitcode 1
 		REMOTE_HOST_PING=no ./$OSYNC_EXECUTABLE $i
@@ -369,8 +393,8 @@ function test_deletion_failure () {
 		assertEquals "File [$INITIATOR_DIR/$OSYNC_DELETE_DIR/$FileB] is not present in deletion dir." "0" $?
 
 		# Allow files from being deleted
-		chattr -i "$TARGET_DIR/$FileA"
-		chattr -i "$INITIATOR_DIR/$FileB"
+		$SUDO_CMD $IMMUTABLE_OFF_CMD "$TARGET_DIR/$FileA"
+		$SUDO_CMD $IMMUTABLE_OFF_CMD "$INITIATOR_DIR/$FileB"
 
 		REMOTE_HOST_PING=no ./$OSYNC_EXECUTABLE $i
 		assertEquals "Third deletion run with parameters [$i]." "0" $?
@@ -388,18 +412,12 @@ function test_deletion_failure () {
 }
 
 function test_skip_deletion () {
-	local skipDeletionLocal
-	local skipDeletionRemote
 	local modes
 
 	if [ "$OSYNC_MIN_VERSION" == "1" ]; then
 		echo "Skipping SkipDeletion test because it wasn't implemented in osync v1.1."
 		return 0
 	fi
-
-	# Keep original values
-	skipDeletionLocal=$(GetConfFileValue "$CONF_DIR/$LOCAL_CONF" "SKIP_DELETION")
-	skipDeletionRemote=$(GetConfFileValue "$CONF_DIR/$REMOTE_CONF" "SKIP_DELETION")
 
 	modes=('initiator' 'target' 'initiator,target')
 
@@ -460,8 +478,8 @@ function test_skip_deletion () {
 	done
 
 	# Set original values back
-	SetConfFileValue "$CONF_DIR/$LOCAL_CONF" "SKIP_DELETION" "$skipDeletionLocal"
-	SetConfFileValue "$CONF_DIR/$REMOTE_CONF" "SKIP_DELETION" "$skipDeletionRemote"
+	SetConfFileValue "$CONF_DIR/$LOCAL_CONF" "SKIP_DELETION" ""
+	SetConfFileValue "$CONF_DIR/$REMOTE_CONF" "SKIP_DELETION" ""
 }
 
 function test_softdeletion_cleanup () {
@@ -488,15 +506,15 @@ function test_softdeletion_cleanup () {
 		for file in "${files[@]}"; do
 			# Create directories first if they do not exist (deletion dir is created by osync, backup dir is created by rsync only when needed)
 			if [ ! -d "$(dirname $file)" ]; then
-				mkdir --parents "$(dirname $file)"
+				mkdir -p "$(dirname $file)"
 			fi
 
 			touch "$file.new"
 
-			if [ "$TRAVIS_RUN" != true ]; then
-				CreateOldFile "$file.old"
+			if [ "$TRAVIS_RUN" == true ] || [ "$LOCAL_OS" == "BSD" ] || [ "$LOCAL_OS" == "MacOSX" ]; then
+				echo "Skipping changing ctime on file because travis / bsd / macos does not support debugfs"
 			else
-				echo "Skipping changing ctime on file because travis does not support debugfs"
+				CreateOldFile "$file.old"
 			fi
 		done
 
@@ -508,12 +526,12 @@ function test_softdeletion_cleanup () {
 			[ -f "$file.new" ]
 			assertEquals "New softdeleted / backed up file [$file.new] exists." "0" $?
 
-			if [ "$TRAVIS_RUN" != true ]; then
-				[ ! -f "$file.old" ]
-				assertEquals "Old softdeleted / backed up file [$file.old] is deleted permanently." "1" $?
-			else
+			if [ "$TRAVIS_RUN" == true ] || [ "$LOCAL_OS" == "BSD" ] || [ "$LOCAL_OS" == "MacOSX" ]; then
 				[ ! -f "$file.old" ]
 				assertEquals "Old softdeleted / backed up file [$file.old] is deleted permanently." "0" $?
+			else
+				[ ! -f "$file.old" ]
+				assertEquals "Old softdeleted / backed up file [$file.old] is deleted permanently." "1" $?
 			fi
 		done
 	done
@@ -524,6 +542,11 @@ function test_FileAttributePropagation () {
 
 	if [ "$TRAVIS_RUN" == true ]; then
 		echo "Skipping FileAttributePropagation tests as travis does not support getfacl / setfacl."
+		return 0
+	fi
+
+	if [ "$LOCAL_OS" == "MacOSX" ]; then
+		echo "Skipping FileAttributePropagation tests because Mac OSX does not support ACL."
 		return 0
 	fi
 
@@ -565,14 +588,14 @@ function test_FileAttributePropagation () {
 		getfacl "$TARGET_DIR/$DirD" | grep "other::r-x" > /dev/null
 		assertEquals "Check getting ACL on target subdirectory." "0" $?
 
-		setfacl -m o:r-x "$INITIATOR_DIR/$FileA"
+		setfacl -m o::r-x "$INITIATOR_DIR/$FileA"
 		assertEquals "Set ACL on initiator" "0" $?
-		setfacl -m o:-w- "$TARGET_DIR/$FileB"
+		setfacl -m o::-w- "$TARGET_DIR/$FileB"
 		assertEquals "Set ACL on target" "0" $?
 
-		setfacl -m o:rwx "$INITIATOR_DIR/$DirC"
+		setfacl -m o::rwx "$INITIATOR_DIR/$DirC"
 		assertEquals "Set ACL on initiator directory" "0" $?
-		setfacl -m o:-wx "$TARGET_DIR/$DirD"
+		setfacl -m o::-wx "$TARGET_DIR/$DirD"
 		assertEquals "Set ACL on target directory" "0" $?
 
 		# Second run
@@ -630,15 +653,10 @@ function test_ConflictBackups () {
 }
 
 function test_MultipleConflictBackups () {
-	local conflictBackupMultipleLocal
-	local conflictBackupMultipleRemote
 
 	local additionalParameters
 
 	# modify config files
-	conflictBackupMultipleLocal=$(GetConfFileValue "$CONF_DIR/$LOCAL_CONF" "CONFLICT_BACKUP_MULTIPLE")
-	conflictBackupMultipleRemote=$(GetConfFileValue "$CONF_DIR/$REMOTE_CONF" "CONFLICT_BACKUP_MULTIPLE")
-
 	SetConfFileValue "$CONF_DIR/$LOCAL_CONF" "CONFLICT_BACKUP_MULTIPLE" "yes"
 	SetConfFileValue "$CONF_DIR/$REMOTE_CONF" "CONFLICT_BACKUP_MULTIPLE" "yes"
 
@@ -690,9 +708,8 @@ function test_MultipleConflictBackups () {
 		assertEquals "3 Backup files are present in [$TARGET_DIR/$OSYNC_BACKUP_DIR/]." "0" $?
 	done
 
-	SetConfFileValue "$CONF_DIR/$LOCAL_CONF" "CONFLICT_BACKUP_MULTIPLE" "$conflictBackupMultipleLocal"
-	SetConfFileValue "$CONF_DIR/$REMOTE_CONF" "CONFLICT_BACKUP_MULTIPLE" "$conflictBackupMultipleRemote"
-
+	SetConfFileValue "$CONF_DIR/$LOCAL_CONF" "CONFLICT_BACKUP_MULTIPLE" "no"
+	SetConfFileValue "$CONF_DIR/$REMOTE_CONF" "CONFLICT_BACKUP_MULTIPLE" "no"
 }
 
 function test_Locking () {
@@ -931,11 +948,6 @@ function test_UpgradeConfRun () {
 }
 
 function test_DaemonMode () {
-
-	if [ "$TRAVIS_RUN" == true ]; then
-		echo "Skipping daemon mode tests as no inotifywait present in travis yet."
-		return 0
-	fi
 
 	for i in "${osyncDaemonParameters[@]}"; do
 
