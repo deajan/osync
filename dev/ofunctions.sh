@@ -1,6 +1,6 @@
 #### MINIMAL-FUNCTION-SET BEGIN ####
 
-## FUNC_BUILD=2016112202
+## FUNC_BUILD=2016112203
 ## BEGIN Generic bash functions written in 2013-2016 by Orsiris de Jong - http://www.netpower.fr - ozy@netpower.fr
 
 ## To use in a program, define the following variables:
@@ -1500,7 +1500,7 @@ function InitLocalOSSettings {
 		PING_CMD="ping -c 2 -i .2"
 	fi
 
-	if [ "$LOCAL_OS" == "BusyBox" ] || [ "$LOCAL_OS" == "Android" ]; then
+	if [ "$LOCAL_OS" == "BusyBox" ] || [ "$LOCAL_OS" == "Android" ] || [ "$LOCAL_OS" == "msys" ]; then
 		PROCESS_STATE_CMD="echo none"
 		DF_CMD="df"
 	else
@@ -1515,7 +1515,7 @@ function InitLocalOSSettings {
 		STAT_CMD="stat -f \"%Sm\""
 		STAT_CTIME_MTIME_CMD="stat -f %N;%c;%m"
 	else
-		# Tested on GNU stat and busybox
+		# Tested on GNU stat, busybox and Cygwin
 		STAT_CMD="stat -c %y"
 		STAT_CTIME_MTIME_CMD="stat -c %n;%Z;%Y"
 	fi
