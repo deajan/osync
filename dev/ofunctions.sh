@@ -1,6 +1,6 @@
 #### MINIMAL-FUNCTION-SET BEGIN ####
 
-## FUNC_BUILD=2016112104
+## FUNC_BUILD=2016112201
 ## BEGIN Generic bash functions written in 2013-2016 by Orsiris de Jong - http://www.netpower.fr - ozy@netpower.fr
 
 ## To use in a program, define the following variables:
@@ -571,6 +571,10 @@ function joinString {
 # Fills a global variable called WAIT_FOR_TASK_COMPLETION that contains list of failed pids in format pid1:result1;pid2:result2
 # Warning: Don't imbricate this function into another run if you plan to use the global variable output
 
+# Standard wait $! emulation would be WaitForTaskCompletion $! 0 0 ${FUNCNAME[0]} true 0 true false
+
+#TODO: function WaitForTask $pid $softTime $hardTime $sleepTime $keepLogging $counting $spinner $noErrror $callerName
+
 function WaitForTaskCompletion {
 	local pids="${1}" # pids to wait for, separated by semi-colon
 	local softMaxTime="${2}" # If program with pid $pid takes longer than $softMaxTime seconds, will log a warning, unless $softMaxTime equals 0.
@@ -579,9 +583,11 @@ function WaitForTaskCompletion {
 	local counting="${5:-true}" # Count time since function has been launched if true, since script has been launched if false
 	local keepLogging="${6:-0}" # Log a standby message every X seconds. Set to zero to disable logging
 	local noError="${7:-false}" # When set to true, reaching soft or hard max time does not trigger an error
+	local spinner="${8:-true}" # Do we show spinner ?
+	local sleepTime="${9:-0}" # Override SLEEP_TIME
 
 	Logger "${FUNCNAME[0]} called by [$callerName]." "PARANOIA_DEBUG"	#__WITH_PARANOIA_DEBUG
-	__CheckArguments 6-7 $# ${FUNCNAME[0]} "$@"				#__WITH_PARANOIA_DEBUG
+	__CheckArguments 6-8 $# ${FUNCNAME[0]} "$@"				#__WITH_PARANOIA_DEBUG
 
 	local soft_alert=false # Does a soft alert need to be triggered, if yes, send an alert once
 	local log_ttime=0 # local time instance for comparaison
@@ -606,10 +612,17 @@ function WaitForTaskCompletion {
 
 	WAIT_FOR_TASK_COMPLETION=""
 
+	# Default value when not overriden
+	if [ $sleepTime -eq 0 ]; then
+		sleepTime=$SLEEP_TIME
+	fi
+
 	while [ ${#pidsArray[@]} -gt 0 ]; do
 		newPidsArray=()
 
-		Spinner
+		if [ $spinner == true ]; then
+			Spinner
+		fi
 		if [ $counting == true ]; then
 			exec_time=$(($SECONDS - $seconds_begin))
 		else
@@ -682,7 +695,7 @@ function WaitForTaskCompletion {
 
 		pidsArray=("${newPidsArray[@]}")
 		# Trivial wait time for bash to not eat up all CPU
-		sleep $SLEEP_TIME
+		sleep $sleepTime
 	done
 
 	Logger "${FUNCNAME[0]} ended for [$callerName] using [$pidCount] subprocesses with [$errorcount] errors." "PARANOIA_DEBUG"	#__WITH_PARANOIA_DEBUG
