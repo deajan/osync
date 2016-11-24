@@ -4,7 +4,7 @@ PROGRAM="osync" # Rsync based two way sync engine with fault tolerance
 AUTHOR="(C) 2013-2016 by Orsiris de Jong"
 CONTACT="http://www.netpower.fr/osync - ozy@netpower.fr"
 PROGRAM_VERSION=1.2-beta3
-PROGRAM_BUILD=2016112203
+PROGRAM_BUILD=2016112401
 IS_STABLE=no
 
 # Execution order						#__WITH_PARANOIA_DEBUG
@@ -269,7 +269,7 @@ function CheckReplicaPaths {
 		_CheckReplicaPathsRemote "${TARGET[$__replicaDir]}" &
 		pids="$pids;$!"
 	fi
-	WaitForTaskCompletion $pids 720 1800 ${FUNCNAME[0]} false $KEEP_LOGGING
+	WaitForTaskCompletion $pids 720 1800 $SLEEP_TIME $KEEP_LOGGING true true false ${FUNCNAME[0]}
 	if [ $? -ne 0 ]; then
 		Logger "Cancelling task." "CRITICAL"
 		exit 1
@@ -351,7 +351,7 @@ function CheckDiskSpace {
 		_CheckDiskSpaceRemote "${TARGET[$__replicaDir]}" &
 		pids="$pids;$!"
 	fi
-	WaitForTaskCompletion $pids 720 1800 ${FUNCNAME[0]} true $KEEP_LOGGING
+	WaitForTaskCompletion $pids 720 1800 $SLEEP_TIME $KEEP_LOGGING true true false ${FUNCNAME[0]}
 }
 
 
@@ -402,7 +402,7 @@ function CreateStateDirs {
 		_CreateStateDirsRemote "${TARGET[$__replicaDir]}${TARGET[$__stateDir]}" &
 		pids="$pids;$!"
 	fi
-	WaitForTaskCompletion $pids 720 1800 ${FUNCNAME[0]} true $KEEP_LOGGING
+	WaitForTaskCompletion $pids 720 1800 $SLEEP_TIME $KEEP_LOGGING true true false ${FUNCNAME[0]}
 	if [ $? -ne 0 ]; then
 		Logger "Cancelling task." "CRITICAL"
 		exit 1
@@ -533,7 +533,7 @@ function CheckLocks {
 			_CheckLocksRemote "${TARGET[$__lockFile]}" &
 			pids="$pids;$!"
 		fi
-		WaitForTaskCompletion $pids 720 1800 ${FUNCNAME[0]} true $KEEP_LOGGING
+		WaitForTaskCompletion $pids 720 1800 $SLEEP_TIME $KEEP_LOGGING true true false ${FUNCNAME[0]}
 		if [ $? -ne 0 ]; then
 			Logger "Cancelling task." "CRITICAL"
 			exit 1
@@ -611,7 +611,7 @@ function WriteLockFiles {
 
 	INITIATOR_LOCK_FILE_EXISTS=true
 	TARGET_LOCK_FILE_EXISTS=true
-	WaitForTaskCompletion "$initiatorPid;$targetPid" 720 1800 ${FUNCNAME[0]} true $KEEP_LOGGING
+	WaitForTaskCompletion "$initiatorPid;$targetPid" 720 1800 $SLEEP_TIME $KEEP_LOGGING true true false ${FUNCNAME[0]}
 	if [ $? -ne 0 ]; then
 		IFS=';' read -r -a pidArray <<< "$WAIT_FOR_TASK_COMPLETION"
 		for pid in "${pidArray[@]}"; do
@@ -687,7 +687,7 @@ function UnlockReplicas {
 	fi
 
 	if [ "$pids" != "" ]; then
-		WaitForTaskCompletion $pids 720 1800 ${FUNCNAME[0]} true $KEEP_LOGGING
+		WaitForTaskCompletion $pids 720 1800 $SLEEP_TIME $KEEP_LOGGING true true false ${FUNCNAME[0]}
 	fi
 }
 
@@ -857,7 +857,7 @@ function syncAttrs {
 	fi
 	Logger "RSYNC_CMD: $rsyncCmd" "DEBUG"
 	eval "$rsyncCmd"
-	WaitForTaskCompletion $! $SOFT_MAX_EXEC_TIME $HARD_MAX_EXEC_TIME ${FUNCNAME[0]} false $KEEP_LOGGING
+	WaitForTaskCompletion $! $SOFT_MAX_EXEC_TIME $HARD_MAX_EXEC_TIME $SLEEP_TIME $KEEP_LOGGING false true false ${FUNCNAME[0]}
 	retval=$?
 
 	if [ $retval != 0 ] && [ $retval != 24 ]; then
@@ -889,7 +889,7 @@ function syncAttrs {
 		_getFileCtimeMtimeRemote "${TARGET[$__replicaDir]}" "${TARGET[$__type]}" "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}-cleaned.$SCRIPT_PID" &
 		pids="$pids;$!"
 	fi
-	WaitForTaskCompletion $pids 1800 0 ${FUNCNAME[0]} true $KEEP_LOGGING
+	WaitForTaskCompletion $pids 1800 0 $SLEEP_TIME $KEEP_LOGGING true true false ${FUNCNAME[0]}
 
 	# If target gets updated first, then sync_attr must update initiators attrs first
 	# For join, remove leading replica paths
@@ -937,7 +937,7 @@ function syncAttrs {
 
 	Logger "RSYNC_CMD: $rsyncCmd" "DEBUG"
 	eval "$rsyncCmd"
-	WaitForTaskCompletion $! $SOFT_MAX_EXEC_TIME $HARD_MAX_EXEC_TIME ${FUNCNAME[0]} false $KEEP_LOGGING
+	WaitForTaskCompletion $! $SOFT_MAX_EXEC_TIME $HARD_MAX_EXEC_TIME $SLEEP_TIME $KEEP_LOGGING false true false ${FUNCNAME[0]}
 	retval=$?
 
 	if [ $retval != 0 ] && [ $retval != 24 ]; then
@@ -1404,7 +1404,7 @@ function Sync {
 			targetPid="$!"
 		fi
 
-		WaitForTaskCompletion "$initiatorPid;$targetPid" $SOFT_MAX_EXEC_TIME $HARD_MAX_EXEC_TIME ${FUNCNAME[0]} false $KEEP_LOGGING
+		WaitForTaskCompletion "$initiatorPid;$targetPid" $SOFT_MAX_EXEC_TIME $HARD_MAX_EXEC_TIME $SLEEP_TIME $KEEP_LOGGING false true false ${FUNCNAME[0]}
 		if [ $? != 0 ]; then
 			IFS=';' read -r -a pidArray <<< "$WAIT_FOR_TASK_COMPLETION"
 			initiatorFail=false
@@ -1449,7 +1449,7 @@ function Sync {
 			targetPid="$!"
 		fi
 
-		WaitForTaskCompletion "$initiatorPid;$targetPid" $SOFT_MAX_EXEC_TIME $HARD_MAX_EXEC_TIME ${FUNCNAME[0]} false $KEEP_LOGGING
+		WaitForTaskCompletion "$initiatorPid;$targetPid" $SOFT_MAX_EXEC_TIME $HARD_MAX_EXEC_TIME $SLEEP_TIME $KEEP_LOGGING false true false ${FUNCNAME[0]}
 		if [ $? != 0 ]; then
 			IFS=';' read -r -a pidArray <<< "$WAIT_FOR_TASK_COMPLETION"
 			initiatorFail=false
@@ -1486,7 +1486,7 @@ function Sync {
 	if [ "$resumeInitiator" == "${SYNC_ACTION[2]}" ] || [ "$resumeTarget" == "${SYNC_ACTION[2]}" ]; then
 		if [[ "$RSYNC_ATTR_ARGS" == *"-X"* ]] || [[ "$RSYNC_ATTR_ARGS" == *"-A"* ]]; then
 			syncAttrs "${INITIATOR[$__replicaDir]}" "$TARGET_SYNC_DIR"
-			WaitForTaskCompletion $! $SOFT_MAX_EXEC_TIME $HARD_MAX_EXEC_TIME ${FUNCNAME[0]} false $KEEP_LOGGING
+			WaitForTaskCompletion $! $SOFT_MAX_EXEC_TIME $HARD_MAX_EXEC_TIME $SLEEP_TIME $KEEP_LOGGING false true false ${FUNCNAME[0]}
 			if [ $? != 0 ]; then
 				echo "${SYNC_ACTION[2]}" > "${INITIATOR[$__initiatorLastActionFile]}"
 				echo "${SYNC_ACTION[2]}" > "${INITIATOR[$__targetLastActionFile]}"
@@ -1553,7 +1553,7 @@ function Sync {
 			targetPid="$!"
 		fi
 
-		WaitForTaskCompletion "$initiatorPid;$targetPid" $SOFT_MAX_EXEC_TIME $HARD_MAX_EXEC_TIME ${FUNCNAME[0]} false $KEEP_LOGGING
+		WaitForTaskCompletion "$initiatorPid;$targetPid" $SOFT_MAX_EXEC_TIME $HARD_MAX_EXEC_TIME $SLEEP_TIME $KEEP_LOGGING false true false ${FUNCNAME[0]}
 		if [ $? != 0 ]; then
 			IFS=';' read -r -a pidArray <<< "$WAIT_FOR_TASK_COMPLETION"
 			initiatorFail=false
@@ -1599,7 +1599,7 @@ function Sync {
 			targetPid="$!"
 		fi
 
-		WaitForTaskCompletion "$initiatorPid;$targetPid" $SOFT_MAX_EXEC_TIME $HARD_MAX_EXEC_TIME ${FUNCNAME[0]} false $KEEP_LOGGING
+		WaitForTaskCompletion "$initiatorPid;$targetPid" $SOFT_MAX_EXEC_TIME $HARD_MAX_EXEC_TIME $SLEEP_TIME $KEEP_LOGGING false true false ${FUNCNAME[0]}
 		if [ $? != 0 ]; then
 			IFS=';' read -r -a pidArray <<< "$WAIT_FOR_TASK_COMPLETION"
 			initiatorFail=false
@@ -1751,7 +1751,7 @@ function SoftDelete {
 			_SoftDeleteRemote "${TARGET[$__type]}" "${TARGET[$__replicaDir]}${TARGET[$__backupDir]}" $CONFLICT_BACKUP_DAYS "conflict backup" &
 			pids="$pids;$!"
 		fi
-		WaitForTaskCompletion $pids 720 1800 ${FUNCNAME[0]} true $KEEP_LOGGING
+		WaitForTaskCompletion $pids 720 1800 $SLEEP_TIME $KEEP_LOGGING true true false ${FUNCNAME[0]}
 	fi
 
 	if [ "$SOFT_DELETE" != "no" ] && [ $SOFT_DELETE_DAYS -ne 0 ]; then
@@ -1766,7 +1766,7 @@ function SoftDelete {
 			_SoftDeleteRemote "${TARGET[$__type]}" "${TARGET[$__replicaDir]}${TARGET[$__deleteDir]}" $SOFT_DELETE_DAYS "softdelete" &
 			pids="$pids;$!"
 		fi
-		WaitForTaskCompletion $pids 720 1800 ${FUNCNAME[0]} true $KEEP_LOGGING
+		WaitForTaskCompletion $pids 720 1800 $SLEEP_TIME $KEEP_LOGGING true true false ${FUNCNAME[0]}
 	fi
 }
 
@@ -2085,7 +2085,7 @@ function SyncOnChanges {
 		if [ "$LOCAL_OS" == "MacOSX" ]; then
 			fswatch --exclude $OSYNC_DIR $RSYNC_PATTERNS $RSYNC_PARTIAL_EXCLUDE -1 "$INITIATOR_SYNC_DIR" > /dev/null &
 			# Mac fswatch doesn't have timeout switch, replacing wait $! with WaitForTaskCompletion without warning nor spinner and increased SLEEP_TIME to avoid cpu hogging. This sims wait $! with timeout
-			WaitForTaskCompletion $! 0 $MAX_WAIT ${FUNCNAME[0]} true 0 true false 1
+			WaitForTaskCompletion $! 0 $MAX_WAIT 1 0 true false true ${FUNCNAME[0]}
 		else
 			inotifywait --exclude $OSYNC_DIR $RSYNC_PATTERNS $RSYNC_PARTIAL_EXCLUDE -qq -r -e create -e modify -e delete -e move -e attrib --timeout "$MAX_WAIT" "$INITIATOR_SYNC_DIR" &
 			wait $!
