@@ -154,14 +154,14 @@ DELTA_COPIES=yes
 ## ---------- ALERT OPTIONS
 
 ## List of alert mails separated by spaces
-## Most Unix systems have preconfigured mail support and don't need anything else than the destination mail
-## Just make sure that the current user has enough privileges to use mail / mutt / sendmail
+## Most Unix systems (including Win10 bash) have mail support out of the box
+## Just make sure that the current user has enough privileges to use mail / mutt / sendmail and that the mail system is configured to allow outgoing mails
 ## on pfSense platform, smtp support needs to be configured in System > Advanced > Notifications
 DESTINATION_MAILS="your@alert.tld"
 
-## Busybox / Windows specific (msys / cygwin environment) only mail options
+## Busybox / msys / cygwin environment only mail options
 ## Busybox relies on sendmail
-## Windows mail support relies on mailsend.exe from muquit, http://github.com/muquit/mailsend which needs to be in %PATH% environment variable
+## MSYS / Cygwin Windows mail support relies on mailsend.exe from muquit, http://github.com/muquit/mailsend which needs to be in %PATH% environment variable
 
 SENDER_MAIL="alert@your.system.tld"
 SMTP_SERVER=smtp.your.isp.tld
