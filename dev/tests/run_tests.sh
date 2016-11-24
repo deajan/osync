@@ -257,7 +257,7 @@ function setUp () {
 }
 
 # This test has to be done everytime in order for osync executable to be fresh
-function nope_test_Merge () {
+function test_Merge () {
 	cd "$DEV_DIR"
 	./merge.sh
 	assertEquals "Merging code" "0" $?
@@ -266,7 +266,7 @@ function nope_test_Merge () {
 	SetConfFileValue "$OSYNC_DIR/$OSYNC_EXECUTABLE" "IS_STABLE" "yes"
 }
 
-function nope_test_LargeFileSet () {
+function test_LargeFileSet () {
 	for i in "${osyncParameters[@]}"; do
 		cd "$OSYNC_DIR"
 
@@ -284,7 +284,7 @@ function nope_test_LargeFileSet () {
 	done
 }
 
-function nope_test_Exclusions () {
+function test_Exclusions () {
 	# Will sync except php files
 	# RSYNC_EXCLUDE_PATTERN="*.php" is set at runtime for quicksync and in config files for other runs
 
@@ -313,7 +313,7 @@ function nope_test_Exclusions () {
 	done
 }
 
-function nope_test_Deletetion () {
+function test_Deletetion () {
 	local iFile1="$INITIATOR_DIR/ific"
 	local iFile2="$INITIATOR_DIR/ifoc"
 	local tFile1="$TARGET_DIR/tfic"
@@ -357,7 +357,7 @@ function nope_test_Deletetion () {
 	done
 }
 
-function nope_test_deletion_failure () {
+function test_deletion_failure () {
 	if [ "$LOCAL_OS" == "WinNT10" ]; then
 		echo "Skipping deletion failure test as Win10 does not have chattr  support."
 		return 0
@@ -423,7 +423,7 @@ function nope_test_deletion_failure () {
 	done
 }
 
-function nope_test_skip_deletion () {
+function test_skip_deletion () {
 	local modes
 
 	if [ "$OSYNC_MIN_VERSION" == "1" ]; then
@@ -494,7 +494,7 @@ function nope_test_skip_deletion () {
 	SetConfFileValue "$CONF_DIR/$REMOTE_CONF" "SKIP_DELETION" ""
 }
 
-function nope_test_softdeletion_cleanup () {
+function test_softdeletion_cleanup () {
 	#declare -A files
 
 	files=()
@@ -550,7 +550,7 @@ function nope_test_softdeletion_cleanup () {
 
 }
 
-function nope_test_FileAttributePropagation () {
+function test_FileAttributePropagation () {
 
 	if [ "$TRAVIS_RUN" == true ]; then
 		echo "Skipping FileAttributePropagation tests as travis does not support getfacl / setfacl."
@@ -628,7 +628,7 @@ function nope_test_FileAttributePropagation () {
 	done
 }
 
-function nope_test_ConflictBackups () {
+function test_ConflictBackups () {
 	for i in "${osyncParameters[@]}"; do
 		cd "$OSYNC_DIR"
 		PrepareLocalDirs
@@ -664,7 +664,7 @@ function nope_test_ConflictBackups () {
 	done
 }
 
-function nope_test_MultipleConflictBackups () {
+function test_MultipleConflictBackups () {
 
 	local additionalParameters
 
@@ -724,7 +724,7 @@ function nope_test_MultipleConflictBackups () {
 	SetConfFileValue "$CONF_DIR/$REMOTE_CONF" "CONFLICT_BACKUP_MULTIPLE" "no"
 }
 
-function nope_test_Locking () {
+function test_Locking () {
 	local forceStrangerUnlockLocal
 	local forceStrangerUnlockRemote
 
@@ -954,7 +954,7 @@ function test_ParallelExec () {
 #
 #}
 
-function nope_test_UpgradeConfRun () {
+function test_UpgradeConfRun () {
 	if [ "$OSYNC_MIN_VERSION" == "1" ]; then
 		echo "Skipping Upgrade script test because no further dev will happen on this for v1.1"
 		return 0
@@ -976,7 +976,7 @@ function nope_test_UpgradeConfRun () {
         rm -f "$CONF_DIR/$TMP_OLD_CONF.save"
 }
 
-function nope_test_DaemonMode () {
+function test_DaemonMode () {
 	if [ "$LOCAL_OS" == "WinNT10" ] || [ "$LOCAL_OS" == "msys" ]; then
 		echo "Skipping daemon mode test as Win10 does not have inotifywait support."
 		return 0
@@ -1031,7 +1031,7 @@ function nope_test_DaemonMode () {
 
 }
 
-function nope_test_NoRemoteAccessTest () {
+function test_NoRemoteAccessTest () {
 	RemoveSSH
 
         cd "$OSYNC_DIR"
