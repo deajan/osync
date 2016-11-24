@@ -15,6 +15,19 @@
 ## Logger sets {ERROR|WARN}_ALERT variable when called with critical / error / warn loglevel
 ## When called from subprocesses, variable of main process can't be set. Status needs to be get via $RUN_DIR/$PROGRAM.Logger.{error|warn}.$SCRIPT_PID
 
+
+
+
+
+
+## META ISSUES
+##
+## Updated _LOGGER_STDERR
+## Updated WaitForTaskCompletion syntax
+## Updated ParallelExec syntax
+## SendEmail WinNT10 & msys are two totally different beasts. Document in sync.conf and host_backup.conf
+
+
 if ! type "$BASH" > /dev/null; then
 	echo "Please run this script only with bash shell. Tested on bash >= 3.2"
 	exit 127
@@ -233,7 +246,7 @@ function KillChilds {
 		done
 	fi
 		# Try to kill nicely, if not, wait 15 seconds to let Trap actions happen before killing
-	if ( [ "$self" == true ] && kill -0 $pid > /dev/null 2>&1); then
+	if ( [ "$self" == true ] && kill -0 "$pid" > /dev/null 2>&1); then
 		Logger "Sending SIGTERM to process [$pid]." "DEBUG"
 		kill -s TERM "$pid"
 		if [ $? != 0 ]; then
@@ -575,7 +588,7 @@ function WaitForTaskCompletion {
 	local softMaxTime="${2:-0}"	# If process(es) with pid(s) $pids take longer than $softMaxTime seconds, will log a warning, unless $softMaxTime equals 0.
 	local hardMaxTime="${3:-0}"	# If process(es) with pid(s) $pids take longer than $hardMaxTime seconds, will stop execution, unless $hardMaxTime equals 0.
 	local sleepTime="${4:-.05}"	# Seconds between each state check, the shorter this value, the snappier it will be, but as a tradeoff cpu power will be used (general values between .05 and 1).
-	local keepLogging="${5:-0}"	# Every keepLogging seconds, an 'alive' log message is send. Setting this value to zero disables any alive logging.
+	local keepLogging="${5:-0}"	# Every keepLogging seconds, an alive log message is send. Setting this value to zero disables any alive logging.
 	local counting="${6:-true}"	# Count time since function has been launched (true), or since script has been launched (false)
 	local spinner="${7:-true}"	# Show spinner (true), don't show anything (false)
 	local noError="${8:-false}"	# Log errors when reaching soft / hard max time (false), don't log errors on those triggers (true)
@@ -629,7 +642,7 @@ function WaitForTaskCompletion {
 		fi
 
 		if [ $exec_time -gt $softMaxTime ]; then
-			if [ $soft_alert == true ] && [ $softMaxTime -ne 0 ] && [ $noError != true ]; then
+			if [ $soft_alert != true ] && [ $softMaxTime -ne 0 ] && [ $noError != true ]; then
 				Logger "Max soft execution time exceeded for task [$callerName] with pids [$(joinString , ${pidsArray[@]})]." "WARN"
 				soft_alert=true
 				SendAlert true
@@ -701,24 +714,28 @@ function WaitForTaskCompletion {
 # Take a list of commands to run, runs them sequentially with numberOfProcesses commands simultaneously runs
 # Returns the number of non zero exit codes from commands
 # Use cmd1;cmd2;cmd3 syntax for small sets, use file for large command sets
+# Only 2 first arguments are mandatory
 
-#TODO: function ParallelExec $numberOfProcesses $commandsArg $readFromFile $softTime $HardTime $sleepTime $keepLogging $counting $Spinner $noError $callerName
-
-#WIP
 function ParallelExec {
 	local numberOfProcesses="${1}" 		# Number of simultaneous commands to run
 	local commandsArg="${2}" 		# Semi-colon separated list of commands, or path to file containing one command per line
 	local readFromFile="${3:-false}" 	# commandsArg is a file (true), or a string (false)
-	local softMaxTime="${4:-0}"		#
-	local hardMaxTime="${5:-0}"
-	local sleepTime="${6:-.05}"
-	local keepLogging="${7:-0}"
+	local softMaxTime="${4:-0}"		# If process(es) with pid(s) $pids take longer than $softMaxTime seconds, will log a warning, unless $softMaxTime equals 0.
+	local hardMaxTime="${5:-0}"		# If process(es) with pid(s) $pids take longer than $hardMaxTime seconds, will stop execution, unless $hardMaxTime equals 0.
+	local sleepTime="${6:-.05}"		# Seconds between each state check, the shorter this value, the snappier it will be, but as a tradeoff cpu power will be used (general values between .05 and 1).
+	local keepLogging="${7:-0}"		# Every keepLogging seconds, an alive log message is send. Setting this value to zero disables any alive logging.
 	local counting="${8:-true}"		# Count time since function has been launched (true), or since script has been launched (false)
 	local spinner="${9:-false}"		# Show spinner (true), don't show spinner (false)
-	local noError="${10:-false}"
-	local callerName="${11}"
+	local noError="${10:-false}"		# Log errors when reaching soft / hard max time (false), don't log errors on those triggers (true)
+	local callerName="${11:-false}"		# Name of the function who called this function for debugging purposes, generally ${FUNCNAME[0]}
 
-	__CheckArguments 8 $# ${FUNCNAME[0]} "$@"				#__WITH_PARANOIA_DEBUG
+	__CheckArguments 2-11 $# ${FUNCNAME[0]} "$@"				#__WITH_PARANOIA_DEBUG
+
+	local soft_alert=false # Does a soft alert need to be triggered, if yes, send an alert once
+	local log_ttime=0 # local time instance for comparaison
+
+	local seconds_begin=$SECONDS # Seconds since the beginning of the script
+	local exec_time=0 # Seconds since the beginning of this function
 
 	local commandCount
 	local command
@@ -753,6 +770,48 @@ function ParallelExec {
 			Spinner
 		fi
 
+		if [ $counting == true ]; then
+			exec_time=$(($SECONDS - $seconds_begin))
+		else
+			exec_time=$SECONDS
+		fi
+
+		if [ $keepLogging -ne 0 ]; then
+			if [ $((($exec_time + 1) % $keepLogging)) -eq 0 ]; then
+				if [ $log_ttime -ne $exec_time ]; then # Fix when sleep time lower than 1s
+					log_ttime=$exec_time
+					Logger "Current tasks still running with pids [$(joinString , ${pidsArray[@]})]." "NOTICE"
+				fi
+			fi
+		fi
+
+		if [ $exec_time -gt $softMaxTime ]; then
+			if [ $soft_alert != true ] && [ $softMaxTime -ne 0 ] && [ $noError != true ]; then
+				Logger "Max soft execution time exceeded for task [$callerName] with pids [$(joinString , ${pidsArray[@]})]." "WARN"
+				soft_alert=true
+				SendAlert true
+
+			fi
+			if [ $exec_time -gt $hardMaxTime ] && [ $hardMaxTime -ne 0 ]; then
+				if [ $noError != true ]; then
+					Logger "Max hard execution time exceeded for task [$callerName] with pids [$(joinString , ${pidsArray[@]})]. Stopping task execution." "ERROR"
+				fi
+				for pid in "${pidsArray[@]}"; do
+					KillChilds $pid true
+					if [ $? == 0 ]; then
+						Logger "Task with pid [$pid] stopped successfully." "NOTICE"
+					else
+						Logger "Could not stop task with pid [$pid]." "ERROR"
+					fi
+				done
+				if [ $noError != true ]; then
+					SendAlert true
+				fi
+				# Return the number of commands that haven't run / finished run
+				return $(($commandCount - $counter + ${#pidsArray[@]}))
+			fi
+		fi
+
 		while [ $counter -lt "$commandCount" ] && [ ${#pidsArray[@]} -lt $numberOfProcesses ]; do
 			if [ $readFromFile == true ]; then
 				command=$(awk 'NR == num_line {print; exit}' num_line=$((counter+1)) "$commandsArg")
@@ -760,7 +819,7 @@ function ParallelExec {
 				command="${commandsArray[$counter]}"
 			fi
 			Logger "Running command [$command]." "DEBUG"
-			eval "$command" > "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$SCRIPT_PID" 2>&1 &
+			eval "$command" >> "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$callerName.$SCRIPT_PID" 2>&1 &
 			pid=$!
 			pidsArray+=($pid)
 			commandsArrayPid[$pid]="$command"
