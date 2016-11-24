@@ -3,7 +3,7 @@ SUBPROGRAM=[prgname]
 PROGRAM="$SUBPROGRAM-batch" # Batch program to run osync / obackup instances sequentially and rerun failed ones
 AUTHOR="(L) 2013-2016 by Orsiris de Jong"
 CONTACT="http://www.netpower.fr - ozy@netpower.fr"
-PROGRAM_BUILD=2016112401
+PROGRAM_BUILD=2016112402
 
 ## Runs an osync /obackup instance for every conf file found
 ## If an instance fails, run it again if time permits
@@ -12,9 +12,6 @@ if ! type "$BASH" > /dev/null; then
         echo "Please run this script only with bash shell. Tested on bash >= 3.2"
         exit 127
 fi
-
-## Configuration file path. The path where all the osync / obackup conf files are, usually /etc/osync or /etc/obackup
-CONF_FILE_PATH=/etc/$SUBPROGRAM
 
 ## If maximum execution time is not reached, failed instances will be rerun. Max exec time is in seconds. Example is set to 10 hours.
 MAX_EXECUTION_TIME=36000
@@ -74,6 +71,10 @@ function CheckEnvironment {
 	else
 		SUBPROGRAM_EXECUTABLE=$(type -p $SUBPROGRAM.sh)
 	fi
+
+	if [ "$CONF_FILE_PATH" == "" ]; then
+		Usage
+	fi
 }
 
 function Batch {
@@ -111,7 +112,7 @@ function Batch {
 		Logger "$SUBPROGRAM instances will be run for: $runList" "NOTICE"
 		for confFile in $runList
 		do
-			$SUBPROGRAM_EXECUTABLE "$confFile" $opts &
+			$SUBPROGRAM_EXECUTABLE "$confFile" --silent $opts &
 			wait $!
 			result=$?
 			if [ $result != 0 ]; then
@@ -150,6 +151,9 @@ function Usage {
 	echo "[$SUBPROGRAM OPTIONS]"
 	echo "Specify whatever options $PROGRAM accepts. Example"
 	echo "$PROGRAM.sh --path=/etc/$SUBPROGRAM --no-maxtime"
+	echo ""
+	echo "No output will be written to stdout/stderr."
+	echo "Verify log file in [$LOG_FILE]."
 	exit 128
 }
 
