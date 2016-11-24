@@ -4,7 +4,7 @@ PROGRAM=[prgname]
 PROGRAM_VERSION=[version]
 PROGRAM_BINARY=$PROGRAM".sh"
 PROGRAM_BATCH=$PROGRAM"-batch.sh"
-SCRIPT_BUILD=2016111201
+SCRIPT_BUILD=2016112401
 
 ## osync / obackup / pmocr / zsnap install script
 ## Tested on RHEL / CentOS 6 & 7, Fedora 23, Debian 7 & 8, Mint 17 and FreeBSD 8 & 10
@@ -79,24 +79,29 @@ function urlencode() {
 }
 
 function SetOSSettings {
+	local localOsVar
+
 	USER=root
 
-	if  type busybox > /dev/null 2>&1; then
-		QuickLogger "$0 won't work in busybox. Please use $PROGRAM_BINARY.sh directly."
-		exit 1
-	fi
+        # There's no good way to tell if currently running in BusyBox shell. Using sluggish way.
+        if ls --help 2>&1 | grep -i "BusyBox" > /dev/null; then
+                localOsVar="BusyBox"
+        else
+                # Detecting the special ubuntu userland in Windows 10 bash
+                if grep -i Microsoft /proc/sys/kernel/osrelease > /dev/null 2>&1; then
+                        localOsVar="Microsoft"
+                else
+                        localOsVar="$(uname -spio 2>&1)"
+                        if [ $? != 0 ]; then
+                                localOsVar="$(uname -v 2>&1)"
+                                if [ $? != 0 ]; then
+                                        localOsVar="$(uname)"
+                                fi
+                        fi
+                fi
+        fi
 
-	local local_os_var
-
-	local_os_var="$(uname -spio 2>&1)"
-	if [ $? != 0 ]; then
-		local_os_var="$(uname -v 2>&1)"
-		if [ $? != 0 ]; then
-			local_os_var="$(uname)"
-		fi
-	fi
-
-	case $local_os_var in
+	case $localOsVar in
 		*"BSD"*)
 		GROUP=wheel
 		;;
@@ -117,7 +122,7 @@ function SetOSSettings {
 		exit 1
 	fi
 
-	OS=$(urlencode "$local_os_var")
+	OS=$(urlencode "$localOsVar")
 }
 
 function GetInit {
