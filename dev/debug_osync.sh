@@ -4,7 +4,7 @@ PROGRAM="osync" # Rsync based two way sync engine with fault tolerance
 AUTHOR="(C) 2013-2016 by Orsiris de Jong"
 CONTACT="http://www.netpower.fr/osync - ozy@netpower.fr"
 PROGRAM_VERSION=1.2-beta3
-PROGRAM_BUILD=2016111902
+PROGRAM_BUILD=2016112401
 IS_STABLE=no
 
 # Execution order						#__WITH_PARANOIA_DEBUG
@@ -45,7 +45,7 @@ IS_STABLE=no
 
 #### MINIMAL-FUNCTION-SET BEGIN ####
 
-## FUNC_BUILD=2016111901
+## FUNC_BUILD=2016112401
 ## BEGIN Generic bash functions written in 2013-2016 by Orsiris de Jong - http://www.netpower.fr - ozy@netpower.fr
 
 ## To use in a program, define the following variables:
@@ -60,8 +60,18 @@ IS_STABLE=no
 ## Logger sets {ERROR|WARN}_ALERT variable when called with critical / error / warn loglevel
 ## When called from subprocesses, variable of main process can't be set. Status needs to be get via $RUN_DIR/$PROGRAM.Logger.{error|warn}.$SCRIPT_PID
 
-#TODO: Rewrite Logger so we can decide what to send to stdout, stderr and logfile
-#TODO: Windows checks, check sendmail & mailsend
+
+
+
+
+
+## META ISSUES
+##
+## Updated _LOGGER_STDERR
+## Updated WaitForTaskCompletion syntax
+## Updated ParallelExec syntax
+## SendEmail WinNT10 & msys are two totally different beasts. Document in sync.conf and host_backup.conf
+
 
 if ! type "$BASH" > /dev/null; then
 	echo "Please run this script only with bash shell. Tested on bash >= 3.2"
@@ -96,10 +106,10 @@ fi						#__WITH_PARANOIA_DEBUG
 ## allow debugging from command line with _DEBUG=yes
 if [ ! "$_DEBUG" == "yes" ]; then
 	_DEBUG=no
-	SLEEP_TIME=.05 # Tested under linux and FreeBSD bash, #TODO tests on cygwin / msys
+	SLEEP_TIME=.05
 	_LOGGER_VERBOSE=false
 else
-	if [ "$SLEEP_TIME" == "" ]; then # Set SLEEP_TIME as environment variable when runinng with bash -x in order to avoid spamming console
+	if [ "$SLEEP_TIME" == "" ]; then # Leave the possibity to set SLEEP_TIME as environment variable when runinng with bash -x in order to avoid spamming console
 		SLEEP_TIME=.05
 	fi
 	trap 'TrapError ${LINENO} $?' ERR
@@ -281,7 +291,7 @@ function KillChilds {
 		done
 	fi
 		# Try to kill nicely, if not, wait 15 seconds to let Trap actions happen before killing
-	if ( [ "$self" == true ] && kill -0 $pid > /dev/null 2>&1); then
+	if ( [ "$self" == true ] && kill -0 "$pid" > /dev/null 2>&1); then
 		Logger "Sending SIGTERM to process [$pid]." "DEBUG"
 		kill -s TERM "$pid"
 		if [ $? != 0 ]; then
@@ -455,13 +465,18 @@ function SendEmail {
 	fi
 
 	if type mail > /dev/null 2>&1 ; then
-		if [ "$mail_no_attachment" -eq 0 ] && $(type -p mail) -V | grep "GNU" > /dev/null; then
+		# We need to detect which version of mail is installed
+		if ! $(type -p mail) -V > /dev/null 2>&1; then
+			# This may be MacOS mail program
+			attachment_command=""
+		elif [ "$mail_no_attachment" -eq 0 ] && $(type -p mail) -V | grep "GNU" > /dev/null; then
 			attachment_command="-A $attachment"
 		elif [ "$mail_no_attachment" -eq 0 ] && $(type -p mail) -V > /dev/null; then
 			attachment_command="-a$attachment"
 		else
 			attachment_command=""
 		fi
+
 		echo "$message" | $(type -p mail) $attachment_command -s "$subject" "$destinationMails"
 		if [ $? != 0 ]; then
 			Logger "Cannot send mail via $(type -p mail) with attachments !!!" "WARN"
@@ -573,30 +588,30 @@ function Spinner {
 		return 0
 	fi
 
-	case $toggle
+	case $_OFUNCTIONS_SPINNER_TOGGLE
 	in
 	1)
 	echo -n " \ "
 	echo -ne "\r"
-	toggle="2"
+	_OFUNCTIONS_SPINNER_TOGGLE=2
 	;;
 
 	2)
 	echo -n " | "
 	echo -ne "\r"
-	toggle="3"
+	_OFUNCTIONS_SPINNER_TOGGLE=3
 	;;
 
 	3)
 	echo -n " / "
 	echo -ne "\r"
-	toggle="4"
+	_OFUNCTIONS_SPINNER_TOGGLE=4
 	;;
 
 	*)
 	echo -n " - "
 	echo -ne "\r"
-	toggle="1"
+	_OFUNCTIONS_SPINNER_TOGGLE=1
 	;;
 	esac
 }
@@ -611,16 +626,21 @@ function joinString {
 # Fills a global variable called WAIT_FOR_TASK_COMPLETION that contains list of failed pids in format pid1:result1;pid2:result2
 # Warning: Don't imbricate this function into another run if you plan to use the global variable output
 
+# Standard wait $! emulation would be WaitForTaskCompletion $! 0 0 1 0 true false true "${FUNCNAME[0]}"
+
 function WaitForTaskCompletion {
 	local pids="${1}" # pids to wait for, separated by semi-colon
-	local softMaxTime="${2}" # If program with pid $pid takes longer than $softMaxTime seconds, will log a warning, unless $softMaxTime equals 0.
-	local hardMaxTime="${3}" # If program with pid $pid takes longer than $hardMaxTime seconds, will stop execution, unless $hardMaxTime equals 0.
-	local callerName="${4}" # Who called this function
-	local counting="${5:-true}" # Count time since function has been launched if true, since script has been launched if false
-	local keepLogging="${6:-0}" # Log a standby message every X seconds. Set to zero to disable logging
+	local softMaxTime="${2:-0}"	# If process(es) with pid(s) $pids take longer than $softMaxTime seconds, will log a warning, unless $softMaxTime equals 0.
+	local hardMaxTime="${3:-0}"	# If process(es) with pid(s) $pids take longer than $hardMaxTime seconds, will stop execution, unless $hardMaxTime equals 0.
+	local sleepTime="${4:-.05}"	# Seconds between each state check, the shorter this value, the snappier it will be, but as a tradeoff cpu power will be used (general values between .05 and 1).
+	local keepLogging="${5:-0}"	# Every keepLogging seconds, an alive log message is send. Setting this value to zero disables any alive logging.
+	local counting="${6:-true}"	# Count time since function has been launched (true), or since script has been launched (false)
+	local spinner="${7:-true}"	# Show spinner (true), don't show anything (false)
+	local noError="${8:-false}"	# Log errors when reaching soft / hard max time (false), don't log errors on those triggers (true)
+	local callerName="${9}"		# Name of the function who called this function for debugging purposes, generally ${FUNCNAME[0]}
 
 	Logger "${FUNCNAME[0]} called by [$callerName]." "PARANOIA_DEBUG"	#__WITH_PARANOIA_DEBUG
-	__CheckArguments 6 $# ${FUNCNAME[0]} "$@"				#__WITH_PARANOIA_DEBUG
+	__CheckArguments 9 $# ${FUNCNAME[0]} "$@"				#__WITH_PARANOIA_DEBUG
 
 	local soft_alert=false # Does a soft alert need to be triggered, if yes, send an alert once
 	local log_ttime=0 # local time instance for comparaison
@@ -648,7 +668,9 @@ function WaitForTaskCompletion {
 	while [ ${#pidsArray[@]} -gt 0 ]; do
 		newPidsArray=()
 
-		Spinner
+		if [ $spinner == true ]; then
+			Spinner
+		fi
 		if [ $counting == true ]; then
 			exec_time=$(($SECONDS - $seconds_begin))
 		else
@@ -665,14 +687,16 @@ function WaitForTaskCompletion {
 		fi
 
 		if [ $exec_time -gt $softMaxTime ]; then
-			if [ $soft_alert == true ] && [ $softMaxTime -ne 0 ]; then
+			if [ $soft_alert != true ] && [ $softMaxTime -ne 0 ] && [ $noError != true ]; then
 				Logger "Max soft execution time exceeded for task [$callerName] with pids [$(joinString , ${pidsArray[@]})]." "WARN"
 				soft_alert=true
 				SendAlert true
 
 			fi
 			if [ $exec_time -gt $hardMaxTime ] && [ $hardMaxTime -ne 0 ]; then
-				Logger "Max hard execution time exceeded for task [$callerName] with pids [$(joinString , ${pidsArray[@]})]. Stopping task execution." "ERROR"
+				if [ $noError != true ]; then
+					Logger "Max hard execution time exceeded for task [$callerName] with pids [$(joinString , ${pidsArray[@]})]. Stopping task execution." "ERROR"
+				fi
 				for pid in "${pidsArray[@]}"; do
 					KillChilds $pid true
 					if [ $? == 0 ]; then
@@ -681,7 +705,9 @@ function WaitForTaskCompletion {
 						Logger "Could not stop task with pid [$pid]." "ERROR"
 					fi
 				done
-				SendAlert true
+				if [ $noError != true ]; then
+					SendAlert true
+				fi
 			fi
 		fi
 
@@ -717,7 +743,7 @@ function WaitForTaskCompletion {
 
 		pidsArray=("${newPidsArray[@]}")
 		# Trivial wait time for bash to not eat up all CPU
-		sleep $SLEEP_TIME
+		sleep $sleepTime
 	done
 
 	Logger "${FUNCNAME[0]} ended for [$callerName] using [$pidCount] subprocesses with [$errorcount] errors." "PARANOIA_DEBUG"	#__WITH_PARANOIA_DEBUG
@@ -733,17 +759,28 @@ function WaitForTaskCompletion {
 # Take a list of commands to run, runs them sequentially with numberOfProcesses commands simultaneously runs
 # Returns the number of non zero exit codes from commands
 # Use cmd1;cmd2;cmd3 syntax for small sets, use file for large command sets
-function ParallelExec {
-	local numberOfProcesses="${1}" # Number of simultaneous commands to run
-	local commandsArg="${2}" # Semi-colon separated list of commands, or file containing one command per line
-	local readFromFile="${3:-false}" # Is commandsArg a file or a string ?
-	local softMaxTime="${4:-0}"
-	local hardMaxTime="${5:-0}"
-	local callerName="${6}" # Who called this function
-	local counting="${7:-true}" # Count time since function has been launched if true, since script has been launched if false
-	local keepLogging="${8:-0}" # Log a standby message every X seconds. Set to zero to disable logging
+# Only 2 first arguments are mandatory
 
-	__CheckArguments 8 $# ${FUNCNAME[0]} "$@"				#__WITH_PARANOIA_DEBUG
+function ParallelExec {
+	local numberOfProcesses="${1}" 		# Number of simultaneous commands to run
+	local commandsArg="${2}" 		# Semi-colon separated list of commands, or path to file containing one command per line
+	local readFromFile="${3:-false}" 	# commandsArg is a file (true), or a string (false)
+	local softMaxTime="${4:-0}"		# If process(es) with pid(s) $pids take longer than $softMaxTime seconds, will log a warning, unless $softMaxTime equals 0.
+	local hardMaxTime="${5:-0}"		# If process(es) with pid(s) $pids take longer than $hardMaxTime seconds, will stop execution, unless $hardMaxTime equals 0.
+	local sleepTime="${6:-.05}"		# Seconds between each state check, the shorter this value, the snappier it will be, but as a tradeoff cpu power will be used (general values between .05 and 1).
+	local keepLogging="${7:-0}"		# Every keepLogging seconds, an alive log message is send. Setting this value to zero disables any alive logging.
+	local counting="${8:-true}"		# Count time since function has been launched (true), or since script has been launched (false)
+	local spinner="${9:-false}"		# Show spinner (true), don't show spinner (false)
+	local noError="${10:-false}"		# Log errors when reaching soft / hard max time (false), don't log errors on those triggers (true)
+	local callerName="${11:-false}"		# Name of the function who called this function for debugging purposes, generally ${FUNCNAME[0]}
+
+	__CheckArguments 2-11 $# ${FUNCNAME[0]} "$@"				#__WITH_PARANOIA_DEBUG
+
+	local soft_alert=false # Does a soft alert need to be triggered, if yes, send an alert once
+	local log_ttime=0 # local time instance for comparaison
+
+	local seconds_begin=$SECONDS # Seconds since the beginning of the script
+	local exec_time=0 # Seconds since the beginning of this function
 
 	local commandCount
 	local command
@@ -774,15 +811,60 @@ function ParallelExec {
 
 	while [ $counter -lt "$commandCount" ] || [ ${#pidsArray[@]} -gt 0 ]; do
 
+		if [ $spinner == true ]; then
+			Spinner
+		fi
+
+		if [ $counting == true ]; then
+			exec_time=$(($SECONDS - $seconds_begin))
+		else
+			exec_time=$SECONDS
+		fi
+
+		if [ $keepLogging -ne 0 ]; then
+			if [ $((($exec_time + 1) % $keepLogging)) -eq 0 ]; then
+				if [ $log_ttime -ne $exec_time ]; then # Fix when sleep time lower than 1s
+					log_ttime=$exec_time
+					Logger "Current tasks still running with pids [$(joinString , ${pidsArray[@]})]." "NOTICE"
+				fi
+			fi
+		fi
+
+		if [ $exec_time -gt $softMaxTime ]; then
+			if [ $soft_alert != true ] && [ $softMaxTime -ne 0 ] && [ $noError != true ]; then
+				Logger "Max soft execution time exceeded for task [$callerName] with pids [$(joinString , ${pidsArray[@]})]." "WARN"
+				soft_alert=true
+				SendAlert true
+
+			fi
+			if [ $exec_time -gt $hardMaxTime ] && [ $hardMaxTime -ne 0 ]; then
+				if [ $noError != true ]; then
+					Logger "Max hard execution time exceeded for task [$callerName] with pids [$(joinString , ${pidsArray[@]})]. Stopping task execution." "ERROR"
+				fi
+				for pid in "${pidsArray[@]}"; do
+					KillChilds $pid true
+					if [ $? == 0 ]; then
+						Logger "Task with pid [$pid] stopped successfully." "NOTICE"
+					else
+						Logger "Could not stop task with pid [$pid]." "ERROR"
+					fi
+				done
+				if [ $noError != true ]; then
+					SendAlert true
+				fi
+				# Return the number of commands that haven't run / finished run
+				return $(($commandCount - $counter + ${#pidsArray[@]}))
+			fi
+		fi
+
 		while [ $counter -lt "$commandCount" ] && [ ${#pidsArray[@]} -lt $numberOfProcesses ]; do
 			if [ $readFromFile == true ]; then
-				#TODO: Checked on FreeBSD 10, also check on Win
 				command=$(awk 'NR == num_line {print; exit}' num_line=$((counter+1)) "$commandsArg")
 			else
 				command="${commandsArray[$counter]}"
 			fi
 			Logger "Running command [$command]." "DEBUG"
-			eval "$command" > "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$SCRIPT_PID" 2>&1 &
+			eval "$command" >> "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$callerName.$SCRIPT_PID" 2>&1 &
 			pid=$!
 			pidsArray+=($pid)
 			commandsArrayPid[$pid]="$command"
@@ -983,11 +1065,16 @@ function GetLocalOS {
 	if ls --help 2>&1 | grep -i "BusyBox" > /dev/null; then
 		localOsVar="BusyBox"
 	else
-		localOsVar="$(uname -spio 2>&1)"
-		if [ $? != 0 ]; then
-			localOsVar="$(uname -v 2>&1)"
+		# Detecting the special ubuntu userland in Windows 10 bash
+		if grep -i Microsoft /proc/sys/kernel/osrelease > /dev/null 2>&1; then
+			localOsVar="Microsoft"
+		else
+			localOsVar="$(uname -spio 2>&1)"
 			if [ $? != 0 ]; then
-				localOsVar="$(uname)"
+				localOsVar="$(uname -v 2>&1)"
+				if [ $? != 0 ]; then
+					localOsVar="$(uname)"
+				fi
 			fi
 		fi
 	fi
@@ -1005,6 +1092,9 @@ function GetLocalOS {
 		;;
 		*"MINGW32"*|*"CYGWIN"*)
 		LOCAL_OS="msys"
+		;;
+		*"Microsoft"*)
+		LOCAL_OS="WinNT10"
 		;;
 		*"Darwin"*)
 		LOCAL_OS="MacOSX"
@@ -1044,15 +1134,19 @@ function GetOs {
 	if ls --help 2>&1 | grep -i "BusyBox" > /dev/null; then
 		localOsVar="BusyBox"
 	else
-		localOsVar="$(uname -spio 2>&1)"
-		if [ $? != 0 ]; then
-			localOsVar="$(uname -v 2>&1)"
+		# Detecting the special ubuntu userland in Windows 10 bash
+		if grep -i Microsoft /proc/sys/kernel/osrelease > /dev/null 2>&1; then
+			localOsVar="Microsoft"
+		else
+			localOsVar="$(uname -spio 2>&1)"
 			if [ $? != 0 ]; then
-				localOsVar="$(uname)"
+				localOsVar="$(uname -v 2>&1)"
+				if [ $? != 0 ]; then
+					localOsVar="$(uname)"
+				fi
 			fi
 		fi
 	fi
-
 	echo "$localOsVar"
 }
 
@@ -1074,6 +1168,9 @@ ENDSSH
 			;;
 			*"MINGW32"*|*"CYGWIN"*)
 			REMOTE_OS="msys"
+			;;
+			*"Microsoft"*)
+			REMOTE_OS="WinNT10"
 			;;
 			*"Darwin"*)
 			REMOTE_OS="MacOSX"
@@ -1112,7 +1209,8 @@ function RunLocalCommand {
 
 	Logger "Running command [$command] on local host." "NOTICE"
 	eval "$command" > "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$SCRIPT_PID" 2>&1 &
-	WaitForTaskCompletion $! 0 $hardMaxTime ${FUNCNAME[0]} true $KEEP_LOGGING
+
+	WaitForTaskCompletion $! 0 $hardMaxTime $SLEEP_TIME $KEEP_LOGGING true true false ${FUNCNAME[0]}
 	retval=$?
 	if [ $retval -eq 0 ]; then
 		Logger "Command succeded." "NOTICE"
@@ -1147,7 +1245,7 @@ function RunRemoteCommand {
 	cmd=$SSH_CMD' "$command" > "'$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$SCRIPT_PID'" 2>&1'
 	Logger "cmd: $cmd" "DEBUG"
 	eval "$cmd" &
-	WaitForTaskCompletion $! 0 $hardMaxTime ${FUNCNAME[0]} true $KEEP_LOGGING
+	WaitForTaskCompletion $! 0 $hardMaxTime $SLEEP_TIME $KEEP_LOGGING true true false ${FUNCNAME[0]}
 	retval=$?
 	if [ $retval -eq 0 ]; then
 		Logger "Command succeded." "NOTICE"
@@ -1181,7 +1279,7 @@ function RunBeforeHook {
 		pids="$pids;$!"
 	fi
 	if [ "$pids" != "" ]; then
-		WaitForTaskCompletion $pids 0 0 ${FUNCNAME[0]} true $KEEP_LOGGING
+		WaitForTaskCompletion $pids 0 0 $SLEEP_TIME $KEEP_LOGGING true true false ${FUNCNAME[0]}
 	fi
 }
 
@@ -1200,7 +1298,7 @@ function RunAfterHook {
 		pids="$pids;$!"
 	fi
 	if [ "$pids" != "" ]; then
-		WaitForTaskCompletion $pids 0 0 ${FUNCNAME[0]} true $KEEP_LOGGING
+		WaitForTaskCompletion $pids 0 0 $SLEEP_TIME $KEEP_LOGGING true true false ${FUNCNAME[0]}
 	fi
 }
 
@@ -1209,18 +1307,18 @@ function CheckConnectivityRemoteHost {
 
 	local retval
 
-	if [ "$_PARANOIA_DEBUG" != "yes" ]; then # Do not loose time in paranoia debug
+	if [ "$_PARANOIA_DEBUG" != "yes" ]; then # Do not loose time in paranoia debug		#__WITH_PARANOIA_DEBUG
 
 		if [ "$REMOTE_HOST_PING" != "no" ] && [ "$REMOTE_OPERATION" != "no" ]; then
 			eval "$PING_CMD $REMOTE_HOST > /dev/null 2>&1" &
-			WaitForTaskCompletion $! 60 180 ${FUNCNAME[0]} true $KEEP_LOGGING
+			WaitForTaskCompletion $! 60 180 $SLEEP_TIME $KEEP_LOGGING true true false ${FUNCNAME[0]}
 			retval=$?
 			if [ $retval != 0 ]; then
 				Logger "Cannot ping [$REMOTE_HOST]. Return code [$retval]." "WARN"
 				return $retval
 			fi
 		fi
-	fi
+	fi											#__WITH_PARANOIA_DEBUG
 }
 
 function CheckConnectivity3rdPartyHosts {
@@ -1229,14 +1327,14 @@ function CheckConnectivity3rdPartyHosts {
 	local remote3rdPartySuccess
 	local retval
 
-	if [ "$_PARANOIA_DEBUG" != "yes" ]; then # Do not loose time in paranoia debug
+	if [ "$_PARANOIA_DEBUG" != "yes" ]; then # Do not loose time in paranoia debug		#__WITH_PARANOIA_DEBUG
 
 		if [ "$REMOTE_3RD_PARTY_HOSTS" != "" ]; then
 			remote3rdPartySuccess=false
 			for i in $REMOTE_3RD_PARTY_HOSTS
 			do
 				eval "$PING_CMD $i > /dev/null 2>&1" &
-				WaitForTaskCompletion $! 180 360 ${FUNCNAME[0]} true $KEEP_LOGGING
+				WaitForTaskCompletion $! 180 360 $SLEEP_TIME $KEEP_LOGGING true true false ${FUNCNAME[0]}
 				retval=$?
 				if [ $retval != 0 ]; then
 					Logger "Cannot ping 3rd party host [$i]. Return code [$retval]." "NOTICE"
@@ -1252,7 +1350,7 @@ function CheckConnectivity3rdPartyHosts {
 				return 0
 			fi
 		fi
-	fi
+	fi											#__WITH_PARANOIA_DEBUG
 }
 
 #__BEGIN_WITH_PARANOIA_DEBUG
@@ -1426,66 +1524,12 @@ function PreInit {
 		COMMAND_SUDO=""
 	fi
 
-	 ## Set rsync default arguments
-	RSYNC_ARGS="-rltD"
-	if [ "$_DRYRUN" == true ]; then
-		RSYNC_DRY_ARG="-n"
-		DRY_WARNING="/!\ DRY RUN "
-	else
-		RSYNC_DRY_ARG=""
-	fi
-
-	RSYNC_ATTR_ARGS=""
-	if [ "$PRESERVE_PERMISSIONS" != "no" ]; then
-		RSYNC_ATTR_ARGS=$RSYNC_ATTR_ARGS" -p"
-	fi
-	if [ "$PRESERVE_OWNER" != "no" ]; then
-		RSYNC_ATTR_ARGS=$RSYNC_ATTR_ARGS" -o"
-	fi
-	if [ "$PRESERVE_GROUP" != "no" ]; then
-		RSYNC_ATTR_ARGS=$RSYNC_ATTR_ARGS" -g"
-	fi
-	if [ "$PRESERVE_ACL" == "yes" ]; then
-		RSYNC_ATTR_ARGS=$RSYNC_ATTR_ARGS" -A"
-	fi
-	if [ "$PRESERVE_XATTR" == "yes" ]; then
-		RSYNC_ATTR_ARGS=$RSYNC_ATTR_ARGS" -X"
-	fi
-	if [ "$RSYNC_COMPRESS" == "yes" ]; then
-		RSYNC_ARGS=$RSYNC_ARGS" -z"
-	fi
-	if [ "$COPY_SYMLINKS" == "yes" ]; then
-		RSYNC_ARGS=$RSYNC_ARGS" -L"
-	fi
-	if [ "$KEEP_DIRLINKS" == "yes" ]; then
-		RSYNC_ARGS=$RSYNC_ARGS" -K"
-	fi
-	if [ "$PRESERVE_HARDLINKS" == "yes" ]; then
-		RSYNC_ARGS=$RSYNC_ARGS" -H"
-	fi
-	if [ "$CHECKSUM" == "yes" ]; then
-		RSYNC_TYPE_ARGS=$RSYNC_TYPE_ARGS" --checksum"
-	fi
-	if [ "$BANDWIDTH" != "" ] && [ "$BANDWIDTH" != "0" ]; then
-		RSYNC_ARGS=$RSYNC_ARGS" --bwlimit=$BANDWIDTH"
-	fi
-
-	if [ "$PARTIAL" == "yes" ]; then
-		RSYNC_ARGS=$RSYNC_ARGS" --partial --partial-dir=\"$PARTIAL_DIR\""
-		RSYNC_PARTIAL_EXCLUDE="--exclude=\"$PARTIAL_DIR\""
-	fi
-
-	if [ "$DELTA_COPIES" != "no" ]; then
-		RSYNC_ARGS=$RSYNC_ARGS" --no-whole-file"
-	else
-		RSYNC_ARGS=$RSYNC_ARGS" --whole-file"
-	fi
-
-	 ## Set compression executable and extension
+	## Set compression executable and extension
 	if [ "$(IsInteger $COMPRESSION_LEVEL)" -eq 0 ]; then
 		COMPRESSION_LEVEL=3
 	fi
 
+	#TODO: Remote OS isn't defined yet
 	## Busybox fix (Termux xz command doesn't support compression at all)
 	if [ "$LOCAL_OS" == "BusyBox" ] || [ "$REMOTE_OS" == "Busybox" ] || [ "$LOCAL_OS" == "Android" ] || [ "$REMOTE_OS" == "Android" ]; then
 		compressionString=""
@@ -1564,7 +1608,7 @@ function InitLocalOSSettings {
 		PING_CMD="ping -c 2 -i .2"
 	fi
 
-	if [ "$LOCAL_OS" == "BusyBox" ] || [ "$LOCAL_OS" == "Android" ]; then
+	if [ "$LOCAL_OS" == "BusyBox" ] || [ "$LOCAL_OS" == "Android" ] || [ "$LOCAL_OS" == "msys" ]; then
 		PROCESS_STATE_CMD="echo none"
 		DF_CMD="df"
 	else
@@ -1579,7 +1623,7 @@ function InitLocalOSSettings {
 		STAT_CMD="stat -f \"%Sm\""
 		STAT_CTIME_MTIME_CMD="stat -f %N;%c;%m"
 	else
-		# Tested on GNU stat and busybox
+		# Tested on GNU stat, busybox and Cygwin
 		STAT_CMD="stat -c %y"
 		STAT_CTIME_MTIME_CMD="stat -c %n;%Z;%Y"
 	fi
@@ -1587,13 +1631,6 @@ function InitLocalOSSettings {
 
 function InitRemoteOSSettings {
 	__CheckArguments 0 $# ${FUNCNAME[0]} "$@"    #__WITH_PARANOIA_DEBUG
-
-	## MacOSX does not use the -E parameter like Linux or BSD does (-E is mapped to extended attrs instead of preserve executability)
-	if [ "$PRESERVE_EXECUTABILITY" != "no" ];then
-		if [ "$LOCAL_OS" != "MacOSX" ] && [ "$REMOTE_OS" != "MacOSX" ]; then
-			RSYNC_ATTR_ARGS=$RSYNC_ATTR_ARGS" -E"
-		fi
-	fi
 
 	if [ "$REMOTE_OS" == "msys" ]; then
 		REMOTE_FIND_CMD=$(dirname $BASH)/find
@@ -1610,6 +1647,72 @@ function InitRemoteOSSettings {
 		REMOTE_STAT_CTIME_MTIME_CMD="stat -c \\\"%n;%Z;%Y\\\""
 	fi
 
+}
+
+function InitRsyncSettings {
+	__CheckArguments 0 $# ${FUNCNAME[0]} "$@"    #__WITH_PARANOIA_DEBUG
+
+	## Set rsync default arguments
+	RSYNC_ARGS="-rltD"
+	if [ "$_DRYRUN" == true ]; then
+		RSYNC_DRY_ARG="-n"
+		DRY_WARNING="/!\ DRY RUN "
+	else
+		RSYNC_DRY_ARG=""
+	fi
+
+	RSYNC_ATTR_ARGS=""
+	if [ "$PRESERVE_PERMISSIONS" != "no" ]; then
+		RSYNC_ATTR_ARGS=$RSYNC_ATTR_ARGS" -p"
+	fi
+	if [ "$PRESERVE_OWNER" != "no" ]; then
+		RSYNC_ATTR_ARGS=$RSYNC_ATTR_ARGS" -o"
+	fi
+	if [ "$PRESERVE_GROUP" != "no" ]; then
+		RSYNC_ATTR_ARGS=$RSYNC_ATTR_ARGS" -g"
+	fi
+	if [ "$PRESERVE_EXECUTABILITY" != "no" ]; then
+		RSYNC_ATTR_ARGS=$RSYNC_ATTR_ARGS" --executability"
+	fi
+	if [ "$LOCAL_OS" != "MacOSX" ] && [ "$REMOTE_OS" != "MacOSX" ] && [ "$LOCAL_OS" != "msys" ] && [ "$REMOTE_OS" != "MacOSX" ]; then
+		if [ "$PRESERVE_ACL" == "yes" ]; then
+			RSYNC_ATTR_ARGS=$RSYNC_ATTR_ARGS" -A"
+		fi
+		if [ "$PRESERVE_XATTR" == "yes" ]; then
+			RSYNC_ATTR_ARGS=$RSYNC_ATTR_ARGS" -X"
+		fi
+	else
+		Logger "Disabling ACL and extended attributes synchronization on [$LOCAL_OS]." "NOTICE"
+	fi
+	if [ "$RSYNC_COMPRESS" == "yes" ]; then
+		RSYNC_ARGS=$RSYNC_ARGS" -z"
+	fi
+	if [ "$COPY_SYMLINKS" == "yes" ]; then
+		RSYNC_ARGS=$RSYNC_ARGS" -L"
+	fi
+	if [ "$KEEP_DIRLINKS" == "yes" ]; then
+		RSYNC_ARGS=$RSYNC_ARGS" -K"
+	fi
+	if [ "$PRESERVE_HARDLINKS" == "yes" ]; then
+		RSYNC_ARGS=$RSYNC_ARGS" -H"
+	fi
+	if [ "$CHECKSUM" == "yes" ]; then
+		RSYNC_TYPE_ARGS=$RSYNC_TYPE_ARGS" --checksum"
+	fi
+	if [ "$BANDWIDTH" != "" ] && [ "$BANDWIDTH" != "0" ]; then
+		RSYNC_ARGS=$RSYNC_ARGS" --bwlimit=$BANDWIDTH"
+	fi
+
+	if [ "$PARTIAL" == "yes" ]; then
+		RSYNC_ARGS=$RSYNC_ARGS" --partial --partial-dir=\"$PARTIAL_DIR\""
+		RSYNC_PARTIAL_EXCLUDE="--exclude=\"$PARTIAL_DIR\""
+	fi
+
+	if [ "$DELTA_COPIES" != "no" ]; then
+		RSYNC_ARGS=$RSYNC_ARGS" --no-whole-file"
+	else
+		RSYNC_ARGS=$RSYNC_ARGS" --whole-file"
+	fi
 }
 
 ## IFS debug function
@@ -1856,7 +1959,7 @@ function CheckReplicaPaths {
 		_CheckReplicaPathsRemote "${TARGET[$__replicaDir]}" &
 		pids="$pids;$!"
 	fi
-	WaitForTaskCompletion $pids 720 1800 ${FUNCNAME[0]} false $KEEP_LOGGING
+	WaitForTaskCompletion $pids 720 1800 $SLEEP_TIME $KEEP_LOGGING true true false ${FUNCNAME[0]}
 	if [ $? -ne 0 ]; then
 		Logger "Cancelling task." "CRITICAL"
 		exit 1
@@ -1938,7 +2041,7 @@ function CheckDiskSpace {
 		_CheckDiskSpaceRemote "${TARGET[$__replicaDir]}" &
 		pids="$pids;$!"
 	fi
-	WaitForTaskCompletion $pids 720 1800 ${FUNCNAME[0]} true $KEEP_LOGGING
+	WaitForTaskCompletion $pids 720 1800 $SLEEP_TIME $KEEP_LOGGING true true false ${FUNCNAME[0]}
 }
 
 
@@ -1989,7 +2092,7 @@ function CreateStateDirs {
 		_CreateStateDirsRemote "${TARGET[$__replicaDir]}${TARGET[$__stateDir]}" &
 		pids="$pids;$!"
 	fi
-	WaitForTaskCompletion $pids 720 1800 ${FUNCNAME[0]} true $KEEP_LOGGING
+	WaitForTaskCompletion $pids 720 1800 $SLEEP_TIME $KEEP_LOGGING true true false ${FUNCNAME[0]}
 	if [ $? -ne 0 ]; then
 		Logger "Cancelling task." "CRITICAL"
 		exit 1
@@ -2120,7 +2223,7 @@ function CheckLocks {
 			_CheckLocksRemote "${TARGET[$__lockFile]}" &
 			pids="$pids;$!"
 		fi
-		WaitForTaskCompletion $pids 720 1800 ${FUNCNAME[0]} true $KEEP_LOGGING
+		WaitForTaskCompletion $pids 720 1800 $SLEEP_TIME $KEEP_LOGGING true true false ${FUNCNAME[0]}
 		if [ $? -ne 0 ]; then
 			Logger "Cancelling task." "CRITICAL"
 			exit 1
@@ -2198,7 +2301,7 @@ function WriteLockFiles {
 
 	INITIATOR_LOCK_FILE_EXISTS=true
 	TARGET_LOCK_FILE_EXISTS=true
-	WaitForTaskCompletion "$initiatorPid;$targetPid" 720 1800 ${FUNCNAME[0]} true $KEEP_LOGGING
+	WaitForTaskCompletion "$initiatorPid;$targetPid" 720 1800 $SLEEP_TIME $KEEP_LOGGING true true false ${FUNCNAME[0]}
 	if [ $? -ne 0 ]; then
 		IFS=';' read -r -a pidArray <<< "$WAIT_FOR_TASK_COMPLETION"
 		for pid in "${pidArray[@]}"; do
@@ -2274,7 +2377,7 @@ function UnlockReplicas {
 	fi
 
 	if [ "$pids" != "" ]; then
-		WaitForTaskCompletion $pids 720 1800 ${FUNCNAME[0]} true $KEEP_LOGGING
+		WaitForTaskCompletion $pids 720 1800 $SLEEP_TIME $KEEP_LOGGING true true false ${FUNCNAME[0]}
 	fi
 }
 
@@ -2444,7 +2547,7 @@ function syncAttrs {
 	fi
 	Logger "RSYNC_CMD: $rsyncCmd" "DEBUG"
 	eval "$rsyncCmd"
-	WaitForTaskCompletion $! $SOFT_MAX_EXEC_TIME $HARD_MAX_EXEC_TIME ${FUNCNAME[0]} false $KEEP_LOGGING
+	WaitForTaskCompletion $! $SOFT_MAX_EXEC_TIME $HARD_MAX_EXEC_TIME $SLEEP_TIME $KEEP_LOGGING false true false ${FUNCNAME[0]}
 	retval=$?
 
 	if [ $retval != 0 ] && [ $retval != 24 ]; then
@@ -2476,7 +2579,7 @@ function syncAttrs {
 		_getFileCtimeMtimeRemote "${TARGET[$__replicaDir]}" "${TARGET[$__type]}" "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}-cleaned.$SCRIPT_PID" &
 		pids="$pids;$!"
 	fi
-	WaitForTaskCompletion $pids 1800 0 ${FUNCNAME[0]} true $KEEP_LOGGING
+	WaitForTaskCompletion $pids 1800 0 $SLEEP_TIME $KEEP_LOGGING true true false ${FUNCNAME[0]}
 
 	# If target gets updated first, then sync_attr must update initiators attrs first
 	# For join, remove leading replica paths
@@ -2524,7 +2627,7 @@ function syncAttrs {
 
 	Logger "RSYNC_CMD: $rsyncCmd" "DEBUG"
 	eval "$rsyncCmd"
-	WaitForTaskCompletion $! $SOFT_MAX_EXEC_TIME $HARD_MAX_EXEC_TIME ${FUNCNAME[0]} false $KEEP_LOGGING
+	WaitForTaskCompletion $! $SOFT_MAX_EXEC_TIME $HARD_MAX_EXEC_TIME $SLEEP_TIME $KEEP_LOGGING false true false ${FUNCNAME[0]}
 	retval=$?
 
 	if [ $retval != 0 ] && [ $retval != 24 ]; then
@@ -2696,6 +2799,8 @@ function _deleteRemote {
 
 	local deletionListFromReplica
 
+	local loggerPrefix
+
 	if [ "$replicaType" == "${INITIATOR[$__type]}" ]; then
 		deletionListFromReplica="${TARGET[$__type]}"
 	elif [ "$replicaType" == "${TARGET[$__type]}" ]; then
@@ -2830,12 +2935,16 @@ $SSH_CMD ERROR_ALERT=0 sync_on_changes=$sync_on_changes _DEBUG=$_DEBUG _DRYRUN=$
 	done < "$FILE_LIST"
 ENDSSH
 
-	if [ -f "$RUN_DIR/$PROGRAM.remote_deletion.$SCRIPT_PID" ]; then
-		Logger "Remote Deletion:\n$(cat $RUN_DIR/$PROGRAM.remote_deletion.$SCRIPT_PID)" "VERBOSE"
+	if [ -z "$RUN_DIR/$PROGRAM.remote_deletion.$SCRIPT_PID" ]; then
+		loggerPrefix="$_LOGGER_PREFIX"
+		_LOGGER_PREFIX=""
+		Logger "$(cat $RUN_DIR/$PROGRAM.remote_deletion.$SCRIPT_PID)" "ERROR"
+		_LOGGER_PREFIX="$loggerPrefix"
 	fi
 
 	## Copy back the deleted failed file list
-	rsyncCmd="$(type -p $RSYNC_EXECUTABLE) --rsync-path=\"$RSYNC_PATH\" -e \"$RSYNC_SSH_CMD\" $REMOTE_USER@$REMOTE_HOST:\"{$failedDeleteList,$successDeleteList}\" \"${INITIATOR[$__replicaDir]}${INITIATOR[$__stateDir]}\" > \"$RUN_DIR/$PROGRAM.remote_failed_deletion_list_copy.$SCRIPT_PID\""
+	#rsyncCmd="$(type -p $RSYNC_EXECUTABLE) --rsync-path=\"$RSYNC_PATH\" -e \"$RSYNC_SSH_CMD\" $REMOTE_USER@$REMOTE_HOST:\"{$failedDeleteList,$successDeleteList}\" \"${INITIATOR[$__replicaDir]}${INITIATOR[$__stateDir]}\" > \"$RUN_DIR/$PROGRAM.remote_failed_deletion_list_copy.$SCRIPT_PID\""
+	rsyncCmd="$(type -p $RSYNC_EXECUTABLE) -r --rsync-path=\"$RSYNC_PATH\" -e \"$RSYNC_SSH_CMD\" --include \"$(dirname ${TARGET[$__stateDir]})\" --include \"${TARGET[$__stateDir]}\" --include \"${TARGET[$__stateDir]}/$replicaType${TARGET[$__failedDeletedListFile]}\" --include \"${TARGET[$__stateDir]}/$replicaType${TARGET[$__successDeletedListFile]}\" --exclude='*' $REMOTE_USER@$REMOTE_HOST:\"$(EscapeSpaces ${TARGET[$__replicaDir]})\" \"${INITIATOR[$__replicaDir]}\" > \"$RUN_DIR/$PROGRAM.remote_failed_deletion_list_copy.$SCRIPT_PID\""
 	Logger "RSYNC_CMD: $rsyncCmd" "DEBUG"
 	eval "$rsyncCmd" 2>> "$LOG_FILE"
 	result=$?
@@ -2985,7 +3094,7 @@ function Sync {
 			targetPid="$!"
 		fi
 
-		WaitForTaskCompletion "$initiatorPid;$targetPid" $SOFT_MAX_EXEC_TIME $HARD_MAX_EXEC_TIME ${FUNCNAME[0]} false $KEEP_LOGGING
+		WaitForTaskCompletion "$initiatorPid;$targetPid" $SOFT_MAX_EXEC_TIME $HARD_MAX_EXEC_TIME $SLEEP_TIME $KEEP_LOGGING false true false ${FUNCNAME[0]}
 		if [ $? != 0 ]; then
 			IFS=';' read -r -a pidArray <<< "$WAIT_FOR_TASK_COMPLETION"
 			initiatorFail=false
@@ -3030,7 +3139,7 @@ function Sync {
 			targetPid="$!"
 		fi
 
-		WaitForTaskCompletion "$initiatorPid;$targetPid" $SOFT_MAX_EXEC_TIME $HARD_MAX_EXEC_TIME ${FUNCNAME[0]} false $KEEP_LOGGING
+		WaitForTaskCompletion "$initiatorPid;$targetPid" $SOFT_MAX_EXEC_TIME $HARD_MAX_EXEC_TIME $SLEEP_TIME $KEEP_LOGGING false true false ${FUNCNAME[0]}
 		if [ $? != 0 ]; then
 			IFS=';' read -r -a pidArray <<< "$WAIT_FOR_TASK_COMPLETION"
 			initiatorFail=false
@@ -3067,7 +3176,7 @@ function Sync {
 	if [ "$resumeInitiator" == "${SYNC_ACTION[2]}" ] || [ "$resumeTarget" == "${SYNC_ACTION[2]}" ]; then
 		if [[ "$RSYNC_ATTR_ARGS" == *"-X"* ]] || [[ "$RSYNC_ATTR_ARGS" == *"-A"* ]]; then
 			syncAttrs "${INITIATOR[$__replicaDir]}" "$TARGET_SYNC_DIR"
-			WaitForTaskCompletion $! $SOFT_MAX_EXEC_TIME $HARD_MAX_EXEC_TIME ${FUNCNAME[0]} false $KEEP_LOGGING
+			WaitForTaskCompletion $! $SOFT_MAX_EXEC_TIME $HARD_MAX_EXEC_TIME $SLEEP_TIME $KEEP_LOGGING false true false ${FUNCNAME[0]}
 			if [ $? != 0 ]; then
 				echo "${SYNC_ACTION[2]}" > "${INITIATOR[$__initiatorLastActionFile]}"
 				echo "${SYNC_ACTION[2]}" > "${INITIATOR[$__targetLastActionFile]}"
@@ -3134,7 +3243,7 @@ function Sync {
 			targetPid="$!"
 		fi
 
-		WaitForTaskCompletion "$initiatorPid;$targetPid" $SOFT_MAX_EXEC_TIME $HARD_MAX_EXEC_TIME ${FUNCNAME[0]} false $KEEP_LOGGING
+		WaitForTaskCompletion "$initiatorPid;$targetPid" $SOFT_MAX_EXEC_TIME $HARD_MAX_EXEC_TIME $SLEEP_TIME $KEEP_LOGGING false true false ${FUNCNAME[0]}
 		if [ $? != 0 ]; then
 			IFS=';' read -r -a pidArray <<< "$WAIT_FOR_TASK_COMPLETION"
 			initiatorFail=false
@@ -3180,7 +3289,7 @@ function Sync {
 			targetPid="$!"
 		fi
 
-		WaitForTaskCompletion "$initiatorPid;$targetPid" $SOFT_MAX_EXEC_TIME $HARD_MAX_EXEC_TIME ${FUNCNAME[0]} false $KEEP_LOGGING
+		WaitForTaskCompletion "$initiatorPid;$targetPid" $SOFT_MAX_EXEC_TIME $HARD_MAX_EXEC_TIME $SLEEP_TIME $KEEP_LOGGING false true false ${FUNCNAME[0]}
 		if [ $? != 0 ]; then
 			IFS=';' read -r -a pidArray <<< "$WAIT_FOR_TASK_COMPLETION"
 			initiatorFail=false
@@ -3332,7 +3441,7 @@ function SoftDelete {
 			_SoftDeleteRemote "${TARGET[$__type]}" "${TARGET[$__replicaDir]}${TARGET[$__backupDir]}" $CONFLICT_BACKUP_DAYS "conflict backup" &
 			pids="$pids;$!"
 		fi
-		WaitForTaskCompletion $pids 720 1800 ${FUNCNAME[0]} true $KEEP_LOGGING
+		WaitForTaskCompletion $pids 720 1800 $SLEEP_TIME $KEEP_LOGGING true true false ${FUNCNAME[0]}
 	fi
 
 	if [ "$SOFT_DELETE" != "no" ] && [ $SOFT_DELETE_DAYS -ne 0 ]; then
@@ -3347,7 +3456,7 @@ function SoftDelete {
 			_SoftDeleteRemote "${TARGET[$__type]}" "${TARGET[$__replicaDir]}${TARGET[$__deleteDir]}" $SOFT_DELETE_DAYS "softdelete" &
 			pids="$pids;$!"
 		fi
-		WaitForTaskCompletion $pids 720 1800 ${FUNCNAME[0]} true $KEEP_LOGGING
+		WaitForTaskCompletion $pids 720 1800 $SLEEP_TIME $KEEP_LOGGING true true false ${FUNCNAME[0]}
 	fi
 }
 
@@ -3368,9 +3477,9 @@ function _SummaryFromFile {
 function Summary {
 	__CheckArguments 0 $# "${FUNCNAME[0]}" "$@"	#__WITH_PARANOIA_DEBUG
 
-	local prefix
+	local loggerPrefix
 
-	prefix="$_LOGGER_PREFIX"
+	loggerPrefix="$_LOGGER_PREFIX"
 	_LOGGER_PREFIX=""
 
 	Logger "Attrib updates: INITIATOR << >> TARGET" "ALWAYS"
@@ -3391,7 +3500,7 @@ function Summary {
 	fi
 	_SummaryFromFile "${INITIATOR[$__replicaDir]}" "$RUN_DIR/$PROGRAM.delete.initiator.$SCRIPT_PID" "- <<"
 
-	_LOGGER_PREFIX="$prefix"
+	_LOGGER_PREFIX="$loggerPrefix"
 }
 
 function Init {
@@ -3633,9 +3742,18 @@ function SyncOnChanges {
 	local cmd
 	local retval
 
-	if ! type inotifywait > /dev/null 2>&1 ; then
-		Logger "No inotifywait command found. Cannot monitor changes." "CRITICAL"
-		exit 1
+	local sleepTime
+
+	if [ "$LOCAL_OS" == "MacOSX" ]; then
+		if ! type fswatch > /dev/null 2>&1 ; then
+			Logger "No inotifywait command found. Cannot monitor changes." "CRITICAL"
+			exit 1
+		fi
+	else
+		if ! type inotifywait > /dev/null 2>&1 ; then
+			Logger "No inotifywait command found. Cannot monitor changes." "CRITICAL"
+			exit 1
+		fi
 	fi
 
 	Logger "#### Running osync in file monitor mode." "NOTICE"
@@ -3654,8 +3772,14 @@ function SyncOnChanges {
 		fi
 
 		Logger "#### Monitoring now." "NOTICE"
-		inotifywait --exclude $OSYNC_DIR $RSYNC_PATTERNS $RSYNC_PARTIAL_EXCLUDE -qq -r -e create -e modify -e delete -e move -e attrib --timeout "$MAX_WAIT" "$INITIATOR_SYNC_DIR" &
-		wait $!
+		if [ "$LOCAL_OS" == "MacOSX" ]; then
+			fswatch --exclude $OSYNC_DIR $RSYNC_PATTERNS $RSYNC_PARTIAL_EXCLUDE -1 "$INITIATOR_SYNC_DIR" > /dev/null &
+			# Mac fswatch doesn't have timeout switch, replacing wait $! with WaitForTaskCompletion without warning nor spinner and increased SLEEP_TIME to avoid cpu hogging. This sims wait $! with timeout
+			WaitForTaskCompletion $! 0 $MAX_WAIT 1 0 true false true ${FUNCNAME[0]}
+		else
+			inotifywait --exclude $OSYNC_DIR $RSYNC_PATTERNS $RSYNC_PARTIAL_EXCLUDE -qq -r -e create -e modify -e delete -e move -e attrib --timeout "$MAX_WAIT" "$INITIATOR_SYNC_DIR" &
+			wait $!
+		fi
 		retval=$?
 		if [ $retval == 0 ]; then
 			Logger "#### Changes detected, waiting $MIN_WAIT seconds before running next sync." "NOTICE"
@@ -3874,6 +3998,7 @@ if [ $sync_on_changes == true ]; then
 else
 	GetRemoteOS
 	InitRemoteOSSettings
+	InitRsyncSettings
 	if [ $no_maxtime == true ]; then
 		SOFT_MAX_EXEC_TIME=0
 		HARD_MAX_EXEC_TIME=0
