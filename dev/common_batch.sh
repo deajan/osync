@@ -3,7 +3,7 @@ SUBPROGRAM=[prgname]
 PROGRAM="$SUBPROGRAM-batch" # Batch program to run osync / obackup instances sequentially and rerun failed ones
 AUTHOR="(L) 2013-2016 by Orsiris de Jong"
 CONTACT="http://www.netpower.fr - ozy@netpower.fr"
-PROGRAM_BUILD=2016082901
+PROGRAM_BUILD=2016112401
 
 ## Runs an osync /obackup instance for every conf file found
 ## If an instance fails, run it again if time permits
@@ -141,16 +141,15 @@ function Usage {
 	echo $CONTACT
 	echo ""
 	echo "Batch script to sequentially run osync or obackup instances and rerun failed ones."
-	echo "Usage: $SUBPROGRAM-batch.sh [OPTIONS]"
+	echo "Usage: $PROGRAM.sh [OPTIONS] [$SUBPROGRAM OPTIONS]"
 	echo ""
 	echo "[OPTIONS]"
 	echo "--path=/path/to/conf      Path to osync / obackup conf files, defaults to /etc/osync or /etc/obackup"
 	echo "--max-runs=X              Number of max runs per instance, (defaults to 3)"
 	echo "--max-exec-time=X         Retry failed instances only if max execution time not reached (defaults to 36000 seconds). Set to 0 to bypass execution time check"
-	echo "--no-maxtime		Run osync / obackup without honoring conf file defined timeouts"
-	echo "--dry                     Will run osync / obackup without actually doing anything; just testing"
-	echo "--silent                  Will run osync / obackup without any output to stdout, used for cron jobs"
-	echo "--verbose                 Increases output"
+	echo "[$SUBPROGRAM OPTIONS]"
+	echo "Specify whatever options $PROGRAM accepts. Example"
+	echo "$PROGRAM.sh --path=/etc/$SUBPROGRAM --no-maxtime"
 	exit 128
 }
 
@@ -158,18 +157,6 @@ opts=""
 for i in "$@"
 do
 	case $i in
-		--silent)
-		opts=$opts" --silent"
-		;;
-		--dry)
-		opts=$opts" --dry"
-		;;
-		--verbose)
-		opts=$opts" --verbose"
-		;;
-		--no-maxtime)
-		opts=$opts" --no-maxtime"
-		;;
 		--path=*)
 		CONF_FILE_PATH=${i##*=}
 		;;
@@ -183,8 +170,7 @@ do
 		Usage
 		;;
 		*)
-		Logger "Unknown param '$i'" "CRITICAL"
-		Usage
+		opts="$i "
 		;;
 	esac
 done
