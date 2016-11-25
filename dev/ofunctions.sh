@@ -1,6 +1,6 @@
 #### MINIMAL-FUNCTION-SET BEGIN ####
 
-## FUNC_BUILD=2016112401
+## FUNC_BUILD=2016112501
 ## BEGIN Generic bash functions written in 2013-2016 by Orsiris de Jong - http://www.netpower.fr - ozy@netpower.fr
 
 ## To use in a program, define the following variables:
@@ -16,7 +16,7 @@
 ## When called from subprocesses, variable of main process can't be set. Status needs to be get via $RUN_DIR/$PROGRAM.Logger.{error|warn}.$SCRIPT_PID
 
 
-
+# TODO: WaitForTaskCompletion and ParallelExec both need exit codes on hard_max_exec_time
 
 
 
@@ -61,14 +61,14 @@ fi						#__WITH_PARANOIA_DEBUG
 ## allow debugging from command line with _DEBUG=yes
 if [ ! "$_DEBUG" == "yes" ]; then
 	_DEBUG=no
-	SLEEP_TIME=.05
 	_LOGGER_VERBOSE=false
 else
-	if [ "$SLEEP_TIME" == "" ]; then # Leave the possibity to set SLEEP_TIME as environment variable when runinng with bash -x in order to avoid spamming console
-		SLEEP_TIME=.05
-	fi
 	trap 'TrapError ${LINENO} $?' ERR
 	_LOGGER_VERBOSE=true
+fi
+
+if [ "$SLEEP_TIME" == "" ]; then # Leave the possibity to set SLEEP_TIME as environment variable when runinng with bash -x in order to avoid spamming console
+	SLEEP_TIME=.05
 fi
 
 SCRIPT_PID=$$
@@ -663,6 +663,8 @@ function WaitForTaskCompletion {
 				if [ $noError != true ]; then
 					SendAlert true
 				fi
+				#TODO: add exit flag when max exec time is reached
+				return 1
 			fi
 		fi
 
@@ -1320,10 +1322,6 @@ function __CheckArguments {
 		local minArgs
 		local maxArgs
 
-		if [ "$_PARANOIA_DEBUG" == "yes" ]; then
-			Logger "Entering function [$functionName]." "DEBUG"
-		fi
-
 		# All arguments of the function to check are passed as array in ${4} (the function call waits for $@)
 		# If any of the arguments contains spaces, bash things there are two aguments
 		# In order to avoid this, we need to iterate over ${4} and count
@@ -1338,22 +1336,29 @@ function __CheckArguments {
 			if [ "$argument" = "" ]; then
 				fetchArguments=false
 			else
-				argList="$arg_list [Argument $(($iterate-3)): $argument]"
+				argList="$argList[Argument $(($iterate-3)): $argument] "
 				iterate=$(($iterate+1))
 			fi
 		done
+
 		countedArguments=$((iterate-4))
 
-		if [ $(IsNumeric "$numberOfArguments") -eq 1 ]; then
+		if [ $(IsInteger "$numberOfArguments") -eq 1 ]; then
 			minArgs=$numberOfArguments
 			maxArgs=$numberOfArguments
 		else
 			IFS='-' read minArgs maxArgs <<< "$numberOfArguments"
 		fi
 
+		if [ "$_PARANOIA_DEBUG" == "yes" ]; then
+			Logger "Entering function [$functionName]." "DEBUG"
+		fi
+
 		if ! ([ $countedArguments -ge $minArgs ] && [ $countedArguments -le $maxArgs ]); then
 			Logger "Function $functionName may have inconsistent number of arguments. Expected min: $minArgs, max: $maxArgs, count: $countedArguments, bash seen: $numberOfGivenArguments. see log file." "ERROR"
 			Logger "Arguments passed: $argList" "ERROR"
+		else
+			Logger "Arguments passed: $argList" "VERBOSE"
 		fi
 	fi
 }
