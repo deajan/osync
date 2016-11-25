@@ -4,7 +4,7 @@ PROGRAM="osync" # Rsync based two way sync engine with fault tolerance
 AUTHOR="(C) 2013-2016 by Orsiris de Jong"
 CONTACT="http://www.netpower.fr/osync - ozy@netpower.fr"
 PROGRAM_VERSION=1.2-beta3
-PROGRAM_BUILD=2016112401
+PROGRAM_BUILD=2016112501
 IS_STABLE=no
 
 # Execution order						#__WITH_PARANOIA_DEBUG
@@ -889,7 +889,7 @@ function syncAttrs {
 		_getFileCtimeMtimeRemote "${TARGET[$__replicaDir]}" "${TARGET[$__type]}" "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}-cleaned.$SCRIPT_PID" &
 		pids="$pids;$!"
 	fi
-	WaitForTaskCompletion $pids 1800 0 $SLEEP_TIME $KEEP_LOGGING true true false ${FUNCNAME[0]}
+	WaitForTaskCompletion $pids $SOFT_MAX_EXEC_TIME $HARD_MAX_EXEC_TIME $SLEEP_TIME $KEEP_LOGGING false true false ${FUNCNAME[0]}
 
 	# If target gets updated first, then sync_attr must update initiators attrs first
 	# For join, remove leading replica paths
@@ -1751,7 +1751,7 @@ function SoftDelete {
 			_SoftDeleteRemote "${TARGET[$__type]}" "${TARGET[$__replicaDir]}${TARGET[$__backupDir]}" $CONFLICT_BACKUP_DAYS "conflict backup" &
 			pids="$pids;$!"
 		fi
-		WaitForTaskCompletion $pids 720 1800 $SLEEP_TIME $KEEP_LOGGING true true false ${FUNCNAME[0]}
+		WaitForTaskCompletion $pids $SOFT_MAX_EXEC_TIME $HARD_MAX_EXEC_TIME $SLEEP_TIME $KEEP_LOGGING false true false ${FUNCNAME[0]}
 	fi
 
 	if [ "$SOFT_DELETE" != "no" ] && [ $SOFT_DELETE_DAYS -ne 0 ]; then
@@ -1766,7 +1766,7 @@ function SoftDelete {
 			_SoftDeleteRemote "${TARGET[$__type]}" "${TARGET[$__replicaDir]}${TARGET[$__deleteDir]}" $SOFT_DELETE_DAYS "softdelete" &
 			pids="$pids;$!"
 		fi
-		WaitForTaskCompletion $pids 720 1800 $SLEEP_TIME $KEEP_LOGGING true true false ${FUNCNAME[0]}
+		WaitForTaskCompletion $pids $SOFT_MAX_EXEC_TIME $HARD_MAX_EXEC_TIME $SLEEP_TIME $KEEP_LOGGING false true false ${FUNCNAME[0]}
 	fi
 }
 
@@ -2170,13 +2170,11 @@ for i in "$@"; do
 		_QUICK_SYNC=$(($_QUICK_SYNC + 1))
 		INITIATOR_SYNC_DIR=${i##*=}
 		opts=$opts" --initiator=\"$INITIATOR_SYNC_DIR\""
-		no_maxtime=true
 		;;
 		--target=*)
 		_QUICK_SYNC=$(($_QUICK_SYNC + 1))
 		TARGET_SYNC_DIR=${i##*=}
 		opts=$opts" --target=\"$TARGET_SYNC_DIR\""
-		no_maxtime=true
 		;;
 		--rsakey=*)
 		SSH_RSA_PRIVATE_KEY=${i##*=}
@@ -2233,27 +2231,26 @@ opts="${opts# *}"
 
 		# Let the possibility to initialize those values directly via command line like SOFT_DELETE_DAYS=60 ./osync.sh
 
-		if [ "$MINIMUM_SPACE" == "" ]; then
+		if [ $(IsInteger $MINIMUM_SPACE) -ne 1 ]; then
 			MINIMUM_SPACE=1024
 		fi
 
-		if [ "$CONFLICT_BACKUP_DAYS" == "" ]; then
+		if [ $(IsInteger $CONFLICT_BACKUP_DAYS) -ne 1 ]; then
 			CONFLICT_BACKUP_DAYS=30
 		fi
 
-		if [ "$SOFT_DELETE_DAYS" == "" ]; then
+		if [ $(IsInteger $SOFT_DELETE_DAYS) -ne 1 ]; then
 			SOFT_DELETE_DAYS=30
 		fi
 
-		if [ "$RESUME_TRY" == "" ]; then
+		if [ $(IsInteger $RESUME_TRY) -ne 1 ]; then
 			RESUME_TRY=1
 		fi
 
-		if [ "$SOFT_MAX_EXEC_TIME" == "" ]; then
+		if [ $(IsInteger $SOFT_MAX_EXEC_TIME) -ne 1 ]; then
 			SOFT_MAX_EXEC_TIME=0
 		fi
-
-		if [ "$HARD_MAX_EXEC_TIME" == "" ]; then
+		if [ $(IsInteger $HARD_MAX_EXEC_TIME) -ne 1 ]; then
 			HARD_MAX_EXEC_TIME=0
 		fi
 
