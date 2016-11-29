@@ -4,7 +4,7 @@ PROGRAM="osync" # Rsync based two way sync engine with fault tolerance
 AUTHOR="(C) 2013-2016 by Orsiris de Jong"
 CONTACT="http://www.netpower.fr/osync - ozy@netpower.fr"
 PROGRAM_VERSION=1.2-beta3
-PROGRAM_BUILD=2016112501
+PROGRAM_BUILD=2016112901
 IS_STABLE=no
 
 # Execution order						#__WITH_PARANOIA_DEBUG
@@ -1510,15 +1510,25 @@ function Sync {
 	if [ "$resumeInitiator" == "${SYNC_ACTION[3]}" ] || [ "$resumeTarget" == "${SYNC_ACTION[3]}" ]; then
 		if [ "$CONFLICT_PREVALANCE" == "${TARGET[$__type]}" ]; then
 			if [ "$resumeTarget" == "${SYNC_ACTION[3]}" ]; then
-				syncUpdate "${TARGET[$__type]}" "${INITIATOR[$__type]}"
-				if [ $? == 0 ]; then
+				syncUpdate "${TARGET[$__type]}" "${INITIATOR[$__type]}" &
+				WaitForTaskCompletion $! $SOFT_MAX_EXEC_TIME $HARD_MAX_EXEC_TIME $SLEEP_TIME $KEEP_LOGGING false true false ${FUNCNAME[0]}
+				if [ $? != 0 ]; then
+					echo "${SYNC_ACTION[3]}" > "${INITIATOR[$__targetLastActionFile]}"
+					resumeTarget="${SYNC_ACTION[3]}"
+					exit 1
+				else
 					echo "${SYNC_ACTION[4]}" > "${INITIATOR[$__targetLastActionFile]}"
 					resumeTarget="${SYNC_ACTION[4]}"
 				fi
 			fi
 			if [ "$resumeInitiator" == "${SYNC_ACTION[3]}" ]; then
 				syncUpdate "${INITIATOR[$__type]}" "${TARGET[$__type]}"
-				if [ $? == 0 ]; then
+				WaitForTaskCompletion $! $SOFT_MAX_EXEC_TIME $HARD_MAX_EXEC_TIME $SLEEP_TIME $KEEP_LOGGING false true false ${FUNCNAME[0]}
+				if [ $? != 0 ]; then
+					echo "${SYNC_ACTION[3]}" > "${INITIATOR[$__initiatorLastActionFile]}"
+					resumeInitiator="${SYNC_ACTION[3]}"
+					exit 1
+				else
 					echo "${SYNC_ACTION[4]}" > "${INITIATOR[$__initiatorLastActionFile]}"
 					resumeInitiator="${SYNC_ACTION[4]}"
 				fi
@@ -1526,14 +1536,24 @@ function Sync {
 		else
 			if [ "$resumeInitiator" == "${SYNC_ACTION[3]}" ]; then
 				syncUpdate "${INITIATOR[$__type]}" "${TARGET[$__type]}"
-				if [ $? == 0 ]; then
+				WaitForTaskCompletion $! $SOFT_MAX_EXEC_TIME $HARD_MAX_EXEC_TIME $SLEEP_TIME $KEEP_LOGGING false true false ${FUNCNAME[0]}
+				if [ $? != 0 ]; then
+					echo "${SYNC_ACTION[3]}" > "${INITIATOR[$__initiatorLastActionFile]}"
+					resumeInitiator="${SYNC_ACTION[3]}"
+					exit 1
+				else
 					echo "${SYNC_ACTION[4]}" > "${INITIATOR[$__initiatorLastActionFile]}"
 					resumeInitiator="${SYNC_ACTION[4]}"
 				fi
 			fi
 			if [ "$resumeTarget" == "${SYNC_ACTION[3]}" ]; then
 				syncUpdate "${TARGET[$__type]}" "${INITIATOR[$__type]}"
-				if [ $? == 0 ]; then
+				WaitForTaskCompletion $! $SOFT_MAX_EXEC_TIME $HARD_MAX_EXEC_TIME $SLEEP_TIME $KEEP_LOGGING false true false ${FUNCNAME[0]}
+				if [ $? != 0 ]; then
+					echo "${SYNC_ACTION[3]}" > "${INITIATOR[$__targetLastActionFile]}"
+					resumeTarget="${SYNC_ACTION[3]}"
+					exit 1
+				else
 					echo "${SYNC_ACTION[4]}" > "${INITIATOR[$__targetLastActionFile]}"
 					resumeTarget="${SYNC_ACTION[4]}"
 				fi
@@ -1752,6 +1772,9 @@ function SoftDelete {
 			pids="$pids;$!"
 		fi
 		WaitForTaskCompletion $pids $SOFT_MAX_EXEC_TIME $HARD_MAX_EXEC_TIME $SLEEP_TIME $KEEP_LOGGING false true false ${FUNCNAME[0]}
+		if [ $? != 0 ]; then #WIP: check for env variable with hard max flag ?
+			exit 1
+		fi
 	fi
 
 	if [ "$SOFT_DELETE" != "no" ] && [ $SOFT_DELETE_DAYS -ne 0 ]; then
@@ -1767,6 +1790,9 @@ function SoftDelete {
 			pids="$pids;$!"
 		fi
 		WaitForTaskCompletion $pids $SOFT_MAX_EXEC_TIME $HARD_MAX_EXEC_TIME $SLEEP_TIME $KEEP_LOGGING false true false ${FUNCNAME[0]}
+		if [ $? != 0 ]; then #WIP: check for env variable with hard max flag ?
+			exit 1
+		fi
 	fi
 }
 

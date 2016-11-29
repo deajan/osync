@@ -1,6 +1,6 @@
 #### MINIMAL-FUNCTION-SET BEGIN ####
 
-## FUNC_BUILD=2016112501
+## FUNC_BUILD=2016112901
 ## BEGIN Generic bash functions written in 2013-2016 by Orsiris de Jong - http://www.netpower.fr - ozy@netpower.fr
 
 ## To use in a program, define the following variables:
@@ -14,11 +14,6 @@
 
 ## Logger sets {ERROR|WARN}_ALERT variable when called with critical / error / warn loglevel
 ## When called from subprocesses, variable of main process can't be set. Status needs to be get via $RUN_DIR/$PROGRAM.Logger.{error|warn}.$SCRIPT_PID
-
-
-# TODO: WaitForTaskCompletion and ParallelExec both need exit codes on hard_max_exec_time
-
-
 
 ## META ISSUES
 ##
@@ -246,16 +241,20 @@ function KillChilds {
 		done
 	fi
 		# Try to kill nicely, if not, wait 15 seconds to let Trap actions happen before killing
-	if ( [ "$self" == true ] && kill -0 "$pid" > /dev/null 2>&1); then
-		Logger "Sending SIGTERM to process [$pid]." "DEBUG"
-		kill -s TERM "$pid"
-		if [ $? != 0 ]; then
-			sleep 15
-			Logger "Sending SIGTERM to process [$pid] failed." "DEBUG"
-			kill -9 "$pid"
+	if [ "$self" == true ]; then
+		if kill -0 "$pid" > /dev/null 2>&1; then
+			kill -s TERM "$pid"
+			Logger "Sent SIGTERM to process [$pid]." "DEBUG"
 			if [ $? != 0 ]; then
-				Logger "Sending SIGKILL to process [$pid] failed." "DEBUG"
-				return 1
+				sleep 15
+				Logger "Sending SIGTERM to process [$pid] failed." "DEBUG"
+				kill -9 "$pid"
+				if [ $? != 0 ]; then
+					Logger "Sending SIGKILL to process [$pid] failed." "DEBUG"
+					return 1
+				fi	# Simplify the return 0 logic here
+			else
+				return 0
 			fi
 		else
 			return 0
@@ -581,7 +580,7 @@ function joinString {
 # Fills a global variable called WAIT_FOR_TASK_COMPLETION that contains list of failed pids in format pid1:result1;pid2:result2
 # Warning: Don't imbricate this function into another run if you plan to use the global variable output
 
-# Standard wait $! emulation would be WaitForTaskCompletion $! 0 0 1 0 true false true "${FUNCNAME[0]}"
+# Standard wait $! emulation would be WaitForTaskCompletion $! 0 0 1 0 true false true false "${FUNCNAME[0]}"
 
 function WaitForTaskCompletion {
 	local pids="${1}" # pids to wait for, separated by semi-colon
@@ -591,7 +590,7 @@ function WaitForTaskCompletion {
 	local keepLogging="${5:-0}"	# Every keepLogging seconds, an alive log message is send. Setting this value to zero disables any alive logging.
 	local counting="${6:-true}"	# Count time since function has been launched (true), or since script has been launched (false)
 	local spinner="${7:-true}"	# Show spinner (true), don't show anything (false)
-	local noError="${8:-false}"	# Log errors when reaching soft / hard max time (false), don't log errors on those triggers (true)
+	local noErrorLog="${8:-false}"	# Log errors when reaching soft / hard max time (false), don't log errors on those triggers (true)
 	local callerName="${9}"		# Name of the function who called this function for debugging purposes, generally ${FUNCNAME[0]}
 
 	Logger "${FUNCNAME[0]} called by [$callerName]." "PARANOIA_DEBUG"	#__WITH_PARANOIA_DEBUG
@@ -642,14 +641,14 @@ function WaitForTaskCompletion {
 		fi
 
 		if [ $exec_time -gt $softMaxTime ]; then
-			if [ $soft_alert != true ] && [ $softMaxTime -ne 0 ] && [ $noError != true ]; then
+			if [ $soft_alert != true ] && [ $softMaxTime -ne 0 ] && [ $noErrorLog != true ]; then
 				Logger "Max soft execution time exceeded for task [$callerName] with pids [$(joinString , ${pidsArray[@]})]." "WARN"
 				soft_alert=true
 				SendAlert true
 
 			fi
 			if [ $exec_time -gt $hardMaxTime ] && [ $hardMaxTime -ne 0 ]; then
-				if [ $noError != true ]; then
+				if [ $noErrorLog != true ]; then
 					Logger "Max hard execution time exceeded for task [$callerName] with pids [$(joinString , ${pidsArray[@]})]. Stopping task execution." "ERROR"
 				fi
 				for pid in "${pidsArray[@]}"; do
@@ -660,11 +659,9 @@ function WaitForTaskCompletion {
 						Logger "Could not stop task with pid [$pid]." "ERROR"
 					fi
 				done
-				if [ $noError != true ]; then
+				if [ $noErrorLog != true ]; then
 					SendAlert true
 				fi
-				#TODO: add exit flag when max exec time is reached
-				return 1
 			fi
 		fi
 
@@ -706,6 +703,7 @@ function WaitForTaskCompletion {
 	Logger "${FUNCNAME[0]} ended for [$callerName] using [$pidCount] subprocesses with [$errorcount] errors." "PARANOIA_DEBUG"	#__WITH_PARANOIA_DEBUG
 
 	# Return exit code if only one process was monitored, else return number of errors
+	# As we cannot return multiple values, a global variable WAIT_FOR_TASK_COMPLETION contains all pids with their return value
 	if [ $pidCount -eq 1 ] && [ $errorcount -eq 0 ]; then
 		return $errorcount
 	else
@@ -728,7 +726,7 @@ function ParallelExec {
 	local keepLogging="${7:-0}"		# Every keepLogging seconds, an alive log message is send. Setting this value to zero disables any alive logging.
 	local counting="${8:-true}"		# Count time since function has been launched (true), or since script has been launched (false)
 	local spinner="${9:-false}"		# Show spinner (true), don't show spinner (false)
-	local noError="${10:-false}"		# Log errors when reaching soft / hard max time (false), don't log errors on those triggers (true)
+	local noErrorLog="${10:-false}"		# Log errors when reaching soft / hard max time (false), don't log errors on those triggers (true)
 	local callerName="${11:-false}"		# Name of the function who called this function for debugging purposes, generally ${FUNCNAME[0]}
 
 	__CheckArguments 2-11 $# ${FUNCNAME[0]} "$@"				#__WITH_PARANOIA_DEBUG
@@ -788,14 +786,14 @@ function ParallelExec {
 		fi
 
 		if [ $exec_time -gt $softMaxTime ]; then
-			if [ $soft_alert != true ] && [ $softMaxTime -ne 0 ] && [ $noError != true ]; then
+			if [ $soft_alert != true ] && [ $softMaxTime -ne 0 ] && [ $noErrorLog != true ]; then
 				Logger "Max soft execution time exceeded for task [$callerName] with pids [$(joinString , ${pidsArray[@]})]." "WARN"
 				soft_alert=true
 				SendAlert true
 
 			fi
 			if [ $exec_time -gt $hardMaxTime ] && [ $hardMaxTime -ne 0 ]; then
-				if [ $noError != true ]; then
+				if [ $noErrorLog != true ]; then
 					Logger "Max hard execution time exceeded for task [$callerName] with pids [$(joinString , ${pidsArray[@]})]. Stopping task execution." "ERROR"
 				fi
 				for pid in "${pidsArray[@]}"; do
@@ -806,11 +804,13 @@ function ParallelExec {
 						Logger "Could not stop task with pid [$pid]." "ERROR"
 					fi
 				done
-				if [ $noError != true ]; then
+				if [ $noErrorLog != true ]; then
 					SendAlert true
+				else
+					Logger "$commandCount $counter ${#pidsArray[@]}" "NOTICE"
+					# Return the number of commands that haven't run / finished run
+					return $(($commandCount - $counter + ${#pidsArray[@]}))
 				fi
-				# Return the number of commands that haven't run / finished run
-				return $(($commandCount - $counter + ${#pidsArray[@]}))
 			fi
 		fi
 
