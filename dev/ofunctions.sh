@@ -1,6 +1,6 @@
 #### MINIMAL-FUNCTION-SET BEGIN ####
 
-## FUNC_BUILD=2016112901
+## FUNC_BUILD=2016112902
 ## BEGIN Generic bash functions written in 2013-2016 by Orsiris de Jong - http://www.netpower.fr - ozy@netpower.fr
 
 ## To use in a program, define the following variables:
@@ -596,7 +596,6 @@ function WaitForTaskCompletion {
 	Logger "${FUNCNAME[0]} called by [$callerName]." "PARANOIA_DEBUG"	#__WITH_PARANOIA_DEBUG
 	__CheckArguments 9 $# ${FUNCNAME[0]} "$@"				#__WITH_PARANOIA_DEBUG
 
-	local soft_alert=false # Does a soft alert need to be triggered, if yes, send an alert once
 	local log_ttime=0 # local time instance for comparaison
 
 	local seconds_begin=$SECONDS # Seconds since the beginning of the script
@@ -613,6 +612,10 @@ function WaitForTaskCompletion {
 	local newPidsArray # New array of currently running pids
 
 	local hasPids=false # Are any valable pids given to function ?		#__WITH_PARANOIA_DEBUG
+
+	if [ $counting == true ]; then 	# If counting == false _SOFT_ALERT should be a global value so no more than one soft alert is shown
+		local _SOFT_ALERT=false # Does a soft alert need to be triggered, if yes, send an alert once
+	fi
 
 	IFS=';' read -a pidsArray <<< "$pids"
 	pidCount=${#pidsArray[@]}
@@ -641,28 +644,30 @@ function WaitForTaskCompletion {
 		fi
 
 		if [ $exec_time -gt $softMaxTime ]; then
-			if [ $soft_alert != true ] && [ $softMaxTime -ne 0 ] && [ $noErrorLog != true ]; then
+			if [ "$_SOFT_ALERT" != true ] && [ $softMaxTime -ne 0 ] && [ $noErrorLog != true ]; then
 				Logger "Max soft execution time exceeded for task [$callerName] with pids [$(joinString , ${pidsArray[@]})]." "WARN"
-				soft_alert=true
+				_SOFT_ALERT=true
 				SendAlert true
+			fi
+		fi
 
+		if [ $exec_time -gt $hardMaxTime ] && [ $hardMaxTime -ne 0 ]; then
+			if [ $noErrorLog != true ]; then
+				Logger "Max hard execution time exceeded for task [$callerName] with pids [$(joinString , ${pidsArray[@]})]. Stopping task execution." "ERROR"
 			fi
-			if [ $exec_time -gt $hardMaxTime ] && [ $hardMaxTime -ne 0 ]; then
-				if [ $noErrorLog != true ]; then
-					Logger "Max hard execution time exceeded for task [$callerName] with pids [$(joinString , ${pidsArray[@]})]. Stopping task execution." "ERROR"
+			for pid in "${pidsArray[@]}"; do
+				KillChilds $pid true
+				if [ $? == 0 ]; then
+					Logger "Task with pid [$pid] stopped successfully." "NOTICE"
+				else
+					Logger "Could not stop task with pid [$pid]." "ERROR"
 				fi
-				for pid in "${pidsArray[@]}"; do
-					KillChilds $pid true
-					if [ $? == 0 ]; then
-						Logger "Task with pid [$pid] stopped successfully." "NOTICE"
-					else
-						Logger "Could not stop task with pid [$pid]." "ERROR"
-					fi
-				done
-				if [ $noErrorLog != true ]; then
-					SendAlert true
-				fi
+				errorcount=$((errorcount+1))
+			done
+			if [ $noErrorLog != true ]; then
+				SendAlert true
 			fi
+			return $errorcount
 		fi
 
 		for pid in "${pidsArray[@]}"; do
@@ -704,8 +709,8 @@ function WaitForTaskCompletion {
 
 	# Return exit code if only one process was monitored, else return number of errors
 	# As we cannot return multiple values, a global variable WAIT_FOR_TASK_COMPLETION contains all pids with their return value
-	if [ $pidCount -eq 1 ] && [ $errorcount -eq 0 ]; then
-		return $errorcount
+	if [ $pidCount -eq 1 ]; then
+		return $retval
 	else
 		return $errorcount
 	fi
@@ -731,7 +736,6 @@ function ParallelExec {
 
 	__CheckArguments 2-11 $# ${FUNCNAME[0]} "$@"				#__WITH_PARANOIA_DEBUG
 
-	local soft_alert=false # Does a soft alert need to be triggered, if yes, send an alert once
 	local log_ttime=0 # local time instance for comparaison
 
 	local seconds_begin=$SECONDS # Seconds since the beginning of the script
@@ -750,6 +754,10 @@ function ParallelExec {
 	local commandsArrayPid
 
 	local hasPids=false # Are any valable pids given to function ?		#__WITH_PARANOIA_DEBUG
+
+	if [ $counting == true ]; then 	# If counting == false _SOFT_ALERT should be a global value so no more than one soft alert is shown
+		local _SOFT_ALERT=false # Does a soft alert need to be triggered, if yes, send an alert once
+	fi
 
 	if [ $readFromFile == true ];then
 		if [ -f "$commandsArg" ]; then
@@ -786,31 +794,29 @@ function ParallelExec {
 		fi
 
 		if [ $exec_time -gt $softMaxTime ]; then
-			if [ $soft_alert != true ] && [ $softMaxTime -ne 0 ] && [ $noErrorLog != true ]; then
+			if [ "$_SOFT_ALERT" != true ] && [ $softMaxTime -ne 0 ] && [ $noErrorLog != true ]; then
 				Logger "Max soft execution time exceeded for task [$callerName] with pids [$(joinString , ${pidsArray[@]})]." "WARN"
-				soft_alert=true
+				_SOFT_ALERT=true
 				SendAlert true
-
 			fi
-			if [ $exec_time -gt $hardMaxTime ] && [ $hardMaxTime -ne 0 ]; then
-				if [ $noErrorLog != true ]; then
-					Logger "Max hard execution time exceeded for task [$callerName] with pids [$(joinString , ${pidsArray[@]})]. Stopping task execution." "ERROR"
-				fi
-				for pid in "${pidsArray[@]}"; do
-					KillChilds $pid true
-					if [ $? == 0 ]; then
-						Logger "Task with pid [$pid] stopped successfully." "NOTICE"
-					else
-						Logger "Could not stop task with pid [$pid]." "ERROR"
-					fi
-				done
-				if [ $noErrorLog != true ]; then
-					SendAlert true
+		fi
+		if [ $exec_time -gt $hardMaxTime ] && [ $hardMaxTime -ne 0 ]; then
+			if [ $noErrorLog != true ]; then
+				Logger "Max hard execution time exceeded for task [$callerName] with pids [$(joinString , ${pidsArray[@]})]. Stopping task execution." "ERROR"
+			fi
+			for pid in "${pidsArray[@]}"; do
+				KillChilds $pid true
+				if [ $? == 0 ]; then
+					Logger "Task with pid [$pid] stopped successfully." "NOTICE"
 				else
-					Logger "$commandCount $counter ${#pidsArray[@]}" "NOTICE"
-					# Return the number of commands that haven't run / finished run
-					return $(($commandCount - $counter + ${#pidsArray[@]}))
+					Logger "Could not stop task with pid [$pid]." "ERROR"
 				fi
+			done
+			if [ $noErrorLog != true ]; then
+				SendAlert true
+			else
+				# Return the number of commands that haven't run / finished run
+				return $(($commandCount - $counter + ${#pidsArray[@]}))
 			fi
 		fi
 
