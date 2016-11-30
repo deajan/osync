@@ -7,6 +7,11 @@ KNOWN ISSUES
 RECENT CHANGES
 --------------
 
+dd mmm YYYY: osync v1.1.6 released
+- SLEEP_TIME, SOFT_MAX_EXEC_TIME and HARD_MAX_EXEC_TIME can now be set as environment variables
+- Backported unit tests from v1.2-beta allowing to fix the following
+	- HARD_MAX_EXEC_TIME wasn't enforced properly
+
 17 Nov 2016: osync v1.1.5 released
 - Backported unit tests from v1.2-beta allowing to fix the following
 	- Allow quicksync mode to specify rsync include / exclude patterns as environment variables
