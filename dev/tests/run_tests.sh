@@ -7,7 +7,11 @@
 
 ## On CYGWIN / MSYS, ACL and extended attributes aren't supported
 
-# osync test suite 2016112901
+
+# TODO: add waitfortaskcompletion tests compat with v1.1
+# TODO: render timed execution checks compat with v1.1 (only using config files)
+
+# osync test suite 2016113001
 
 # 4 tests:
 # quicklocal
@@ -32,7 +36,7 @@
 # ParallelExec
 # daemon mode tests for both config files
 
-#TODO: on BSD, remount UFS with ACL support using mount -o acls /
+# on BSD, remount UFS with ACL support using mount -o acls /
 # setfacl needs double ':' to be compatible with both linux and BSD
 # setfacl -m o::rwx file
 
@@ -832,14 +836,46 @@ function test_Locking () {
 }
 
 function test_WaitForTaskCompletion () {
+	local pids
+
+	# Tests compatible with v1.1 syntax
 	if [ "$OSYNC_MIN_VERSION" == "1" ]; then
 		echo "Skipping WaitForTaskCompletion test because osync v1.1 does not support multiple pid monitoring"
+
+		# Standard wait
+		sleep 2 &
+		WaitForTaskCompletion $! 0 0 ${FUNCNAME[0]}
+		assertEquals "WaitForTaskCompletion v1.1 test 1" "0" $?
+
+		# Standard wait with warning
+		sleep 5 &
+		WaitForTaskCompletion $! 3 0 ${FUNCNAME[0]}
+		assertEquals "WaitForTaskCompletion test 2" "0" $?
+
+		# Pid is killed
+		sleep 5 &
+		WaitForTaskCompletion $! 0 2 ${FUNCNAME[0]}
+		assertEquals "WaitForTaskCompletion test 3" "1" $?
+
+		# Standard wait
+		sleep 2 &
+		WaitForCompletion $! 0 0 ${FUNCNAME[0]}
+		assertEquals "WaitForTaskCompletion v1.1 test 1" "0" $?
+
+		# Standard wait with warning
+		sleep 5 &
+		WaitForCompletion $! 3 0 ${FUNCNAME[0]}
+		assertEquals "WaitForTaskCompletion test 2" "0" $?
+
+		# Pid is killed
+		sleep 5 &
+		WaitForCompletion $! 0 2 ${FUNCNAME[0]}
+		assertEquals "WaitForTaskCompletion test 3" "1" $?
+
 		return 0
 	fi
 
-	local pids
-
-	# Tests if wait for task completion works correctly
+	# Tests if wait for task completion works correctly with v1.2+
 
 	# Standard wait
 	sleep 1 &
