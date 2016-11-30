@@ -5,7 +5,9 @@
 ## On Mac OSX, this needs to be run as root in order to use sudo without password
 ## From current terminal run sudo -s in order to get a new terminal as root
 
-# osync test suite 2016112108
+## On CYGWIN / MSYS, ACL and extended attributes aren't supported
+
+# osync test suite 2016113002
 
 # 4 tests:
 # quicklocal
@@ -23,13 +25,14 @@
 # 	replica lock checks
 #	file attribute tests
 # 	local / remote locking resume tests
+#	timed execution tests
 
 # function test
 # WaitForTaskCompletion
 # ParallelExec
 # daemon mode tests for both config files
 
-#TODO: on BSD, remount UFS with ACL support using mount -o acls /
+# on BSD, remount UFS with ACL support using mount -o acls /
 # setfacl needs double ':' to be compatible with both linux and BSD
 # setfacl -m o::rwx file
 
@@ -77,26 +80,6 @@ OSYNC_IS_STABLE=maybe
 
 # Setup an array with all function modes
 #declare -Ag osyncParameters
-
-readonly __quickLocal=0
-readonly __quickRemote=1
-readonly __confLocal=2
-readonly __confRemote=3
-
-osyncParameters=()
-osyncParameters[$__quickLocal]="--initiator=$INITIATOR_DIR --target=$TARGET_DIR --instance-id=quicklocal"
-osyncParameters[$__quickRemote]="--initiator=$INITIATOR_DIR --target=ssh://localhost:$SSH_PORT/$TARGET_DIR --rsakey=${HOME}/.ssh/id_rsa_local --instance-id=quickremote"
-osyncParameters[$__confLocal]="$CONF_DIR/$LOCAL_CONF"
-osyncParameters[$__confRemote]="$CONF_DIR/$REMOTE_CONF"
-
-#declare -Ag osyncDaemonParameters
-osyncDaemonParameters=()
-
-readonly __local
-readonly __remote
-
-osyncDaemonParameters[$__local]="$CONF_DIR/$LOCAL_CONF --on-changes"
-osyncDaemonParameters[$__remote]="$CONF_DIR/$REMOTE_CONF --on-changes"
 
 function GetConfFileValue () {
 	local file="${1}"
@@ -205,9 +188,33 @@ function oneTimeSetUp () {
 	START_TIME=$SECONDS
 
 	source "$DEV_DIR/ofunctions.sh"
-	SetupSSH
-
 	GetLocalOS
+
+	# Setup modes per test
+	readonly __quickLocal=0
+	readonly __quickRemote=1
+	readonly __confLocal=2
+	readonly __confRemote=3
+
+	osyncParameters=()
+	osyncParameters[$__quickLocal]="--initiator=$INITIATOR_DIR --target=$TARGET_DIR --instance-id=quicklocal"
+	osyncParameters[$__confLocal]="$CONF_DIR/$LOCAL_CONF"
+
+	osyncDaemonParameters=()
+
+	readonly __local
+	readonly __remote
+
+	osyncDaemonParameters[$__local]="$CONF_DIR/$LOCAL_CONF --on-changes"
+
+	if [ "$LOCAL_OS" != "msys" ]; then
+		osyncParameters[$__quickRemote]="--initiator=$INITIATOR_DIR --target=ssh://localhost:$SSH_PORT/$TARGET_DIR --rsakey=${HOME}/.ssh/id_rsa_local --instance-id=quickremote"
+		osyncParameters[$__confRemote]="$CONF_DIR/$REMOTE_CONF"
+
+		osyncDaemonParameters[$__remote]="$CONF_DIR/$REMOTE_CONF --on-changes"
+
+		SetupSSH
+	fi
 
 	#TODO: Assuming that macos has the same syntax than bsd here
 	if [ "$LOCAL_OS" == "BSD" ] || [ "$LOCAL_OS" == "MacOSX" ]; then
@@ -258,7 +265,7 @@ function test_Merge () {
 	SetConfFileValue "$OSYNC_DIR/$OSYNC_EXECUTABLE" "IS_STABLE" "yes"
 }
 
-function test_LargeFileSet () {
+function nope_test_LargeFileSet () {
 	for i in "${osyncParameters[@]}"; do
 		cd "$OSYNC_DIR"
 
@@ -276,7 +283,7 @@ function test_LargeFileSet () {
 	done
 }
 
-function test_Exclusions () {
+function nope_test_Exclusions () {
 	# Will sync except php files
 	# RSYNC_EXCLUDE_PATTERN="*.php" is set at runtime for quicksync and in config files for other runs
 
@@ -296,7 +303,6 @@ function test_Exclusions () {
 		REMOTE_HOST_PING=no RSYNC_EXCLUDE_PATTERN="*.php" ./$OSYNC_EXECUTABLE $i
 		assertEquals "Exclusions with parameters [$i]." "0" $?
 
-		#WIP Add exclusion from file tests here
 		numberOfInitiatorFiles=$(find "$INITIATOR_DIR" ! -wholename "$INITIATOR_DIR/$OSYNC_WORKDIR*" | wc -l)
 		numberOfTargetFiles=$(find "$TARGET_DIR" ! -wholename "$TARGET_DIR/$OSYNC_WORKDIR*" | wc -l)
 		numberOfExcludedFiles=$((numberOfInitiatorFiles-numberOfTargetFiles))
@@ -305,7 +311,7 @@ function test_Exclusions () {
 	done
 }
 
-function test_Deletetion () {
+function nope_test_Deletetion () {
 	local iFile1="$INITIATOR_DIR/ific"
 	local iFile2="$INITIATOR_DIR/ifoc"
 	local tFile1="$TARGET_DIR/tfic"
@@ -349,7 +355,11 @@ function test_Deletetion () {
 	done
 }
 
-function test_deletion_failure () {
+function nope_test_deletion_failure () {
+	if [ "$LOCAL_OS" == "WinNT10" ]; then
+		echo "Skipping deletion failure test as Win10 does not have chattr  support."
+		return 0
+	fi
 
 	for i in "${osyncParameters[@]}"; do
 		cd "$OSYNC_DIR"
@@ -411,7 +421,7 @@ function test_deletion_failure () {
 	done
 }
 
-function test_skip_deletion () {
+function nope_test_skip_deletion () {
 	local modes
 
 	if [ "$OSYNC_MIN_VERSION" == "1" ]; then
@@ -482,7 +492,7 @@ function test_skip_deletion () {
 	SetConfFileValue "$CONF_DIR/$REMOTE_CONF" "SKIP_DELETION" ""
 }
 
-function test_softdeletion_cleanup () {
+function nope_test_softdeletion_cleanup () {
 	#declare -A files
 
 	files=()
@@ -511,8 +521,8 @@ function test_softdeletion_cleanup () {
 
 			touch "$file.new"
 
-			if [ "$TRAVIS_RUN" == true ] || [ "$LOCAL_OS" == "BSD" ] || [ "$LOCAL_OS" == "MacOSX" ]; then
-				echo "Skipping changing ctime on file because travis / bsd / macos does not support debugfs"
+			if [ "$TRAVIS_RUN" == true ] || [ "$LOCAL_OS" == "BSD" ] || [ "$LOCAL_OS" == "MacOSX" ] || [ "$LOCAL_OS" == "WinNT10" ] || [ "LOCAL_OS" == "msys" ]; then
+				echo "Skipping changing ctime on file because travis / bsd / macos / Win10 / msys / cygwin does not support debugfs"
 			else
 				CreateOldFile "$file.old"
 			fi
@@ -526,7 +536,7 @@ function test_softdeletion_cleanup () {
 			[ -f "$file.new" ]
 			assertEquals "New softdeleted / backed up file [$file.new] exists." "0" $?
 
-			if [ "$TRAVIS_RUN" == true ] || [ "$LOCAL_OS" == "BSD" ] || [ "$LOCAL_OS" == "MacOSX" ]; then
+			if [ "$TRAVIS_RUN" == true ] || [ "$LOCAL_OS" == "BSD" ] || [ "$LOCAL_OS" == "MacOSX" ] || [ "$LOCAL_OS" == "WinNT10" ] || [ "$LOCAL_OS" == "msys" ]; then
 				[ ! -f "$file.old" ]
 				assertEquals "Old softdeleted / backed up file [$file.old] is deleted permanently." "0" $?
 			else
@@ -538,7 +548,7 @@ function test_softdeletion_cleanup () {
 
 }
 
-function test_FileAttributePropagation () {
+function nope_test_FileAttributePropagation () {
 
 	if [ "$TRAVIS_RUN" == true ]; then
 		echo "Skipping FileAttributePropagation tests as travis does not support getfacl / setfacl."
@@ -616,7 +626,7 @@ function test_FileAttributePropagation () {
 	done
 }
 
-function test_ConflictBackups () {
+function nope_test_ConflictBackups () {
 	for i in "${osyncParameters[@]}"; do
 		cd "$OSYNC_DIR"
 		PrepareLocalDirs
@@ -652,7 +662,7 @@ function test_ConflictBackups () {
 	done
 }
 
-function test_MultipleConflictBackups () {
+function nope_test_MultipleConflictBackups () {
 
 	local additionalParameters
 
@@ -712,7 +722,7 @@ function test_MultipleConflictBackups () {
 	SetConfFileValue "$CONF_DIR/$REMOTE_CONF" "CONFLICT_BACKUP_MULTIPLE" "no"
 }
 
-function test_Locking () {
+function nope_test_Locking () {
 	local forceStrangerUnlockLocal
 	local forceStrangerUnlockRemote
 
@@ -822,21 +832,60 @@ function test_Locking () {
 }
 
 function test_WaitForTaskCompletion () {
+	local pids
+
+	# Tests compatible with v1.1 syntax
+
+	# These tests aren't really effective because in any case, output from WaitFor functions is always 0, which was a bad behavior in v1.1
+
 	if [ "$OSYNC_MIN_VERSION" == "1" ]; then
-		echo "Skipping WaitForTaskCompletion test because osync v1.1 does not support multiple pid monitoring"
+		echo "Using v1.1 WaitForTaskCompletion test"
+
+		# Needed in order to get PROCESS_nope_test_CMD value
+		InitLocalOSSettings
+
+		# Standard wait
+		sleep 2 &
+		pid=$!
+		WaitForTaskCompletion $pid 0 0 ${FUNCNAME[0]}
+		assertEquals "WaitForTaskCompletion v1.1 test 1" "0" $?
+
+		# Standard wait with warning
+		sleep 5 &
+		WaitForTaskCompletion $! 3 0 ${FUNCNAME[0]}
+		assertEquals "WaitForTaskCompletion v1.1 test 2" "0" $?
+
+		# Pid is killed
+		sleep 5 &
+		WaitForTaskCompletion $! 0 2 ${FUNCNAME[0]}
+		assertEquals "WaitForTaskCompletion v1.1 test 3" "1" $?
+
+		# Standard wait
+		sleep 2 &
+		WaitForCompletion $! 0 0 ${FUNCNAME[0]}
+		assertEquals "WaitForCompletion test 1" "0" $?
+
+		# Standard wait with warning
+		sleep 5 &
+		WaitForCompletion $! 3 0 ${FUNCNAME[0]}
+		assertEquals "WaitForCompletion test 2" "0" $?
+
+		# Pid is killed
+		sleep 5 &
+		WaitForCompletion $! 0 2 ${FUNCNAME[0]}
+		assertEquals "WaitForCompletion test 3" "1" $?
+
 		return 0
 	fi
 
-	local pids
-
-	# Tests if wait for task completion works correctly
+	# Tests if wait for task completion works correctly with v1.2+
 
 	# Standard wait
 	sleep 1 &
 	pids="$!"
 	sleep 2 &
 	pids="$pids;$!"
-	WaitForTaskCompletion $pids 0 0 ${FUNCNAME[0]} true 0
+	WaitForTaskCompletion $pids 0 0 $SLEEP_TIME $KEEP_LOGGING true true false ${FUNCNAME[0]}
 	assertEquals "WaitForTaskCompletion test 1" "0" $?
 
 	# Standard wait with warning
@@ -845,7 +894,7 @@ function test_WaitForTaskCompletion () {
 	sleep 5 &
 	pids="$pids;$!"
 
-	WaitForTaskCompletion $pids 3 0 ${FUNCNAME[0]} true 0
+	WaitForTaskCompletion $pids 3 0 $SLEEP_TIME $KEEP_LOGGING true true false ${FUNCNAME[0]}
 	assertEquals "WaitForTaskCompletion test 2" "0" $?
 
 	# Both pids are killed
@@ -854,7 +903,7 @@ function test_WaitForTaskCompletion () {
 	sleep 5 &
 	pids="$pids;$!"
 
-	WaitForTaskCompletion $pids 0 2 ${FUNCNAME[0]} true 0
+	WaitForTaskCompletion $pids 0 2 $SLEEP_TIME $KEEP_LOGGING true true false ${FUNCNAME[0]}
 	assertEquals "WaitForTaskCompletion test 3" "2" $?
 
 	# One of two pids are killed
@@ -863,7 +912,7 @@ function test_WaitForTaskCompletion () {
 	sleep 10 &
 	pids="$pids;$!"
 
-	WaitForTaskCompletion $pids 0 3 ${FUNCNAME[0]} true 0
+	WaitForTaskCompletion $pids 0 3 $SLEEP_TIME $KEEP_LOGGING true true false ${FUNCNAME[0]}
 	assertEquals "WaitForTaskCompletion test 4" "1" $?
 
 	# Count since script begin, the following should output two warnings and both pids should get killed
@@ -872,19 +921,17 @@ function test_WaitForTaskCompletion () {
 	sleep 20 &
 	pids="$pids;$!"
 
-	WaitForTaskCompletion $pids 3 5 ${FUNCNAME[0]} false 0
+	WaitForTaskCompletion $pids 3 5 $SLEEP_TIME $KEEP_LOGGING false true false ${FUNCNAME[0]}
 	assertEquals "WaitForTaskCompletion test 5" "2" $?
 }
 
-function test_ParallelExec () {
+function nope_test_ParallelExec () {
 	if [ "$OSYNC_MIN_VERSION" == "1" ]; then
-		echo "Skipping ParallelExec test because osync v1.1 didn't have this"
+		echo "Skipping ParallelExec test because osync v1.1 ofunctions don't have this function."
 		return 0
 	fi
 
 	local cmd
-
-
 
 	# Test if parallelExec works correctly in array mode
 
@@ -923,9 +970,71 @@ function test_ParallelExec () {
 	ParallelExec 3 "$TMP_FILE" true
 	assertEquals "ParallelExec test 6" "2" $?
 
+	#function ParallelExec $numberOfProcesses $commandsArg $readFromFile $softTime $HardTime $sleepTime $keepLogging $counting $Spinner $noError $callerName
+	# Test if parallelExec works correctly in array mode with full  time control
+
+	cmd="sleep 5;sleep 5;sleep 5;sleep 5;sleep 5"
+	ParallelExec 4 "$cmd" false 1 0 .05 3600 true true false ${FUNCNAME[0]}
+	assertEquals "ParallelExec full test 1" "0" $?
+
+	cmd="sleep 2;du /none;sleep 2;sleep 2;sleep 4"
+	ParallelExec 2 "$cmd" false 0 0 .1 2 true false false ${FUNCNAME[0]}
+	assertEquals "ParallelExec full test 2" "1" $?
+
+	cmd="sleep 4;du /none;sleep 3;du /none;sleep 2"
+	ParallelExec 3 "$cmd" false 1 2 .05 7000 true true false ${FUNCNAME[0]}
+	assertNotEquals "ParallelExec full test 3" "0" $?
+
 }
 
-function test_UpgradeConfRun () {
+function test_timedExecution () {
+	local arguments
+	local warnExitCode
+
+	# Clever usage of indexes and exit codes
+	# osync exits with 0 when no problem detected
+	# exits with 1 when error detected (triggered by reaching HARD_MAX_EXEC_TIME)
+	# exits with 2 when warning only detected (triggered by reaching SOFT_MAX_EXEC_TIME)
+
+	softTimes=()
+	softTimes[0]=7200 	# original values (to be executed at last in order to leave config file in original state)
+	hardTimes[0]=10600
+	softTimes[1]=0
+	hardTimes[1]=3
+	softTimes[2]=2
+	hardTimes[2]=10600
+
+	for x in 2 1 0; do
+
+		SetConfFileValue "$CONF_DIR/$LOCAL_CONF" "SOFT_MAX_EXEC_TIME" ${softTimes[$x]}
+		SetConfFileValue "$CONF_DIR/$LOCAL_CONF" "HARD_MAX_EXEC_TIME" ${hardTimes[$x]}
+		SetConfFileValue "$CONF_DIR/$REMOTE_CONF" "SOFT_MAX_EXEC_TIME" ${softTimes[$x]}
+		SetConfFileValue "$CONF_DIR/$REMOTE_CONF" "HARD_MAX_EXEC_TIME" ${hardTimes[$x]}
+
+		for i in "${osyncParameters[@]}"; do
+			cd "$OSYNC_DIR"
+			PrepareLocalDirs
+
+			echo "Test with args [$i $arguments]."
+			SLEEP_TIME=1 SOFT_MAX_EXEC_TIME=${softTimes[$x]} HARD_MAX_EXEC_TIME=${hardTimes[$x]} ./$OSYNC_EXECUTABLE $i
+			retval=$?
+			if [ "$OSYNC_MIN_VERSION" -gt 1 ]; then
+	        		assertEquals "Timed Execution test with timed SOFT_MAX_EXEC_TIME=${softTimes[$x]} and HARD_MAX_EXEC_TIME=${hardTimes[$x]}." $x $retval
+			else
+				# osync v1.1 had different exit codes, 240 was warning, anything else than 0 was error
+				if [ $x -eq 2 ]; then
+		        		assertEquals "Timed Execution test with timed SOFT_MAX_EXEC_TIME=${softTimes[$x]} and HARD_MAX_EXEC_TIME=${hardTimes[$x]}." 240 $retval
+				elif [ $x -eq 1 ]; then
+		        		assertNotEquals "Timed Execution test with timed SOFT_MAX_EXEC_TIME=${softTimes[$x]} and HARD_MAX_EXEC_TIME=${hardTimes[$x]}." 0 $retval
+				else
+		        		assertEquals "Timed Execution test with timed SOFT_MAX_EXEC_TIME=${softTimes[$x]} and HARD_MAX_EXEC_TIME=${hardTimes[$x]}." 0 $retval
+				fi
+			fi
+		done
+	done
+}
+
+function nope_test_UpgradeConfRun () {
 	if [ "$OSYNC_MIN_VERSION" == "1" ]; then
 		echo "Skipping Upgrade script test because no further dev will happen on this for v1.1"
 		return 0
@@ -947,7 +1056,11 @@ function test_UpgradeConfRun () {
         rm -f "$CONF_DIR/$TMP_OLD_CONF.save"
 }
 
-function test_DaemonMode () {
+function nope_test_DaemonMode () {
+	if [ "$LOCAL_OS" == "WinNT10" ] || [ "$LOCAL_OS" == "msys" ]; then
+		echo "Skipping daemon mode test as Win10 does not have inotifywait support."
+		return 0
+	fi
 
 	for i in "${osyncDaemonParameters[@]}"; do
 
@@ -991,14 +1104,14 @@ function test_DaemonMode () {
 		assertEquals "File [$INITIATOR_DIR/$OSYNC_DELETE_DIR/$FileB] should be in soft deletion dir." "0" $?
 
 		[ -f "$TARGET_DIR/$FileC" ]
-		assertEquals "$File [$TARGET_DIR/$FileC] should be synced." "0" $?
+		assertEquals "File [$TARGET_DIR/$FileC] should be synced." "0" $?
 
 		kill $pid
 	done
 
 }
 
-function test_NoRemoteAccessTest () {
+function nope_test_NoRemoteAccessTest () {
 	RemoveSSH
 
         cd "$OSYNC_DIR"
