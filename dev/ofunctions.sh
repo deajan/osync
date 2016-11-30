@@ -1,4 +1,4 @@
-## FUNC_BUILD=2016071902-g
+## FUNC_BUILD=2016071902-h
 ## BEGIN Generic functions for osync & obackup written in 2013-2016 by Orsiris de Jong - http://www.netpower.fr - ozy@netpower.fr
 
 ## type -p does not work on platforms other than linux (bash). If if does not work, always assume output is not a zero exitcode
@@ -38,12 +38,14 @@ fi						#__WITH_PARANOIA_DEBUG
 ## allow debugging from command line with _DEBUG=yes
 if [ ! "$_DEBUG" == "yes" ]; then
 	_DEBUG=no
-	SLEEP_TIME=.1
 	_VERBOSE=0
 else
-	SLEEP_TIME=1
 	trap 'TrapError ${LINENO} $?' ERR
 	_VERBOSE=1
+fi
+
+if [ "$SLEEP_TIME" == "" ]; then
+	SLEEP_TIME=.1
 fi
 
 SCRIPT_PID=$$
@@ -764,10 +766,10 @@ function WaitForTaskCompletion {
 				KillChilds $pid
 				if [ $? == 0 ]; then
 					Logger "Task stopped successfully" "NOTICE"
-					return 0
 				else
-					return 1
+					Logger "Could not stop task" "ERROR"
 				fi
+				return 1
 			fi
 		fi
 		sleep $SLEEP_TIME
@@ -814,10 +816,16 @@ function WaitForCompletion {
 				KillChilds $pid
 				if [ $? == 0 ]; then
 					Logger "Task stopped successfully" "NOTICE"
-					return 0
 				else
-					return 1
+					Logger "Could not stop task" "ERROR"
 				fi
+				return 1
+				#if [ $? == 0 ]; then
+				#	Logger "Task stopped successfully" "NOTICE"
+				#	return 0
+				#else
+				#	return 1
+				#fi
 			fi
 		fi
 		sleep $SLEEP_TIME

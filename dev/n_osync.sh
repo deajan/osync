@@ -3,8 +3,8 @@
 PROGRAM="osync" # Rsync based two way sync engine with fault tolerance
 AUTHOR="(C) 2013-2016 by Orsiris de Jong"
 CONTACT="http://www.netpower.fr/osync - ozy@netpower.fr"
-PROGRAM_VERSION=1.1.5
-PROGRAM_BUILD=2016111701
+PROGRAM_VERSION=1.1.6-beta
+PROGRAM_BUILD=2016113001
 IS_STABLE=yes
 
 source "./ofunctions.sh"
@@ -28,7 +28,7 @@ function TrapStop {
 }
 
 function TrapQuit {
-	local exitcode=
+	local exitcode
 
 	# Get ERROR / WARN alert flags from subprocesses that call Logger
 	if [ -f "$RUN_DIR/$PROGRAM.Logger.warn.$SCRIPT_PID" ]; then
@@ -1652,7 +1652,6 @@ do
 		;;
 		--initiator=*)
 		_QUICK_SYNC=$(($_QUICK_SYNC + 1))
-		no_maxtime=1
 		INITIATOR_SYNC_DIR=${i##*=}
 		opts=$opts" --initiator=\"$INITIATOR_SYNC_DIR\""
 		;;
@@ -1660,7 +1659,6 @@ do
 		_QUICK_SYNC=$(($_QUICK_SYNC + 1))
 		TARGET_SYNC_DIR=${i##*=}
 		opts=$opts" --target=\"$TARGET_SYNC_DIR\""
-		no_maxtime=1
 		;;
 		--rsakey=*)
 		SSH_RSA_PRIVATE_KEY=${i##*=}
@@ -1772,7 +1770,7 @@ opts="${opts# *}"
 		GetRemoteOS
 		InitRemoteOSSettings
 
-		if [ $no_maxtime -eq 1 ]; then
+		if [ $no_maxtime -eq 1 ] ; then
 			SOFT_MAX_EXEC_TIME=0
 			HARD_MAX_EXEC_TIME=0
 		fi
