@@ -7,11 +7,7 @@
 
 ## On CYGWIN / MSYS, ACL and extended attributes aren't supported
 
-
-# TODO: add waitfortaskcompletion tests compat with v1.1
-# TODO: render timed execution checks compat with v1.1 (only using config files)
-
-# osync test suite 2016113001
+# osync test suite 2016113002
 
 # 4 tests:
 # quicklocal
@@ -839,38 +835,45 @@ function test_WaitForTaskCompletion () {
 	local pids
 
 	# Tests compatible with v1.1 syntax
+
+	# These tests aren't really effective because in any case, output from WaitFor functions is always 0, which was a bad behavior in v1.1
+
 	if [ "$OSYNC_MIN_VERSION" == "1" ]; then
-		echo "Skipping WaitForTaskCompletion test because osync v1.1 does not support multiple pid monitoring"
+		echo "Using v1.1 WaitForTaskCompletion test"
+
+		# Needed in order to get PROCESS_test_CMD value
+		InitLocalOSSettings
 
 		# Standard wait
 		sleep 2 &
-		WaitForTaskCompletion $! 0 0 ${FUNCNAME[0]}
+		pid=$!
+		WaitForTaskCompletion $pid 0 0 ${FUNCNAME[0]}
 		assertEquals "WaitForTaskCompletion v1.1 test 1" "0" $?
 
 		# Standard wait with warning
 		sleep 5 &
 		WaitForTaskCompletion $! 3 0 ${FUNCNAME[0]}
-		assertEquals "WaitForTaskCompletion test 2" "0" $?
+		assertEquals "WaitForTaskCompletion v1.1 test 2" "0" $?
 
 		# Pid is killed
 		sleep 5 &
 		WaitForTaskCompletion $! 0 2 ${FUNCNAME[0]}
-		assertEquals "WaitForTaskCompletion test 3" "1" $?
+		assertEquals "WaitForTaskCompletion v1.1 test 3" "1" $?
 
 		# Standard wait
 		sleep 2 &
 		WaitForCompletion $! 0 0 ${FUNCNAME[0]}
-		assertEquals "WaitForTaskCompletion v1.1 test 1" "0" $?
+		assertEquals "WaitForCompletion test 1" "0" $?
 
 		# Standard wait with warning
 		sleep 5 &
 		WaitForCompletion $! 3 0 ${FUNCNAME[0]}
-		assertEquals "WaitForTaskCompletion test 2" "0" $?
+		assertEquals "WaitForCompletion test 2" "0" $?
 
 		# Pid is killed
 		sleep 5 &
 		WaitForCompletion $! 0 2 ${FUNCNAME[0]}
-		assertEquals "WaitForTaskCompletion test 3" "1" $?
+		assertEquals "WaitForCompletion test 3" "1" $?
 
 		return 0
 	fi
@@ -986,10 +989,7 @@ function test_ParallelExec () {
 
 function test_timedExecution () {
 	local arguments
-
-	#if [ "$OSYNC_MIN_VERSION" -gt "1" ]; then
-	#	arguments="--errors-only"
-	#fi
+	local warnExitCode
 
 	# Clever usage of indexes and exit codes
 	# osync exits with 0 when no problem detected
@@ -999,7 +999,7 @@ function test_timedExecution () {
 	softTimes=()
 	softTimes[0]=7200 	# original values (to be executed at last in order to leave config file in original state)
 	hardTimes[0]=10600
-	softTimes[1]=3600
+	softTimes[1]=0
 	hardTimes[1]=3
 	softTimes[2]=2
 	hardTimes[2]=10600
@@ -1012,13 +1012,24 @@ function test_timedExecution () {
 		SetConfFileValue "$CONF_DIR/$REMOTE_CONF" "HARD_MAX_EXEC_TIME" ${hardTimes[$x]}
 
 		for i in "${osyncParameters[@]}"; do
-
 			cd "$OSYNC_DIR"
 			PrepareLocalDirs
 
 			echo "Test with args [$i $arguments]."
-			SLEEP_TIME=1 SOFT_MAX_EXEC_TIME=${softTimes[$x]} HARD_MAX_EXEC_TIME=${hardTimes[$x]} ./$OSYNC_EXECUTABLE $i $arguments
-		        assertEquals "Timed Execution test with timed SOFT_MAX_EXEC_TIME=${softTimes[$x]} and HARD_MAX_EXEC_TIME=${hardTimes[$x]}." $x $?
+			SLEEP_TIME=1 SOFT_MAX_EXEC_TIME=${softTimes[$x]} HARD_MAX_EXEC_TIME=${hardTimes[$x]} ./$OSYNC_EXECUTABLE $i
+			retval=$?
+			if [ "$OSYNC_MIN_VERSION" -gt 1 ]; then
+	        		assertEquals "Timed Execution test with timed SOFT_MAX_EXEC_TIME=${softTimes[$x]} and HARD_MAX_EXEC_TIME=${hardTimes[$x]}." $x $retval
+			else
+				# osync v1.1 had different exit codes, 240 was warning, anything else than 0 was error
+				if [ $x -eq 2 ]; then
+		        		assertEquals "Timed Execution test with timed SOFT_MAX_EXEC_TIME=${softTimes[$x]} and HARD_MAX_EXEC_TIME=${hardTimes[$x]}." 240 $retval
+				elif [ $x -eq 1 ]; then
+		        		assertNotEquals "Timed Execution test with timed SOFT_MAX_EXEC_TIME=${softTimes[$x]} and HARD_MAX_EXEC_TIME=${hardTimes[$x]}." 0 $retval
+				else
+		        		assertEquals "Timed Execution test with timed SOFT_MAX_EXEC_TIME=${softTimes[$x]} and HARD_MAX_EXEC_TIME=${hardTimes[$x]}." 0 $retval
+				fi
+			fi
 		done
 	done
 }
