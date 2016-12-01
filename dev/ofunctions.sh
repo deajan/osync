@@ -1,6 +1,6 @@
 #### MINIMAL-FUNCTION-SET BEGIN ####
 
-## FUNC_BUILD=2016120101
+## FUNC_BUILD=2016120102
 ## BEGIN Generic bash functions written in 2013-2016 by Orsiris de Jong - http://www.netpower.fr - ozy@netpower.fr
 
 ## To use in a program, define the following variables:
@@ -410,7 +410,8 @@ function SendEmail {
 	fi
 
 	if type mutt > /dev/null 2>&1 ; then
-		echo "$message" | $(type -p mutt) -x -s "$subject" "$destinationMails" $attachment_command
+		# We need to replace spaces with comma in order for mutt to be able to process multiple destinations
+		echo "$message" | $(type -p mutt) -x -s "$subject" "${destinationMails// /,}" $attachment_command
 		if [ $? != 0 ]; then
 			Logger "Cannot send mail via $(type -p mutt) !!!" "WARN"
 		else
@@ -1357,15 +1358,13 @@ function __CheckArguments {
 			IFS='-' read minArgs maxArgs <<< "$numberOfArguments"
 		fi
 
-		if [ "$_PARANOIA_DEBUG" == "yes" ]; then
-			Logger "Entering function [$functionName]." "DEBUG"
-		fi
+		Logger "Entering function [$functionName]." "PARANOIA_DEBUG"
 
 		if ! ([ $countedArguments -ge $minArgs ] && [ $countedArguments -le $maxArgs ]); then
 			Logger "Function $functionName may have inconsistent number of arguments. Expected min: $minArgs, max: $maxArgs, count: $countedArguments, bash seen: $numberOfGivenArguments. see log file." "ERROR"
 			Logger "Arguments passed: $argList" "ERROR"
 		else
-			Logger "Arguments passed: $argList" "VERBOSE"
+			Logger "Arguments passed: $argList" "PARANOIA_DEBUG"
 		fi
 	fi
 }
