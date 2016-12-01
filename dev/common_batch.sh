@@ -3,7 +3,7 @@ SUBPROGRAM=[prgname]
 PROGRAM="$SUBPROGRAM-batch" # Batch program to run osync / obackup instances sequentially and rerun failed ones
 AUTHOR="(L) 2013-2016 by Orsiris de Jong"
 CONTACT="http://www.netpower.fr - ozy@netpower.fr"
-PROGRAM_BUILD=2016112402
+PROGRAM_BUILD=2016120101
 
 ## Runs an osync /obackup instance for every conf file found
 ## If an instance fails, run it again if time permits
@@ -78,7 +78,7 @@ function CheckEnvironment {
 }
 
 function Batch {
-	local runs=0 # Number of batch runs
+	local runs=1 # Number of batch runs
 	local runList # Actual conf file list to run
 	local runAgainList # List of failed conf files sto run again
 
@@ -107,9 +107,10 @@ function Batch {
 		Usage
 	fi
 
-	while ([ $MAX_EXECUTION_TIME -gt $SECONDS ] || [ $MAX_EXECUTION_TIME -eq 0 ]) && [ "$runList" != "" ] && [ $MAX_RUNS -gt $runs ]
+	while ([ $MAX_EXECUTION_TIME -gt $SECONDS ] || [ $MAX_EXECUTION_TIME -eq 0 ]) && [ "$runList" != "" ] && [ $runs -le $MAX_RUNS ]
 	do
-		Logger "$SUBPROGRAM instances will be run for: $runList" "NOTICE"
+		Logger "Sequential run n°$runs of $SUBPROGRAM instances for:" "NOTICE"
+		Logger "$runList" "NOTICE"
 		for confFile in $runList
 		do
 			$SUBPROGRAM_EXECUTABLE "$confFile" --silent $opts &
