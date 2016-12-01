@@ -90,7 +90,7 @@ PRESERVE_EXECUTABILITY=yes
 PRESERVE_ACL=no
 ## Preserve Xattr. Make sure source and target FS can manage identical XATTRS. Disabled on Mac OSX.
 PRESERVE_XATTR=no
-## Transforms symlinks into referent files/dirs
+## Transforms symlinks into referent files/dirs. Be careful as symlinks without referrent will break sync as if standard files could not be copied.
 COPY_SYMLINKS=no
 ## Treat symlinked dirs	as dirs. CAUTION: This also follows symlinks outside of the replica root.
 KEEP_DIRLINKS=no
