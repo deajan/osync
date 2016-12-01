@@ -4,7 +4,7 @@ PROGRAM="osync" # Rsync based two way sync engine with fault tolerance
 AUTHOR="(C) 2013-2016 by Orsiris de Jong"
 CONTACT="http://www.netpower.fr/osync - ozy@netpower.fr"
 PROGRAM_VERSION=1.2-beta3
-PROGRAM_BUILD=2016112902
+PROGRAM_BUILD=2016113001
 IS_STABLE=no
 
 # Execution order						#__WITH_PARANOIA_DEBUG
@@ -730,7 +730,7 @@ function treeList {
 	if ([ $retval == 0 ] || [ $retval == 24 ]) then
 		return $?
 	elif [ $retval == 23 ]; then
-		Logger "Some files could not be listed in [$replicaPath]. Check for failing symlinks." "ERROR"
+		Logger "Some files could not be listed in $replicaType replica [$replicaPath]. Check for failing symlinks." "ERROR"
 		Logger "Command output\n$(cat $RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$replicaType.error.$SCRIPT_PID)" "NOTICE"
 		return 0
 	else
