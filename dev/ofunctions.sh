@@ -1,6 +1,6 @@
 #### MINIMAL-FUNCTION-SET BEGIN ####
 
-## FUNC_BUILD=2016112902
+## FUNC_BUILD=2016120101
 ## BEGIN Generic bash functions written in 2013-2016 by Orsiris de Jong - http://www.netpower.fr - ozy@netpower.fr
 
 ## To use in a program, define the following variables:
@@ -370,7 +370,8 @@ function SendEmail {
 	local smtpPassword="${10}"
 
 	# CheckArguments will report a warning that can be ignored if used in Windows with paranoia debug enabled
-	__CheckArguments 4 $# ${FUNCNAME[0]} "$@"	#__WITH_PARANOIA_DEBUG
+	#TODO: Check whether there must be minimum 3 or maximum 10 args
+	__CheckArguments 3-10 $# ${FUNCNAME[0]} "$@"	#__WITH_PARANOIA_DEBUG
 
 	local mail_no_attachment=
 	local attachment_command=
