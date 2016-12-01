@@ -4,7 +4,7 @@ PROGRAM="osync" # Rsync based two way sync engine with fault tolerance
 AUTHOR="(C) 2013-2016 by Orsiris de Jong"
 CONTACT="http://www.netpower.fr/osync - ozy@netpower.fr"
 PROGRAM_VERSION=1.2-beta3
-PROGRAM_BUILD=2016120101
+PROGRAM_BUILD=2016120102
 IS_STABLE=no
 
 # Execution order						#__WITH_PARANOIA_DEBUG
@@ -1066,14 +1066,13 @@ function _deleteLocal {
 	while read -r files; do
 		## On every run, check wheter the next item is already deleted because it is included in a directory already deleted
 		if [[ "$files" != "$previousFile/"* ]] && [ "$files" != "" ]; then
-
 			if [ "$SOFT_DELETE" != "no" ]; then
 				if [ $_DRYRUN == false ]; then
-					if [ -e "$replicaDir$deletionDir/$files" ]; then
+					if [ -e "$replicaDir$deletionDir/$files" ] || [ -L "$replicaDir$deletionDir/$files" ]; then
 						rm -rf "${replicaDir:?}$deletionDir/$files"
 					fi
 
-					if [ -e "$replicaDir$files" ]; then
+					if [ -e "$replicaDir$files" ] || [ -L "$replicaDir$files" ]; then
 						# In order to keep full path on soft deletion, create parent directories before move
 						parentdir="$(dirname "$files")"
 						if [ "$parentdir" != "." ]; then
@@ -1094,7 +1093,7 @@ function _deleteLocal {
 				fi
 			else
 				if [ $_DRYRUN == false ]; then
-					if [ -e "$replicaDir$files" ]; then
+					if [ -e "$replicaDir$files" ] || [ -L "$replicaDir$files" ]; then
 						rm -rf "$replicaDir$files"
 						result=$?
 						Logger "Deleting [$replicaDir$files]." "VERBOSE"
@@ -1219,11 +1218,11 @@ $SSH_CMD ERROR_ALERT=0 sync_on_changes=$sync_on_changes _DEBUG=$_DEBUG _DRYRUN=$
 
 			if [ "$SOFT_DELETE" != "no" ]; then
 				if [ $_DRYRUN == false ]; then
-					if [ -e "$REPLICA_DIR$DELETION_DIR/$files" ]; then
+					if [ -e "$REPLICA_DIR$DELETION_DIR/$files" ] || [ -L "$REPLICA_DIR$DELETION_DIR/$files" ]; then
 						$COMMAND_SUDO rm -rf "$REPLICA_DIR$DELETION_DIR/$files"
 					fi
 
-					if [ -e "$REPLICA_DIR$files" ]; then
+					if [ -e "$REPLICA_DIR$files" ] || [ -L "$REPLICA_DIR$files" ]; then
 						# In order to keep full path on soft deletion, create parent directories before move
 						parentdir="$(dirname "$files")"
 						if [ "$parentdir" != "." ]; then
@@ -1245,7 +1244,7 @@ $SSH_CMD ERROR_ALERT=0 sync_on_changes=$sync_on_changes _DEBUG=$_DEBUG _DRYRUN=$
 				fi
 			else
 				if [ $_DRYRUN == false ]; then
-					if [ -e "$REPLICA_DIR$files" ]; then
+					if [ -e "$REPLICA_DIR$files" ] || [ -e "$REPLICA_DIR$files" ]; then
 						Logger "Deleting [$REPLICA_DIR$files]." "VERBOSE"
 						$COMMAND_SUDO rm -rf "$REPLICA_DIR$files"
 						if [ $? != 0 ]; then
