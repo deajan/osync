@@ -4,7 +4,7 @@ PROGRAM="osync" # Rsync based two way sync engine with fault tolerance
 AUTHOR="(C) 2013-2016 by Orsiris de Jong"
 CONTACT="http://www.netpower.fr/osync - ozy@netpower.fr"
 PROGRAM_VERSION=1.2-beta3
-PROGRAM_BUILD=2016120103
+PROGRAM_BUILD=2016120301
 IS_STABLE=no
 
 # Execution order						#__WITH_PARANOIA_DEBUG
@@ -49,17 +49,18 @@ _LOGGER_PREFIX="time"
 ## Working directory. This directory exists in any replica and contains state files, backups, soft deleted files etc
 OSYNC_DIR=".osync_workdir"
 
+# The catch CRTL+C behavior can be changed at script entry point with SOFT_STOP=0
 function TrapStop {
-	if [ $SOFT_STOP -eq 0 ]; then
+	if [ $SOFT_STOP -eq 2 ]; then
 		Logger " /!\ WARNING: Manual exit of osync is really not recommended. Sync will be in inconsistent state." "WARN"
 		Logger " /!\ WARNING: If you are sure, please hit CTRL+C another time to quit." "WARN"
 		SOFT_STOP=1
 		return 1
 	fi
 
-	if [ $SOFT_STOP -eq 1 ]; then
-		Logger " /!\ WARNING: CTRL+C hit twice. Exiting osync. Please wait while replicas get unlocked..." "WARN"
-		SOFT_STOP=2
+	if [ $SOFT_STOP -lt 2 ]; then
+		Logger " /!\ WARNING: CTRL+C hit. Exiting osync. Please wait while replicas get unlocked..." "WARN"
+		SOFT_STOP=0
 		exit 2
 	fi
 }
@@ -135,6 +136,7 @@ function CheckEnvironment {
         fi
 }
 
+# Only gets checked in config file mode where all values should be present
 function CheckCurrentConfig {
         __CheckArguments 0 $# "${FUNCNAME[0]}" "$@"    #__WITH_PARANOIA_DEBUG
 
@@ -153,6 +155,7 @@ function CheckCurrentConfig {
         done
 }
 
+# Gets checked in quicksync and config file mode
 function CheckCurrentConfigAll {
         __CheckArguments 0 $# "${FUNCNAME[0]}" "$@"    #__WITH_PARANOIA_DEBUG
 
@@ -2138,6 +2141,8 @@ function SyncOnChanges {
 
 }
 
+#### SCRIPT ENTRY POINT
+
 # quicksync mode settings, overriden by config file
 STATS=false
 PARTIAL=no
@@ -2152,8 +2157,8 @@ no_maxtime=false
 opts=""
 ERROR_ALERT=false
 WARN_ALERT=false
-# Number of CTRL+C
-SOFT_STOP=0
+# Number of CTRL+C needed to stop script
+SOFT_STOP=2
 # Number of given replicas in command line
 _QUICK_SYNC=0
 sync_on_changes=false
