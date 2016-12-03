@@ -1,6 +1,6 @@
 #### MINIMAL-FUNCTION-SET BEGIN ####
 
-## FUNC_BUILD=2016120302
+## FUNC_BUILD=2016120303
 ## BEGIN Generic bash functions written in 2013-2016 by Orsiris de Jong - http://www.netpower.fr - ozy@netpower.fr
 
 ## To use in a program, define the following variables:
@@ -182,11 +182,11 @@ function Logger {
 			_Logger "$prefix$value" "$prefix$value"
 			return
 		fi
-	elif [ "$level" == "PARANOIA_DEBUG" ]; then			#__WITH_PARANOIA_DEBUG
-		if [ "$_PARANOIA_DEBUG" == "yes" ]; then		#__WITH_PARANOIA_DEBUG
-			_Logger "$prefix$value" "$prefix$value"		#__WITH_PARANOIA_DEBUG
-			return						#__WITH_PARANOIA_DEBUG
-		fi							#__WITH_PARANOIA_DEBUG
+	elif [ "$level" == "PARANOIA_DEBUG" ]; then				#__WITH_PARANOIA_DEBUG
+		if [ "$_PARANOIA_DEBUG" == "yes" ]; then			#__WITH_PARANOIA_DEBUG
+			_Logger "$prefix$value" "$prefix\e[35m$value\e[0m"	#__WITH_PARANOIA_DEBUG
+			return							#__WITH_PARANOIA_DEBUG
+		fi								#__WITH_PARANOIA_DEBUG
 	else
 		_Logger "\e[41mLogger function called without proper loglevel [$level].\e[0m"
 		_Logger "Value was: $prefix$value"
@@ -569,9 +569,8 @@ function joinString {
 }
 
 # Time control function for background processes, suitable for multiple synchronous processes
-# Fills a global variable called WAIT_FOR_TASK_COMPLETION that contains list of failed pids in format pid1:result1;pid2:result2
-# Also sets a global variable called HARD_MAX_EXEC_TIME_REACHED to true if hardMaxTime is reached
-# Warning: Don't imbricate this function into another run if you plan to use the global variable output
+# Fills a global variable called WAIT_FOR_TASK_COMPLETION_$callerName that contains list of failed pids in format pid1:result1;pid2:result2
+# Also sets a global variable called HARD_MAX_EXEC_TIME_REACHED_$callerName to true if hardMaxTime is reached
 
 # Standard wait $! emulation would be WaitForTaskCompletion $! 0 0 1 0 true false true false "${FUNCNAME[0]}"
 
@@ -613,8 +612,9 @@ function WaitForTaskCompletion {
 	IFS=';' read -a pidsArray <<< "$pids"
 	pidCount=${#pidsArray[@]}
 
-	WAIT_FOR_TASK_COMPLETION=""
-	HARD_MAX_EXEC_TIME_REACHED=false
+	# Set global var default
+	eval "WAIT_FOR_TASK_COMPLETION_$callerName=\"\""
+	eval "HARD_MAX_EXEC_TIME_REACHED_$callerName=false"
 
 	while [ ${#pidsArray[@]} -gt 0 ]; do
 		newPidsArray=()
@@ -661,7 +661,7 @@ function WaitForTaskCompletion {
 			if [ $noErrorLog != true ]; then
 				SendAlert true
 			fi
-			HARD_MAX_EXEC_TIME_REACHED=true
+			eval "HARD_MAX_EXEC_TIME_REACHED_$callerName=true"
 			return $errorcount
 		fi
 
@@ -680,10 +680,11 @@ function WaitForTaskCompletion {
 					if [ $retval -ne 0 ]; then
 						errorcount=$((errorcount+1))
 						Logger "${FUNCNAME[0]} called by [$callerName] finished monitoring [$pid] with exitcode [$retval]." "DEBUG"
-						if [ "$WAIT_FOR_TASK_COMPLETION" == "" ]; then
-							WAIT_FOR_TASK_COMPLETION="$pid:$retval"
+						# Welcome to variable variable bash hell
+						if [ "$(eval echo \"\$WAIT_FOR_TASK_COMPLETION_$callerName\")" == "" ]; then
+							eval "WAIT_FOR_TASK_COMPLETION_$callerName=\"$pid:$retval\""
 						else
-							WAIT_FOR_TASK_COMPLETION=";$pid:$retval"
+							eval "WAIT_FOR_TASK_COMPLETION_$callerName=\";$pid:$retval\""
 						fi
 					fi
 				fi

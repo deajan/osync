@@ -4,7 +4,7 @@ PROGRAM="osync" # Rsync based two way sync engine with fault tolerance
 AUTHOR="(C) 2013-2016 by Orsiris de Jong"
 CONTACT="http://www.netpower.fr/osync - ozy@netpower.fr"
 PROGRAM_VERSION=1.2-beta3
-PROGRAM_BUILD=2016120301
+PROGRAM_BUILD=2016120303
 IS_STABLE=no
 
 # Execution order						#__WITH_PARANOIA_DEBUG
@@ -614,7 +614,7 @@ function WriteLockFiles {
 	TARGET_LOCK_FILE_EXISTS=true
 	WaitForTaskCompletion "$initiatorPid;$targetPid" 720 1800 $SLEEP_TIME $KEEP_LOGGING true true false ${FUNCNAME[0]}
 	if [ $? -ne 0 ]; then
-		IFS=';' read -r -a pidArray <<< "$WAIT_FOR_TASK_COMPLETION"
+		IFS=';' read -r -a pidArray <<< "$(eval echo \"\$WAIT_FOR_TASK_COMPLETION_${FUNCNAME[0]}\")"
 		for pid in "${pidArray[@]}"; do
 			pid=${pid%:*}
 			if [ "$pid" == "$initiatorPid" ]; then
@@ -1415,7 +1415,7 @@ function Sync {
 
 		WaitForTaskCompletion "$initiatorPid;$targetPid" $SOFT_MAX_EXEC_TIME $HARD_MAX_EXEC_TIME $SLEEP_TIME $KEEP_LOGGING false true false ${FUNCNAME[0]}
 		if [ $? != 0 ]; then
-			IFS=';' read -r -a pidArray <<< "$WAIT_FOR_TASK_COMPLETION"
+			IFS=';' read -r -a pidArray <<< "$(eval echo \"\$WAIT_FOR_TASK_COMPLETION_${FUNCNAME[0]}\")"
 			initiatorFail=false
 			targetFail=false
 			for pid in "${pidArray[@]}"; do
@@ -1460,7 +1460,7 @@ function Sync {
 
 		WaitForTaskCompletion "$initiatorPid;$targetPid" $SOFT_MAX_EXEC_TIME $HARD_MAX_EXEC_TIME $SLEEP_TIME $KEEP_LOGGING false true false ${FUNCNAME[0]}
 		if [ $? != 0 ]; then
-			IFS=';' read -r -a pidArray <<< "$WAIT_FOR_TASK_COMPLETION"
+			IFS=';' read -r -a pidArray <<< "$(eval echo \"\$WAIT_FOR_TASK_COMPLETION_${FUNCNAME[0]}\")"
 			initiatorFail=false
 			targetFail=false
 			for pid in "${pidArray[@]}"; do
@@ -1584,7 +1584,7 @@ function Sync {
 
 		WaitForTaskCompletion "$initiatorPid;$targetPid" $SOFT_MAX_EXEC_TIME $HARD_MAX_EXEC_TIME $SLEEP_TIME $KEEP_LOGGING false true false ${FUNCNAME[0]}
 		if [ $? != 0 ]; then
-			IFS=';' read -r -a pidArray <<< "$WAIT_FOR_TASK_COMPLETION"
+			IFS=';' read -r -a pidArray <<< "$(eval echo \"\$WAIT_FOR_TASK_COMPLETION_${FUNCNAME[0]}\")"
 			initiatorFail=false
 			targetFail=false
 			for pid in "${pidArray[@]}"; do
@@ -1630,7 +1630,7 @@ function Sync {
 
 		WaitForTaskCompletion "$initiatorPid;$targetPid" $SOFT_MAX_EXEC_TIME $HARD_MAX_EXEC_TIME $SLEEP_TIME $KEEP_LOGGING false true false ${FUNCNAME[0]}
 		if [ $? != 0 ]; then
-			IFS=';' read -r -a pidArray <<< "$WAIT_FOR_TASK_COMPLETION"
+			IFS=';' read -r -a pidArray <<< "$(eval echo \"\$WAIT_FOR_TASK_COMPLETION_${FUNCNAME[0]}\")"
 			initiatorFail=false
 			targetFail=false
 			for pid in "${pidArray[@]}"; do
@@ -1781,7 +1781,7 @@ function SoftDelete {
 			pids="$pids;$!"
 		fi
 		WaitForTaskCompletion $pids $SOFT_MAX_EXEC_TIME $HARD_MAX_EXEC_TIME $SLEEP_TIME $KEEP_LOGGING false true false ${FUNCNAME[0]}
-		if [ $? != 0 ]; then # WIP Check for env variable as hard max flag that stops the script instead of just screaming for errors
+		if [ $? != 0 ] && [ "$(eval echo \"\$HARD_MAX_EXEC_TIME_REACHED_${FUNCNAME[0]}\")" == true ]; then
 			exit 1
 		fi
 	fi
@@ -1799,7 +1799,7 @@ function SoftDelete {
 			pids="$pids;$!"
 		fi
 		WaitForTaskCompletion $pids $SOFT_MAX_EXEC_TIME $HARD_MAX_EXEC_TIME $SLEEP_TIME $KEEP_LOGGING false true false ${FUNCNAME[0]}
-		if [ $? != 0 ]; then
+		if [ $? != 0 ] && [ "$(eval echo \"\$HARD_MAX_EXEC_TIME_REACHED_${FUNCNAME[0]}\")" == true ]; then
 			exit 1
 		fi
 	fi
