@@ -7,21 +7,13 @@
 ## PROGRAM=program-name
 ## INSTANCE_ID=program-instance-name
 ## _DEBUG=yes/no
-## _LOGGER_LOGGER_SILENT=true/false
-## _LOGGER_LOGGER_VERBOSE=true/false
+## _LOGGER_SILENT=true/false
+## _LOGGER_VERBOSE=true/false
 ## _LOGGER_ERR_ONLY=true/false
 ## _LOGGER_PREFIX="date"/"time"/""
 
 ## Logger sets {ERROR|WARN}_ALERT variable when called with critical / error / warn loglevel
 ## When called from subprocesses, variable of main process can't be set. Status needs to be get via $RUN_DIR/$PROGRAM.Logger.{error|warn}.$SCRIPT_PID
-
-## META ISSUES
-##
-## Updated _LOGGER_STDERR
-## Updated WaitForTaskCompletion syntax
-## Updated ParallelExec syntax
-## SendEmail WinNT10 & msys are two totally different beasts. Document in sync.conf and host_backup.conf
-
 
 if ! type "$BASH" > /dev/null; then
 	echo "Please run this script only with bash shell. Tested on bash >= 3.2"
@@ -369,8 +361,6 @@ function SendEmail {
 	local smtpUser="${9}"
 	local smtpPassword="${10}"
 
-	# CheckArguments will report a warning that can be ignored if used in Windows with paranoia debug enabled
-	#TODO: Check whether there must be minimum 3 or maximum 10 args
 	__CheckArguments 3-10 $# ${FUNCNAME[0]} "$@"	#__WITH_PARANOIA_DEBUG
 
 	local mail_no_attachment=
@@ -1068,7 +1058,7 @@ function GetLocalOS {
 		LOCAL_OS="BusyBox"
 		;;
 		*)
-		if [ "$IGNORE_OS_TYPE" == "yes" ]; then		#TODO(doc): Undocumented option
+		if [ "$IGNORE_OS_TYPE" == "yes" ]; then
 			Logger "Running on unknown local OS [$localOsVar]." "WARN"
 			return
 		fi
