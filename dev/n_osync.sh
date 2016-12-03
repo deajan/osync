@@ -580,8 +580,6 @@ function _WriteLockFilesRemote {
 	CheckConnectivityRemoteHost
 
 	cmd=$SSH_CMD' "( if [ $overwrite == true ]; then set -o noclobber; fi; echo '$SCRIPT_PID@$INSTANCE_ID' | '$COMMAND_SUDO' tee \"'$lockfile'\")" > /dev/null 2> $RUN_DIR/$PROGRAM._WriteLockFilesRemote.$replicaType.$SCRIPT_PID'
-	#WIP
-	#cmd=$SSH_CMD' "( set -o noclobber; echo '$SCRIPT_PID@$INSTANCE_ID' | '$COMMAND_SUDO' tee \"'$lockfile'\")" > /dev/null 2> $RUN_DIR/$PROGRAM._WriteLockFilesRemote.$replicaType.$SCRIPT_PID'
 	Logger "cmd: $cmd" "DEBUG"
 	eval "$cmd"
 	if [ $? != 0 ]; then
@@ -1783,7 +1781,7 @@ function SoftDelete {
 			pids="$pids;$!"
 		fi
 		WaitForTaskCompletion $pids $SOFT_MAX_EXEC_TIME $HARD_MAX_EXEC_TIME $SLEEP_TIME $KEEP_LOGGING false true false ${FUNCNAME[0]}
-		if [ $? != 0 ]; then #WIP: check for env variable with hard max flag ?
+		if [ $? != 0 ]; then # WIP Check for env variable as hard max flag that stops the script instead of just screaming for errors
 			exit 1
 		fi
 	fi
@@ -1801,7 +1799,7 @@ function SoftDelete {
 			pids="$pids;$!"
 		fi
 		WaitForTaskCompletion $pids $SOFT_MAX_EXEC_TIME $HARD_MAX_EXEC_TIME $SLEEP_TIME $KEEP_LOGGING false true false ${FUNCNAME[0]}
-		if [ $? != 0 ]; then #WIP: check for env variable with hard max flag ?
+		if [ $? != 0 ]; then
 			exit 1
 		fi
 	fi
@@ -1838,7 +1836,6 @@ function Summary {
 	_SummaryFromFile "${TARGET[$__replicaDir]}" "$RUN_DIR/$PROGRAM.update.target.$SCRIPT_PID" "+ >>"
 	_SummaryFromFile "${INITIATOR[$__replicaDir]}" "$RUN_DIR/$PROGRAM.update.initiator.$SCRIPT_PID" "+ <<"
 
-	#WIP: remote deletion summary does not work
 	Logger "File deletions: INITIATOR << >> TARGET" "ALWAYS"
 	if [ "$REMOTE_OPERATION" == "yes" ]; then
 		_SummaryFromFile "${TARGET[$__replicaDir]}" "${INITIATOR[$__replicaDir]}${INITIATOR[$__stateDir]}/target${TARGET[$__successDeletedListFile]}" "- >>"
