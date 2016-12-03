@@ -3,7 +3,7 @@ SUBPROGRAM=[prgname]
 PROGRAM="$SUBPROGRAM-batch" # Batch program to run osync / obackup instances sequentially and rerun failed ones
 AUTHOR="(L) 2013-2016 by Orsiris de Jong"
 CONTACT="http://www.netpower.fr - ozy@netpower.fr"
-PROGRAM_BUILD=2016120102
+PROGRAM_BUILD=2016120301
 
 ## Runs an osync /obackup instance for every conf file found
 ## If an instance fails, run it again if time permits
@@ -95,13 +95,13 @@ function Batch {
 	else
 		# Ugly hack to read files into an array while preserving special characters
 		runList=()
-		while IFS= read -d $'\0' -r file; do runList+=("$file"); done < <(find "$CONF_FILE_PATH" -iname "*.conf" -print0)
+		while IFS= read -d $'\0' -r file; do runList+=("$file"); done < <(find "$CONF_FILE_PATH" -maxdepth 1 -iname "*.conf" -print0)
 
 		while ([ $MAX_EXECUTION_TIME -gt $SECONDS ] || [ $MAX_EXECUTION_TIME -eq 0 ]) && [ "${#runList[@]}" -gt 0 ] && [ $runs -le $MAX_RUNS ]; do
 			runAgainList=()
 			Logger "Sequential run n°$runs of $SUBPROGRAM instances for:" "NOTICE"
 			for confFile in "${runList[@]}"; do
-				Logger "$confFile" "NOTICE"
+				Logger "$(basename $confFile)" "NOTICE"
 			done
 			for confFile in "${runList[@]}"; do
 				$SUBPROGRAM_EXECUTABLE "$confFile" --silent $opts &
