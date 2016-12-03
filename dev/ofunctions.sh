@@ -1,6 +1,6 @@
 #### MINIMAL-FUNCTION-SET BEGIN ####
 
-## FUNC_BUILD=2016120102
+## FUNC_BUILD=2016120301
 ## BEGIN Generic bash functions written in 2013-2016 by Orsiris de Jong - http://www.netpower.fr - ozy@netpower.fr
 
 ## To use in a program, define the following variables:
@@ -1384,13 +1384,13 @@ function RsyncPatternsAdd {
 	while [ -n "$rest" ]
 	do
 		# Take the string until first occurence until $PATH_SEPARATOR_CHAR
-		str=${rest%%;*} #TODO: replace ; with $PATH_SEPARATOR_CHAR
+		str="${rest%%$PATH_SEPARATOR_CHAR*}"
 		# Handle the last case
 		if [ "$rest" = "${rest/$PATH_SEPARATOR_CHAR/}" ]; then
 			rest=
 		else
 			# Cut everything before the first occurence of $PATH_SEPARATOR_CHAR
-			rest=${rest#*$PATH_SEPARATOR_CHAR}
+			rest="${rest#*$PATH_SEPARATOR_CHAR}"
 		fi
 			if [ "$RSYNC_PATTERNS" == "" ]; then
 			RSYNC_PATTERNS="--"$patternType"=\"$str\""
