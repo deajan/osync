@@ -1,6 +1,6 @@
 #### MINIMAL-FUNCTION-SET BEGIN ####
 
-## FUNC_BUILD=2016120301
+## FUNC_BUILD=2016120302
 ## BEGIN Generic bash functions written in 2013-2016 by Orsiris de Jong - http://www.netpower.fr - ozy@netpower.fr
 
 ## To use in a program, define the following variables:
@@ -570,6 +570,7 @@ function joinString {
 
 # Time control function for background processes, suitable for multiple synchronous processes
 # Fills a global variable called WAIT_FOR_TASK_COMPLETION that contains list of failed pids in format pid1:result1;pid2:result2
+# Also sets a global variable called HARD_MAX_EXEC_TIME_REACHED to true if hardMaxTime is reached
 # Warning: Don't imbricate this function into another run if you plan to use the global variable output
 
 # Standard wait $! emulation would be WaitForTaskCompletion $! 0 0 1 0 true false true false "${FUNCNAME[0]}"
@@ -613,6 +614,7 @@ function WaitForTaskCompletion {
 	pidCount=${#pidsArray[@]}
 
 	WAIT_FOR_TASK_COMPLETION=""
+	HARD_MAX_EXEC_TIME_REACHED=false
 
 	while [ ${#pidsArray[@]} -gt 0 ]; do
 		newPidsArray=()
@@ -659,6 +661,7 @@ function WaitForTaskCompletion {
 			if [ $noErrorLog != true ]; then
 				SendAlert true
 			fi
+			HARD_MAX_EXEC_TIME_REACHED=true
 			return $errorcount
 		fi
 
@@ -712,6 +715,7 @@ function WaitForTaskCompletion {
 # Returns the number of non zero exit codes from commands
 # Use cmd1;cmd2;cmd3 syntax for small sets, use file for large command sets
 # Only 2 first arguments are mandatory
+# Sets a global variable called HARD_MAX_EXEC_TIME_REACHED to true if hardMaxTime is reached
 
 function ParallelExec {
 	local numberOfProcesses="${1}" 		# Number of simultaneous commands to run
@@ -746,6 +750,8 @@ function ParallelExec {
 	local commandsArrayPid
 
 	local hasPids=false # Are any valable pids given to function ?		#__WITH_PARANOIA_DEBUG
+
+	HARD_MAX_EXEC_TIME_REACHED=false
 
 	if [ $counting == true ]; then 	# If counting == false _SOFT_ALERT should be a global value so no more than one soft alert is shown
 		local _SOFT_ALERT=false # Does a soft alert need to be triggered, if yes, send an alert once
@@ -806,10 +812,10 @@ function ParallelExec {
 			done
 			if [ $noErrorLog != true ]; then
 				SendAlert true
-			else
-				# Return the number of commands that haven't run / finished run
-				return $(($commandCount - $counter + ${#pidsArray[@]}))
 			fi
+			HARD_MAX_EXEC_TIME_REACHED=true
+			# Return the number of commands that haven't run / finished run
+			return $(($commandCount - $counter + ${#pidsArray[@]}))
 		fi
 
 		while [ $counter -lt "$commandCount" ] && [ ${#pidsArray[@]} -lt $numberOfProcesses ]; do
