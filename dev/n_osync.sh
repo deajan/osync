@@ -252,10 +252,6 @@ function CheckReplicaPaths {
 
 	local pids
 
-	# Use direct comparaison before having a portable realpath implementation
-	#INITIATOR_SYNC_DIR_CANN=$(realpath "${INITIATOR[$__replicaDir]}")	#TODO(verylow): investigate realpath & readlink issues on MSYS and busybox here
-	#TARGET_SYNC_DIR_CANN=$(realpath "${TARGET[$__replicaDir]}")
-
 	if [ "$REMOTE_OPERATION" != "yes" ]; then
 		if [ "${INITIATOR[$__replicaDir]}" == "${TARGET[$__replicaDir]}" ]; then
 			Logger "Initiator and target path [${INITIATOR[$__replicaDir]}] cannot be the same." "CRITICAL"
