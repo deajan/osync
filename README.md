@@ -2,7 +2,7 @@
 
 A two way filesync script with fault tolerance, resume, soft deletion, conflictual file backups running on bash (linux, BSD and virtually any system supporting bash).
 File synchronization is bidirectional, and can be run manually, as scheduled task, or triggered on file changes in deamon mode.
-It is a command line tool rsync wrapper with a lot of additional features backed in.
+It is a command line tool rsync wrapper with a lot of additional features baked in.
 
 About
 -----
