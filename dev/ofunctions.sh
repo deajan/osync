@@ -1,6 +1,7 @@
 #### MINIMAL-FUNCTION-SET BEGIN ####
 
-## FUNC_BUILD=2016120401
+_OFUNCTIONS_VERSION=2.0
+_OFUNCTIONS_BUILD=2016120401
 ## BEGIN Generic bash functions written in 2013-2016 by Orsiris de Jong - http://www.netpower.fr - ozy@netpower.fr
 
 ## To use in a program, define the following variables:
