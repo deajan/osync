@@ -7,7 +7,7 @@
 
 ## On CYGWIN / MSYS, ACL and extended attributes aren't supported
 
-# osync test suite 2016113002
+# osync test suite 2016120401
 
 # 4 tests:
 # quicklocal
@@ -22,6 +22,7 @@
 # 	conflict resolution initiator with backups / multiple backups
 # 	conflict resolution target with backups / multiple backups
 # 	deletion propagation, failed deletion repropagation, skip deletion
+#	symlink and broken symlink propagation and deletion
 # 	replica lock checks
 #	file attribute tests
 # 	local / remote locking resume tests
@@ -177,7 +178,7 @@ function PrepareLocalDirs () {
 		rm -rf "$INITIATOR_DIR"
 	fi
 	mkdir -p "$INITIATOR_DIR"
-
+ 
 	if [ -d "$TARGET_DIR" ]; then
  		rm -rf "$TARGET_DIR"
 	fi
@@ -235,6 +236,23 @@ function oneTimeSetUp () {
 	OSYNC_IS_STABLE=$(GetConfFileValue "$OSYNC_DIR/$OSYNC_DEV_EXECUTABLE" "IS_STABLE")
 
 	echo "Running with $OSYNC_VERSION ($OSYNC_MIN_VERSION) STABLE=$OSYNC_IS_STABLE"
+
+	# Be sure to set default values for config files which can be incoherent if tests gets aborted
+	SetConfFileValue "$CONF_DIR/$LOCAL_CONF" "SKIP_DELETION" ""
+	SetConfFileValue "$CONF_DIR/$REMOTE_CONF" "SKIP_DELETION" ""
+
+	SetConfFileValue "$CONF_DIR/$LOCAL_CONF" "COPY_SYMLINKS" "no"
+	SetConfFileValue "$CONF_DIR/$REMOTE_CONF" "COPY_SYMLINKS" "no"
+
+	SetConfFileValue "$CONF_DIR/$LOCAL_CONF" "CONFLICT_BACKUP_MULTIPLE" "no"
+	SetConfFileValue "$CONF_DIR/$REMOTE_CONF" "CONFLICT_BACKUP_MULTIPLE" "no"
+
+	SetConfFileValue "$CONF_DIR/$LOCAL_CONF" "FORCE_STRANGER_LOCK_RESUME" "no"
+	SetConfFileValue "$CONF_DIR/$REMOTE_CONF" "FORCE_STRANGER_LOCK_RESUME" "no"
+
+	SetConfFileValue "$CONF_DIR/$REMOTE_CONF" "SOFT_MAX_EXEC_TIME" "7200"
+	SetConfFileValue "$CONF_DIR/$REMOTE_CONF" "HARD_MAX_EXEC_TIME" "10600"
+
 }
 
 function oneTimeTearDown () {
@@ -392,13 +410,14 @@ function test_deletion_failure () {
 		REMOTE_HOST_PING=no ./$OSYNC_EXECUTABLE $i
 		assertEquals "Second deletion run with parameters [$i]." "1" $?
 
+		# standard file tests
 		[ -f "$TARGET_DIR/$FileA" ]
-		assertEquals "File [$TARGET_DIR/$FileA] is still present in deletion dir." "0" $?
+		assertEquals "File [$TARGET_DIR/$FileA] is still present in replica dir." "0" $?
 		[ ! -f "$TARGET_DIR/$OSYNC_DELETE_DIR/$FileA" ]
 		assertEquals "File [$TARGET_DIR/$OSYNC_DELETE_DIR/$FileA] is not present in deletion dir." "0" $?
 
 		[ -f "$INITIATOR_DIR/$FileB" ]
-		assertEquals "File [$INITIATOR_DIR/$FileB] is still present in deletion dir." "0" $?
+		assertEquals "File [$INITIATOR_DIR/$FileB] is still present in replica dir." "0" $?
 		[ ! -f "$INITIATOR_DIR/$OSYNC_DELETE_DIR/$FileB" ]
 		assertEquals "File [$INITIATOR_DIR/$OSYNC_DELETE_DIR/$FileB] is not present in deletion dir." "0" $?
 
@@ -410,12 +429,12 @@ function test_deletion_failure () {
 		assertEquals "Third deletion run with parameters [$i]." "0" $?
 
 		[ ! -f "$TARGET_DIR/$FileA" ]
-		assertEquals "File [$TARGET_DIR/$FileA] is still present in deletion dir." "0" $?
+		assertEquals "File [$TARGET_DIR/$FileA] is still present in replica dir." "0" $?
 		[ -f "$TARGET_DIR/$OSYNC_DELETE_DIR/$FileA" ]
 		assertEquals "File [$TARGET_DIR/$OSYNC_DELETE_DIR/$FileA] is not present in deletion dir." "0" $?
 
 		[ ! -f "$INITIATOR_DIR/$FileB" ]
-		assertEquals "File [$INITIATOR_DIR/$FileB] is still present in deletion dir." "0" $?
+		assertEquals "File [$INITIATOR_DIR/$FileB] is still present in replica dir." "0" $?
 		[ -f "$INITIATOR_DIR/$OSYNC_DELETE_DIR/$FileB" ]
 		assertEquals "File [$INITIATOR_DIR/$OSYNC_DELETE_DIR/$FileB] is not present in deletion dir." "0" $?
 	done
@@ -490,6 +509,177 @@ function test_skip_deletion () {
 	# Set original values back
 	SetConfFileValue "$CONF_DIR/$LOCAL_CONF" "SKIP_DELETION" ""
 	SetConfFileValue "$CONF_DIR/$REMOTE_CONF" "SKIP_DELETION" ""
+}
+
+function test_handle_symlinks () {
+	if [ "$OSYNC_MIN_VERSION" == "1" ]; then
+		echo "Skipping symlink tests as osync v1.1x didn't handle this."
+		return 0
+	fi
+
+	# Check with and without copySymlinks
+	copySymlinks="yes"
+
+	echo "Running with COPY_SYMLINKS=$copySymlinks"
+
+	SetConfFileValue "$CONF_DIR/$LOCAL_CONF" "COPY_SYMLINKS" "$copySymlinks"
+	SetConfFileValue "$CONF_DIR/$REMOTE_CONF" "COPY_SYMLINKS" "$copySymlinks"
+
+	for i in "${osyncParameters[@]}"; do
+		cd "$OSYNC_DIR"
+
+		PrepareLocalDirs
+
+		DirA="some directory with spaces"
+		DirB="another directoy/and sub directory"
+
+		mkdir -p "$INITIATOR_DIR/$DirA"
+		mkdir -p "$TARGET_DIR/$DirB"
+
+		FileA="$DirA/File A"
+		FileB="$DirB/File B"
+		FileAL="$DirA/File A symlink"
+		FileBL="$DirB/File B symlink"
+
+		# Create symlinks
+		touch "$INITIATOR_DIR/$FileA"
+		touch "$TARGET_DIR/$FileB"
+		ln -s "$INITIATOR_DIR/$FileA" "$INITIATOR_DIR/$FileAL"
+		ln -s "$TARGET_DIR/$FileB" "$TARGET_DIR/$FileBL"
+
+		COPY_SYMLINKS=$copySymlinks REMOTE_HOST_PING=no ./$OSYNC_EXECUTABLE $i
+		assertEquals "First symlink run with parameters [$i]." "0" $?
+
+		# Delete symlinks
+		rm -f "$INITIATOR_DIR/$FileAL"
+		rm -f "$TARGET_DIR/$FileBL"
+
+		COPY_SYMLINKS=$copySymlinks REMOTE_HOST_PING=no ./$OSYNC_EXECUTABLE $i
+		assertEquals "Second symlink deletion run with parameters [$i]." "0" $?
+
+		# symlink deletion propagation
+		[ ! -f "$TARGET_DIR/$FileAL" ]
+		assertEquals "File [$TARGET_DIR/$FileAL] is still present in replica dir." "0" $?
+		[ -f "$TARGET_DIR/$OSYNC_DELETE_DIR/$FileAL" ]
+		assertEquals "File [$TARGET_DIR/$OSYNC_DELETE_DIR/$FileAL] is not present in deletion dir." "0" $?
+		[ ! -f "$INITIATOR_DIR/$FileBL" ]
+		assertEquals "File [$INITIATOR_DIR/$FileBL] is still present in replica dir." "0" $?
+		[ -f "$INITIATOR_DIR/$OSYNC_DELETE_DIR/$FileBL" ]
+		assertEquals "File [$INITIATOR_DIR/$OSYNC_DELETE_DIR/$FileBL] is not present in deletion dir." "0" $?
+
+		# Create broken symlinks and propagate them
+		ln -s "$INITIATOR_DIR/$FileA" "$INITIATOR_DIR/$FileAL"
+		ln -s "$TARGET_DIR/$FileB" "$TARGET_DIR/$FileBL"
+		rm -f "$INITIATOR_DIR/$FileA"
+		rm -f "$TARGET_DIR/$FileB"
+
+		COPY_SYMLINKS=$copySymlinks REMOTE_HOST_PING=no ./$OSYNC_EXECUTABLE $i
+		assertEquals "Third broken symlink run with parameters should fail [$i]." "1" $?
+
+		[ ! -f "$TARGET_DIR/$FileAL" ]
+		assertEquals "File [$TARGET_DIR/$FileAL] is present in replica dir." "0" $?
+
+		[ ! -f "$INITIATOR_DIR/$FileBL" ]
+		assertEquals "File [$INITIATOR_DIR/$FileBL] is present in replica dir." "0" $?
+
+		# Check broken symlink deletion propagation
+		rm -f "$INITIATOR_DIR/$FileAL"
+		rm -f "$TARGET_DIR/$FileBL"
+
+		COPY_SYMLINKS=$copySymlinks REMOTE_HOST_PING=no ./$OSYNC_EXECUTABLE $i
+		assertEquals "Fourth symlink deletion run should resume with parameters [$i]." "2" $?
+
+		[ ! -f "$TARGET_DIR/$FileAL" ]
+		assertEquals "File [$TARGET_DIR/$FileAL] is still present in replica dir." "0" $?
+		[ -f "$TARGET_DIR/$OSYNC_DELETE_DIR/$FileAL" ]
+		assertEquals "File [$TARGET_DIR/$OSYNC_DELETE_DIR/$FileAL] is not present in deletion dir." "0" $?
+		[ ! -f "$INITIATOR_DIR/$FileBL" ]
+		assertEquals "File [$INITIATOR_DIR/$FileBL] is still present in replica dir." "0" $?
+		[ -f "$INITIATOR_DIR/$OSYNC_DELETE_DIR/$FileBL" ]
+		assertEquals "File [$INITIATOR_DIR/$OSYNC_DELETE_DIR/$FileBL] is not present in deletion dir." "0" $?
+	done
+
+	# Check with and without copySymlinks
+	copySymlinks="no"
+
+	echo "Running with COPY_SYMLINKS=$copySymlinks"
+
+	SetConfFileValue "$CONF_DIR/$LOCAL_CONF" "COPY_SYMLINKS" "$copySymlinks"
+	SetConfFileValue "$CONF_DIR/$REMOTE_CONF" "COPY_SYMLINKS" "$copySymlinks"
+
+	for i in "${osyncParameters[@]}"; do
+		cd "$OSYNC_DIR"
+
+		PrepareLocalDirs
+
+		DirA="some directory with spaces"
+		DirB="another directoy/and sub directory"
+
+		mkdir -p "$INITIATOR_DIR/$DirA"
+		mkdir -p "$TARGET_DIR/$DirB"
+
+		FileA="$DirA/File A"
+		FileB="$DirB/File B"
+		FileAL="$DirA/File A symlink"
+		FileBL="$DirB/File B symlink"
+
+		# Create symlinks
+		touch "$INITIATOR_DIR/$FileA"
+		touch "$TARGET_DIR/$FileB"
+		ln -s "$INITIATOR_DIR/$FileA" "$INITIATOR_DIR/$FileAL"
+		ln -s "$TARGET_DIR/$FileB" "$TARGET_DIR/$FileBL"
+
+		COPY_SYMLINKS=$copySymlinks REMOTE_HOST_PING=no ./$OSYNC_EXECUTABLE $i
+		assertEquals "First symlink run with parameters [$i]." "0" $?
+
+		# Delete symlinks
+		rm -f "$INITIATOR_DIR/$FileAL"
+		rm -f "$TARGET_DIR/$FileBL"
+
+		COPY_SYMLINKS=$copySymlinks REMOTE_HOST_PING=no ./$OSYNC_EXECUTABLE $i
+		assertEquals "Second symlink deletion run with parameters [$i]." "0" $?
+
+		# symlink deletion propagation
+		[ ! -L "$TARGET_DIR/$FileAL" ]
+		assertEquals "File [$TARGET_DIR/$FileAL] is still present in replica dir." "0" $?
+		[ -L "$TARGET_DIR/$OSYNC_DELETE_DIR/$FileAL" ]
+		assertEquals "File [$TARGET_DIR/$OSYNC_DELETE_DIR/$FileAL] is not present in deletion dir." "0" $?
+		[ ! -L "$INITIATOR_DIR/$FileBL" ]
+		assertEquals "File [$INITIATOR_DIR/$FileBL] is still present in replica dir." "0" $?
+		[ -L "$INITIATOR_DIR/$OSYNC_DELETE_DIR/$FileBL" ]
+		assertEquals "File [$INITIATOR_DIR/$OSYNC_DELETE_DIR/$FileBL] is not present in deletion dir." "0" $?
+
+		# Create broken symlinks and propagate them
+		ln -s "$INITIATOR_DIR/$FileA" "$INITIATOR_DIR/$FileAL"
+		ln -s "$TARGET_DIR/$FileB" "$TARGET_DIR/$FileBL"
+		rm -f "$INITIATOR_DIR/$FileA"
+		rm -f "$TARGET_DIR/$FileB"
+
+		COPY_SYMLINKS=$copySymlinks REMOTE_HOST_PING=no ./$OSYNC_EXECUTABLE $i
+		assertEquals "Third broken symlink run with parameters [$i]." "0" $?
+
+		[ -L "$TARGET_DIR/$FileAL" ]
+		assertEquals "File [$TARGET_DIR/$FileAL] is present in replica dir." "0" $?
+
+		[ -L "$INITIATOR_DIR/$FileBL" ]
+		assertEquals "File [$INITIATOR_DIR/$FileBL] is present in replica dir." "0" $?
+
+		# Check broken symlink deletion propagation
+		rm -f "$INITIATOR_DIR/$FileAL"
+		rm -f "$TARGET_DIR/$FileBL"
+
+		COPY_SYMLINKS=$copySymlinks REMOTE_HOST_PING=no ./$OSYNC_EXECUTABLE $i
+		assertEquals "Fourth symlink deletion run with parameters [$i]." "0" $?
+
+		[ ! -L "$TARGET_DIR/$FileAL" ]
+		assertEquals "File [$TARGET_DIR/$FileAL] is still present in replica dir." "0" $?
+		[ -L "$TARGET_DIR/$OSYNC_DELETE_DIR/$FileAL" ]
+		assertEquals "File [$TARGET_DIR/$OSYNC_DELETE_DIR/$FileAL] is not present in deletion dir." "0" $?
+		[ ! -L "$INITIATOR_DIR/$FileBL" ]
+		assertEquals "File [$INITIATOR_DIR/$FileBL] is still present in replica dir." "0" $?
+		[ -L "$INITIATOR_DIR/$OSYNC_DELETE_DIR/$FileBL" ]
+		assertEquals "File [$INITIATOR_DIR/$OSYNC_DELETE_DIR/$FileBL] is not present in deletion dir." "0" $?
+	done
 }
 
 function test_softdeletion_cleanup () {
@@ -723,9 +913,6 @@ function test_MultipleConflictBackups () {
 }
 
 function test_Locking () {
-	local forceStrangerUnlockLocal
-	local forceStrangerUnlockRemote
-
 # local not running = resume
 # remote same instance_id = resume
 # remote different instance_id = stop
@@ -809,9 +996,6 @@ function test_Locking () {
 
 	# Target lock present should be resumed if instance ID is NOT the same as current one but FORCE_STRANGER_UNLOCK=yes
 
-	forceStrangerUnlockLocal=$(GetConfFileValue "$CONF_DIR/$LOCAL_CONF" "FORCE_STRANGER_LOCK_RESUME")
-	forceStrangerUnlockRemote=$(GetConfFileValue "$CONF_DIR/$REMOTE_CONF" "FORCE_STRANGER_LOCK_RESUME")
-
 	SetConfFileValue "$CONF_DIR/$LOCAL_CONF" "FORCE_STRANGER_LOCK_RESUME" "yes"
 	SetConfFileValue "$CONF_DIR/$REMOTE_CONF" "FORCE_STRANGER_LOCK_RESUME" "yes"
 
@@ -827,8 +1011,8 @@ function test_Locking () {
 		assertEquals "Should be able to resume when target has lock with different instance id but FORCE_STRANGER_UNLOCK=yes." "0" $?
 	done
 
-	SetConfFileValue "$CONF_DIR/$LOCAL_CONF" "FORCE_STRANGER_LOCK_RESUME" "$forceStrangerUnlockLocal"
-	SetConfFileValue "$CONF_DIR/$REMOTE_CONF" "FORCE_STRANGER_LOCK_RESUME" "$forceStrangerUnlockRemote"
+	SetConfFileValue "$CONF_DIR/$LOCAL_CONF" "FORCE_STRANGER_LOCK_RESUME" "no"
+	SetConfFileValue "$CONF_DIR/$REMOTE_CONF" "FORCE_STRANGER_LOCK_RESUME" "no"
 }
 
 function test_WaitForTaskCompletion () {
