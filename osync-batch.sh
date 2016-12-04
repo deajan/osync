@@ -3,7 +3,7 @@ SUBPROGRAM=osync
 PROGRAM="$SUBPROGRAM-batch" # Batch program to run osync / obackup instances sequentially and rerun failed ones
 AUTHOR="(L) 2013-2016 by Orsiris de Jong"
 CONTACT="http://www.netpower.fr - ozy@netpower.fr"
-PROGRAM_BUILD=2016120301
+PROGRAM_BUILD=2016120401
 
 ## Runs an osync /obackup instance for every conf file found
 ## If an instance fails, run it again if time permits
@@ -162,7 +162,7 @@ do
 		Usage
 		;;
 		*)
-		opts="$i "
+		opts="$opts$i "
 		;;
 	esac
 done
