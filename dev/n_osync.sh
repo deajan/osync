@@ -105,7 +105,7 @@ function TrapQuit {
 	else
 		UnlockReplicas
 		RunAfterHook
-		Logger "$PROGRAM finished." "NOTICE"
+		Logger "$PROGRAM finished." "ALWAYS"
 		exitcode=0
 	fi
 
