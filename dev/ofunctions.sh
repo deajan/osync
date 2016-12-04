@@ -1,6 +1,6 @@
 #### MINIMAL-FUNCTION-SET BEGIN ####
 
-## FUNC_BUILD=2016120303
+## FUNC_BUILD=2016120401
 ## BEGIN Generic bash functions written in 2013-2016 by Orsiris de Jong - http://www.netpower.fr - ozy@netpower.fr
 
 ## To use in a program, define the following variables:
@@ -1491,49 +1491,6 @@ function PreInit {
 	if [ "$(IsInteger $COMPRESSION_LEVEL)" -eq 0 ]; then
 		COMPRESSION_LEVEL=3
 	fi
-
-	#TODO: Remote OS isn't defined yet
-	## Busybox fix (Termux xz command doesn't support compression at all)
-	if [ "$LOCAL_OS" == "BusyBox" ] || [ "$REMOTE_OS" == "Busybox" ] || [ "$LOCAL_OS" == "Android" ] || [ "$REMOTE_OS" == "Android" ]; then
-		compressionString=""
-		if type gzip > /dev/null 2>&1
-		then
-			COMPRESSION_PROGRAM="| gzip -c$compressionString"
-			COMPRESSION_EXTENSION=.gz
-			# obackup specific
-		else
-			COMPRESSION_PROGRAM=
-			COMPRESSION_EXTENSION=
-		fi
-	else
-		compressionString=" -$COMPRESSION_LEVEL"
-
-		if type xz > /dev/null 2>&1
-		then
-			COMPRESSION_PROGRAM="| xz -c$compressionString"
-			COMPRESSION_EXTENSION=.xz
-		elif type lzma > /dev/null 2>&1
-		then
-			COMPRESSION_PROGRAM="| lzma -c$compressionString"
-			COMPRESSION_EXTENSION=.lzma
-		elif type pigz > /dev/null 2>&1
-		then
-			COMPRESSION_PROGRAM="| pigz -c$compressionString"
-			COMPRESSION_EXTENSION=.gz
-			# obackup specific
-			COMPRESSION_OPTIONS=--rsyncable
-		elif type gzip > /dev/null 2>&1
-		then
-			COMPRESSION_PROGRAM="| gzip -c$compressionString"
-			COMPRESSION_EXTENSION=.gz
-			# obackup specific
-			COMPRESSION_OPTIONS=--rsyncable
-		else
-			COMPRESSION_PROGRAM=
-			COMPRESSION_EXTENSION=
-		fi
-	fi
-	ALERT_LOG_FILE="$ALERT_LOG_FILE$COMPRESSION_EXTENSION"
 }
 
 function PostInit {
@@ -1556,7 +1513,7 @@ function PostInit {
 	fi
 }
 
-function InitLocalOSSettings {
+function InitLocalOSDependingSettings {
 	__CheckArguments 0 $# ${FUNCNAME[0]} "$@"    #__WITH_PARANOIA_DEBUG
 
 	## If running under Msys, some commands do not run the same way
@@ -1592,7 +1549,7 @@ function InitLocalOSSettings {
 	fi
 }
 
-function InitRemoteOSSettings {
+function InitRemoteOSDependingSettings {
 	__CheckArguments 0 $# ${FUNCNAME[0]} "$@"    #__WITH_PARANOIA_DEBUG
 
 	if [ "$REMOTE_OS" == "msys" ]; then
@@ -1609,11 +1566,6 @@ function InitRemoteOSSettings {
 		REMOTE_STAT_CMD="stat --format %y"
 		REMOTE_STAT_CTIME_MTIME_CMD="stat -c \\\"%n;%Z;%Y\\\""
 	fi
-
-}
-
-function InitRsyncSettings {
-	__CheckArguments 0 $# ${FUNCNAME[0]} "$@"    #__WITH_PARANOIA_DEBUG
 
 	## Set rsync default arguments
 	RSYNC_ARGS="-rltD"
@@ -1676,6 +1628,48 @@ function InitRsyncSettings {
 	else
 		RSYNC_ARGS=$RSYNC_ARGS" --whole-file"
 	fi
+
+	## Busybox fix (Termux xz command doesn't support compression at all)
+	if [ "$LOCAL_OS" == "BusyBox" ] || [ "$REMOTE_OS" == "Busybox" ] || [ "$LOCAL_OS" == "Android" ] || [ "$REMOTE_OS" == "Android" ]; then
+		compressionString=""
+		if type gzip > /dev/null 2>&1
+		then
+			COMPRESSION_PROGRAM="| gzip -c$compressionString"
+			COMPRESSION_EXTENSION=.gz
+			# obackup specific
+		else
+			COMPRESSION_PROGRAM=
+			COMPRESSION_EXTENSION=
+		fi
+	else
+		compressionString=" -$COMPRESSION_LEVEL"
+
+		if type xz > /dev/null 2>&1
+		then
+			COMPRESSION_PROGRAM="| xz -c$compressionString"
+			COMPRESSION_EXTENSION=.xz
+		elif type lzma > /dev/null 2>&1
+		then
+			COMPRESSION_PROGRAM="| lzma -c$compressionString"
+			COMPRESSION_EXTENSION=.lzma
+		elif type pigz > /dev/null 2>&1
+		then
+			COMPRESSION_PROGRAM="| pigz -c$compressionString"
+			COMPRESSION_EXTENSION=.gz
+			# obackup specific
+			COMPRESSION_OPTIONS=--rsyncable
+		elif type gzip > /dev/null 2>&1
+		then
+			COMPRESSION_PROGRAM="| gzip -c$compressionString"
+			COMPRESSION_EXTENSION=.gz
+			# obackup specific
+			COMPRESSION_OPTIONS=--rsyncable
+		else
+			COMPRESSION_PROGRAM=
+			COMPRESSION_EXTENSION=
+		fi
+	fi
+	ALERT_LOG_FILE="$ALERT_LOG_FILE$COMPRESSION_EXTENSION"
 }
 
 ## IFS debug function

@@ -4,20 +4,20 @@ PROGRAM="osync" # Rsync based two way sync engine with fault tolerance
 AUTHOR="(C) 2013-2016 by Orsiris de Jong"
 CONTACT="http://www.netpower.fr/osync - ozy@netpower.fr"
 PROGRAM_VERSION=1.2-beta3
-PROGRAM_BUILD=2016120303
+PROGRAM_BUILD=2016120401
 IS_STABLE=no
 
 # Execution order						#__WITH_PARANOIA_DEBUG
 #	Function Name				Is parallel	#__WITH_PARANOIA_DEBUG
 
 #	GetLocalOS				no		#__WITH_PARANOIA_DEBUG
-#	InitLocalOSSettings			no		#__WITH_PARANOIA_DEBUG
+#	InitLocalOSDependingSettings		no		#__WITH_PARANOIA_DEBUG
 #	CheckEnvironment			no		#__WITH_PARANOIA_DEBUG
 #	PreInit					no		#__WITH_PARANOIA_DEBUG
 #	Init					no		#__WITH_PARANOIA_DEBUG
 #	PostInit				no		#__WITH_PARANOIA_DEBUG
 #	GetRemoteOS				no		#__WITH_PARANOIA_DEBUG
-#	InitRemoteOSSettings			no		#__WITH_PARANOIA_DEBUG
+#	InitRemoteOSDependingSettings		no		#__WITH_PARANOIA_DEBUG
 #	CheckReplicaPaths			yes		#__WITH_PARANOIA_DEBUG
 #	CheckDiskSpace				yes		#__WITH_PARANOIA_DEBUG
 #	RunBeforeHook				yes		#__WITH_PARANOIA_DEBUG
@@ -2322,7 +2322,7 @@ if [ "$IS_STABLE" != "yes" ]; then
 	fi
 
 GetLocalOS
-InitLocalOSSettings
+InitLocalOSDependingSettings
 PreInit
 Init
 CheckEnvironment
@@ -2340,8 +2340,7 @@ if [ $sync_on_changes == true ]; then
 	SyncOnChanges
 else
 	GetRemoteOS
-	InitRemoteOSSettings
-	InitRsyncSettings
+	InitRemoteOSDependingSettings
 	if [ $no_maxtime == true ]; then
 		SOFT_MAX_EXEC_TIME=0
 		HARD_MAX_EXEC_TIME=0
