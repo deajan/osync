@@ -176,7 +176,6 @@ function CheckCurrentConfigAll {
 		exit 1
 	fi
 
-        #TODO(low): Add runtime variable tests (RSYNC_ARGS etc)
 	if [ "$REMOTE_OPERATION" == "yes" ] && ([ ! -f "$SSH_RSA_PRIVATE_KEY" ] && [ ! -f "$SSH_PASSWORD_FILE" ]); then
 		Logger "Cannot find rsa private key [$SSH_RSA_PRIVATE_KEY] nor password file [$SSH_PASSWORD_FILE]. No authentication method provided." "CRITICAL"
 		exit 1
