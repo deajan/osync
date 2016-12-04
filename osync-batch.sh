@@ -3,7 +3,7 @@ SUBPROGRAM=osync
 PROGRAM="$SUBPROGRAM-batch" # Batch program to run osync / obackup instances sequentially and rerun failed ones
 AUTHOR="(L) 2013-2016 by Orsiris de Jong"
 CONTACT="http://www.netpower.fr - ozy@netpower.fr"
-PROGRAM_BUILD=2016112402
+PROGRAM_BUILD=2016120301
 
 ## Runs an osync /obackup instance for every conf file found
 ## If an instance fails, run it again if time permits
@@ -66,6 +66,7 @@ function CheckEnvironment {
 			SUBPROGRAM_EXECUTABLE=/usr/local/bin/$SUBPROGRAM.sh
 		else
 			Logger "Could not find [/usr/local/bin/$SUBPROGRAM.sh]" "CRITICAL"
+			( >&2 echo "Could not find [/usr/local/bin/$SUBPROGRAM.sh]" )
 			exit 1
 		fi
 	else
@@ -78,62 +79,49 @@ function CheckEnvironment {
 }
 
 function Batch {
-	local runs=0 # Number of batch runs
+	local runs=1 # Number of batch runs
 	local runList # Actual conf file list to run
 	local runAgainList # List of failed conf files sto run again
 
 	local confFile
 	local result
 
-	## Check for CONF_FILE_PATH
-	if [ -d "$CONF_FILE_PATH" ]; then
-		## Get list of .conf files
-		for confFile in $CONF_FILE_PATH/*.conf
-		do
-			if [ -f "$confFile" ]; then
-				if [ "$runList" == "" ]; then
-					runList="$confFile"
-				else
-					runList=$runList" $confFile"
-				fi
-			fi
-		done
-	elif [ -f "$CONF_FILE_PATH" ] && [ "${CONF_FILE_PATH##*.}" == "conf" ]; then
-		runList="$CONF_FILE_PATH"
-	fi
+	local i
 
-	if [ "$runList" == "" ]; then
+	# Using -e because find will accept directories or files
+	if [ ! -e "$CONF_FILE_PATH" ]; then
 		Logger "Cannot find conf file path [$CONF_FILE_PATH]." "CRITICAL"
 		Usage
-	fi
+	else
+		# Ugly hack to read files into an array while preserving special characters
+		runList=()
+		while IFS= read -d $'\0' -r file; do runList+=("$file"); done < <(find "$CONF_FILE_PATH" -maxdepth 1 -iname "*.conf" -print0)
 
-	while ([ $MAX_EXECUTION_TIME -gt $SECONDS ] || [ $MAX_EXECUTION_TIME -eq 0 ]) && [ "$runList" != "" ] && [ $MAX_RUNS -gt $runs ]
-	do
-		Logger "$SUBPROGRAM instances will be run for: $runList" "NOTICE"
-		for confFile in $runList
-		do
-			$SUBPROGRAM_EXECUTABLE "$confFile" --silent $opts &
-			wait $!
-			result=$?
-			if [ $result != 0 ]; then
-				if [ $result == 1 ] || [ $result == 128 ]; then # Do not handle exit code 127 because it is already handled here
-					Logger "Run instance $(basename $confFile) failed with exit code [$result]." "ERROR"
-					if [ "$runAgainList" == "" ]; then
-						runAgainList="$confFile"
-					else
-						runAgainList=$runAgainList" $confFile"
+		while ([ $MAX_EXECUTION_TIME -gt $SECONDS ] || [ $MAX_EXECUTION_TIME -eq 0 ]) && [ "${#runList[@]}" -gt 0 ] && [ $runs -le $MAX_RUNS ]; do
+			runAgainList=()
+			Logger "Sequential run n°$runs of $SUBPROGRAM instances for:" "NOTICE"
+			for confFile in "${runList[@]}"; do
+				Logger "$(basename $confFile)" "NOTICE"
+			done
+			for confFile in "${runList[@]}"; do
+				$SUBPROGRAM_EXECUTABLE "$confFile" --silent $opts &
+				wait $!
+				result=$?
+				if [ $result != 0 ]; then
+					if [ $result == 1 ] || [ $result == 128 ]; then # Do not handle exit code 128 because it is already handled here
+						Logger "Instance $(basename $confFile) failed with exit code [$result]." "ERROR"
+						runAgainList+=("$confFile")
+					elif [ $result == 2 ]; then
+						Logger "Instance $(basename $confFile) finished with warnings." "WARN"
 					fi
-				elif [ $result == 2 ]; then
-					Logger "Run instance $(basename $confFile) finished with warnings." "WARN"
+				else
+					Logger "Instance $(basename $confFile) succeed." "NOTICE"
 				fi
-			else
-				Logger "Run instance $(basename $confFile) succeed." "NOTICE"
-			fi
+			done
+			runList=("${runAgainList[@]}")
+			runs=$(($runs + 1))
 		done
-		runList="$runAgainList"
-		runAgainList=""
-		runs=$(($runs + 1))
-	done
+	fi
 }
 
 function Usage {
