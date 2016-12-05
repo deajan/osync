@@ -7,7 +7,7 @@
 
 ## On CYGWIN / MSYS, ACL and extended attributes aren't supported
 
-# osync test suite 2016120501
+# osync test suite 2016120502
 
 # 4 tests:
 # quicklocal
@@ -563,13 +563,13 @@ function test_handle_symlinks () {
 		assertEquals "Second symlink deletion run with parameters [$i]." "0" $?
 
 		# symlink deletion propagation
-		[ ! -f "$TARGET_DIR/$FileAL" ]
+		[ ! -L "$TARGET_DIR/$FileAL" ]
 		assertEquals "File [$TARGET_DIR/$FileAL] is still present in replica dir." "0" $?
-		[ -f "$TARGET_DIR/$OSYNC_DELETE_DIR/$FileAL" ]
+		[ -L "$TARGET_DIR/$OSYNC_DELETE_DIR/$FileAL" ]
 		assertEquals "File [$TARGET_DIR/$OSYNC_DELETE_DIR/$FileAL] is not present in deletion dir." "0" $?
-		[ ! -f "$INITIATOR_DIR/$FileBL" ]
+		[ ! -L "$INITIATOR_DIR/$FileBL" ]
 		assertEquals "File [$INITIATOR_DIR/$FileBL] is still present in replica dir." "0" $?
-		[ -f "$INITIATOR_DIR/$OSYNC_DELETE_DIR/$FileBL" ]
+		[ -L "$INITIATOR_DIR/$OSYNC_DELETE_DIR/$FileBL" ]
 		assertEquals "File [$INITIATOR_DIR/$OSYNC_DELETE_DIR/$FileBL] is not present in deletion dir." "0" $?
 
 		# Create broken symlinks and propagate them
@@ -579,12 +579,12 @@ function test_handle_symlinks () {
 		rm -f "$TARGET_DIR/$FileB"
 
 		COPY_SYMLINKS=$copySymlinks REMOTE_HOST_PING=no ./$OSYNC_EXECUTABLE $i
-		assertEquals "Third broken symlink run with parameters should fail [$i]." "1" $?
+		assertEquals "Third broken symlink run with parameters [$i]." "0" $?
 
-		[ ! -f "$TARGET_DIR/$FileAL" ]
+		[ -L "$TARGET_DIR/$FileAL" ]
 		assertEquals "File [$TARGET_DIR/$FileAL] is present in replica dir." "0" $?
 
-		[ ! -f "$INITIATOR_DIR/$FileBL" ]
+		[ -L "$INITIATOR_DIR/$FileBL" ]
 		assertEquals "File [$INITIATOR_DIR/$FileBL] is present in replica dir." "0" $?
 
 		# Check broken symlink deletion propagation
@@ -592,15 +592,15 @@ function test_handle_symlinks () {
 		rm -f "$TARGET_DIR/$FileBL"
 
 		COPY_SYMLINKS=$copySymlinks REMOTE_HOST_PING=no ./$OSYNC_EXECUTABLE $i
-		assertEquals "Fourth symlink deletion run should resume with parameters [$i]." "2" $?
+		assertEquals "Fourth symlink deletion run with parameters [$i]." "0" $?
 
-		[ ! -f "$TARGET_DIR/$FileAL" ]
+		[ ! -L "$TARGET_DIR/$FileAL" ]
 		assertEquals "File [$TARGET_DIR/$FileAL] is still present in replica dir." "0" $?
-		[ -f "$TARGET_DIR/$OSYNC_DELETE_DIR/$FileAL" ]
+		[ -L "$TARGET_DIR/$OSYNC_DELETE_DIR/$FileAL" ]
 		assertEquals "File [$TARGET_DIR/$OSYNC_DELETE_DIR/$FileAL] is not present in deletion dir." "0" $?
-		[ ! -f "$INITIATOR_DIR/$FileBL" ]
+		[ ! -L "$INITIATOR_DIR/$FileBL" ]
 		assertEquals "File [$INITIATOR_DIR/$FileBL] is still present in replica dir." "0" $?
-		[ -f "$INITIATOR_DIR/$OSYNC_DELETE_DIR/$FileBL" ]
+		[ -L "$INITIATOR_DIR/$OSYNC_DELETE_DIR/$FileBL" ]
 		assertEquals "File [$INITIATOR_DIR/$OSYNC_DELETE_DIR/$FileBL] is not present in deletion dir." "0" $?
 	done
 
@@ -650,13 +650,13 @@ function test_handle_symlinks () {
 		assertEquals "Second symlink deletion run with parameters [$i]." "0" $?
 
 		# symlink deletion propagation
-		[ ! -L "$TARGET_DIR/$FileAL" ]
+		[ ! -f "$TARGET_DIR/$FileAL" ]
 		assertEquals "File [$TARGET_DIR/$FileAL] is still present in replica dir." "0" $?
-		[ -L "$TARGET_DIR/$OSYNC_DELETE_DIR/$FileAL" ]
+		[ -f "$TARGET_DIR/$OSYNC_DELETE_DIR/$FileAL" ]
 		assertEquals "File [$TARGET_DIR/$OSYNC_DELETE_DIR/$FileAL] is not present in deletion dir." "0" $?
-		[ ! -L "$INITIATOR_DIR/$FileBL" ]
+		[ ! -f "$INITIATOR_DIR/$FileBL" ]
 		assertEquals "File [$INITIATOR_DIR/$FileBL] is still present in replica dir." "0" $?
-		[ -L "$INITIATOR_DIR/$OSYNC_DELETE_DIR/$FileBL" ]
+		[ -f "$INITIATOR_DIR/$OSYNC_DELETE_DIR/$FileBL" ]
 		assertEquals "File [$INITIATOR_DIR/$OSYNC_DELETE_DIR/$FileBL] is not present in deletion dir." "0" $?
 
 		# Create broken symlinks and propagate them
@@ -666,12 +666,12 @@ function test_handle_symlinks () {
 		rm -f "$TARGET_DIR/$FileB"
 
 		COPY_SYMLINKS=$copySymlinks REMOTE_HOST_PING=no ./$OSYNC_EXECUTABLE $i
-		assertEquals "Third broken symlink run with parameters [$i]." "0" $?
+		assertEquals "Third broken symlink run with parameters should fail [$i]." "1" $?
 
-		[ -L "$TARGET_DIR/$FileAL" ]
+		[ ! -f "$TARGET_DIR/$FileAL" ]
 		assertEquals "File [$TARGET_DIR/$FileAL] is present in replica dir." "0" $?
 
-		[ -L "$INITIATOR_DIR/$FileBL" ]
+		[ ! -f "$INITIATOR_DIR/$FileBL" ]
 		assertEquals "File [$INITIATOR_DIR/$FileBL] is present in replica dir." "0" $?
 
 		# Check broken symlink deletion propagation
@@ -679,15 +679,15 @@ function test_handle_symlinks () {
 		rm -f "$TARGET_DIR/$FileBL"
 
 		COPY_SYMLINKS=$copySymlinks REMOTE_HOST_PING=no ./$OSYNC_EXECUTABLE $i
-		assertEquals "Fourth symlink deletion run with parameters [$i]." "0" $?
+		assertEquals "Fourth symlink deletion run should resume with parameters [$i]." "2" $?
 
-		[ ! -L "$TARGET_DIR/$FileAL" ]
+		[ ! -f "$TARGET_DIR/$FileAL" ]
 		assertEquals "File [$TARGET_DIR/$FileAL] is still present in replica dir." "0" $?
-		[ -L "$TARGET_DIR/$OSYNC_DELETE_DIR/$FileAL" ]
+		[ -f "$TARGET_DIR/$OSYNC_DELETE_DIR/$FileAL" ]
 		assertEquals "File [$TARGET_DIR/$OSYNC_DELETE_DIR/$FileAL] is not present in deletion dir." "0" $?
-		[ ! -L "$INITIATOR_DIR/$FileBL" ]
+		[ ! -f "$INITIATOR_DIR/$FileBL" ]
 		assertEquals "File [$INITIATOR_DIR/$FileBL] is still present in replica dir." "0" $?
-		[ -L "$INITIATOR_DIR/$OSYNC_DELETE_DIR/$FileBL" ]
+		[ -f "$INITIATOR_DIR/$OSYNC_DELETE_DIR/$FileBL" ]
 		assertEquals "File [$INITIATOR_DIR/$OSYNC_DELETE_DIR/$FileBL] is not present in deletion dir." "0" $?
 	done
 }
