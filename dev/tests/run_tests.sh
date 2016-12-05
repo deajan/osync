@@ -7,7 +7,7 @@
 
 ## On CYGWIN / MSYS, ACL and extended attributes aren't supported
 
-# osync test suite 2016120401
+# osync test suite 2016120501
 
 # 4 tests:
 # quicklocal
@@ -178,7 +178,7 @@ function PrepareLocalDirs () {
 		rm -rf "$INITIATOR_DIR"
 	fi
 	mkdir -p "$INITIATOR_DIR"
- 
+
 	if [ -d "$TARGET_DIR" ]; then
  		rm -rf "$TARGET_DIR"
 	fi
@@ -448,7 +448,12 @@ function test_skip_deletion () {
 		return 0
 	fi
 
-	modes=('initiator' 'target' 'initiator,target')
+	# TRAVIS SPECIFIC - time limitation
+	if [ "$TRAVIS_RUN" != true ]; then
+		modes=('initiator' 'target' 'initiator,target')
+	else
+		modes=('target')
+	fi
 
 	for mode in "${modes[@]}"; do
 
@@ -518,7 +523,7 @@ function test_handle_symlinks () {
 	fi
 
 	# Check with and without copySymlinks
-	copySymlinks="yes"
+	copySymlinks="no"
 
 	echo "Running with COPY_SYMLINKS=$copySymlinks"
 
@@ -599,8 +604,13 @@ function test_handle_symlinks () {
 		assertEquals "File [$INITIATOR_DIR/$OSYNC_DELETE_DIR/$FileBL] is not present in deletion dir." "0" $?
 	done
 
+	# TRAVIS SPECIFIC - time limitation
+	if [ "$TRAVIS_RUN" != true ]; then
+		return 0
+	fi
+
 	# Check with and without copySymlinks
-	copySymlinks="no"
+	copySymlinks="yes"
 
 	echo "Running with COPY_SYMLINKS=$copySymlinks"
 
