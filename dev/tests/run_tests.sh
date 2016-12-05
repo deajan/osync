@@ -7,7 +7,7 @@
 
 ## On CYGWIN / MSYS, ACL and extended attributes aren't supported
 
-# osync test suite 2016120502
+# osync test suite 2016120503
 
 # 4 tests:
 # quicklocal
@@ -37,7 +37,9 @@
 # setfacl needs double ':' to be compatible with both linux and BSD
 # setfacl -m o::rwx file
 
-LARGE_FILESET_URL="http://ftp.drupal.org/files/projects/drupal-8.2.2.tar.gz"
+# drupal servers are often unreachable for whetever reason or give 0 bytes files
+#LARGE_FILESET_URL="http://ftp.drupal.org/files/projects/drupal-8.2.2.tar.gz"
+LARGE_FILESET_URL="http://www.netpower.fr/sites/default/files/osync-test-files-drupal-8.2.2.tar.gz"
 
 OSYNC_DIR="$(pwd)"
 OSYNC_DIR=${OSYNC_DIR%%/dev*}
@@ -59,11 +61,9 @@ TMP_FILE="$DEV_DIR/tmp"
 if [ "$TRAVIS_RUN" == true ]; then
 	echo "Running with travis settings"
 	CONF_DIR="$TESTS_DIR/conf-travis"
-	SSH_PORT=22
 else
 	echo "Running with local settings"
 	CONF_DIR="$TESTS_DIR/conf-local"
-	SSH_PORT=49999
 fi
 
 OSYNC_TESTS_DIR="${HOME}/osync-tests"
@@ -112,6 +112,12 @@ function SetConfFileValue () {
 }
 
 function SetupSSH {
+
+	# Get default ssh port from env
+	if [ "$SSH_PORT" == "" ]; then
+		SSH_PORT=22
+	fi
+
 	echo -e  'y\n'| ssh-keygen -t rsa -b 2048 -N "" -f "${HOME}/.ssh/id_rsa_local"
 	if ! grep "$(cat ${HOME}/.ssh/id_rsa_local.pub)" "${HOME}/.ssh/authorized_keys"; then
 		cat "${HOME}/.ssh/id_rsa_local.pub" >> "${HOME}/.ssh/authorized_keys"
@@ -122,6 +128,9 @@ function SetupSSH {
 	if [ -z "$(ssh-keygen -F localhost)" ]; then
 		ssh-keyscan -H localhost >> "${HOME}/.ssh/known_hosts"
 	fi
+
+	# Update remote conf files with SSH port
+	sed -i.tmp 's#ssh://root@localhost:[0-9]*/${HOME}/osync-tests/target#ssh://root@localhost:'$SSH_PORT'/${HOME}/osync-tests/target#' "$CONF_DIR/$REMOTE_CONF"
 }
 
 function RemoveSSH {
