@@ -200,6 +200,8 @@ function oneTimeSetUp () {
 	source "$DEV_DIR/ofunctions.sh"
 	GetLocalOS
 
+	echo "Detected OS: $LOCAL_OS"
+
 	# Setup modes per test
 	readonly __quickLocal=0
 	readonly __quickRemote=1
