@@ -4,7 +4,7 @@ PROGRAM="osync" # Rsync based two way sync engine with fault tolerance
 AUTHOR="(C) 2013-2016 by Orsiris de Jong"
 CONTACT="http://www.netpower.fr/osync - ozy@netpower.fr"
 PROGRAM_VERSION=1.2-beta3
-PROGRAM_BUILD=2016120601
+PROGRAM_BUILD=2016120603
 IS_STABLE=no
 
 # Execution order						#__WITH_PARANOIA_DEBUG
@@ -194,33 +194,33 @@ function CheckCurrentConfigAll {
 ###### Osync specific functions (non shared)
 
 function _CheckReplicaPathsLocal {
-	local replica_path="${1}"
+	local replicaPath="${1}"
 	__CheckArguments 1 $# "${FUNCNAME[0]}" "$@"	#__WITH_PARANOIA_DEBUG
 
-	if [ ! -w "$replica_path" ]; then
-		Logger "Local replica path [$replica_path] is not writable." "CRITICAL"
+	if [ ! -w "$replicaPath" ]; then
+		Logger "Local replica path [$replicaPath] is not writable." "CRITICAL"
 		exit 1
 	fi
 
-	if [ ! -d "$replica_path" ]; then
+	if [ ! -d "$replicaPath" ]; then
 		if [ "$CREATE_DIRS" == "yes" ]; then
-			$COMMAND_SUDO mkdir -p "$replica_path" >> "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$SCRIPT_PID" 2>&1
+			$COMMAND_SUDO mkdir -p "$replicaPath" >> "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$SCRIPT_PID" 2>&1
 			if [ $? != 0 ]; then
-				Logger "Cannot create local replica path [$replica_path]." "CRITICAL"
+				Logger "Cannot create local replica path [$replicaPath]." "CRITICAL"
 				Logger "Command output:\n$(cat $RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$SCRIPT_PID)"
 				exit 1
 			else
-				Logger "Created local replica path [$replica_path]." "NOTICE"
+				Logger "Created local replica path [$replicaPath]." "NOTICE"
 			fi
 		else
-			Logger "Local replica path [$replica_path] does not exist." "CRITICAL"
+			Logger "Local replica path [$replicaPath] does not exist." "CRITICAL"
 			exit 1
 		fi
 	fi
 }
 
 function _CheckReplicaPathsRemote {
-	local replica_path="${1}"
+	local replicaPath="${1}"
 	__CheckArguments 1 $# "${FUNCNAME[0]}" "$@"	#__WITH_PARANOIA_DEBUG
 
 	local cmd
@@ -228,19 +228,26 @@ function _CheckReplicaPathsRemote {
 	CheckConnectivity3rdPartyHosts
 	CheckConnectivityRemoteHost
 
-	cmd=$SSH_CMD' "if [ ! -w \"'$replica_path'\" ];then exit 1; fi" 2>&1'
-	Logger "cmd: $cmd" "DEBUG"
-	eval "$cmd"
+$SSH_CMD replicaPath="'$replicaPath'" 'bash -s' << 'ENDSSH' 2>&1
+if [ ! -w "$replicaPath" ]; then
+	exit 1
+fi
+ENDSSH
+
 	if [ $? != 0 ]; then
-		Logger "Remote replica path [$replica_path] is not writable." "CRITICAL"
+		Logger "Remote replica path [$replicaPath] is not writable." "CRITICAL"
 		exit 1
 	fi
 
-	cmd=$SSH_CMD' "if ! [ -d \"'$replica_path'\" ]; then if [ \"'$CREATE_DIRS'\" == \"yes\" ]; then '$COMMAND_SUDO' mkdir -p \"'$replica_path'\"; fi; fi" > "'$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$SCRIPT_PID'" 2>&1'
-	Logger "cmd: $cmd" "DEBUG"
-	eval "$cmd"
+$SSH_CMD replicaPath="'$replicaPath'" CREATE_DIRS="'$CREATE_DIRS'" COMMAND_SUDO="'$COMMAND_SUDO'" 'bash -s' << 'ENDSSH' > "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$SCRIPT_PID" 2>&1
+if [ ! -d "$replicaPath" ]; then
+	if [ "$CREATE_DIRS" == "yes" ]; then
+		$COMMAND_SUDO mkdir -p "$replicaPath"
+	fi
+fi
+ENDSSH
 	if [ $? != 0 ]; then
-		Logger "Cannot create remote replica path [$replica_path]." "CRITICAL"
+		Logger "Cannot create remote replica path [$replicaPath]." "CRITICAL"
 		Logger "Command output:\n$(cat $RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$SCRIPT_PID)" "ERROR"
 		exit 1
 	fi
@@ -275,14 +282,14 @@ function CheckReplicaPaths {
 }
 
 function _CheckDiskSpaceLocal {
-	local replica_path="${1}"
+	local replicaPath="${1}"
 	__CheckArguments 1 $# "${FUNCNAME[0]}" "$@"	#__WITH_PARANOIA_DEBUG
 
 	local diskSpace
 
-	Logger "Checking minimum disk space in [$replica_path]." "NOTICE"
+	Logger "Checking minimum disk space in [$replicaPath]." "NOTICE"
 
-	diskSpace=$($DF_CMD "$replica_path" | tail -1 | awk '{print $4}')
+	diskSpace=$($DF_CMD "$replicaPath" | tail -1 | awk '{print $4}')
 
 	if [ $? != 0 ]; then
 		Logger "Cannot get free space." "ERROR"
@@ -293,16 +300,16 @@ function _CheckDiskSpaceLocal {
 		fi
 
 		if [ $diskSpace -lt $MINIMUM_SPACE ]; then
-			Logger "There is not enough free space on replica [$replica_path] ($diskSpace KB)." "WARN"
+			Logger "There is not enough free space on replica [$replicaPath] ($diskSpace KB)." "WARN"
 		fi
 	fi
 }
 
 function _CheckDiskSpaceRemote {
-	local replica_path="${1}"
+	local replicaPath="${1}"
 	__CheckArguments 1 $# "${FUNCNAME[0]}" "$@"	#__WITH_PARANOIA_DEBUG
 
-	Logger "Checking remote minimum disk space in [$replica_path]." "NOTICE"
+	Logger "Checking remote minimum disk space in [$replicaPath]." "NOTICE"
 
 	local cmd
 	local diskSpace
@@ -310,11 +317,11 @@ function _CheckDiskSpaceRemote {
 	CheckConnectivity3rdPartyHosts
 	CheckConnectivityRemoteHost
 
-	cmd=$SSH_CMD' "'$COMMAND_SUDO' '$DF_CMD' \"'$replica_path'\"" > "'$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$SCRIPT_PID'" 2>&1'
-	Logger "cmd: $cmd" "DEBUG"
-	eval "$cmd"
+$SSH_CMD replicaPath="'$replicaPath'" COMMAND_SUDO="'$COMMAND_SUDO'" DF_CMD="'$DF_CMD'" bash -s << ENDSSH > "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$SCRIPT_PID" 2>&1
+$COMMAND_SUDO $DF_CMD "$replicaPath"
+ENDSSH
 	if [ $? != 0 ]; then
-		Logger "Cannot get free space on target [$replica_path]." "ERROR"
+		Logger "Cannot get free space on target [$replicaPath]." "ERROR"
 		Logger "Command output:\n$(cat $RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$SCRIPT_PID)" "NOTICE"
 	else
 		diskSpace=$(cat $RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$SCRIPT_PID | tail -1 | awk '{print $4}')
@@ -325,7 +332,7 @@ function _CheckDiskSpaceRemote {
 		fi
 
 		if [ $diskSpace -lt $MINIMUM_SPACE ]; then
-			Logger "There is not enough free space on replica [$replica_path] ($diskSpace KB)." "WARN"
+			Logger "There is not enough free space on replica [$replicaPath] ($diskSpace KB)." "WARN"
 		fi
 	fi
 }
@@ -354,13 +361,13 @@ function CheckDiskSpace {
 
 
 function _CreateStateDirsLocal {
-	local replica_state_dir="${1}"
+	local replicaStateDir="${1}"
 	__CheckArguments 1 $# "${FUNCNAME[0]}" "$@"	#__WITH_PARANOIA_DEBUG
 
-	if ! [ -d "$replica_state_dir" ]; then
-		$COMMAND_SUDO mkdir -p "$replica_state_dir" >> "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$SCRIPT_PID" 2>&1
+	if [ ! -d "$replicaStateDir" ]; then
+		$COMMAND_SUDO mkdir -p "$replicaStateDir" >> "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$SCRIPT_PID" 2>&1
 		if [ $? != 0 ]; then
-			Logger "Cannot create state dir [$replica_state_dir]." "CRITICAL"
+			Logger "Cannot create state dir [$replicaStateDir]." "CRITICAL"
 			Logger "Command output:\n$(cat $RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$SCRIPT_PID)" "ERROR"
 			exit 1
 		fi
@@ -368,7 +375,7 @@ function _CreateStateDirsLocal {
 }
 
 function _CreateStateDirsRemote {
-	local replica_state_dir="${1}"
+	local replicaStateDir="${1}"
 	__CheckArguments 1 $# "${FUNCNAME[0]}" "$@"	#__WITH_PARANOIA_DEBUG
 
 	local cmd
@@ -376,11 +383,13 @@ function _CreateStateDirsRemote {
 	CheckConnectivity3rdPartyHosts
 	CheckConnectivityRemoteHost
 
-	cmd=$SSH_CMD' "if ! [ -d \"'$replica_state_dir'\" ]; then '$COMMAND_SUDO' mkdir -p \"'$replica_state_dir'\"; fi" > "'$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$SCRIPT_PID'" 2>&1'
-	Logger "cmd: $cmd" "DEBUG"
-	eval "$cmd"
+$SSH_CMD replicaStateDir="'$replicaStateDir'" 'bash -s' << 'ENDSSH' > "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$SCRIPT_PID" 2>&1
+if [ ! -d "$replicaStateDir" ]; then
+	$COMMAND_SUDO mkdir -p "$replicaStateDir"
+fi
+ENDSSH
 	if [ $? != 0 ]; then
-		Logger "Cannot create remote state dir [$replica_state_dir]." "CRITICAL"
+		Logger "Cannot create remote state dir [$replicaStateDir]." "CRITICAL"
 		Logger "Command output:\n$(cat $RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$SCRIPT_PID)" "ERROR"
 		exit 1
 	fi
@@ -461,9 +470,11 @@ function _CheckLocksRemote {
 	CheckConnectivity3rdPartyHosts
 	CheckConnectivityRemoteHost
 
-	cmd=$SSH_CMD' "if [ -f \"'$lockfile'\" ]; then cat \"'$lockfile'\"; fi" > "'$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$SCRIPT_PID'"'
-	Logger "cmd: $cmd" "DEBUG"
-	eval "$cmd"
+$SSH_CMD lockfile="'$lockFile'" 'bash -s' << 'ENDSSH' > "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$SCRIPT_PID" 2>&1
+if [ -f "$lockfile" ]; then
+	cat "$lockfile"
+fi
+ENDSSH
 	if [ $? != 0 ]; then
 		Logger "Cannot check remote replica lock." "CRITICAL"
 		exit 1
@@ -574,9 +585,14 @@ function _WriteLockFilesRemote {
 	CheckConnectivity3rdPartyHosts
 	CheckConnectivityRemoteHost
 
-	cmd=$SSH_CMD' "( if [ $overwrite == true ]; then set -o noclobber; fi; echo '$SCRIPT_PID@$INSTANCE_ID' | '$COMMAND_SUDO' tee \"'$lockfile'\")" > /dev/null 2> $RUN_DIR/$PROGRAM._WriteLockFilesRemote.$replicaType.$SCRIPT_PID'
-	Logger "cmd: $cmd" "DEBUG"
-	eval "$cmd"
+$SSH_CMD overwrite="'$overwrite'" SCRIPT_PID="'$SCRIPT_PID'" COMMAND_SUDO="'$COMMAND_SUDO'" lockfile="'$lockfile'" 'bash -s' << 'ENDSSH' > /dev/null 2> "$RUN_DIR/$PROGRAM._WriteLockFilesRemote.$replicaType.$SCRIPT_PID"
+(
+	if [ $overwrite == true ]; then
+		set -o noclobber
+	fi
+	$COMMAND_SUDO echo "$SCRIPT_PID@$INSTANCE_ID" > "$lockfile"
+)
+ENDSSH
 	if [ $? != 0 ]; then
 		Logger "Could not create lock file on remote $replicaType in [$lockfile]." "CRITICAL"
 		Logger "Command output:\n$(cat $RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$replicaType.$SCRIPT_PID)" "NOTICE"
@@ -647,9 +663,11 @@ function _UnlockReplicasRemote {
 	CheckConnectivity3rdPartyHosts
 	CheckConnectivityRemoteHost
 
-	cmd=$SSH_CMD' "if [ -f \"'$lockfile'\" ]; then '$COMMAND_SUDO' rm -f \"'$lockfile'\"; fi" > "'$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$SCRIPT_PID'" 2>&1'
-	Logger "cmd: $cmd" "DEBUG"
-	eval "$cmd"
+$SSH_CMD lockfile="'$lockfile'" COMMAND_SUDO="'$COMMAND_SUDO'" 'bash -s' << 'ENDSSH' > "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$SCRIPT_PID" 2>&1
+if [ -f "$lockfile" ]; then
+	$COMMAND_SUDO rm -f "$lockfile"
+fi
+ENDSSH
 	if [ $? != 0 ]; then
 		Logger "Could not unlock remote replica." "ERROR"
 		Logger "Command Output:\n$(cat $RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$SCRIPT_PID)" "NOTICE"
@@ -818,7 +836,8 @@ function _getFileCtimeMtimeRemote {
 
 	local cmd
 
-	cmd='cat "'$fileList'" | '$SSH_CMD' "while read -r file; do '$REMOTE_STAT_CTIME_MTIME_CMD' \"'$replicaPath'\$file\"; done | sort" > "'$RUN_DIR/$PROGRAM.ctime_mtime.$replicaType.$SCRIPT_PID'"'
+	# Quoting ' in single quote with '"'"' in order to have cmd='some stuff \'bash -c "some other stuff"\''
+	cmd='cat "'$fileList'" | '$SSH_CMD' '"'"'bash -c "while read -r file; do '$REMOTE_STAT_CTIME_MTIME_CMD' \"'$replicaPath'\$file\"; done | sort"'"'"' > "'$RUN_DIR/$PROGRAM.ctime_mtime.$replicaType.$SCRIPT_PID'"'
 	Logger "CMD: $cmd" "DEBUG"
 	eval "$cmd"
 	if [ $? != 0 ]; then
@@ -1733,22 +1752,17 @@ function _SoftDeleteRemote {
 		Logger "Removing files older than $changeTime days on $replicaType replica for $deletionType deletion." "NOTICE"
 	fi
 
-	if [ $_LOGGER_VERBOSE == true ]; then
-		# Cannot launch log function from xargs, ugly hack
-		cmd=$SSH_CMD' "if [ -d \"'$replicaDeletionPath'\" ]; then '$COMMAND_SUDO' '$REMOTE_FIND_CMD' \"'$replicaDeletionPath'/\" -type f -ctime +'$changeTime' -print0 | xargs -0 -I {} echo Will delete file {} && '$COMMAND_SUDO' '$REMOTE_FIND_CMD' \"'$replicaDeletionPath'/\" -type d -empty -ctime '$changeTime' -print0 | xargs -0 -I {} echo Will delete directory {}; else echo \"The $replicaType replica dir [$replicaDeletionPath] does not exist. Skipping cleaning of old files.\"; fi" > "'$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$SCRIPT_PID'" 2>&1'
-		Logger "cmd: $cmd" "DEBUG"
-		eval "$cmd"
-		Logger "Command output:\n$(cat $RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$SCRIPT_PID)" "VERBOSE"
-	fi
+	#TODO: fixed find directory -ctime was missing +, test it
+$SSH_CMD _LOGGER_VERBOSE="'$_LOGGER_VERBOSE'" _DRYRUN="'$_DRYRUN'" replicaDeletionPath="'$replicaDeletionPath'" changeTime="'$changeTime'" COMAMND_SUDO="'$COMMAND_SUDO'" REMOTE_FIND_CMD="'$REMOTE_FIND_CMD'" 'bash -s' << 'ENDSSH' > "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$SCRIPT_PID" 2>&1
 
-	if [ $_DRYRUN == false ]; then
-		cmd=$SSH_CMD' "if [ -d \"'$replicaDeletionPath'\" ]; then '$COMMAND_SUDO' '$REMOTE_FIND_CMD' \"'$replicaDeletionPath'/\" -type f -ctime +'$changeTime' -print0 | xargs -0 -I {} '$COMMAND_SUDO' rm -f \"{}\" && '$COMMAND_SUDO' '$REMOTE_FIND_CMD' \"'$replicaDeletionPath'/\" -type d -empty -ctime '$changeTime' -print0 | xargs -0 -I {} '$COMMAND_SUDO' rm -rf \"{}\"; else echo \"The $replicaType replicaDir [$replicaDeletionPath] does not exist. Skipping cleaning of old files.\"; fi" >> "'$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$SCRIPT_PID'" 2>&1'
-
-		Logger "cmd: $cmd" "DEBUG"
-		eval "$cmd"
-	else
-		Dummy
-	fi
+# Cannot launch log function from xargs, ugly hack
+if [ -d "$replicaDeletionPath" ]; then
+$COMMAND_SUDO $REMOTE_FIND_CMD "$replicaDeletionPath" -type f -ctime +"$changeTime" -print0 | xargs -0 -I {} bash -c 'export file="{}"; if [ '$_LOGGER_VERBOSE' == true ]; then echo "Will delete file {}"; if [ '$DRYRUN' == false ]; then '$COMMAND_SUDO' rm -f "$file"'
+$COMMAND_SUDO $REMOTE_FIND_CMD "$replicaDeletionPath" -type d -empty -ctime +"$changeTime" -print0 | xargs -0 -I {} bash -c 'export file="{}"; if [ '$_LOGGER_VERBOSE' == true ]; then echo "Will delete directory {}"; if [ '$DRY_RUN' == false ]; then '$COMMAND_SUDO' rm -f "{}"'
+else
+	echo "The $replicaType replica dir [$replicaDeletionPath] does not exist. Skipping cleaning of old files"
+fi
+ENDSSH
 	retval=$?
 	if [ $retval -ne 0 ]; then
 		Logger "Error while executing cleanup on remote $replicaType replica." "ERROR"
