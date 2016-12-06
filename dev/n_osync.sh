@@ -2090,7 +2090,7 @@ function Init {
 function Main {
 	__CheckArguments 0 $# "${FUNCNAME[0]}" "$@"	#__WITH_PARANOIA_DEBUG
 
-	#HandleLocks
+	HandleLocks
 	Sync
 }
 
