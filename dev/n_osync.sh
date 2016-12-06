@@ -4,7 +4,7 @@ PROGRAM="osync" # Rsync based two way sync engine with fault tolerance
 AUTHOR="(C) 2013-2016 by Orsiris de Jong"
 CONTACT="http://www.netpower.fr/osync - ozy@netpower.fr"
 PROGRAM_VERSION=1.2-beta3
-PROGRAM_BUILD=2016120603
+PROGRAM_BUILD=2016120604
 IS_STABLE=no
 
 # Execution order						#__WITH_PARANOIA_DEBUG
@@ -22,9 +22,7 @@ IS_STABLE=no
 #	CheckDiskSpace				yes		#__WITH_PARANOIA_DEBUG
 #	RunBeforeHook				yes		#__WITH_PARANOIA_DEBUG
 #	Main					no		#__WITH_PARANOIA_DEBUG
-#		CreateStateDirs			yes		#__WITH_PARANOIA_DEBUG
-#	 	CheckLocks			yes		#__WITH_PARANOIA_DEBUG
-#	 	WriteLockFiles			yes		#__WITH_PARANOIA_DEBUG
+#	 	HandleLocks			yes		#__WITH_PARANOIA_DEBUG
 #	 	Sync				no		#__WITH_PARANOIA_DEBUG
 #			treeList		yes		#__WITH_PARANOIA_DEBUG
 #			treeList		yes		#__WITH_PARANOIA_DEBUG
@@ -184,7 +182,7 @@ function CheckCurrentConfigAll {
 	if [ "$SKIP_DELETION" != "" ]; then
 		tmp="$SKIP_DELETION"
 		IFS=',' read -r -a SKIP_DELETION <<< "$tmp"
-		if [ $(arrayContains "${INITIATOR[$__type]}" "${SKIP_DELETION[@]}") -eq 0 ] && [ $(arrayContains "${TARGET[$__type]}" "${SKIP_DELETION[@]}") -eq 0 ]; then
+		if [ $(ArrayContains "${INITIATOR[$__type]}" "${SKIP_DELETION[@]}") -eq 0 ] && [ $(ArrayContains "${TARGET[$__type]}" "${SKIP_DELETION[@]}") -eq 0 ]; then
 			Logger "Bogus skip deletion parameter [$SKIP_DELETION]." "CRITICAL"
 			exit 1
 		fi
@@ -359,85 +357,41 @@ function CheckDiskSpace {
 	WaitForTaskCompletion $pids 720 1800 $SLEEP_TIME $KEEP_LOGGING true true false ${FUNCNAME[0]}
 }
 
-
-function _CreateStateDirsLocal {
+function _HandleLocksLocal {
 	local replicaStateDir="${1}"
-	__CheckArguments 1 $# "${FUNCNAME[0]}" "$@"	#__WITH_PARANOIA_DEBUG
+	local lockfile="${2}"
+	local replicaType="${3}"
+	local overwrite="${4:-false}"
+
+	__CheckArguments 4 $# "${FUNCNAME[0]}" "$@"	#__WITH_PARANOIA_DEBUG
+
+	local lockfileContent
+	local lockPid
+	local lockInstanceID
+	local writeLocks
 
 	if [ ! -d "$replicaStateDir" ]; then
 		$COMMAND_SUDO mkdir -p "$replicaStateDir" >> "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$SCRIPT_PID" 2>&1
 		if [ $? != 0 ]; then
 			Logger "Cannot create state dir [$replicaStateDir]." "CRITICAL"
 			Logger "Command output:\n$(cat $RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$SCRIPT_PID)" "ERROR"
-			exit 1
+			return 1
 		fi
 	fi
-}
 
-function _CreateStateDirsRemote {
-	local replicaStateDir="${1}"
-	__CheckArguments 1 $# "${FUNCNAME[0]}" "$@"	#__WITH_PARANOIA_DEBUG
-
-	local cmd
-
-	CheckConnectivity3rdPartyHosts
-	CheckConnectivityRemoteHost
-
-$SSH_CMD replicaStateDir="'$replicaStateDir'" 'bash -s' << 'ENDSSH' > "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$SCRIPT_PID" 2>&1
-if [ ! -d "$replicaStateDir" ]; then
-	$COMMAND_SUDO mkdir -p "$replicaStateDir"
-fi
-ENDSSH
-	if [ $? != 0 ]; then
-		Logger "Cannot create remote state dir [$replicaStateDir]." "CRITICAL"
-		Logger "Command output:\n$(cat $RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$SCRIPT_PID)" "ERROR"
-		exit 1
-	fi
-}
-
-function CreateStateDirs {
-	__CheckArguments 0 $# "${FUNCNAME[0]}" "$@"	#__WITH_PARANOIA_DEBUG
-
-	local pids
-
-	_CreateStateDirsLocal "${INITIATOR[$__replicaDir]}${INITIATOR[$__stateDir]}" &
-	pids="$!"
-	if [ "$REMOTE_OPERATION" != "yes" ]; then
-		_CreateStateDirsLocal "${TARGET[$__replicaDir]}${TARGET[$__stateDir]}" &
-		pids="$pids;$!"
-	else
-		_CreateStateDirsRemote "${TARGET[$__replicaDir]}${TARGET[$__stateDir]}" &
-		pids="$pids;$!"
-	fi
-	WaitForTaskCompletion $pids 720 1800 $SLEEP_TIME $KEEP_LOGGING true true false ${FUNCNAME[0]}
-	if [ $? -ne 0 ]; then
-		Logger "Cancelling task." "CRITICAL"
-		exit 1
-	fi
-}
-
-function _CheckLocksLocal {
-	local lockfile="${1}"
-	local replicaType="${2}"
-
-	__CheckArguments 2 $# "${FUNCNAME[0]}" "$@"	#__WITH_PARANOIA_DEBUG
-
-	local lockfileContent
-	local lockPid
-	local lockInstanceID
-
-	if [ -s "$lockfile" ]; then
+	# Skip the whole part if overwrite true
+	if [ -s "$lockfile" ] && [ $overwrite != true ]; then
 		lockfileContent=$(cat $lockfile)
 		Logger "Master lock pid present: $lockfileContent" "DEBUG"
-		lockPid=${lockfileContent%@*}
+		lockPid="${lockfileContent%@*}"
 		if [ $(IsInteger $lockPid) -ne 1 ]; then
 			Logger "Invalid pid [$lockPid] in local replica." "CRITICAL"
-			exit 1
+			return 1
 		fi
-		lockInstanceID=${lockfileContent#*@}
+		lockInstanceID="${lockfileContent#*@}"
 		if [ "$lockInstanceID" == "" ]; then
 			Logger "Invalid instance id [$lockInstanceID] in local replica." "CRITICAL"
-			exit 1
+			return 1
 
 		Logger "Local $replicaType  lock is: [$lockPid@$lockInstanceID]." "DEBUG"
 
@@ -445,82 +399,199 @@ function _CheckLocksLocal {
 		kill -0 $lockPid > /dev/null 2>&1
 		if [ $? != 0 ]; then
 			Logger "There is a local dead osync lock [$lockPid@$lockInstanceID] that is no longer running. Resuming." "NOTICE"
-			if [ "$replicaType" == "${INITIATOR[$__type]}" ]; then
-				# REPLICA_OVERWRITE_LOCK disables noclobber option in WriteLock functions
-				INITIATOR_OVERWRITE_LOCK=true
-			elif [ "$replicaType" == "${TARGET[$__type]}" ]; then
-				TARGET_OVERWRITE_LOCK=true
-			fi
+			writeLocks=true
 		else
 			Logger "There is already a local instance [$lockPid@$lockInstanceID] of osync running for this replica. Cannot start." "CRITICAL"
-			exit 1
+			return 1
+		fi
+	else
+		writeLocks=true
+	fi
+
+	if [ $writeLocks != true ]; then
+		Logger "This is the final merdier" "WARN"
+		return 1
+	else
+		$COMMAND_SUDO echo "$SCRIPT_PID@$INSTANCE_ID" > "$lockfile" 2> "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}-$replicaType.$SCRIPT_PID"
+		if [ $?	!= 0 ]; then
+			Logger "Could not create lock file on local $replicaType in [$lockfile]." "CRITICAL"
+			Logger "Command output\n$($RUN_DIR/$PROGRAM.${FUNCNAME[0]}-$replicaType.$SCRIPT_PID)" "NOTICE"
+			return 1
+		else
+			Logger "Locked local $replicaType replica in [$lockfile]." "DEBUG"
 		fi
 	fi
 }
 
-function _CheckLocksRemote {
-	local lockfile="${1}"
-	__CheckArguments 1 $# "${FUNCNAME[0]}" "$@"	#__WITH_PARANOIA_DEBUG
+function _HandleLocksRemote {
+	local replicaStateDir="${1}"
+	local lockfile="${2}"
+	local replicaType="${3}"
+	local overwrite="${4:-false}"
 
-	local cmd
-	local lockPid
-	local lockInstanceID
-	local lockfileContent
+	__CheckArguments 4 $# "${FUNCNAME[0]}" "$@"	#__WITH_PARANOIA_DEBUG
+
+	local initiatorRunningPids
 
 	CheckConnectivity3rdPartyHosts
 	CheckConnectivityRemoteHost
 
-$SSH_CMD lockfile="'$lockFile'" 'bash -s' << 'ENDSSH' > "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$SCRIPT_PID" 2>&1
-if [ -f "$lockfile" ]; then
-	cat "$lockfile"
-fi
-ENDSSH
-	if [ $? != 0 ]; then
-		Logger "Cannot check remote replica lock." "CRITICAL"
-		exit 1
+	# Create an array of all currently running pids
+	# TODO: check portability
+	read -a initiatorRunningPids <<< $(ps -A | tail -n +2 | awk '{print $1}')
+
+# passing initiatorRunningPids as litteral string (has to be run through eval to be an array again)
+$SSH_CMD replicaStateDir="'$replicaStateDir'" initiatorRunningPidsFlat="(${initiatorRunningPids[@]})" lockfile="'$lockfile'" replicaType="'$replicaType'" overwrite="'$overwrite'" SCRIPT_PID="'$SCRIPT_PID'" INSTANCE_ID="'$INSTANCE_ID'" FORCE_STRANGER_LOCK_RESUME="'$FORCE_STRANGER_LOCK_RESUME'"  'bash -s' << 'ENDSSH' > "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$SCRIPT_PID" 2>&1
+	function ArrayContains () {
+        	local needle="${1}"
+        	local haystack="${@:2}"
+        	local e
+
+        	if [ "$needle" != "" ] && [ "$haystack" != "" ]; then
+                	for e in "${@:2}"; do
+                        	if [ "$e" == "$needle" ]; then
+                                	echo 1
+                                	return
+                        	fi
+                	done
+        	fi
+        	echo 0
+		return
+	}
+
+	function IsInteger {
+	        local value="${1}"
+
+	        if [[ $value =~ ^[0-9]+$ ]]; then
+                	echo 1
+        	else
+                	echo 0
+        	fi
+	}
+
+	## The following lines are executed remotely
+	function _logger {
+		local value="${1}" # What to log
+		echo -e "$value"
+	}
+
+	function Logger {
+		local value="${1}" # What to log
+		local level="${2}" # Log level: DEBUG, NOTICE, WARN, ERROR, CRITIAL
+
+		local prefix="RTIME: $SECONDS - "
+
+		if [ "$level" == "CRITICAL" ]; then
+			_logger "$prefix\e[41m$value\e[0m"
+			return
+		elif [ "$level" == "ERROR" ]; then
+			_logger "$prefix\e[91m$value\e[0m"
+			return
+		elif [ "$level" == "WARN" ]; then
+			_logger "$prefix\e[93m$value\e[0m"
+			return
+		elif [ "$level" == "NOTICE" ]; then
+			_logger "$prefix$value"
+			return
+		elif [ "$level" == "VERBOSE" ]; then
+			if [ $_LOGGER_VERBOSE == true ]; then
+				_logger "$prefix$value"
+			fi
+			return
+		elif [ "$level" == "DEBUG" ]; then
+			if [ "$_DEBUG" == "yes" ]; then
+				_logger "$prefix$value"
+			fi
+			return
+		else
+			_logger "\e[41mLogger function called without proper loglevel [$level].\e[0m"
+			_logger "$prefix$value"
+		fi
+	}
+
+function _HandleLocksRemoteSub {
+	#WIP do not remote log to file as output is already logged from ssh
+	if [ ! -d "$replicaStateDir" ]; then
+		$COMMAND_SUDO mkdir -p "$replicaStateDir" >> "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$SCRIPT_PID" 2>&1
+		if [ $? != 0 ]; then
+			Logger "Cannot create state dir [$replicaStateDir]." "CRITICAL"
+			Logger "Command output:\n$(cat $RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$SCRIPT_PID)" "ERROR"
+			return 1
+		fi
 	fi
 
-	if [ -s "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$SCRIPT_PID" ]; then
-		lockfileContent="$(cat $RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$SCRIPT_PID)"
-
-		lockPid=${lockfileContent%@*}
+	# Skip the whole part if overwrite true
+	if [ -s "$lockfile" ] && [ $overwrite != true ]; then
+		lockfileContent=$(cat $lockfile)
+		Logger "Master lock pid present: $lockfileContent" "DEBUG"
+		lockPid="${lockfileContent%@*}"
 		if [ $(IsInteger $lockPid) -ne 1 ]; then
-			Logger "Invalid pid [$lockPid] in remote replica lock." "CRITICAL"
-			exit 1
+			Logger "Invalid pid [$lockPid] in local replica." "CRITICAL"
+			return 1
 		fi
-		lockInstanceID=${lockfileContent#*@}
+		lockInstanceID="${lockfileContent#*@}"
 		if [ "$lockInstanceID" == "" ]; then
-			Logger "Invalid instance id [$lockInstanceID] in remote replica." "CRITICAL"
-			exit 1
+			Logger "Invalid instance id [$lockInstanceID] in local replica." "CRITICAL"
+			return 1
+
+		Logger "Local $replicaType  lock is: [$lockPid@$lockInstanceID]." "DEBUG"
+
 		fi
 
-		Logger "Remote lock is: [$lockPid@$lockInstanceID]" "DEBUG"
-
-		kill -0 $lockPid > /dev/null 2>&1
-		if [ $? != 0 ]; then
+		# Retransform litteral array string to array
+		eval "initiatorRunningPids=$initiatorRunningPidsFlat"
+		if [ $(ArrayContains "$lockPid" "${initiatorRunningPids[@]}") -eq 0 ]; then
 			if [ "$lockInstanceID" == "$INSTANCE_ID" ]; then
-				Logger "There is a remote dead osync lock [$lockPid@lockInstanceID] on target replica that corresponds to this initiator INSTANCE_ID. Pid [$lockPid] no longer running. Resuming." "NOTICE"
-				TARGET_OVERWRITE_LOCK=true
+				Logger "There is a remote dead osync lock [$lockPid@$lockInstanceID] on target replica that corresponds to this initiator INSTANCE_ID. Pid [$lockPid] no longer running. Resuming." "NOTICE"
+				writeLocks=true
 			else
 				if [ "$FORCE_STRANGER_LOCK_RESUME" == "yes" ]; then
 					Logger "There is a remote (maybe dead) osync lock [$lockPid@$lockInstanceID] on target replica that does not correspond to this initiator INSTANCE_ID. Forcing resume." "WARN"
-					TARGET_OVERWRITE_LOCK=true
+					writeLocks=true
 				else
 					Logger "There is a remote (maybe dead) osync lock [$lockPid@$lockInstanceID] on target replica that does not correspond to this initiator INSTANCE_ID. Will not resume." "CRITICAL"
-					exit 1
+					return 1
 				fi
 			fi
 		else
 			Logger "There is already a local instance of osync that locks target replica [$lockPid@$lockInstanceID]. Cannot start." "CRITICAL"
-			exit 1
+			return 1
+		fi
+	else
+		writeLocks=true
+	fi
+
+	if [ $writeLocks != true ]; then
+		return 1
+	else
+		$COMMAND_SUDO echo "$SCRIPT_PID@$INSTANCE_ID" > "$lockfile" 2> "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}-$replicaType.$SCRIPT_PID"
+		if [ $?	!= 0 ]; then
+			Logger "Could not create lock file on local $replicaType in [$lockfile]." "CRITICAL"
+			Logger "Command output\n$($RUN_DIR/$PROGRAM.${FUNCNAME[0]}-$replicaType.$SCRIPT_PID)" "NOTICE"
+			return 1
+		else
+			Logger "Locked local $replicaType replica in [$lockfile]." "DEBUG"
 		fi
 	fi
 }
 
-function CheckLocks {
+_HandleLocksRemoteSub
+result=$?
+exit $result
+ENDSSH
+
+	if [ $? != 0 ]; then
+		Logger "Remote lock handling failed." "CRITICAL"
+		Logger "Command output:\n$(cat $RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$SCRIPT_PID)" "ERROR"
+		return 1
+	fi
+}
+
+function HandleLocks {
 	__CheckArguments 0 $# "${FUNCNAME[0]}" "$@"	#__WITH_PARANOIA_DEBUG
 
 	local pids
+	local overwrite=false
 
 	if [ $_NOLOCKS == true ]; then
 		return 0
@@ -528,115 +599,34 @@ function CheckLocks {
 
 	# Do not bother checking for locks when FORCE_UNLOCK is set
 	if [ $FORCE_UNLOCK == true ]; then
-		WriteLockFiles
-		if [ $? != 0 ]; then
-			exit 1
-		fi
+		overwrite=true
 	else
-		_CheckLocksLocal "${INITIATOR[$__lockFile]}" "${INITIATOR[$__type]}" &
+		_HandleLocksLocal "${INITIATOR[$__replicaDir]}${INITIATOR[$__stateDir]}" "${INITIATOR[$__lockFile]}" "${INITIATOR[$__type]}" $overwrite &
 		pids="$!"
 		if [ "$REMOTE_OPERATION" != "yes" ]; then
-			_CheckLocksLocal "${TARGET[$__lockFile]}" "${INITIATOR[$__type]}" &
+			_HandleLocksLocal "${TARGET[$__replicaDir]}${TARGET[$__stateDir]}" "${TARGET[$__lockFile]}" "${TARGET[$__type]}" $overwrite &
 			pids="$pids;$!"
 		else
-			_CheckLocksRemote "${TARGET[$__lockFile]}" &
+			_HandleLocksRemote "${TARGET[$__replicaDir]}${TARGET[$__stateDir]}" "${TARGET[$__lockFile]}" "${TARGET[$__type]}" $overwrite &
 			pids="$pids;$!"
 		fi
+	        INITIATOR_LOCK_FILE_EXISTS=true
+        	TARGET_LOCK_FILE_EXISTS=true
 		WaitForTaskCompletion $pids 720 1800 $SLEEP_TIME $KEEP_LOGGING true true false ${FUNCNAME[0]}
 		if [ $? -ne 0 ]; then
-			Logger "Cancelling task." "CRITICAL"
-			exit 1
+	                IFS=';' read -r -a pidArray <<< "$(eval echo \"\$WAIT_FOR_TASK_COMPLETION_${FUNCNAME[0]}\")"
+        	        for pid in "${pidArray[@]}"; do
+                	        pid=${pid%:*}
+                        	if [ "$pid" == "$initiatorPid" ]; then
+                                	INITIATOR_LOCK_FILE_EXISTS=false
+                        	elif [ "$pid" == "$targetPid" ]; then
+                                	TARGET_LOCK_FILE_EXISTS=false
+                        	fi
+                	done
+
+                	Logger "Cancelling task." "CRITICAL"
+                	exit 1
 		fi
-		WriteLockFiles
-	fi
-}
-
-function _WriteLockFilesLocal {
-	local lockfile="${1}"
-	local replicaType="${2}"
-	local overwrite="${3:-false}"
-
-	__CheckArguments 2-3 $# "${FUNCNAME[0]}" "$@"	#__WITH_PARANOIA_DEBUG
-
-	(
-		if [ $overwrite == true ]; then
-			set -o noclobber
-		fi
-		$COMMAND_SUDO echo "$SCRIPT_PID@$INSTANCE_ID" > "$lockfile" 2> "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}-$replicaType.$SCRIPT_PID"
-	)
-	if [ $?	!= 0 ]; then
-		Logger "Could not create lock file on local $replicaType in [$lockfile]." "CRITICAL"
-		Logger "Command output\n$($RUN_DIR/$PROGRAM.${FUNCNAME[0]}-$replicaType.$SCRIPT_PID)" "NOTICE"
-		return 1
-	else
-		Logger "Locked local $replicaType replica in [$lockfile]." "DEBUG"
-	fi
-}
-
-function _WriteLockFilesRemote {
-	local lockfile="${1}"
-	local replicaType="${2}"
-	local overwrite="${3-false}"
-
-	__CheckArguments 2-3 $# "${FUNCNAME[0]}" "$@"	#__WITH_PARANOIA_DEBUG
-
-	local cmd
-
-	CheckConnectivity3rdPartyHosts
-	CheckConnectivityRemoteHost
-
-$SSH_CMD overwrite="'$overwrite'" SCRIPT_PID="'$SCRIPT_PID'" COMMAND_SUDO="'$COMMAND_SUDO'" lockfile="'$lockfile'" 'bash -s' << 'ENDSSH' > /dev/null 2> "$RUN_DIR/$PROGRAM._WriteLockFilesRemote.$replicaType.$SCRIPT_PID"
-(
-	if [ $overwrite == true ]; then
-		set -o noclobber
-	fi
-	$COMMAND_SUDO echo "$SCRIPT_PID@$INSTANCE_ID" > "$lockfile"
-)
-ENDSSH
-	if [ $? != 0 ]; then
-		Logger "Could not create lock file on remote $replicaType in [$lockfile]." "CRITICAL"
-		Logger "Command output:\n$(cat $RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$replicaType.$SCRIPT_PID)" "NOTICE"
-		return 1
-	else
-		Logger "Locked remote $replicaType replica in [$lockfile]." "DEBUG"
-	fi
-}
-
-function WriteLockFiles {
-	__CheckArguments 0 $# "${FUNCNAME[0]}" "$@"	#__WITH_PARANOIA_DEBUG
-
-	local initiatorPid
-	local targetPid
-	local pidArray
-	local pid
-
-	_WriteLockFilesLocal "${INITIATOR[$__lockFile]}" "${INITIATOR[$__type]}" $INITIATOR_LOCK_OVERWRITE &
-	initiatorPid="$!"
-
-	if [ "$REMOTE_OPERATION" != "yes" ]; then
-		_WriteLockFilesLocal "${TARGET[$__lockFile]}" "${TARGET[$__type]}" $TARGET_LOCK_OVERWRITE &
-		targetPid="$!"
-	else
-		_WriteLockFilesRemote "${TARGET[$__lockFile]}" "${TARGET[$__type]}" $TARGET_LOCK_OVERWRITE &
-		targetPid="$!"
-	fi
-
-	INITIATOR_LOCK_FILE_EXISTS=true
-	TARGET_LOCK_FILE_EXISTS=true
-	WaitForTaskCompletion "$initiatorPid;$targetPid" 720 1800 $SLEEP_TIME $KEEP_LOGGING true true false ${FUNCNAME[0]}
-	if [ $? -ne 0 ]; then
-		IFS=';' read -r -a pidArray <<< "$(eval echo \"\$WAIT_FOR_TASK_COMPLETION_${FUNCNAME[0]}\")"
-		for pid in "${pidArray[@]}"; do
-			pid=${pid%:*}
-			if [ "$pid" == "$initiatorPid" ]; then
-				INITIATOR_LOCK_FILE_EXISTS=false
-			elif [ "$pid" == "$targetPid" ]; then
-				TARGET_LOCK_FILE_EXISTS=false
-			fi
-		done
-
-		Logger "Cancelling task." "CRITICAL"
-		exit 1
 	fi
 }
 
@@ -1302,7 +1292,7 @@ function deletionPropagation {
 	Logger "Propagating deletions to $replicaType replica." "NOTICE"
 
 	if [ "$replicaType" == "${INITIATOR[$__type]}" ]; then
-		if [ $(arrayContains "${INITIATOR[$__type]}" "${SKIP_DELETION[@]}") -eq 0 ]; then
+		if [ $(ArrayContains "${INITIATOR[$__type]}" "${SKIP_DELETION[@]}") -eq 0 ]; then
 			replicaDir="${INITIATOR[$__replicaDir]}"
 			deleteDir="${INITIATOR[$__deleteDir]}"
 
@@ -1316,7 +1306,7 @@ function deletionPropagation {
 			Logger "Skipping deletion on replica $replicaType." "NOTICE"
 		fi
 	elif [ "$replicaType" == "${TARGET[$__type]}" ]; then
-		if [ $(arrayContains "${TARGET[$__type]}" "${SKIP_DELETION[@]}") -eq 0 ]; then
+		if [ $(ArrayContains "${TARGET[$__type]}" "${SKIP_DELETION[@]}") -eq 0 ]; then
 			replicaDir="${TARGET[$__replicaDir]}"
 			deleteDir="${TARGET[$__deleteDir]}"
 
@@ -2041,8 +2031,7 @@ function Init {
 function Main {
 	__CheckArguments 0 $# "${FUNCNAME[0]}" "$@"	#__WITH_PARANOIA_DEBUG
 
-	CreateStateDirs
-	CheckLocks
+	HandleLocks
 	Sync
 }
 
