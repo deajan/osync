@@ -7,7 +7,7 @@
 
 ## On CYGWIN / MSYS, ACL and extended attributes aren't supported
 
-# osync test suite 2016120503
+# osync test suite 2016120601
 
 # 4 tests:
 # quicklocal
@@ -46,6 +46,7 @@ OSYNC_DIR=${OSYNC_DIR%%/dev*}
 DEV_DIR="$OSYNC_DIR/dev"
 TESTS_DIR="$DEV_DIR/tests"
 
+CONF_DIR="$TESTS_DIR/conf"
 LOCAL_CONF="local.conf"
 REMOTE_CONF="remote.conf"
 OLD_CONF="old.conf"
@@ -56,15 +57,6 @@ OSYNC_DEV_EXECUTABLE="dev/n_osync.sh"
 OSYNC_UPGRADE="upgrade-v1.0x-v1.2x.sh"
 TMP_FILE="$DEV_DIR/tmp"
 
-
-
-if [ "$TRAVIS_RUN" == true ]; then
-	echo "Running with travis settings"
-	CONF_DIR="$TESTS_DIR/conf-travis"
-else
-	echo "Running with local settings"
-	CONF_DIR="$TESTS_DIR/conf-local"
-fi
 
 OSYNC_TESTS_DIR="${HOME}/osync-tests"
 INITIATOR_DIR="$OSYNC_TESTS_DIR/initiator"
@@ -112,12 +104,6 @@ function SetConfFileValue () {
 }
 
 function SetupSSH {
-
-	# Get default ssh port from env
-	if [ "$SSH_PORT" == "" ]; then
-		SSH_PORT=22
-	fi
-
 	echo -e  'y\n'| ssh-keygen -t rsa -b 2048 -N "" -f "${HOME}/.ssh/id_rsa_local"
 	if ! grep "$(cat ${HOME}/.ssh/id_rsa_local.pub)" "${HOME}/.ssh/authorized_keys"; then
 		cat "${HOME}/.ssh/id_rsa_local.pub" >> "${HOME}/.ssh/authorized_keys"
@@ -130,7 +116,7 @@ function SetupSSH {
 	fi
 
 	# Update remote conf files with SSH port
-	sed -i.tmp 's#ssh://root@localhost:[0-9]*/${HOME}/osync-tests/target#ssh://root@localhost:'$SSH_PORT'/${HOME}/osync-tests/target#' "$CONF_DIR/$REMOTE_CONF"
+	sed -i.tmp 's#ssh://.*@localhost:[0-9]*/${HOME}/osync-tests/target#ssh://'$REMOTE_USER'@localhost:'$SSH_PORT'/${HOME}/osync-tests/target#' "$CONF_DIR/$REMOTE_CONF"
 }
 
 function RemoveSSH {
@@ -201,6 +187,22 @@ function oneTimeSetUp () {
 	GetLocalOS
 
 	echo "Detected OS: $LOCAL_OS"
+
+	# Set some travis related changes
+	if [ "$TRAVIS_RUN" == true ]; then
+	echo "Running with travis settings"
+		REMOTE_USER="travis"
+		SetConfFileValue "$CONF_DIR/$REMOTE_CONF" "REMOTE_3RD_PARTY_HOSTS" ""
+	else
+		echo "Running with local settings"
+		REMOTE_USER="root"
+		SetConfFileValue "$CONF_DIR/$REMOTE_CONF" "REMOTE_3RD_PARTY_HOSTS" "www.kernel.org www.google.com"
+	fi
+
+	# Get default ssh port from env
+	if [ "$SSH_PORT" == "" ]; then
+		SSH_PORT=22
+	fi
 
 	# Setup modes per test
 	readonly __quickLocal=0
