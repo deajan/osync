@@ -7,7 +7,7 @@
 
 ## On CYGWIN / MSYS, ACL and extended attributes aren't supported
 
-# osync test suite 2016120601
+# osync test suite 2016120602
 
 # 4 tests:
 # quicklocal
@@ -196,7 +196,7 @@ function oneTimeSetUp () {
 	else
 		echo "Running with local settings"
 		REMOTE_USER="root"
-		SetConfFileValue "$CONF_DIR/$REMOTE_CONF" "REMOTE_3RD_PARTY_HOSTS" "www.kernel.org www.google.com"
+		SetConfFileValue "$CONF_DIR/$REMOTE_CONF" "REMOTE_3RD_PARTY_HOSTS" "\"www.kernel.org www.google.com\""
 	fi
 
 	# Get default ssh port from env
@@ -1015,7 +1015,7 @@ function test_Locking () {
 	echo 65536@bogusinstance > "$TARGET_DIR/$OSYNC_WORKDIR/lock"
 
 	REMOTE_HOST_PING=no ./$OSYNC_EXECUTABLE ${osyncParameters[$__confRemote]}
-	assertEquals "Should not be able to resume remote locked target with bgous instance_id in confRemote mode." "1" $?
+	assertEquals "Should not be able to resume remote locked target with bogus instance_id in confRemote mode." "1" $?
 
 	# Target lock present should be resumed if instance ID is NOT the same as current one but FORCE_STRANGER_UNLOCK=yes
 
