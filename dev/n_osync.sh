@@ -4,8 +4,12 @@ PROGRAM="osync" # Rsync based two way sync engine with fault tolerance
 AUTHOR="(C) 2013-2016 by Orsiris de Jong"
 CONTACT="http://www.netpower.fr/osync - ozy@netpower.fr"
 PROGRAM_VERSION=1.2-beta3
-PROGRAM_BUILD=2016120604
+PROGRAM_BUILD=2016120605
 IS_STABLE=no
+
+#TODO: replace _Logger & Logger in remote functions with ofunctions version dedicated to remote logging
+#TODO: replace ArrayContains, IsNumeric, HumanToNumeric with ofunctions version via merge
+#TODO: deal with _VERBOSE / _SILENT switches in remote Logger
 
 # Execution order						#__WITH_PARANOIA_DEBUG
 #	Function Name				Is parallel	#__WITH_PARANOIA_DEBUG
@@ -18,8 +22,7 @@ IS_STABLE=no
 #	PostInit				no		#__WITH_PARANOIA_DEBUG
 #	GetRemoteOS				no		#__WITH_PARANOIA_DEBUG
 #	InitRemoteOSDependingSettings		no		#__WITH_PARANOIA_DEBUG
-#	CheckReplicaPaths			yes		#__WITH_PARANOIA_DEBUG
-#	CheckDiskSpace				yes		#__WITH_PARANOIA_DEBUG
+#	CheckReplicas				yes		#__WITH_PARANOIA_DEBUG
 #	RunBeforeHook				yes		#__WITH_PARANOIA_DEBUG
 #	Main					no		#__WITH_PARANOIA_DEBUG
 #	 	HandleLocks			yes		#__WITH_PARANOIA_DEBUG
@@ -191,14 +194,11 @@ function CheckCurrentConfigAll {
 
 ###### Osync specific functions (non shared)
 
-function _CheckReplicaPathsLocal {
+function _CheckReplicasLocal {
 	local replicaPath="${1}"
 	__CheckArguments 1 $# "${FUNCNAME[0]}" "$@"	#__WITH_PARANOIA_DEBUG
 
-	if [ ! -w "$replicaPath" ]; then
-		Logger "Local replica path [$replicaPath] is not writable." "CRITICAL"
-		exit 1
-	fi
+	local diskSpace
 
 	if [ ! -d "$replicaPath" ]; then
 		if [ "$CREATE_DIRS" == "yes" ]; then
@@ -206,18 +206,38 @@ function _CheckReplicaPathsLocal {
 			if [ $? != 0 ]; then
 				Logger "Cannot create local replica path [$replicaPath]." "CRITICAL"
 				Logger "Command output:\n$(cat $RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$SCRIPT_PID)"
-				exit 1
+				return 1
 			else
 				Logger "Created local replica path [$replicaPath]." "NOTICE"
 			fi
 		else
 			Logger "Local replica path [$replicaPath] does not exist." "CRITICAL"
-			exit 1
+			return 1
+		fi
+	fi
+
+	if [ ! -w "$replicaPath" ]; then
+		Logger "Local replica path [$replicaPath] is not writable." "CRITICAL"
+		return 1
+	fi
+
+	Logger "Checking minimum disk space in local replica [$replicaPath]." "NOTICE"
+	diskSpace=$($DF_CMD "$replicaPath" | tail -1 | awk '{print $4}')
+	if [ $? != 0 ]; then
+		Logger "Cannot get free space." "ERROR"
+	else
+		# Ugly fix for df in some busybox environments that can only show human formats
+		if [ $(IsInteger $diskSpace) -eq 0 ]; then
+			diskSpace=$(HumanToNumeric $diskSpace)
+		fi
+
+		if [ $diskSpace -lt $MINIMUM_SPACE ]; then
+			Logger "There is not enough free space on local replica [$replicaPath] ($diskSpace KB)." "WARN"
 		fi
 	fi
 }
 
-function _CheckReplicaPathsRemote {
+function _CheckReplicasRemote {
 	local replicaPath="${1}"
 	__CheckArguments 1 $# "${FUNCNAME[0]}" "$@"	#__WITH_PARANOIA_DEBUG
 
@@ -226,32 +246,147 @@ function _CheckReplicaPathsRemote {
 	CheckConnectivity3rdPartyHosts
 	CheckConnectivityRemoteHost
 
-$SSH_CMD replicaPath="'$replicaPath'" 'bash -s' << 'ENDSSH' 2>&1
-if [ ! -w "$replicaPath" ]; then
-	exit 1
-fi
-ENDSSH
+$SSH_CMD replicaPath="'$replicaPath'" CREATE_DIRS="'$CREATE_DIRS'" COMMAND_SUDO="'$COMMAND_SUDO'" DF_CMD="'$DF_CMD'" MINIMUM_SPACE="'$MINIMUM_SPACE'" 'bash -s' << 'ENDSSH' > "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$SCRIPT_PID" 2>&1
+	## The following lines are executed remotely
+	function _logger {
+		local value="${1}" # What to log
+		echo -e "$value"
+	}
 
-	if [ $? != 0 ]; then
+	function Logger {
+		local value="${1}" # What to log
+		local level="${2}" # Log level: DEBUG, NOTICE, WARN, ERROR, CRITIAL
+
+		local prefix="RTIME: $SECONDS - "
+
+		if [ "$level" == "CRITICAL" ]; then
+			_logger "$prefix\e[41m$value\e[0m"
+			return
+		elif [ "$level" == "ERROR" ]; then
+			_logger "$prefix\e[91m$value\e[0m"
+			return
+		elif [ "$level" == "WARN" ]; then
+			_logger "$prefix\e[93m$value\e[0m"
+			return
+		elif [ "$level" == "NOTICE" ]; then
+			_logger "$prefix$value"
+			return
+		elif [ "$level" == "VERBOSE" ]; then
+			if [ $_LOGGER_VERBOSE == true ]; then
+				_logger "$prefix$value"
+			fi
+			return
+		elif [ "$level" == "DEBUG" ]; then
+			if [ "$_DEBUG" == "yes" ]; then
+				_logger "$prefix$value"
+			fi
+			return
+		else
+			_logger "\e[41mLogger function called without proper loglevel [$level].\e[0m"
+			_logger "$prefix$value"
+		fi
+	}
+
+function IsInteger {
+        local value="${1}"
+
+        if [[ $value =~ ^[0-9]+$ ]]; then
+                echo 1
+        else
+                echo 0
+        fi
+}
+
+# Converts human readable sizes into integer kilobyte sizes
+# Usage numericSize="$(HumanToNumeric $humanSize)"
+function HumanToNumeric {
+        local value="${1}"
+
+        local notation
+        local suffix
+        local suffixPresent
+        local multiplier
+
+        notation=(K M G T P E)
+        for suffix in "${notation[@]}"; do
+                multiplier=$((multiplier+1))
+                if [[ "$value" == *"$suffix"* ]]; then
+                        suffixPresent=$suffix
+                        break;
+                fi
+        done
+
+	if [ "$suffixPresent" != "" ]; then
+                value=${value%$suffix*}
+                value=${value%.*}
+                # /1024 since we convert to kilobytes instead of bytes
+                value=$((value*(1024**multiplier/1024)))
+        else
+            	value=${value%.*}
+        fi
+
+	echo $value
+}
+
+function _CheckReplicasRemoteSub {
+
+	if [ ! -d "$replicaPath" ]; then
+		if [ "$CREATE_DIRS" == "yes" ]; then
+			$COMMAND_SUDO mkdir -p "$replicaPath" >> "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$SCRIPT_PID" 2>&1
+			if [ $? != 0 ]; then
+				Logger "Cannot create remote replica path [$replicaPath]." "CRITICAL"
+				Logger "Command output:\n$(cat $RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$SCRIPT_PID)"
+				exit 1
+			else
+				Logger "Created remote replica path [$replicaPath]." "NOTICE"
+			fi
+		else
+			Logger "Remote replica path [$replicaPath] does not exist." "CRITICAL"
+			exit 1
+		fi
+	fi
+
+	if [ ! -w "$replicaPath" ]; then
 		Logger "Remote replica path [$replicaPath] is not writable." "CRITICAL"
 		exit 1
 	fi
 
-$SSH_CMD replicaPath="'$replicaPath'" CREATE_DIRS="'$CREATE_DIRS'" COMMAND_SUDO="'$COMMAND_SUDO'" 'bash -s' << 'ENDSSH' > "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$SCRIPT_PID" 2>&1
-if [ ! -d "$replicaPath" ]; then
-	if [ "$CREATE_DIRS" == "yes" ]; then
-		$COMMAND_SUDO mkdir -p "$replicaPath"
-	fi
-fi
-ENDSSH
+	Logger "Checking minimum disk space in remote replica [$replicaPath]." "NOTICE"
+	diskSpace=$($DF_CMD "$replicaPath" | tail -1 | awk '{print $4}')
 	if [ $? != 0 ]; then
-		Logger "Cannot create remote replica path [$replicaPath]." "CRITICAL"
-		Logger "Command output:\n$(cat $RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$SCRIPT_PID)" "ERROR"
-		exit 1
+		Logger "Cannot get free space." "ERROR"
+	else
+		# Ugly fix for df in some busybox environments that can only show human formats
+		if [ $(IsInteger $diskSpace) -eq 0 ]; then
+			diskSpace=$(HumanToNumeric $diskSpace)
+		fi
+
+		if [ $diskSpace -lt $MINIMUM_SPACE ]; then
+			Logger "There is not enough free space on remote replica [$replicaPath] ($diskSpace KB)." "WARN"
+		fi
+	fi
+}
+_CheckReplicasRemoteSub
+exit $?
+ENDSSH
+	result=$?
+	if [ $result != 0 ]; then
+		Logger "Failed to check remote replica.." "CRITICAL"
+	fi
+	if [ -s "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$SCRIPT_PID" ]; then
+		(
+		_LOGGER_PREFIX=""
+		Logger "$(cat $RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$SCRIPT_PID)" "NOTICE"
+		)
+	fi
+	if [ $result != 0 ]; then
+		return 1
+	else
+		return 0
 	fi
 }
 
-function CheckReplicaPaths {
+function CheckReplicas {
 	__CheckArguments 0 $# "${FUNCNAME[0]}" "$@"	#__WITH_PARANOIA_DEBUG
 
 	local pids
@@ -263,13 +398,13 @@ function CheckReplicaPaths {
 		fi
 	fi
 
-	_CheckReplicaPathsLocal "${INITIATOR[$__replicaDir]}" &
+	_CheckReplicasLocal "${INITIATOR[$__replicaDir]}" &
 	pids="$!"
 	if [ "$REMOTE_OPERATION" != "yes" ]; then
-		_CheckReplicaPathsLocal "${TARGET[$__replicaDir]}" &
+		_CheckReplicasLocal "${TARGET[$__replicaDir]}" &
 		pids="$pids;$!"
 	else
-		_CheckReplicaPathsRemote "${TARGET[$__replicaDir]}" &
+		_CheckReplicasRemote "${TARGET[$__replicaDir]}" &
 		pids="$pids;$!"
 	fi
 	WaitForTaskCompletion $pids 720 1800 $SLEEP_TIME $KEEP_LOGGING true true false ${FUNCNAME[0]}
@@ -277,84 +412,6 @@ function CheckReplicaPaths {
 		Logger "Cancelling task." "CRITICAL"
 		exit 1
 	fi
-}
-
-function _CheckDiskSpaceLocal {
-	local replicaPath="${1}"
-	__CheckArguments 1 $# "${FUNCNAME[0]}" "$@"	#__WITH_PARANOIA_DEBUG
-
-	local diskSpace
-
-	Logger "Checking minimum disk space in [$replicaPath]." "NOTICE"
-
-	diskSpace=$($DF_CMD "$replicaPath" | tail -1 | awk '{print $4}')
-
-	if [ $? != 0 ]; then
-		Logger "Cannot get free space." "ERROR"
-	else
-		# Ugly fix for df in some busybox environments that can only show human formats
-		if [ $(IsInteger $diskSpace) -eq 0 ]; then
-			diskSpace=$(HumanToNumeric $diskSpace)
-		fi
-
-		if [ $diskSpace -lt $MINIMUM_SPACE ]; then
-			Logger "There is not enough free space on replica [$replicaPath] ($diskSpace KB)." "WARN"
-		fi
-	fi
-}
-
-function _CheckDiskSpaceRemote {
-	local replicaPath="${1}"
-	__CheckArguments 1 $# "${FUNCNAME[0]}" "$@"	#__WITH_PARANOIA_DEBUG
-
-	Logger "Checking remote minimum disk space in [$replicaPath]." "NOTICE"
-
-	local cmd
-	local diskSpace
-
-	CheckConnectivity3rdPartyHosts
-	CheckConnectivityRemoteHost
-
-$SSH_CMD replicaPath="'$replicaPath'" COMMAND_SUDO="'$COMMAND_SUDO'" DF_CMD="'$DF_CMD'" bash -s << ENDSSH > "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$SCRIPT_PID" 2>&1
-$COMMAND_SUDO $DF_CMD "$replicaPath"
-ENDSSH
-	if [ $? != 0 ]; then
-		Logger "Cannot get free space on target [$replicaPath]." "ERROR"
-		Logger "Command output:\n$(cat $RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$SCRIPT_PID)" "NOTICE"
-	else
-		diskSpace=$(cat $RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$SCRIPT_PID | tail -1 | awk '{print $4}')
-
-		# Ugly fix for df in some busybox environments that can only show human formats
-	        if [ $(IsInteger $diskSpace) -eq 0 ]; then
-			diskSpace=$(HumanToNumeric $diskSpace)
-		fi
-
-		if [ $diskSpace -lt $MINIMUM_SPACE ]; then
-			Logger "There is not enough free space on replica [$replicaPath] ($diskSpace KB)." "WARN"
-		fi
-	fi
-}
-
-function CheckDiskSpace {
-	__CheckArguments 0 $# "${FUNCNAME[0]}" "$@"	#__WITH_PARANOIA_DEBUG
-
-	local pids
-
-	if [ $MINIMUM_SPACE -eq 0 ]; then
-		Logger "Skipped minimum space check." "NOTICE"
-		return 0
-	fi
-
-	_CheckDiskSpaceLocal "${INITIATOR[$__replicaDir]}" &
-	pids="$!"
-	if [ "$REMOTE_OPERATION" != "yes" ]; then
-		_CheckDiskSpaceLocal "${TARGET[$__replicaDir]}" &
-		pids="$pids;$!"
-	else
-		_CheckDiskSpaceRemote "${TARGET[$__replicaDir]}" &
-		pids="$pids;$!"
-	fi
-	WaitForTaskCompletion $pids 720 1800 $SLEEP_TIME $KEEP_LOGGING true true false ${FUNCNAME[0]}
 }
 
 function _HandleLocksLocal {
@@ -582,7 +639,14 @@ ENDSSH
 
 	if [ $? != 0 ]; then
 		Logger "Remote lock handling failed." "CRITICAL"
-		Logger "Command output:\n$(cat $RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$SCRIPT_PID)" "ERROR"
+	fi
+	if [ -s "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$SCRIPT_PID" ]; then
+		(
+		_LOGGER_PREFIX=""
+		Logger "$(cat $RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$SCRIPT_PID)" "NOTICE"
+		)
+	fi
+	if [ $? != 0 ]; then
 		return 1
 	fi
 }
@@ -1122,8 +1186,6 @@ function _deleteRemote {
 
 	local deletionListFromReplica
 
-	local loggerPrefix
-
 	if [ "$replicaType" == "${INITIATOR[$__type]}" ]; then
 		deletionListFromReplica="${TARGET[$__type]}"
 	elif [ "$replicaType" == "${TARGET[$__type]}" ]; then
@@ -1259,10 +1321,10 @@ $SSH_CMD ERROR_ALERT=0 sync_on_changes=$sync_on_changes _DEBUG=$_DEBUG _DRYRUN=$
 ENDSSH
 
 	if [ -s "$RUN_DIR/$PROGRAM.remote_deletion.$SCRIPT_PID" ]; then
-		loggerPrefix="$_LOGGER_PREFIX"
+		(
 		_LOGGER_PREFIX=""
 		Logger "$(cat $RUN_DIR/$PROGRAM.remote_deletion.$SCRIPT_PID)" "ERROR"
-		_LOGGER_PREFIX="$loggerPrefix"
+		)
 	fi
 
 	## Copy back the deleted failed file list
@@ -1821,9 +1883,7 @@ function _SummaryFromFile {
 function Summary {
 	__CheckArguments 0 $# "${FUNCNAME[0]}" "$@"	#__WITH_PARANOIA_DEBUG
 
-	local loggerPrefix
-
-	loggerPrefix="$_LOGGER_PREFIX"
+	(
 	_LOGGER_PREFIX=""
 
 	Logger "Attrib updates: INITIATOR << >> TARGET" "ALWAYS"
@@ -1842,8 +1902,7 @@ function Summary {
 		_SummaryFromFile "${TARGET[$__replicaDir]}" "$RUN_DIR/$PROGRAM.delete.target.$SCRIPT_PID" "- >>"
 	fi
 	_SummaryFromFile "${INITIATOR[$__replicaDir]}" "$RUN_DIR/$PROGRAM.delete.initiator.$SCRIPT_PID" "- <<"
-
-	_LOGGER_PREFIX="$loggerPrefix"
+	)
 }
 
 function Init {
@@ -2031,7 +2090,7 @@ function Init {
 function Main {
 	__CheckArguments 0 $# "${FUNCNAME[0]}" "$@"	#__WITH_PARANOIA_DEBUG
 
-	HandleLocks
+	#HandleLocks
 	Sync
 }
 
@@ -2343,8 +2402,7 @@ else
 		SOFT_MAX_EXEC_TIME=0
 		HARD_MAX_EXEC_TIME=0
 	fi
-	CheckReplicaPaths
-	CheckDiskSpace
+	CheckReplicas
 	RunBeforeHook
 	Main
 	if [ $? == 0 ]; then
