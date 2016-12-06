@@ -1,7 +1,7 @@
 #### MINIMAL-FUNCTION-SET BEGIN ####
 
 _OFUNCTIONS_VERSION=2.0
-_OFUNCTIONS_BUILD=2016120401
+_OFUNCTIONS_BUILD=2016120601
 ## BEGIN Generic bash functions written in 2013-2016 by Orsiris de Jong - http://www.netpower.fr - ozy@netpower.fr
 
 ## To use in a program, define the following variables:
@@ -1006,17 +1006,21 @@ function urlDecode {
 
 ## Modified version of http://stackoverflow.com/a/8574392
 ## Usage: arrayContains "needle" "${haystack[@]}"
-arrayContains () {
+function ArrayContains () {
+	local needle="${1}"
+	local haystack="${2}"
 	local e
 
-	if [ "$2" == "" ]; then
-		echo 0 && return 0
+	if [ "$needle" != "" ] && [ "$haystack" != "" ]; then
+		for e in "${@:2}"; do
+			if [ "$e" == "$needle" ]; then
+				echo 1
+				return
+			fi
+		done
 	fi
-
-	for e in "${@:2}"; do
-		[[ "$e" == "$1" ]] && echo 1 && return 1
-	done
-	echo 0 && return 0
+	echo 0
+	return
 }
 
 function GetLocalOS {
