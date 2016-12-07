@@ -1,7 +1,7 @@
 #### MINIMAL-FUNCTION-SET BEGIN ####
 
 _OFUNCTIONS_VERSION=2.0
-_OFUNCTIONS_BUILD=2016120601
+_OFUNCTIONS_BUILD=2016120701
 ## BEGIN Generic bash functions written in 2013-2016 by Orsiris de Jong - http://www.netpower.fr - ozy@netpower.fr
 
 ## To use in a program, define the following variables:
@@ -73,8 +73,10 @@ if [ -w /var/log ]; then
 	LOG_FILE="/var/log/$PROGRAM.log"
 elif ([ "$HOME" != "" ] && [ -w "$HOME" ]); then
 	LOG_FILE="$HOME/$PROGRAM.log"
-else
+elif [ -w . ]; then
 	LOG_FILE="./$PROGRAM.log"
+else
+	LOG_FILE="/tmp/$PROGRAM.log"
 fi
 
 ## Default directory where to store temporary run files
@@ -101,15 +103,18 @@ function Dummy {
 	sleep $SLEEP_TIME
 }
 
+#### MINIMAL-FUNCTION-SET BEGIN ####
 # Sub function of Logger
 function _Logger {
 	local logValue="${1}"		# Log to file
 	local stdValue="${2}"		# Log to screeen
 	local toStderr="${3:-false}"	# Log to stderr instead of stdout
 
-	echo -e "$logValue" >> "$LOG_FILE"
-	# Current log file
-	echo -e "$logValue" >> "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$SCRIPT_PID"
+	if [ "$logValue" != "" ]; then
+		echo -e "$logValue" >> "$LOG_FILE"
+		# Current log file
+		echo -e "$logValue" >> "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$SCRIPT_PID"
+	fi
 
 	if [ "$stdValue" != "" ] && [ "$_LOGGER_SILENT" != true ]; then
 		if [ $toStderr == true ]; then
