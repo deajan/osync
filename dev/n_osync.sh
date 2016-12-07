@@ -4,12 +4,11 @@ PROGRAM="osync" # Rsync based two way sync engine with fault tolerance
 AUTHOR="(C) 2013-2016 by Orsiris de Jong"
 CONTACT="http://www.netpower.fr/osync - ozy@netpower.fr"
 PROGRAM_VERSION=1.2-beta3
-PROGRAM_BUILD=2016120701
+PROGRAM_BUILD=2016120702
 IS_STABLE=no
 
-#TODO: replace _Logger & Logger in remote functions with ofunctions version dedicated to remote logging
-#TODO: replace ArrayContains, IsNumeric, HumanToNumeric with ofunctions version via merge
-#TODO: deal with _VERBOSE / _SILENT switches in remote Logger
+#TODO: update waitfor parallelexec and checkarguments
+#TODO: update coding style checkarguments
 
 # Execution order						#__WITH_PARANOIA_DEBUG
 #	Function Name				Is parallel	#__WITH_PARANOIA_DEBUG
@@ -44,7 +43,7 @@ IS_STABLE=no
 #	UnlockReplicas				yes		#__WITH_PARANOIA_DEBUG
 #	CleanUp					no		#__WITH_PARANOIA_DEBUG
 
-source "./ofunctions.sh"
+include #### OFUNCTIONS FULL SUBSET ####
 _LOGGER_PREFIX="time"
 
 ## Working directory. This directory exists in any replica and contains state files, backups, soft deleted files etc
@@ -117,7 +116,7 @@ function TrapQuit {
 }
 
 function CheckEnvironment {
-        __CheckArguments 0 $# "${FUNCNAME[0]}" "$@"    #__WITH_PARANOIA_DEBUG
+        __CheckArguments 0 $# "$@"    #__WITH_PARANOIA_DEBUG
 
         if [ "$REMOTE_OPERATION" == "yes" ]; then
                 if ! type ssh > /dev/null 2>&1 ; then
@@ -139,7 +138,7 @@ function CheckEnvironment {
 
 # Only gets checked in config file mode where all values should be present
 function CheckCurrentConfig {
-        __CheckArguments 0 $# "${FUNCNAME[0]}" "$@"    #__WITH_PARANOIA_DEBUG
+        __CheckArguments 0 $# "$@"    #__WITH_PARANOIA_DEBUG
 
         # Check all variables that should contain "yes" or "no"
         declare -a yes_no_vars=(CREATE_DIRS SUDO_EXEC SSH_COMPRESSION SSH_IGNORE_KNOWN_HOSTS REMOTE_HOST_PING PRESERVE_PERMISSIONS PRESERVE_OWNER PRESERVE_GROUP PRESERVE_EXECUTABILITY PRESERVE_ACL PRESERVE_XATTR COPY_SYMLINKS KEEP_DIRLINKS PRESERVE_HARDLINKS CHECKSUM RSYNC_COMPRESS CONFLICT_BACKUP CONFLICT_BACKUP_MULTIPLE SOFT_DELETE RESUME_SYNC FORCE_STRANGER_LOCK_RESUME PARTIAL DELTA_COPIES STOP_ON_CMD_ERROR RUN_AFTER_CMD_ON_ERROR)
@@ -158,7 +157,7 @@ function CheckCurrentConfig {
 
 # Gets checked in quicksync and config file mode
 function CheckCurrentConfigAll {
-        __CheckArguments 0 $# "${FUNCNAME[0]}" "$@"    #__WITH_PARANOIA_DEBUG
+        __CheckArguments 0 $# "$@"    #__WITH_PARANOIA_DEBUG
 
 	local tmp
 
@@ -196,7 +195,7 @@ function CheckCurrentConfigAll {
 
 function _CheckReplicasLocal {
 	local replicaPath="${1}"
-	__CheckArguments 1 $# "${FUNCNAME[0]}" "$@"	#__WITH_PARANOIA_DEBUG
+	__CheckArguments 1 $# "$@"	#__WITH_PARANOIA_DEBUG
 
 	local diskSpace
 
@@ -239,121 +238,45 @@ function _CheckReplicasLocal {
 
 function _CheckReplicasRemote {
 	local replicaPath="${1}"
-	__CheckArguments 1 $# "${FUNCNAME[0]}" "$@"	#__WITH_PARANOIA_DEBUG
+	__CheckArguments 1 $# "$@"	#__WITH_PARANOIA_DEBUG
 
 	local cmd
 
 	CheckConnectivity3rdPartyHosts
 	CheckConnectivityRemoteHost
 
-$SSH_CMD replicaPath="'$replicaPath'" CREATE_DIRS="'$CREATE_DIRS'" COMMAND_SUDO="'$COMMAND_SUDO'" DF_CMD="'$DF_CMD'" MINIMUM_SPACE="'$MINIMUM_SPACE'" 'bash -s' << 'ENDSSH' > "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$SCRIPT_PID" 2>&1
-	## The following lines are executed remotely
-	function _logger {
-		local value="${1}" # What to log
-		echo -e "$value"
-	}
-
-	function Logger {
-		local value="${1}" # What to log
-		local level="${2}" # Log level: DEBUG, NOTICE, WARN, ERROR, CRITIAL
-
-		local prefix="RTIME: $SECONDS - "
-
-		if [ "$level" == "CRITICAL" ]; then
-			_logger "$prefix\e[41m$value\e[0m"
-			return
-		elif [ "$level" == "ERROR" ]; then
-			_logger "$prefix\e[91m$value\e[0m"
-			return
-		elif [ "$level" == "WARN" ]; then
-			_logger "$prefix\e[93m$value\e[0m"
-			return
-		elif [ "$level" == "NOTICE" ]; then
-			_logger "$prefix$value"
-			return
-		elif [ "$level" == "VERBOSE" ]; then
-			if [ $_LOGGER_VERBOSE == true ]; then
-				_logger "$prefix$value"
-			fi
-			return
-		elif [ "$level" == "DEBUG" ]; then
-			if [ "$_DEBUG" == "yes" ]; then
-				_logger "$prefix$value"
-			fi
-			return
-		else
-			_logger "\e[41mLogger function called without proper loglevel [$level].\e[0m"
-			_logger "$prefix$value"
-		fi
-	}
-
-function IsInteger {
-        local value="${1}"
-
-        if [[ $value =~ ^[0-9]+$ ]]; then
-                echo 1
-        else
-                echo 0
-        fi
-}
-
-# Converts human readable sizes into integer kilobyte sizes
-# Usage numericSize="$(HumanToNumeric $humanSize)"
-function HumanToNumeric {
-        local value="${1}"
-
-        local notation
-        local suffix
-        local suffixPresent
-        local multiplier
-
-        notation=(K M G T P E)
-        for suffix in "${notation[@]}"; do
-                multiplier=$((multiplier+1))
-                if [[ "$value" == *"$suffix"* ]]; then
-                        suffixPresent=$suffix
-                        break;
-                fi
-        done
-
-	if [ "$suffixPresent" != "" ]; then
-                value=${value%$suffix*}
-                value=${value%.*}
-                # /1024 since we convert to kilobytes instead of bytes
-                value=$((value*(1024**multiplier/1024)))
-        else
-            	value=${value%.*}
-        fi
-
-	echo $value
-}
-
+$SSH_CMD _DEBUG="'$_DEBUG'" _PARANOIA_DEBUG="'$_PARANOIA_DEBUG'" _LOGGER_SILENT="'$_LOGGER_SILENT'" _LOGGER_VERBOSE="'$_LOGGER_VERBOSE'" _LOGGER_PREFIX="'$_LOGGER_PREFIX'" _LOGGER_ERR_ONLY="'$_LOGGER_ERR_ONLY'" replicaPath="'$replicaPath'" CREATE_DIRS="'$CREATE_DIRS'" COMMAND_SUDO="'$COMMAND_SUDO'" DF_CMD="'$DF_CMD'" MINIMUM_SPACE="'$MINIMUM_SPACE'" 'bash -s' << 'ENDSSH' > "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$SCRIPT_PID" 2>&1
+include #### DEBUG SUBSET ####
+include #### TrapError SUBSET ####
+include #### IsInteger SUBSET ####
+include #### HumanToNumeric SUBSET ####
+include #### RemoteLogger SUBSET ####
 function _CheckReplicasRemoteSub {
 
 	if [ ! -d "$replicaPath" ]; then
 		if [ "$CREATE_DIRS" == "yes" ]; then
 			$COMMAND_SUDO mkdir -p "$replicaPath"
 			if [ $? != 0 ]; then
-				Logger "Cannot create remote replica path [$replicaPath]." "CRITICAL"
+				RemoteLogger "Cannot create remote replica path [$replicaPath]." "CRITICAL"
 				exit 1
 			else
-				Logger "Created remote replica path [$replicaPath]." "NOTICE"
+				RemoteLogger "Created remote replica path [$replicaPath]." "NOTICE"
 			fi
 		else
-			Logger "Remote replica path [$replicaPath] does not exist." "CRITICAL"
+			RemoteLogger "Remote replica path [$replicaPath] does not exist." "CRITICAL"
 			exit 1
 		fi
 	fi
 
 	if [ ! -w "$replicaPath" ]; then
-		Logger "Remote replica path [$replicaPath] is not writable." "CRITICAL"
+		RemoteLogger "Remote replica path [$replicaPath] is not writable." "CRITICAL"
 		exit 1
 	fi
 
-	Logger "Checking minimum disk space in remote replica [$replicaPath]." "NOTICE"
+	RemoteLogger "Checking minimum disk space in remote replica [$replicaPath]." "NOTICE"
 	diskSpace=$($DF_CMD "$replicaPath" | tail -1 | awk '{print $4}')
 	if [ $? != 0 ]; then
-		Logger "Cannot get free space." "ERROR"
+		RemoteLogger "Cannot get free space." "ERROR"
 	else
 		# Ugly fix for df in some busybox environments that can only show human formats
 		if [ $(IsInteger $diskSpace) -eq 0 ]; then
@@ -361,7 +284,7 @@ function _CheckReplicasRemoteSub {
 		fi
 
 		if [ $diskSpace -lt $MINIMUM_SPACE ]; then
-			Logger "There is not enough free space on remote replica [$replicaPath] ($diskSpace KB)." "WARN"
+			RemoteLogger "There is not enough free space on remote replica [$replicaPath] ($diskSpace KB)." "WARN"
 		fi
 	fi
 }
@@ -386,7 +309,7 @@ ENDSSH
 }
 
 function CheckReplicas {
-	__CheckArguments 0 $# "${FUNCNAME[0]}" "$@"	#__WITH_PARANOIA_DEBUG
+	__CheckArguments 0 $# "$@"	#__WITH_PARANOIA_DEBUG
 
 	local pids
 
@@ -406,7 +329,7 @@ function CheckReplicas {
 		_CheckReplicasRemote "${TARGET[$__replicaDir]}" &
 		pids="$pids;$!"
 	fi
-	WaitForTaskCompletion $pids 720 1800 $SLEEP_TIME $KEEP_LOGGING true true false ${FUNCNAME[0]}
+	WaitForTaskCompletion $pids 720 1800 $SLEEP_TIME $KEEP_LOGGING true true false
 	if [ $? -ne 0 ]; then
 		Logger "Cancelling task." "CRITICAL"
 		exit 1
@@ -419,7 +342,7 @@ function _HandleLocksLocal {
 	local replicaType="${3}"
 	local overwrite="${4:-false}"
 
-	__CheckArguments 4 $# "${FUNCNAME[0]}" "$@"	#__WITH_PARANOIA_DEBUG
+	__CheckArguments 4 $# "$@"	#__WITH_PARANOIA_DEBUG
 
 	local lockfileContent
 	local lockPid
@@ -485,7 +408,7 @@ function _HandleLocksRemote {
 	local replicaType="${3}"
 	local overwrite="${4:-false}"
 
-	__CheckArguments 4 $# "${FUNCNAME[0]}" "$@"	#__WITH_PARANOIA_DEBUG
+	__CheckArguments 4 $# "$@"	#__WITH_PARANOIA_DEBUG
 
 	local initiatorRunningPids
 
@@ -497,80 +420,19 @@ function _HandleLocksRemote {
 	read -a initiatorRunningPids <<< $(ps -A | tail -n +2 | awk '{print $1}')
 
 # passing initiatorRunningPids as litteral string (has to be run through eval to be an array again)
-$SSH_CMD replicaStateDir="'$replicaStateDir'" initiatorRunningPidsFlat="(${initiatorRunningPids[@]})" lockfile="'$lockfile'" replicaType="'$replicaType'" overwrite="'$overwrite'" SCRIPT_PID="'$SCRIPT_PID'" INSTANCE_ID="'$INSTANCE_ID'" FORCE_STRANGER_LOCK_RESUME="'$FORCE_STRANGER_LOCK_RESUME'"  'bash -s' << 'ENDSSH' > "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$SCRIPT_PID" 2>&1
-	function ArrayContains () {
-        	local needle="${1}"
-        	local haystack="${@:2}"
-        	local e
-
-        	if [ "$needle" != "" ] && [ "$haystack" != "" ]; then
-                	for e in "${@:2}"; do
-                        	if [ "$e" == "$needle" ]; then
-                                	echo 1
-                                	return
-                        	fi
-                	done
-        	fi
-        	echo 0
-		return
-	}
-
-	function IsInteger {
-	        local value="${1}"
-
-	        if [[ $value =~ ^[0-9]+$ ]]; then
-                	echo 1
-        	else
-                	echo 0
-        	fi
-	}
-
-	## The following lines are executed remotely
-	function _logger {
-		local value="${1}" # What to log
-		echo -e "$value"
-	}
-
-	function Logger {
-		local value="${1}" # What to log
-		local level="${2}" # Log level: DEBUG, NOTICE, WARN, ERROR, CRITIAL
-
-		local prefix="RTIME: $SECONDS - "
-
-		if [ "$level" == "CRITICAL" ]; then
-			_logger "$prefix\e[41m$value\e[0m"
-			return
-		elif [ "$level" == "ERROR" ]; then
-			_logger "$prefix\e[91m$value\e[0m"
-			return
-		elif [ "$level" == "WARN" ]; then
-			_logger "$prefix\e[93m$value\e[0m"
-			return
-		elif [ "$level" == "NOTICE" ]; then
-			_logger "$prefix$value"
-			return
-		elif [ "$level" == "VERBOSE" ]; then
-			if [ $_LOGGER_VERBOSE == true ]; then
-				_logger "$prefix$value"
-			fi
-			return
-		elif [ "$level" == "DEBUG" ]; then
-			if [ "$_DEBUG" == "yes" ]; then
-				_logger "$prefix$value"
-			fi
-			return
-		else
-			_logger "\e[41mLogger function called without proper loglevel [$level].\e[0m"
-			_logger "$prefix$value"
-		fi
-	}
+$SSH_CMD _DEBUG="'$_DEBUG'" _PARANOIA_DEBUG="'$_PARANOIA_DEBUG'" _LOGGER_SILENT="'$_LOGGER_SILENT'" _LOGGER_VERBOSE="'$_LOGGER_VERBOSE'" _LOGGER_PREFIX="'$_LOGGER_PREFIX'" _LOGGER_ERR_ONLY="'$_LOGGER_ERR_ONLY'" replicaStateDir="'$replicaStateDir'" initiatorRunningPidsFlat="(${initiatorRunningPids[@]})" lockfile="'$lockfile'" replicaType="'$replicaType'" overwrite="'$overwrite'" SCRIPT_PID="'$SCRIPT_PID'" INSTANCE_ID="'$INSTANCE_ID'" FORCE_STRANGER_LOCK_RESUME="'$FORCE_STRANGER_LOCK_RESUME'"  'bash -s' << 'ENDSSH' > "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$SCRIPT_PID" 2>&1
+include #### DEBUG SUBSET ####
+include #### TrapError SUBSET ####
+incldue #### ArrayContains SUBSET ####
+include #### IsInteger SUBSET ####
+include #### RemoteLogger SUBSET ####
 
 function _HandleLocksRemoteSub {
 	#WIP do not remote log to file as output is already logged from ssh
 	if [ ! -d "$replicaStateDir" ]; then
 		$COMMAND_SUDO mkdir -p "$replicaStateDir"
 		if [ $? != 0 ]; then
-			Logger "Cannot create state dir [$replicaStateDir]." "CRITICAL"
+			RemoteLogger "Cannot create state dir [$replicaStateDir]." "CRITICAL"
 			return 1
 		fi
 	fi
@@ -578,18 +440,18 @@ function _HandleLocksRemoteSub {
 	# Skip the whole part if overwrite true
 	if [ -s "$lockfile" ] && [ $overwrite != true ]; then
 		lockfileContent=$(cat $lockfile)
-		Logger "Master lock pid present: $lockfileContent" "DEBUG"
+		RemoteLogger "Master lock pid present: $lockfileContent" "DEBUG"
 		lockPid="${lockfileContent%@*}"
 		if [ $(IsInteger $lockPid) -ne 1 ]; then
-			Logger "Invalid pid [$lockPid] in local replica." "CRITICAL"
+			RemoteLogger "Invalid pid [$lockPid] in local replica." "CRITICAL"
 			return 1
 		fi
 		lockInstanceID="${lockfileContent#*@}"
 		if [ "$lockInstanceID" == "" ]; then
-			Logger "Invalid instance id [$lockInstanceID] in local replica." "CRITICAL"
+			RemoteLogger "Invalid instance id [$lockInstanceID] in local replica." "CRITICAL"
 			return 1
 
-		Logger "Local $replicaType  lock is: [$lockPid@$lockInstanceID]." "DEBUG"
+		RemoteLogger "Local $replicaType  lock is: [$lockPid@$lockInstanceID]." "DEBUG"
 
 		fi
 
@@ -597,19 +459,19 @@ function _HandleLocksRemoteSub {
 		eval "initiatorRunningPids=$initiatorRunningPidsFlat"
 		if [ $(ArrayContains "$lockPid" "${initiatorRunningPids[@]}") -eq 0 ]; then
 			if [ "$lockInstanceID" == "$INSTANCE_ID" ]; then
-				Logger "There is a remote dead osync lock [$lockPid@$lockInstanceID] on target replica that corresponds to this initiator INSTANCE_ID. Pid [$lockPid] no longer running. Resuming." "NOTICE"
+				RemoteLogger "There is a remote dead osync lock [$lockPid@$lockInstanceID] on target replica that corresponds to this initiator INSTANCE_ID. Pid [$lockPid] no longer running. Resuming." "NOTICE"
 				writeLocks=true
 			else
 				if [ "$FORCE_STRANGER_LOCK_RESUME" == "yes" ]; then
-					Logger "There is a remote (maybe dead) osync lock [$lockPid@$lockInstanceID] on target replica that does not correspond to this initiator INSTANCE_ID. Forcing resume." "WARN"
+					RemoteLogger "There is a remote (maybe dead) osync lock [$lockPid@$lockInstanceID] on target replica that does not correspond to this initiator INSTANCE_ID. Forcing resume." "WARN"
 					writeLocks=true
 				else
-					Logger "There is a remote (maybe dead) osync lock [$lockPid@$lockInstanceID] on target replica that does not correspond to this initiator INSTANCE_ID. Will not resume." "CRITICAL"
+					RemoteLogger "There is a remote (maybe dead) osync lock [$lockPid@$lockInstanceID] on target replica that does not correspond to this initiator INSTANCE_ID. Will not resume." "CRITICAL"
 					return 1
 				fi
 			fi
 		else
-			Logger "There is already a local instance of osync that locks target replica [$lockPid@$lockInstanceID]. Cannot start." "CRITICAL"
+			RemoteLogger "There is already a local instance of osync that locks target replica [$lockPid@$lockInstanceID]. Cannot start." "CRITICAL"
 			return 1
 		fi
 	else
@@ -621,10 +483,10 @@ function _HandleLocksRemoteSub {
 	else
 		$COMMAND_SUDO echo "$SCRIPT_PID@$INSTANCE_ID" > "$lockfile"
 		if [ $?	!= 0 ]; then
-			Logger "Could not create lock file on local $replicaType in [$lockfile]." "CRITICAL"
+			RemoteLogger "Could not create lock file on local $replicaType in [$lockfile]." "CRITICAL"
 			return 1
 		else
-			Logger "Locked local $replicaType replica in [$lockfile]." "DEBUG"
+			RemoteLogger "Locked local $replicaType replica in [$lockfile]." "DEBUG"
 		fi
 	fi
 }
@@ -649,7 +511,7 @@ ENDSSH
 }
 
 function HandleLocks {
-	__CheckArguments 0 $# "${FUNCNAME[0]}" "$@"	#__WITH_PARANOIA_DEBUG
+	__CheckArguments 0 $# "$@"	#__WITH_PARANOIA_DEBUG
 
 	local pids
 	local overwrite=false
@@ -673,7 +535,7 @@ function HandleLocks {
 		fi
 	        INITIATOR_LOCK_FILE_EXISTS=true
         	TARGET_LOCK_FILE_EXISTS=true
-		WaitForTaskCompletion $pids 720 1800 $SLEEP_TIME $KEEP_LOGGING true true false ${FUNCNAME[0]}
+		WaitForTaskCompletion $pids 720 1800 $SLEEP_TIME $KEEP_LOGGING true true false
 		if [ $? -ne 0 ]; then
 	                IFS=';' read -r -a pidArray <<< "$(eval echo \"\$WAIT_FOR_TASK_COMPLETION_${FUNCNAME[0]}\")"
         	        for pid in "${pidArray[@]}"; do
@@ -693,7 +555,7 @@ function HandleLocks {
 
 function _UnlockReplicasLocal {
 	local lockfile="${1}"
-	__CheckArguments 1 $# "${FUNCNAME[0]}" "$@"	#__WITH_PARANOIA_DEBUG
+	__CheckArguments 1 $# "$@"	#__WITH_PARANOIA_DEBUG
 
 	if [ -f "$lockfile" ]; then
 		$COMMAND_SUDO rm "$lockfile"
@@ -707,7 +569,7 @@ function _UnlockReplicasLocal {
 
 function _UnlockReplicasRemote {
 	local lockfile="${1}"
-	__CheckArguments 1 $# "${FUNCNAME[0]}" "$@"	#__WITH_PARANOIA_DEBUG
+	__CheckArguments 1 $# "$@"	#__WITH_PARANOIA_DEBUG
 
 	local cmd=
 
@@ -728,7 +590,7 @@ ENDSSH
 }
 
 function UnlockReplicas {
-	__CheckArguments 0 $# "${FUNCNAME[0]}" "$@"	#__WITH_PARANOIA_DEBUG
+	__CheckArguments 0 $# "$@"	#__WITH_PARANOIA_DEBUG
 
 	local pids
 
@@ -752,7 +614,7 @@ function UnlockReplicas {
 	fi
 
 	if [ "$pids" != "" ]; then
-		WaitForTaskCompletion $pids 720 1800 $SLEEP_TIME $KEEP_LOGGING true true false ${FUNCNAME[0]}
+		WaitForTaskCompletion $pids 720 1800 $SLEEP_TIME $KEEP_LOGGING true true false
 	fi
 }
 
@@ -768,7 +630,7 @@ function treeList {
 	local replicaType="${2}" # replica type: initiator, target
 	local treeFilename="${3}" # filename to output tree (will be prefixed with $replicaType)
 
-	__CheckArguments 3 $# "${FUNCNAME[0]}" "$@"	#__WITH_PARANOIA_DEBUG
+	__CheckArguments 3 $# "$@"	#__WITH_PARANOIA_DEBUG
 
 	local escapedReplicaPath
 	local rsyncCmd
@@ -816,7 +678,7 @@ function treeList {
 # deleteList(replicaType): Creates a list of files vanished from last run on replica $1 (initiator/target)
 function deleteList {
 	local replicaType="${1}" # replica type: initiator, target
-	__CheckArguments 1 $# "${FUNCNAME[0]}" "$@"	#__WITH_PARANOIA_DEBUG
+	__CheckArguments 1 $# "$@"	#__WITH_PARANOIA_DEBUG
 
 	local cmd
 
@@ -865,7 +727,7 @@ function _getFileCtimeMtimeLocal {
 	local replicaPath="${1}" # Contains replica path
 	local replicaType="${2}" # Initiator / Target
 	local fileList="${3}" # Contains list of files to get time attrs
-	__CheckArguments 3 $# "${FUNCNAME[0]}" "$@"	#__WITH_PARANOIA_DEBUG
+	__CheckArguments 3 $# "$@"	#__WITH_PARANOIA_DEBUG
 
 	echo -n "" > "$RUN_DIR/$PROGRAM.ctime_mtime.$replicaType.$SCRIPT_PID"
 	while read -r file; do $STAT_CTIME_MTIME_CMD "$replicaPath$file" | sort >> "$RUN_DIR/$PROGRAM.ctime_mtime.$replicaType.$SCRIPT_PID"; done < "$fileList"
@@ -883,7 +745,7 @@ function _getFileCtimeMtimeRemote {
 	local replicaPath="${1}" # Contains replica path
 	local replicaType="${2}"
 	local fileList="${3}"
-	__CheckArguments 3 $# "${FUNCNAME[0]}" "$@"	#__WITH_PARANOIA_DEBUG
+	__CheckArguments 3 $# "$@"	#__WITH_PARANOIA_DEBUG
 
 	local cmd
 
@@ -905,7 +767,7 @@ function _getFileCtimeMtimeRemote {
 function syncAttrs {
 	local initiatorReplica="${1}"
 	local targetReplica="${2}"
-	__CheckArguments 2 $# "${FUNCNAME[0]}" "$@"	#__WITH_PARANOIA_DEBUG
+	__CheckArguments 2 $# "$@"	#__WITH_PARANOIA_DEBUG
 
 	local rsyncCmd
 	local retval
@@ -932,7 +794,7 @@ function syncAttrs {
 	fi
 	Logger "RSYNC_CMD: $rsyncCmd" "DEBUG"
 	eval "$rsyncCmd"
-	WaitForTaskCompletion $! $SOFT_MAX_EXEC_TIME $HARD_MAX_EXEC_TIME $SLEEP_TIME $KEEP_LOGGING false true false ${FUNCNAME[0]}
+	WaitForTaskCompletion $! $SOFT_MAX_EXEC_TIME $HARD_MAX_EXEC_TIME $SLEEP_TIME $KEEP_LOGGING false true false
 	retval=$?
 
 	if [ $retval != 0 ] && [ $retval != 24 ]; then
@@ -964,7 +826,7 @@ function syncAttrs {
 		_getFileCtimeMtimeRemote "${TARGET[$__replicaDir]}" "${TARGET[$__type]}" "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}-cleaned.$SCRIPT_PID" &
 		pids="$pids;$!"
 	fi
-	WaitForTaskCompletion $pids $SOFT_MAX_EXEC_TIME $HARD_MAX_EXEC_TIME $SLEEP_TIME $KEEP_LOGGING false true false ${FUNCNAME[0]}
+	WaitForTaskCompletion $pids $SOFT_MAX_EXEC_TIME $HARD_MAX_EXEC_TIME $SLEEP_TIME $KEEP_LOGGING false true false
 
 	# If target gets updated first, then sync_attr must update initiators attrs first
 	# For join, remove leading replica paths
@@ -1012,7 +874,7 @@ function syncAttrs {
 
 	Logger "RSYNC_CMD: $rsyncCmd" "DEBUG"
 	eval "$rsyncCmd"
-	WaitForTaskCompletion $! $SOFT_MAX_EXEC_TIME $HARD_MAX_EXEC_TIME $SLEEP_TIME $KEEP_LOGGING false true false ${FUNCNAME[0]}
+	WaitForTaskCompletion $! $SOFT_MAX_EXEC_TIME $HARD_MAX_EXEC_TIME $SLEEP_TIME $KEEP_LOGGING false true false
 	retval=$?
 
 	if [ $retval != 0 ] && [ $retval != 24 ]; then
@@ -1033,7 +895,7 @@ function syncAttrs {
 function syncUpdate {
 	local sourceReplica="${1}" # Contains replica type of source: initiator, target
 	local destinationReplica="${2}" # Contains replica type of destination: initiator, target
-	__CheckArguments 2 $# "${FUNCNAME[0]}" "$@"	#__WITH_PARANOIA_DEBUG
+	__CheckArguments 2 $# "$@"	#__WITH_PARANOIA_DEBUG
 
 	local rsyncCmd
 	local retval
@@ -1096,7 +958,7 @@ function _deleteLocal {
 	local replicaType="${1}" # Replica type
 	local replicaDir="${2}" # Full path to replica
 	local deletionDir="${3}" # deletion dir in format .[workdir]/deleted
-	__CheckArguments 3 $# "${FUNCNAME[0]}" "$@"	#__WITH_PARANOIA_DEBUG
+	__CheckArguments 3 $# "$@"	#__WITH_PARANOIA_DEBUG
 
 	local parentdir
 	local previousFile=""
@@ -1173,7 +1035,7 @@ function _deleteRemote {
 	local replicaType="${1}" # Replica type
 	local replicaDir="${2}" # Full path to replica
 	local deletionDir="${3}" # deletion dir in format .[workdir]/deleted
-	__CheckArguments 3 $# "${FUNCNAME[0]}" "$@"	#__WITH_PARANOIA_DEBUG
+	__CheckArguments 3 $# "$@"	#__WITH_PARANOIA_DEBUG
 
 	local escDestDir
 	local rsyncCmd
@@ -1211,47 +1073,10 @@ function _deleteRemote {
 		exit 1
 	fi
 
-$SSH_CMD ERROR_ALERT=0 sync_on_changes=$sync_on_changes _DEBUG=$_DEBUG _DRYRUN=$_DRYRUN _LOGGER_VERBOSE=$_LOGGER_VERBOSE COMMAND_SUDO=$COMMAND_SUDO FILE_LIST="$(EscapeSpaces "${TARGET[$__replicaDir]}${TARGET[$__stateDir]}/$deletionListFromReplica${INITIATOR[$__deletedListFile]}")" REPLICA_DIR="$(EscapeSpaces "$replicaDir")" SOFT_DELETE=$SOFT_DELETE DELETION_DIR="$(EscapeSpaces "$deletionDir")" FAILED_DELETE_LIST="$failedDeleteList" SUCCESS_DELETE_LIST="$successDeleteList" 'bash -s' << 'ENDSSH' >> "$RUN_DIR/$PROGRAM.remote_deletion.$SCRIPT_PID" 2>&1
-
-	## The following lines are executed remotely
-	function _logger {
-		local value="${1}" # What to log
-		echo -e "$value"
-	}
-
-	function Logger {
-		local value="${1}" # What to log
-		local level="${2}" # Log level: DEBUG, NOTICE, WARN, ERROR, CRITIAL
-
-		local prefix="RTIME: $SECONDS - "
-
-		if [ "$level" == "CRITICAL" ]; then
-			_logger "$prefix\e[41m$value\e[0m"
-			return
-		elif [ "$level" == "ERROR" ]; then
-			_logger "$prefix\e[91m$value\e[0m"
-			return
-		elif [ "$level" == "WARN" ]; then
-			_logger "$prefix\e[93m$value\e[0m"
-			return
-		elif [ "$level" == "NOTICE" ]; then
-			_logger "$prefix$value"
-			return
-		elif [ "$level" == "VERBOSE" ]; then
-			if [ $_LOGGER_VERBOSE == true ]; then
-				_logger "$prefix$value"
-			fi
-			return
-		elif [ "$level" == "DEBUG" ]; then
-			if [ "$_DEBUG" == "yes" ]; then
-				_logger "$prefix$value"
-			fi
-			return
-		else
-			_logger "\e[41mLogger function called without proper loglevel [$level].\e[0m"
-			_logger "$prefix$value"
-		fi
-	}
+$SSH_CMD _DEBUG="'$_DEBUG'" _PARANOIA_DEBUG="'$_PARANOIA_DEBUG'" _LOGGER_SILENT="'$_LOGGER_SILENT'" _LOGGER_VERBOSE="'$_LOGGER_VERBOSE'" _LOGGER_PREFIX="'$_LOGGER_PREFIX'" _LOGGER_ERR_ONLY="'$_LOGGER_ERR_ONLY'" ERROR_ALERT=0 sync_on_changes=$sync_on_changes _DEBUG=$_DEBUG _DRYRUN=$_DRYRUN COMMAND_SUDO=$COMMAND_SUDO FILE_LIST="$(EscapeSpaces "${TARGET[$__replicaDir]}${TARGET[$__stateDir]}/$deletionListFromReplica${INITIATOR[$__deletedListFile]}")" REPLICA_DIR="$(EscapeSpaces "$replicaDir")" SOFT_DELETE=$SOFT_DELETE DELETION_DIR="$(EscapeSpaces "$deletionDir")" FAILED_DELETE_LIST="$failedDeleteList" SUCCESS_DELETE_LIST="$successDeleteList" 'bash -s' << 'ENDSSH' >> "$RUN_DIR/$PROGRAM.remote_deletion.$SCRIPT_PID" 2>&1
+include #### DEBUG SUBSET ####
+include #### TrapError SUBSET ####
+include #### RemoteLogger SUBSET ####
 
 	## Empty earlier failed delete list
 	> "$FAILED_DELETE_LIST"
@@ -1263,7 +1088,7 @@ $SSH_CMD ERROR_ALERT=0 sync_on_changes=$sync_on_changes _DEBUG=$_DEBUG _DRYRUN=$
 	if [ ! -d "$REPLICA_DIR$DELETION_DIR" ] && [ $_DRYRUN == false ]; then
 		$COMMAND_SUDO mkdir -p "$REPLICA_DIR$DELETION_DIR"
 		if [ $? != 0 ]; then
-			Logger "Cannot create remote replica deletion directory in [$REPLICA_DIR$DELETION_DIR]." "ERROR"
+			RemoteLogger "Cannot create remote replica deletion directory in [$REPLICA_DIR$DELETION_DIR]." "ERROR"
 			exit 1
 		fi
 	fi
@@ -1282,15 +1107,15 @@ $SSH_CMD ERROR_ALERT=0 sync_on_changes=$sync_on_changes _DEBUG=$_DEBUG _DRYRUN=$
 						# In order to keep full path on soft deletion, create parent directories before move
 						parentdir="$(dirname "$files")"
 						if [ "$parentdir" != "." ]; then
-							Logger "Moving deleted file [$REPLICA_DIR$files] to [$REPLICA_DIR$DELETION_DIR/$parentdir]." "VERBOSE"
+							RemoteLogger "Moving deleted file [$REPLICA_DIR$files] to [$REPLICA_DIR$DELETION_DIR/$parentdir]." "VERBOSE"
 							$COMMAND_SUDO mkdir -p "$REPLICA_DIR$DELETION_DIR/$parentdir"
 							$COMMAND_SUDO mv -f "$REPLICA_DIR$files" "$REPLICA_DIR$DELETION_DIR/$parentdir"
 						else
-							Logger "Moving deleted file [$REPLICA_DIR$files] to [$REPLICA_DIR$DELETION_DIR]." "VERBOSE"
+							RemoteLogger "Moving deleted file [$REPLICA_DIR$files] to [$REPLICA_DIR$DELETION_DIR]." "VERBOSE"
 							$COMMAND_SUDO mv -f "$REPLICA_DIR$files" "$REPLICA_DIR$DELETION_DIR"
 						fi
 						if [ $? != 0 ]; then
-							Logger "Cannot move [$REPLICA_DIR$files] to deletion directory." "ERROR"
+							RemoteLogger "Cannot move [$REPLICA_DIR$files] to deletion directory." "ERROR"
 							# Using $files instead of $REPLICA_DIR$files here so the list is ready for next run
 							echo "$files" >> "$FAILED_DELETE_LIST"
 						else
@@ -1301,10 +1126,10 @@ $SSH_CMD ERROR_ALERT=0 sync_on_changes=$sync_on_changes _DEBUG=$_DEBUG _DRYRUN=$
 			else
 				if [ $_DRYRUN == false ]; then
 					if [ -e "$REPLICA_DIR$files" ] || [ -e "$REPLICA_DIR$files" ]; then
-						Logger "Deleting [$REPLICA_DIR$files]." "VERBOSE"
+						RemoteLogger "Deleting [$REPLICA_DIR$files]." "VERBOSE"
 						$COMMAND_SUDO rm -rf "$REPLICA_DIR$files"
 						if [ $? != 0 ]; then
-							Logger "Cannot delete [$REPLICA_DIR$files]." "ERROR"
+							RemoteLogger "Cannot delete [$REPLICA_DIR$files]." "ERROR"
 							echo "$files" >> "$FAILED_DELETE_LIST"
 						else
 							echo "$files" >> "$SUCCESS_DELETE_LIST"
@@ -1343,7 +1168,7 @@ ENDSSH
 # delete_Propagation(replica type)
 function deletionPropagation {
 	local replicaType="${1}" # Contains replica type: initiator, target where to delete
-	__CheckArguments 1 $# "${FUNCNAME[0]}" "$@"	#__WITH_PARANOIA_DEBUG
+	__CheckArguments 1 $# "$@"	#__WITH_PARANOIA_DEBUG
 
 	local replicaDir
 	local deleteDir
@@ -1403,7 +1228,7 @@ function deletionPropagation {
 ###### Step 5a & 5b: Create after run file list of replicas
 
 function Sync {
-	__CheckArguments 0 $# "${FUNCNAME[0]}" "$@"	#__WITH_PARANOIA_DEBUG
+	__CheckArguments 0 $# "$@"	#__WITH_PARANOIA_DEBUG
 
 	local resumeCount
 	local resumeInitiator
@@ -1476,7 +1301,7 @@ function Sync {
 			targetPid="$!"
 		fi
 
-		WaitForTaskCompletion "$initiatorPid;$targetPid" $SOFT_MAX_EXEC_TIME $HARD_MAX_EXEC_TIME $SLEEP_TIME $KEEP_LOGGING false true false ${FUNCNAME[0]}
+		WaitForTaskCompletion "$initiatorPid;$targetPid" $SOFT_MAX_EXEC_TIME $HARD_MAX_EXEC_TIME $SLEEP_TIME $KEEP_LOGGING false true false
 		if [ $? != 0 ]; then
 			IFS=';' read -r -a pidArray <<< "$(eval echo \"\$WAIT_FOR_TASK_COMPLETION_${FUNCNAME[0]}\")"
 			initiatorFail=false
@@ -1521,7 +1346,7 @@ function Sync {
 			targetPid="$!"
 		fi
 
-		WaitForTaskCompletion "$initiatorPid;$targetPid" $SOFT_MAX_EXEC_TIME $HARD_MAX_EXEC_TIME $SLEEP_TIME $KEEP_LOGGING false true false ${FUNCNAME[0]}
+		WaitForTaskCompletion "$initiatorPid;$targetPid" $SOFT_MAX_EXEC_TIME $HARD_MAX_EXEC_TIME $SLEEP_TIME $KEEP_LOGGING false true false
 		if [ $? != 0 ]; then
 			IFS=';' read -r -a pidArray <<< "$(eval echo \"\$WAIT_FOR_TASK_COMPLETION_${FUNCNAME[0]}\")"
 			initiatorFail=false
@@ -1558,7 +1383,7 @@ function Sync {
 	if [ "$resumeInitiator" == "${SYNC_ACTION[2]}" ] || [ "$resumeTarget" == "${SYNC_ACTION[2]}" ]; then
 		if [[ "$RSYNC_ATTR_ARGS" == *"-X"* ]] || [[ "$RSYNC_ATTR_ARGS" == *"-A"* ]]; then
 			syncAttrs "${INITIATOR[$__replicaDir]}" "$TARGET_SYNC_DIR"
-			WaitForTaskCompletion $! $SOFT_MAX_EXEC_TIME $HARD_MAX_EXEC_TIME $SLEEP_TIME $KEEP_LOGGING false true false ${FUNCNAME[0]}
+			WaitForTaskCompletion $! $SOFT_MAX_EXEC_TIME $HARD_MAX_EXEC_TIME $SLEEP_TIME $KEEP_LOGGING false true false
 			if [ $? != 0 ]; then
 				echo "${SYNC_ACTION[2]}" > "${INITIATOR[$__initiatorLastActionFile]}"
 				echo "${SYNC_ACTION[2]}" > "${INITIATOR[$__targetLastActionFile]}"
@@ -1583,7 +1408,7 @@ function Sync {
 		if [ "$CONFLICT_PREVALANCE" == "${TARGET[$__type]}" ]; then
 			if [ "$resumeTarget" == "${SYNC_ACTION[3]}" ]; then
 				syncUpdate "${TARGET[$__type]}" "${INITIATOR[$__type]}" &
-				WaitForTaskCompletion $! $SOFT_MAX_EXEC_TIME $HARD_MAX_EXEC_TIME $SLEEP_TIME $KEEP_LOGGING false true false ${FUNCNAME[0]}
+				WaitForTaskCompletion $! $SOFT_MAX_EXEC_TIME $HARD_MAX_EXEC_TIME $SLEEP_TIME $KEEP_LOGGING false true false
 				if [ $? != 0 ]; then
 					echo "${SYNC_ACTION[3]}" > "${INITIATOR[$__targetLastActionFile]}"
 					resumeTarget="${SYNC_ACTION[3]}"
@@ -1595,7 +1420,7 @@ function Sync {
 			fi
 			if [ "$resumeInitiator" == "${SYNC_ACTION[3]}" ]; then
 				syncUpdate "${INITIATOR[$__type]}" "${TARGET[$__type]}"
-				WaitForTaskCompletion $! $SOFT_MAX_EXEC_TIME $HARD_MAX_EXEC_TIME $SLEEP_TIME $KEEP_LOGGING false true false ${FUNCNAME[0]}
+				WaitForTaskCompletion $! $SOFT_MAX_EXEC_TIME $HARD_MAX_EXEC_TIME $SLEEP_TIME $KEEP_LOGGING false true false
 				if [ $? != 0 ]; then
 					echo "${SYNC_ACTION[3]}" > "${INITIATOR[$__initiatorLastActionFile]}"
 					resumeInitiator="${SYNC_ACTION[3]}"
@@ -1608,7 +1433,7 @@ function Sync {
 		else
 			if [ "$resumeInitiator" == "${SYNC_ACTION[3]}" ]; then
 				syncUpdate "${INITIATOR[$__type]}" "${TARGET[$__type]}"
-				WaitForTaskCompletion $! $SOFT_MAX_EXEC_TIME $HARD_MAX_EXEC_TIME $SLEEP_TIME $KEEP_LOGGING false true false ${FUNCNAME[0]}
+				WaitForTaskCompletion $! $SOFT_MAX_EXEC_TIME $HARD_MAX_EXEC_TIME $SLEEP_TIME $KEEP_LOGGING false true false
 				if [ $? != 0 ]; then
 					echo "${SYNC_ACTION[3]}" > "${INITIATOR[$__initiatorLastActionFile]}"
 					resumeInitiator="${SYNC_ACTION[3]}"
@@ -1620,7 +1445,7 @@ function Sync {
 			fi
 			if [ "$resumeTarget" == "${SYNC_ACTION[3]}" ]; then
 				syncUpdate "${TARGET[$__type]}" "${INITIATOR[$__type]}"
-				WaitForTaskCompletion $! $SOFT_MAX_EXEC_TIME $HARD_MAX_EXEC_TIME $SLEEP_TIME $KEEP_LOGGING false true false ${FUNCNAME[0]}
+				WaitForTaskCompletion $! $SOFT_MAX_EXEC_TIME $HARD_MAX_EXEC_TIME $SLEEP_TIME $KEEP_LOGGING false true false
 				if [ $? != 0 ]; then
 					echo "${SYNC_ACTION[3]}" > "${INITIATOR[$__targetLastActionFile]}"
 					resumeTarget="${SYNC_ACTION[3]}"
@@ -1645,7 +1470,7 @@ function Sync {
 			targetPid="$!"
 		fi
 
-		WaitForTaskCompletion "$initiatorPid;$targetPid" $SOFT_MAX_EXEC_TIME $HARD_MAX_EXEC_TIME $SLEEP_TIME $KEEP_LOGGING false true false ${FUNCNAME[0]}
+		WaitForTaskCompletion "$initiatorPid;$targetPid" $SOFT_MAX_EXEC_TIME $HARD_MAX_EXEC_TIME $SLEEP_TIME $KEEP_LOGGING false true false
 		if [ $? != 0 ]; then
 			IFS=';' read -r -a pidArray <<< "$(eval echo \"\$WAIT_FOR_TASK_COMPLETION_${FUNCNAME[0]}\")"
 			initiatorFail=false
@@ -1691,7 +1516,7 @@ function Sync {
 			targetPid="$!"
 		fi
 
-		WaitForTaskCompletion "$initiatorPid;$targetPid" $SOFT_MAX_EXEC_TIME $HARD_MAX_EXEC_TIME $SLEEP_TIME $KEEP_LOGGING false true false ${FUNCNAME[0]}
+		WaitForTaskCompletion "$initiatorPid;$targetPid" $SOFT_MAX_EXEC_TIME $HARD_MAX_EXEC_TIME $SLEEP_TIME $KEEP_LOGGING false true false
 		if [ $? != 0 ]; then
 			IFS=';' read -r -a pidArray <<< "$(eval echo \"\$WAIT_FOR_TASK_COMPLETION_${FUNCNAME[0]}\")"
 			initiatorFail=false
@@ -1734,7 +1559,7 @@ function _SoftDeleteLocal {
 	local changeTime="${3}" # Delete files older than changeTime days
 	local deletionType="${4}" # Trivial deletion type string
 
-	__CheckArguments 4 $# "${FUNCNAME[0]}" "$@"	#__WITH_PARANOIA_DEBUG
+	__CheckArguments 4 $# "$@"	#__WITH_PARANOIA_DEBUG
 
 	local retval
 
@@ -1783,7 +1608,7 @@ function _SoftDeleteRemote {
 	local changeTime="${3}" # Delete files older than changeTime days
 	local deletionType="${4}" # Trivial deletion type string
 
-	__CheckArguments 4 $# "${FUNCNAME[0]}" "$@"	#__WITH_PARANOIA_DEBUG
+	__CheckArguments 4 $# "$@"	#__WITH_PARANOIA_DEBUG
 
 	local retval
 
@@ -1822,7 +1647,7 @@ ENDSSH
 }
 
 function SoftDelete {
-	__CheckArguments 0 $# "${FUNCNAME[0]}" "$@"	#__WITH_PARANOIA_DEBUG
+	__CheckArguments 0 $# "$@"	#__WITH_PARANOIA_DEBUG
 
 	local pids
 
@@ -1838,7 +1663,7 @@ function SoftDelete {
 			_SoftDeleteRemote "${TARGET[$__type]}" "${TARGET[$__replicaDir]}${TARGET[$__backupDir]}" $CONFLICT_BACKUP_DAYS "conflict backup" &
 			pids="$pids;$!"
 		fi
-		WaitForTaskCompletion $pids $SOFT_MAX_EXEC_TIME $HARD_MAX_EXEC_TIME $SLEEP_TIME $KEEP_LOGGING false true false ${FUNCNAME[0]}
+		WaitForTaskCompletion $pids $SOFT_MAX_EXEC_TIME $HARD_MAX_EXEC_TIME $SLEEP_TIME $KEEP_LOGGING false true false
 		if [ $? != 0 ] && [ "$(eval echo \"\$HARD_MAX_EXEC_TIME_REACHED_${FUNCNAME[0]}\")" == true ]; then
 			exit 1
 		fi
@@ -1856,7 +1681,7 @@ function SoftDelete {
 			_SoftDeleteRemote "${TARGET[$__type]}" "${TARGET[$__replicaDir]}${TARGET[$__deleteDir]}" $SOFT_DELETE_DAYS "softdelete" &
 			pids="$pids;$!"
 		fi
-		WaitForTaskCompletion $pids $SOFT_MAX_EXEC_TIME $HARD_MAX_EXEC_TIME $SLEEP_TIME $KEEP_LOGGING false true false ${FUNCNAME[0]}
+		WaitForTaskCompletion $pids $SOFT_MAX_EXEC_TIME $HARD_MAX_EXEC_TIME $SLEEP_TIME $KEEP_LOGGING false true false
 		if [ $? != 0 ] && [ "$(eval echo \"\$HARD_MAX_EXEC_TIME_REACHED_${FUNCNAME[0]}\")" == true ]; then
 			exit 1
 		fi
@@ -1868,7 +1693,7 @@ function _SummaryFromFile {
 	local summaryFile="${2}"
 	local direction="${3}"
 
-	__CheckArguments 3 $# "${FUNCNAME[0]}" "$@"	#__WITH_PARANOIA_DEBUG
+	__CheckArguments 3 $# "$@"	#__WITH_PARANOIA_DEBUG
 
 	if [ -f "$summaryFile" ]; then
 		while read -r file; do
@@ -1878,7 +1703,7 @@ function _SummaryFromFile {
 }
 
 function Summary {
-	__CheckArguments 0 $# "${FUNCNAME[0]}" "$@"	#__WITH_PARANOIA_DEBUG
+	__CheckArguments 0 $# "$@"	#__WITH_PARANOIA_DEBUG
 
 	(
 	_LOGGER_PREFIX=""
@@ -1903,7 +1728,7 @@ function Summary {
 }
 
 function Init {
-	__CheckArguments 0 $# "${FUNCNAME[0]}" "$@"	#__WITH_PARANOIA_DEBUG
+	__CheckArguments 0 $# "$@"	#__WITH_PARANOIA_DEBUG
 
 	# Set error exit code if a piped command fails
 	set -o pipefail
@@ -2085,14 +1910,14 @@ function Init {
 }
 
 function Main {
-	__CheckArguments 0 $# "${FUNCNAME[0]}" "$@"	#__WITH_PARANOIA_DEBUG
+	__CheckArguments 0 $# "$@"	#__WITH_PARANOIA_DEBUG
 
 	HandleLocks
 	Sync
 }
 
 function Usage {
-	__CheckArguments 0 $# "${FUNCNAME[0]}" "$@"	#__WITH_PARANOIA_DEBUG
+	__CheckArguments 0 $# "$@"	#__WITH_PARANOIA_DEBUG
 
 	if [ "$IS_STABLE" != "yes" ]; then
                 echo -e "\e[93mThis is an unstable dev build. Please use with caution.\e[0m"
@@ -2135,7 +1960,7 @@ function Usage {
 }
 
 function SyncOnChanges {
-	__CheckArguments 0 $# "${FUNCNAME[0]}" "$@"	#__WITH_PARANOIA_DEBUG
+	__CheckArguments 0 $# "$@"	#__WITH_PARANOIA_DEBUG
 
 	local cmd
 	local retval
@@ -2173,7 +1998,7 @@ function SyncOnChanges {
 		if [ "$LOCAL_OS" == "MacOSX" ]; then
 			fswatch --exclude $OSYNC_DIR $RSYNC_PATTERNS $RSYNC_PARTIAL_EXCLUDE -1 "$INITIATOR_SYNC_DIR" > /dev/null &
 			# Mac fswatch doesn't have timeout switch, replacing wait $! with WaitForTaskCompletion without warning nor spinner and increased SLEEP_TIME to avoid cpu hogging. This sims wait $! with timeout
-			WaitForTaskCompletion $! 0 $MAX_WAIT 1 0 true false true ${FUNCNAME[0]}
+			WaitForTaskCompletion $! 0 $MAX_WAIT 1 0 true false true
 		else
 			inotifywait --exclude $OSYNC_DIR $RSYNC_PATTERNS $RSYNC_PARTIAL_EXCLUDE -qq -r -e create -e modify -e delete -e move -e attrib --timeout "$MAX_WAIT" "$INITIATOR_SYNC_DIR" &
 			wait $!

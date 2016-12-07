@@ -1,6 +1,7 @@
-#### MINIMAL-FUNCTION-SET BEGIN ####
+#### OFUNCTIONS FULL SUBSET ####
+#### OFUNCTIONS MINI SUBSET ####
 
-_OFUNCTIONS_VERSION=2.0
+_OFUNCTIONS_VERSION=2.1
 _OFUNCTIONS_BUILD=2016120701
 ## BEGIN Generic bash functions written in 2013-2016 by Orsiris de Jong - http://www.netpower.fr - ozy@netpower.fr
 
@@ -41,6 +42,7 @@ fi
 ERROR_ALERT=false
 WARN_ALERT=false
 
+#### DEBUG SUBSET ####
 ## allow function call checks			#__WITH_PARANOIA_DEBUG
 if [ "$_PARANOIA_DEBUG" == "yes" ];then		#__WITH_PARANOIA_DEBUG
 	_DEBUG=yes				#__WITH_PARANOIA_DEBUG
@@ -58,6 +60,7 @@ fi
 if [ "$SLEEP_TIME" == "" ]; then # Leave the possibity to set SLEEP_TIME as environment variable when runinng with bash -x in order to avoid spamming console
 	SLEEP_TIME=.05
 fi
+#### DEBUG SUBSET END ####
 
 SCRIPT_PID=$$
 
@@ -98,12 +101,13 @@ ALERT_LOG_FILE="$RUN_DIR/$PROGRAM.$SCRIPT_PID.last.log"
 
 
 function Dummy {
-	__CheckArguments 0 $# ${FUNCNAME[0]} "$@"	#__WITH_PARANOIA_DEBUG
+	__CheckArguments 0 $# "$@"	#__WITH_PARANOIA_DEBUG
 
 	sleep $SLEEP_TIME
 }
 
-#### MINIMAL-FUNCTION-SET BEGIN ####
+#### Logger SUBSET ####
+#### RemoteLogger SUBSET ####
 # Sub function of Logger
 function _Logger {
 	local logValue="${1}"		# Log to file
@@ -126,6 +130,58 @@ function _Logger {
 		fi
 	fi
 }
+
+# Remote logger similar to below Logger, without log to file and alert flags
+function RemoteLogger {
+	local value="${1}" # Sentence to log (in double quotes)
+	local level="${2}" # Log level
+
+	if [ "$_LOGGER_PREFIX" == "time" ]; then
+		prefix="TIME: $SECONDS - "
+	elif [ "$_LOGGER_PREFIX" == "date" ]; then
+		prefix="$(date) - "
+	else
+		prefix=""
+	fi
+
+	if [ "$level" == "CRITICAL" ]; then
+		_Logger "" "$prefix\e[41m$value\e[0m" true
+		return
+	elif [ "$level" == "ERROR" ]; then
+		_Logger "" "$prefix\e[91m$value\e[0m" true
+		return
+	elif [ "$level" == "WARN" ]; then
+		_Logger "" "$prefix\e[33m$value\e[0m" true
+		return
+	elif [ "$level" == "NOTICE" ]; then
+		if [ $_LOGGER_ERR_ONLY != true ]; then
+			_Logger "" "$prefix$value"
+		fi
+		return
+	elif [ "$level" == "VERBOSE" ]; then
+		if [ $_LOGGER_VERBOSE == true ]; then
+			_Logger "" "$prefix$value"
+		fi
+		return
+	elif [ "$level" == "ALWAYS" ]; then
+		_Logger  "" "$prefix$value"
+		return
+	elif [ "$level" == "DEBUG" ]; then
+		if [ "$_DEBUG" == "yes" ]; then
+			_Logger "" "$prefix$value"
+			return
+		fi
+	elif [ "$level" == "PARANOIA_DEBUG" ]; then				#__WITH_PARANOIA_DEBUG
+		if [ "$_PARANOIA_DEBUG" == "yes" ]; then			#__WITH_PARANOIA_DEBUG
+			_Logger "" "$prefix\e[35m$value\e[0m"			#__WITH_PARANOIA_DEBUG
+			return							#__WITH_PARANOIA_DEBUG
+		fi								#__WITH_PARANOIA_DEBUG
+	else
+		_Logger "\e[41mLogger function called without proper loglevel [$level].\e[0m"
+		_Logger "Value was: $prefix$value"
+	fi
+}
+#### RemoteLogger SUBSET END ####
 
 # General log function with log levels:
 
@@ -198,13 +254,14 @@ function Logger {
 		_Logger "Value was: $prefix$value"
 	fi
 }
+#### Logger SUBSET END ####
 
 # QuickLogger subfunction, can be called directly
 function _QuickLogger {
 	local value="${1}"
 	local destination="${2}" # Destination: stdout, log, both
 
-	__CheckArguments 2 $# ${FUNCNAME[0]} "$@"	#__WITH_PARANOIA_DEBUG
+	__CheckArguments 2 $# "$@"	#__WITH_PARANOIA_DEBUG
 
 	if ([ "$destination" == "log" ] || [ "$destination" == "both" ]); then
 		echo -e "$(date) - $value" >> "$LOG_FILE"
@@ -217,7 +274,7 @@ function _QuickLogger {
 function QuickLogger {
 	local value="${1}"
 
-	__CheckArguments 1 $# ${FUNCNAME[0]} "$@"	#__WITH_PARANOIA_DEBUG
+	__CheckArguments 1 $# "$@"	#__WITH_PARANOIA_DEBUG
 
 	if [ $_LOGGER_SILENT == true ]; then
 		_QuickLogger "$value" "log"
@@ -266,7 +323,7 @@ function KillAllChilds {
 	local pids="${1}" # List of parent pids to kill separated by semi-colon
 	local self="${2:-false}" # Should parent be killed too ?
 
-	__CheckArguments 1 $# ${FUNCNAME[0]} "$@"	#__WITH_PARANOIA_DEBUG
+	__CheckArguments 1 $# "$@"	#__WITH_PARANOIA_DEBUG
 
 	local errorcount=0
 
@@ -284,7 +341,7 @@ function KillAllChilds {
 function SendAlert {
 	local runAlert="${1:-false}" # Specifies if current message is sent while running or at the end of a run
 
-	__CheckArguments 0-1 $# ${FUNCNAME[0]} "$@"	#__WITH_PARANOIA_DEBUG
+	__CheckArguments 0-1 $# "$@"	#__WITH_PARANOIA_DEBUG
 
 	local attachment
 	local attachmentFile
@@ -367,7 +424,7 @@ function SendEmail {
 	local smtpUser="${9}"
 	local smtpPassword="${10}"
 
-	__CheckArguments 3-10 $# ${FUNCNAME[0]} "$@"	#__WITH_PARANOIA_DEBUG
+	__CheckArguments 3-10 $# "$@"	#__WITH_PARANOIA_DEBUG
 
 	local mail_no_attachment=
 	local attachment_command=
@@ -504,6 +561,7 @@ function SendEmail {
 	Logger "Cannot send mail (neither mutt, mail, sendmail, sendemail, mailsend (windows) or pfSense mail.php could be used)." "ERROR" # Is not marked critical because execution must continue
 }
 
+#### TrapError SUBSET ####
 function TrapError {
 	local job="$0"
 	local line="$1"
@@ -513,11 +571,12 @@ function TrapError {
 		echo -e "\e[45m/!\ ERROR in ${job}: Near line ${line}, exit code ${code}\e[0m"
 	fi
 }
+#### TrapError SUBSET END ####
 
 function LoadConfigFile {
 	local configFile="${1}"
 
-	__CheckArguments 1 $# ${FUNCNAME[0]} "$@"	#__WITH_PARANOIA_DEBUG
+	__CheckArguments 1 $# "$@"	#__WITH_PARANOIA_DEBUG
 
 
 	if [ ! -f "$configFile" ]; then
@@ -578,7 +637,7 @@ function joinString {
 # Fills a global variable called WAIT_FOR_TASK_COMPLETION_$callerName that contains list of failed pids in format pid1:result1;pid2:result2
 # Also sets a global variable called HARD_MAX_EXEC_TIME_REACHED_$callerName to true if hardMaxTime is reached
 
-# Standard wait $! emulation would be WaitForTaskCompletion $! 0 0 1 0 true false true false "${FUNCNAME[0]}"
+# Standard wait $! emulation would be WaitForTaskCompletion $! 0 0 1 0 true false true false
 
 function WaitForTaskCompletion {
 	local pids="${1}" # pids to wait for, separated by semi-colon
@@ -589,10 +648,10 @@ function WaitForTaskCompletion {
 	local counting="${6:-true}"	# Count time since function has been launched (true), or since script has been launched (false)
 	local spinner="${7:-true}"	# Show spinner (true), don't show anything (false)
 	local noErrorLog="${8:-false}"	# Log errors when reaching soft / hard max time (false), don't log errors on those triggers (true)
-	local callerName="${9}"		# Name of the function who called this function for debugging purposes, generally ${FUNCNAME[0]}
 
+	local callerName="${FUNCNAME[1]}"
 	Logger "${FUNCNAME[0]} called by [$callerName]." "PARANOIA_DEBUG"	#__WITH_PARANOIA_DEBUG
-	__CheckArguments 9 $# ${FUNCNAME[0]} "$@"				#__WITH_PARANOIA_DEBUG
+	__CheckArguments 8 $# "$@"				#__WITH_PARANOIA_DEBUG
 
 	local log_ttime=0 # local time instance for comparaison
 
@@ -735,9 +794,9 @@ function ParallelExec {
 	local counting="${8:-true}"		# Count time since function has been launched (true), or since script has been launched (false)
 	local spinner="${9:-false}"		# Show spinner (true), don't show spinner (false)
 	local noErrorLog="${10:-false}"		# Log errors when reaching soft / hard max time (false), don't log errors on those triggers (true)
-	local callerName="${11:-false}"		# Name of the function who called this function for debugging purposes, generally ${FUNCNAME[0]}
 
-	__CheckArguments 2-11 $# ${FUNCNAME[0]} "$@"				#__WITH_PARANOIA_DEBUG
+	local callerName="${FUNCNAME[1]}"
+	__CheckArguments 2-10 $# "$@"				#__WITH_PARANOIA_DEBUG
 
 	local log_ttime=0 # local time instance for comparaison
 
@@ -876,7 +935,7 @@ function ParallelExec {
 }
 
 function CleanUp {
-	__CheckArguments 0 $# ${FUNCNAME[0]} "$@"	#__WITH_PARANOIA_DEBUG
+	__CheckArguments 0 $# "$@"	#__WITH_PARANOIA_DEBUG
 
 	if [ "$_DEBUG" != "yes" ]; then
 		rm -f "$RUN_DIR/$PROGRAM."*".$SCRIPT_PID"
@@ -944,6 +1003,7 @@ function IsNumeric {
 	fi
 }
 
+#### IsInteger SUBSET ####
 function IsInteger {
 	local value="${1}"
 
@@ -953,7 +1013,9 @@ function IsInteger {
 		echo 0
 	fi
 }
+#### IsInteger SUBSET END ####
 
+#### HumanToNumeric SUBSET ####
 # Converts human readable sizes into integer kilobyte sizes
 # Usage numericSize="$(HumanToNumeric $humanSize)"
 function HumanToNumeric {
@@ -984,6 +1046,7 @@ function HumanToNumeric {
 
 	echo $value
 }
+#### HumanToNumeric SUBSET END ####
 
 ## from https://gist.github.com/cdown/1163649
 function urlEncode {
@@ -1009,6 +1072,7 @@ function urlDecode {
 	printf '%b' "${urlEncoded//%/\\x}"
 }
 
+#### ArrayContains SUBSET ####
 ## Modified version of http://stackoverflow.com/a/8574392
 ## Usage: arrayContains "needle" "${haystack[@]}"
 function ArrayContains () {
@@ -1027,9 +1091,10 @@ function ArrayContains () {
 	echo 0
 	return
 }
+#### ArrayContains SUBSET END ####
 
 function GetLocalOS {
-	__CheckArguments 0 $# ${FUNCNAME[0]} "$@"	#__WITH_PARANOIA_DEBUG
+	__CheckArguments 0 $# "$@"	#__WITH_PARANOIA_DEBUG
 
 	local localOsVar
 
@@ -1086,10 +1151,10 @@ function GetLocalOS {
 	Logger "Local OS: [$localOsVar]." "DEBUG"
 }
 
-#### MINIMAL-FUNCTION-SET END ####
+#### OFUNCTIONS MINI SUBSET END ####
 
 function GetRemoteOS {
-	__CheckArguments 0 $# ${FUNCNAME[0]} "$@"	#__WITH_PARANOIA_DEBUG
+	__CheckArguments 0 $# "$@"	#__WITH_PARANOIA_DEBUG
 
 	if [ "$REMOTE_OPERATION" != "yes" ]; then
 		return 0
@@ -1172,7 +1237,7 @@ ENDSSH
 function RunLocalCommand {
 	local command="${1}" # Command to run
 	local hardMaxTime="${2}" # Max time to wait for command to compleet
-	__CheckArguments 2 $# ${FUNCNAME[0]} "$@"	#__WITH_PARANOIA_DEBUG
+	__CheckArguments 2 $# "$@"	#__WITH_PARANOIA_DEBUG
 
 	if [ $_DRYRUN == true ]; then
 		Logger "Dryrun: Local command [$command] not run." "NOTICE"
@@ -1204,7 +1269,7 @@ function RunLocalCommand {
 function RunRemoteCommand {
 	local command="${1}" # Command to run
 	local hardMaxTime="${2}" # Max time to wait for command to compleet
-	__CheckArguments 2 $# ${FUNCNAME[0]} "$@"	#__WITH_PARANOIA_DEBUG
+	__CheckArguments 2 $# "$@"	#__WITH_PARANOIA_DEBUG
 
 	CheckConnectivity3rdPartyHosts
 	CheckConnectivityRemoteHost
@@ -1237,7 +1302,7 @@ function RunRemoteCommand {
 }
 
 function RunBeforeHook {
-	__CheckArguments 0 $# ${FUNCNAME[0]} "$@"	#__WITH_PARANOIA_DEBUG
+	__CheckArguments 0 $# "$@"	#__WITH_PARANOIA_DEBUG
 
 	local pids
 
@@ -1256,7 +1321,7 @@ function RunBeforeHook {
 }
 
 function RunAfterHook {
-	__CheckArguments 0 $# ${FUNCNAME[0]} "$@"	#__WITH_PARANOIA_DEBUG
+	__CheckArguments 0 $# "$@"	#__WITH_PARANOIA_DEBUG
 
 	local pids
 
@@ -1275,7 +1340,7 @@ function RunAfterHook {
 }
 
 function CheckConnectivityRemoteHost {
-	__CheckArguments 0 $# ${FUNCNAME[0]} "$@"	#__WITH_PARANOIA_DEBUG
+	__CheckArguments 0 $# "$@"	#__WITH_PARANOIA_DEBUG
 
 	local retval
 
@@ -1294,7 +1359,7 @@ function CheckConnectivityRemoteHost {
 }
 
 function CheckConnectivity3rdPartyHosts {
-	__CheckArguments 0 $# ${FUNCNAME[0]} "$@"	#__WITH_PARANOIA_DEBUG
+	__CheckArguments 0 $# "$@"	#__WITH_PARANOIA_DEBUG
 
 	local remote3rdPartySuccess
 	local retval
@@ -1332,16 +1397,17 @@ function __CheckArguments {
 	if [ "$_DEBUG" == "yes" ]; then
 		local numberOfArguments="${1}" # Number of arguments the tested function should have, can be a number of a range, eg 0-2 for zero to two arguments
 		local numberOfGivenArguments="${2}" # Number of arguments that have been passed
-		local functionName="${3}" # Function name that called __CheckArguments
 
 		local minArgs
 		local maxArgs
 
-		# All arguments of the function to check are passed as array in ${4} (the function call waits for $@)
+		# All arguments of the function to check are passed as array in ${3} (the function call waits for $@)
 		# If any of the arguments contains spaces, bash things there are two aguments
-		# In order to avoid this, we need to iterate over ${4} and count
+		# In order to avoid this, we need to iterate over ${3} and count
 
-		local iterate=4
+		callerName="${FUNCNAME[1]}"
+
+		local iterate=3
 		local fetchArguments=true
 		local argList=""
 		local countedArguments
@@ -1351,12 +1417,12 @@ function __CheckArguments {
 			if [ "$argument" = "" ]; then
 				fetchArguments=false
 			else
-				argList="$argList[Argument $(($iterate-3)): $argument] "
+				argList="$argList[Argument $(($iterate-2)): $argument] "
 				iterate=$(($iterate+1))
 			fi
 		done
 
-		countedArguments=$((iterate-4))
+		countedArguments=$((iterate-3))
 
 		if [ $(IsInteger "$numberOfArguments") -eq 1 ]; then
 			minArgs=$numberOfArguments
@@ -1365,13 +1431,15 @@ function __CheckArguments {
 			IFS='-' read minArgs maxArgs <<< "$numberOfArguments"
 		fi
 
-		Logger "Entering function [$functionName]." "PARANOIA_DEBUG"
+		Logger "Entering function [$callerName]." "PARANOIA_DEBUG"
 
 		if ! ([ $countedArguments -ge $minArgs ] && [ $countedArguments -le $maxArgs ]); then
 			Logger "Function $functionName may have inconsistent number of arguments. Expected min: $minArgs, max: $maxArgs, count: $countedArguments, bash seen: $numberOfGivenArguments. see log file." "ERROR"
-			Logger "Arguments passed: $argList" "ERROR"
+			Logger "$callerName arguments: $argList" "ERROR"
 		else
-			Logger "Arguments passed: $argList" "PARANOIA_DEBUG"
+			if [ ! -z "$argList" ]; then
+				Logger "$callerName arguments: $argList" "PARANOIA_DEBUG"
+			fi
 		fi
 	fi
 }
@@ -1381,7 +1449,7 @@ function __CheckArguments {
 function RsyncPatternsAdd {
 	local patternType="${1}"	# exclude or include
 	local pattern="${2}"
-	__CheckArguments 2 $# ${FUNCNAME[0]} "$@"	#__WITH_PARANOIA_DEBUG
+	__CheckArguments 2 $# "$@"	#__WITH_PARANOIA_DEBUG
 
 	local rest
 
@@ -1411,7 +1479,7 @@ function RsyncPatternsAdd {
 function RsyncPatternsFromAdd {
 	local patternType="${1}"
 	local patternFrom="${2}"
-	__CheckArguments 2 $# ${FUNCNAME[0]} "$@"    #__WITH_PARANOIA_DEBUG
+	__CheckArguments 2 $# "$@"    #__WITH_PARANOIA_DEBUG
 
 	## Check if the exclude list has a full path, and if not, add the config file path if there is one
 	if [ "$(basename $patternFrom)" == "$patternFrom" ]; then
@@ -1424,7 +1492,7 @@ function RsyncPatternsFromAdd {
 }
 
 function RsyncPatterns {
-	__CheckArguments 0 $# ${FUNCNAME[0]} "$@"    #__WITH_PARANOIA_DEBUG
+	__CheckArguments 0 $# "$@"    #__WITH_PARANOIA_DEBUG
 
        if [ "$RSYNC_PATTERN_FIRST" == "exclude" ]; then
 		if [ "$RSYNC_EXCLUDE_PATTERN" != "" ]; then
@@ -1459,7 +1527,7 @@ function RsyncPatterns {
 }
 
 function PreInit {
-	 __CheckArguments 0 $# ${FUNCNAME[0]} "$@"    #__WITH_PARANOIA_DEBUG
+	 __CheckArguments 0 $# "$@"    #__WITH_PARANOIA_DEBUG
 
 	local compressionString
 
@@ -1504,7 +1572,7 @@ function PreInit {
 }
 
 function PostInit {
-	__CheckArguments 0 $# ${FUNCNAME[0]} "$@"    #__WITH_PARANOIA_DEBUG
+	__CheckArguments 0 $# "$@"    #__WITH_PARANOIA_DEBUG
 
 	# Define remote commands
 	if [ -f "$SSH_RSA_PRIVATE_KEY" ]; then
@@ -1524,7 +1592,7 @@ function PostInit {
 }
 
 function InitLocalOSDependingSettings {
-	__CheckArguments 0 $# ${FUNCNAME[0]} "$@"    #__WITH_PARANOIA_DEBUG
+	__CheckArguments 0 $# "$@"    #__WITH_PARANOIA_DEBUG
 
 	## If running under Msys, some commands do not run the same way
 	## Using mingw version of find instead of windows one
@@ -1560,7 +1628,7 @@ function InitLocalOSDependingSettings {
 }
 
 function InitRemoteOSDependingSettings {
-	__CheckArguments 0 $# ${FUNCNAME[0]} "$@"    #__WITH_PARANOIA_DEBUG
+	__CheckArguments 0 $# "$@"    #__WITH_PARANOIA_DEBUG
 
 	if [ "$REMOTE_OS" == "msys" ]; then
 		REMOTE_FIND_CMD=$(dirname $BASH)/find
@@ -1700,4 +1768,4 @@ function ParentPid {
 	fi
 }
 
-## END Generic functions
+#### OFUNCTIONS FULL SUBSET END ####
