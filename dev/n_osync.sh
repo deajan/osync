@@ -4,7 +4,7 @@ PROGRAM="osync" # Rsync based two way sync engine with fault tolerance
 AUTHOR="(C) 2013-2016 by Orsiris de Jong"
 CONTACT="http://www.netpower.fr/osync - ozy@netpower.fr"
 PROGRAM_VERSION=1.2-beta3
-PROGRAM_BUILD=2016120605
+PROGRAM_BUILD=2016120701
 IS_STABLE=no
 
 #TODO: replace _Logger & Logger in remote functions with ofunctions version dedicated to remote logging
@@ -332,10 +332,9 @@ function _CheckReplicasRemoteSub {
 
 	if [ ! -d "$replicaPath" ]; then
 		if [ "$CREATE_DIRS" == "yes" ]; then
-			$COMMAND_SUDO mkdir -p "$replicaPath" >> "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$SCRIPT_PID" 2>&1
+			$COMMAND_SUDO mkdir -p "$replicaPath"
 			if [ $? != 0 ]; then
 				Logger "Cannot create remote replica path [$replicaPath]." "CRITICAL"
-				Logger "Command output:\n$(cat $RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$SCRIPT_PID)"
 				exit 1
 			else
 				Logger "Created remote replica path [$replicaPath]." "NOTICE"
@@ -569,10 +568,9 @@ $SSH_CMD replicaStateDir="'$replicaStateDir'" initiatorRunningPidsFlat="(${initi
 function _HandleLocksRemoteSub {
 	#WIP do not remote log to file as output is already logged from ssh
 	if [ ! -d "$replicaStateDir" ]; then
-		$COMMAND_SUDO mkdir -p "$replicaStateDir" >> "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$SCRIPT_PID" 2>&1
+		$COMMAND_SUDO mkdir -p "$replicaStateDir"
 		if [ $? != 0 ]; then
 			Logger "Cannot create state dir [$replicaStateDir]." "CRITICAL"
-			Logger "Command output:\n$(cat $RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$SCRIPT_PID)" "ERROR"
 			return 1
 		fi
 	fi
@@ -621,10 +619,9 @@ function _HandleLocksRemoteSub {
 	if [ $writeLocks != true ]; then
 		return 1
 	else
-		$COMMAND_SUDO echo "$SCRIPT_PID@$INSTANCE_ID" > "$lockfile" 2> "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}-$replicaType.$SCRIPT_PID"
+		$COMMAND_SUDO echo "$SCRIPT_PID@$INSTANCE_ID" > "$lockfile"
 		if [ $?	!= 0 ]; then
 			Logger "Could not create lock file on local $replicaType in [$lockfile]." "CRITICAL"
-			Logger "Command output\n$($RUN_DIR/$PROGRAM.${FUNCNAME[0]}-$replicaType.$SCRIPT_PID)" "NOTICE"
 			return 1
 		else
 			Logger "Locked local $replicaType replica in [$lockfile]." "DEBUG"
