@@ -288,7 +288,7 @@ function KillChilds {
 	local pid="${1}" # Parent pid to kill childs
 	local self="${2:-false}" # Should parent be killed too ?
 
-
+	# Warning: pgrep does not exist in cygwin, have this checked in CheckEnvironment
 	if children="$(pgrep -P "$pid")"; then
 		for child in $children; do
 			Logger "Launching KillChilds \"$child\" true" "DEBUG"	#__WITH_PARANOIA_DEBUG
