@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-## MERGE 2016120701
+## MERGE 2016120801
 
 ## Merges ofunctions.sh and n_program.sh into program.sh
 ## Adds installer
@@ -24,11 +24,6 @@ function __PREPROCESSOR_Merge {
 		__PREPROCESSOR_MergeSubset "$subset" "${subset//SUBSET/SUBSET END}" "ofunctions.sh" "debug_$PROGRAM.sh"
 	done
 
-	#if [ "$PROGRAM" == "osync" ] || [ "$PROGRAM" == "obackup" ]; then
-	#	MergeAll
-	#else
-	#	MergeMinimum
-	#fi
 	__PREPROCESSOR_CleanDebug
 	__PREPROCESSOR_CopyCommons
 	rm -f tmp_$PROGRAM.sh
@@ -66,40 +61,6 @@ function __PREPROCESSOR_Unexpand {
 	fi
 }
 
-function __PREPROCESSOR_MergeAll {
-
-	sed "/source \"\.\/ofunctions.sh\"/r ofunctions.sh" tmp_$PROGRAM.sh | grep -v 'source "./ofunctions.sh"' > debug_$PROGRAM.sh
-	if [ $? != 0 ]; then
-		QuickLogger "Cannot sed ofunctions" "stderr"
-		exit 1
-	fi
-}
-
-function __PREPROCESSOR_MergeMinimum {
-        sed -n "/$MINIMUM_FUNCTION_BEGIN/,/$MINIMUM_FUNCTION_END/p" ofunctions.sh > tmp_minimal.sh
-	if [ $? != 0 ]; then
-		QuickLogger "Cannot sed minimum functions." "stderr"
-		exit 1
-	fi
-        sed "/source \"\.\/ofunctions.sh\"/r tmp_minimal.sh" tmp_$PROGRAM.sh | grep -v 'source "./ofunctions.sh"' | grep -v "$PARANOIA_DEBUG_LINE" > debug_$PROGRAM.sh
-	if [ $? != 0 ]; then
-		QuickLogger "Cannot remove PARANOIA_DEBUG code from tmp_minimum." "stderr"
-		exit 1
-	fi
-	rm -f tmp_minimal.sh
-	if [ $? != 0 ]; then
-		QuickLogger "Cannot remove tmp_minimal.sh" "stderr"
-		exit 1
-	fi
-
-        chmod +x debug_$PROGRAM.sh
-	if [ $? != 0 ]; then
-		QuickLogger "Cannot chmod debug_$PROGRAM.sh" "stderr"
-		exit 1
-	fi
-
-}
-
 function __PREPROCESSOR_MergeSubset {
 	local subsetBegin="${1}"
 	local subsetEnd="${2}"
@@ -116,7 +77,7 @@ function __PREPROCESSOR_MergeSubset {
 		QuickLogger "Cannot add subset [$subsetBegin] to [$mergedFile]." "stderr"
 		exit 1
 	fi
-	rm -f "$subsetFile.$subsetBegin"
+	#rm -f "$subsetFile.$subsetBegin"
 	if [ $? != 0 ]; then
 		QuickLogger "Cannot remove temporary subset [$subsetFile.$subsetBeign]." "stderr"
 		exit 1
