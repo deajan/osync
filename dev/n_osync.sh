@@ -300,7 +300,7 @@ exit $?
 ENDSSH
 	result=$?
 	if [ $result != 0 ]; then
-		Logger "Failed to check remote replica.." "CRITICAL"
+		Logger "Failed to check remote replica." "CRITICAL"
 	fi
 	if [ -s "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$SCRIPT_PID" ]; then
 		(
