@@ -136,6 +136,11 @@ function CheckEnvironment {
                 Logger "rsync not present. Sync cannot start." "CRITICAL"
                 exit 1
         fi
+
+        if ! type pgrep > /dev/null 2>&1 ; then
+                Logger "pgrep not present. Sync cannot start." "CRITICAL"
+                exit 1
+        fi
 }
 
 # Only gets checked in config file mode where all values should be present
