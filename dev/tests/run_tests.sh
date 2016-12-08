@@ -7,7 +7,7 @@
 
 ## On CYGWIN / MSYS, ACL and extended attributes aren't supported
 
-# osync test suite 2016120602
+# osync test suite 2016120801
 
 # 4 tests:
 # quicklocal
@@ -387,7 +387,7 @@ function test_Deletetion () {
 }
 
 function test_deletion_failure () {
-	if [ "$LOCAL_OS" == "WinNT10" ]; then
+	if [ "$LOCAL_OS" == "WinNT10" ] || [ "$LOCAL_OS" == "msys" ]; then
 		echo "Skipping deletion failure test as Win10 does not have chattr  support."
 		return 0
 	fi
@@ -734,7 +734,7 @@ function test_softdeletion_cleanup () {
 
 			touch "$file.new"
 
-			if [ "$TRAVIS_RUN" == true ] || [ "$LOCAL_OS" == "BSD" ] || [ "$LOCAL_OS" == "MacOSX" ] || [ "$LOCAL_OS" == "WinNT10" ] || [ "LOCAL_OS" == "msys" ]; then
+			if [ "$TRAVIS_RUN" == true ] || [ "$LOCAL_OS" == "BSD" ] || [ "$LOCAL_OS" == "MacOSX" ] || [ "$LOCAL_OS" == "WinNT10" ] || [ "$LOCAL_OS" == "msys" ]; then
 				echo "Skipping changing ctime on file because travis / bsd / macos / Win10 / msys / cygwin does not support debugfs"
 			else
 				CreateOldFile "$file.old"
@@ -768,8 +768,8 @@ function test_FileAttributePropagation () {
 		return 0
 	fi
 
-	if [ "$LOCAL_OS" == "MacOSX" ]; then
-		echo "Skipping FileAttributePropagation tests because Mac OSX does not support ACL."
+	if [ "$LOCAL_OS" == "MacOSX" ] || [ "$LOCAL_OS" == "msys" ]; then
+		echo "Skipping FileAttributePropagation tests because [$LOCAL_OS]  does not support ACL."
 		return 0
 	fi
 
