@@ -2,7 +2,8 @@
 #### OFUNCTIONS MINI SUBSET ####
 
 _OFUNCTIONS_VERSION=2.1
-_OFUNCTIONS_BUILD=2016120801
+_OFUNCTIONS_BUILD=2016120802
+_OFUNCTIONS_BOOTSTRAP=true
 ## BEGIN Generic bash functions written in 2013-2016 by Orsiris de Jong - http://www.netpower.fr - ozy@netpower.fr
 
 ## To use in a program, define the following variables:
@@ -1127,7 +1128,7 @@ function GetLocalOS {
 		*"BSD"*)
 		LOCAL_OS="BSD"
 		;;
-		*"MINGW32"*|*"CYGWIN"*)
+		*"MINGW32"*|*"MSYS"*|*"CYGWIN"*)
 		LOCAL_OS="msys"
 		;;
 		*"Microsoft"*)
@@ -1203,7 +1204,7 @@ ENDSSH
 			*"BSD"*)
 			REMOTE_OS="BSD"
 			;;
-			*"MINGW32"*|*"CYGWIN"*)
+			*"MINGW32"*|*"MSYS"*|*"CYGWIN"*)
 			REMOTE_OS="msys"
 			;;
 			*"Microsoft"*)
