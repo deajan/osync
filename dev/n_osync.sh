@@ -4,7 +4,7 @@ PROGRAM="osync" # Rsync based two way sync engine with fault tolerance
 AUTHOR="(C) 2013-2016 by Orsiris de Jong"
 CONTACT="http://www.netpower.fr/osync - ozy@netpower.fr"
 PROGRAM_VERSION=1.2-beta3
-PROGRAM_BUILD=2016120802
+PROGRAM_BUILD=2016120804
 IS_STABLE=no
 
 #TODO: update waitfor parallelexec and checkarguments
@@ -47,6 +47,10 @@ IS_STABLE=no
 #	CleanUp					no		#__WITH_PARANOIA_DEBUG
 
 include #### OFUNCTIONS FULL SUBSET ####
+
+# Hopefully multishell compatible (bash & csh seem to like it)
+[ "$_OFUNCTIONS_BOOTSTRAP" != true ] && echo "Please use bootstrap.sh to load this dev version of $(basename $0)" && exit 1
+
 _LOGGER_PREFIX="time"
 
 ## Working directory. This directory exists in any replica and contains state files, backups, soft deleted files etc
@@ -748,7 +752,7 @@ function _getFileCtimeMtimeLocal {
 		if [ -f "$RUN_DIR/$PROGRAM.ctime_mtime.$replicaType.$SCRIPT_PID" ]; then
 			Logger "Command output:\n$(cat $RUN_DIR/$PROGRAM.ctime_mtime.$replicaType.$SCRIPT_PID)" "VERBOSE"
 		fi
-		exit 1
+		return 1
 	fi
 
 }
@@ -761,16 +765,32 @@ function _getFileCtimeMtimeRemote {
 
 	local cmd
 
+	#TODO WIP
 	# Quoting ' in single quote with '"'"' in order to have cmd='some stuff \'bash -c "some other stuff"\''
-	cmd='cat "'$fileList'" | '$SSH_CMD' '"'"'bash -c "while read -r file; do '$REMOTE_STAT_CTIME_MTIME_CMD' \"'$replicaPath'\$file\"; done | sort"'"'"' > "'$RUN_DIR/$PROGRAM.ctime_mtime.$replicaType.$SCRIPT_PID'"'
+	#cmd='cat "'$fileList'" | '$SSH_CMD' '"'"'bash -c "while read -r file; do '$REMOTE_STAT_CTIME_MTIME_CMD' \"'$replicaPath'\$file\"; done | sort"'"'"' > "'$RUN_DIR/$PROGRAM.ctime_mtime.$replicaType.$SCRIPT_PID'"'
+	cmd='cat "'$fileList'" | '$SSH_CMD' "cat > \".$PROGRAM.ctime_mtime.$replicaType.$SCRIPT_PID\""'
 	Logger "CMD: $cmd" "DEBUG"
 	eval "$cmd"
+	if [ $? != 0 ]; then
+		Logger "Sending ctime required file list failed with [$retval] on $replicaType. Stopping execution." "CRITICAL"
+		if [ -f "$RUN_DIR/$PROGRAM.ctime_mtime.$replicaType.$SCRIPT_PID" ]; then
+			Logger "Command output:\n$(cat $RUN_DIR/$PROGRAM.ctime_mtime.$replicaType.$SCRIPT_PID)" "VERBOSE"
+		fi
+		return 1
+	fi
+
+$SSH_CMD env PROGRAM="'$PROGRAM'" env SCRIPT_PID="'$SCRIPT_PID'" env replicaPath="'$replicaPath'" env replicaType="'$replicaType'" env REMOTE_STAT_CTIME_MTIME_CMD="'$REMOTE_STAT_CTIME_MTIME_CMD'" 'bash -s' << 'ENDSSH' > "$RUN_DIR/$PROGRAM.ctime_mtime.$replicaType.$SCRIPT_PID"
+	while read -r file; do $REMOTE_STAT_CTIME_MTIME_CMD "$replicaPath$file" | sort; done < ".$PROGRAM.ctime_mtime.$replicaType.$SCRIPT_PID"
+        	if [ -f ".$PROGRAM.ctime_mtime.$replicaType.$SCRIPT_PID" ]; then
+                	rm -f ".$PROGRAM.ctime_mtime.$replicaType.$SCRIPT_PID"
+        	fi
+ENDSSH
 	if [ $? != 0 ]; then
 		Logger "Getting file attributes failed [$retval] on $replicaType. Stopping execution." "CRITICAL"
 		if [ -f "$RUN_DIR/$PROGRAM.ctime_mtime.$replicaType.$SCRIPT_PID" ]; then
 			Logger "Command output:\n$(cat $RUN_DIR/$PROGRAM.ctime_mtime.$replicaType.$SCRIPT_PID)" "VERBOSE"
 		fi
-		exit 1
+		return 1
 	fi
 }
 
@@ -814,7 +834,7 @@ function syncAttrs {
 		if [ -f "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$SCRIPT_PID" ]; then
 			Logger "Rsync output:\n$(cat $RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$SCRIPT_PID)" "NOTICE"
 		fi
-		exit 1
+		return 1
 	else
 		if [ -f "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$SCRIPT_PID" ]; then
 			Logger "List:\n$(cat $RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$SCRIPT_PID)" "VERBOSE"
@@ -839,6 +859,10 @@ function syncAttrs {
 		pids="$pids;$!"
 	fi
 	WaitForTaskCompletion $pids $SOFT_MAX_EXEC_TIME $HARD_MAX_EXEC_TIME $SLEEP_TIME $KEEP_LOGGING false true false
+	if [ $? != 0 ]; then
+		Logger "Getting ctime attributes failed." "CRITICAL"
+		return 1
+	fi
 
 	# If target gets updated first, then sync_attr must update initiators attrs first
 	# For join, remove leading replica paths
@@ -894,7 +918,7 @@ function syncAttrs {
 		if [ -f "$RUN_DIR/$PROGRAM.attr-update.$destReplica.$SCRIPT_PID" ]; then
 			Logger "Rsync output:\n$(cat $RUN_DIR/$PROGRAM.attr-update.$destReplica.$SCRIPT_PID)" "NOTICE"
 		fi
-		exit 1
+		return 1
 	else
 		if [ -f "$RUN_DIR/$PROGRAM.attr-update.$destReplica.$SCRIPT_PID" ]; then
 			Logger "List:\n$(cat $RUN_DIR/$PROGRAM.attr-update.$destReplica.$SCRIPT_PID)" "VERBOSE"
