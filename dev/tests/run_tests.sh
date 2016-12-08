@@ -276,6 +276,7 @@ function oneTimeTearDown () {
 
 	#TODO: uncomment this when dev is done
 	#rm -rf "$OSYNC_TESTS_DIR"
+	rm -f "$TMP_FILE"
 
 	ELAPSED_TIME=$(($SECONDS - $START_TIME))
 	echo "It took $ELAPSED_TIME seconds to run these tests."
@@ -1195,7 +1196,6 @@ function test_ParallelExec () {
 	cmd="sleep 4;du /none;sleep 3;du /none;sleep 2"
 	ParallelExec 3 "$cmd" false 1 2 .05 7000 true true false ${FUNCNAME[0]}
 	assertNotEquals "ParallelExec full test 3" "0" $?
-
 }
 
 function test_timedExecution () {
