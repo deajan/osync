@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-## MERGE 2016120801
+## MERGE 2016120802
 
 ## Merges ofunctions.sh and n_program.sh into program.sh
 ## Adds installer
@@ -77,7 +77,7 @@ function __PREPROCESSOR_MergeSubset {
 		QuickLogger "Cannot add subset [$subsetBegin] to [$mergedFile]." "stderr"
 		exit 1
 	fi
-	#rm -f "$subsetFile.$subsetBegin"
+	rm -f "$subsetFile.$subsetBegin"
 	if [ $? != 0 ]; then
 		QuickLogger "Cannot remove temporary subset [$subsetFile.$subsetBeign]." "stderr"
 		exit 1
