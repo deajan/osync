@@ -4,11 +4,13 @@ PROGRAM="osync" # Rsync based two way sync engine with fault tolerance
 AUTHOR="(C) 2013-2016 by Orsiris de Jong"
 CONTACT="http://www.netpower.fr/osync - ozy@netpower.fr"
 PROGRAM_VERSION=1.2-beta3
-PROGRAM_BUILD=2016120702
+PROGRAM_BUILD=2016120801
 IS_STABLE=no
 
 #TODO: update waitfor parallelexec and checkarguments
 #TODO: update coding style checkarguments
+#TODO: update common install with includes
+#TODO: revamp quicklogger
 
 # Execution order						#__WITH_PARANOIA_DEBUG
 #	Function Name				Is parallel	#__WITH_PARANOIA_DEBUG
@@ -423,7 +425,7 @@ function _HandleLocksRemote {
 $SSH_CMD _DEBUG="'$_DEBUG'" _PARANOIA_DEBUG="'$_PARANOIA_DEBUG'" _LOGGER_SILENT="'$_LOGGER_SILENT'" _LOGGER_VERBOSE="'$_LOGGER_VERBOSE'" _LOGGER_PREFIX="'$_LOGGER_PREFIX'" _LOGGER_ERR_ONLY="'$_LOGGER_ERR_ONLY'" replicaStateDir="'$replicaStateDir'" initiatorRunningPidsFlat="(${initiatorRunningPids[@]})" lockfile="'$lockfile'" replicaType="'$replicaType'" overwrite="'$overwrite'" SCRIPT_PID="'$SCRIPT_PID'" INSTANCE_ID="'$INSTANCE_ID'" FORCE_STRANGER_LOCK_RESUME="'$FORCE_STRANGER_LOCK_RESUME'"  'bash -s' << 'ENDSSH' > "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$SCRIPT_PID" 2>&1
 include #### DEBUG SUBSET ####
 include #### TrapError SUBSET ####
-incldue #### ArrayContains SUBSET ####
+include #### ArrayContains SUBSET ####
 include #### IsInteger SUBSET ####
 include #### RemoteLogger SUBSET ####
 
