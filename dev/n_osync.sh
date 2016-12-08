@@ -4,13 +4,14 @@ PROGRAM="osync" # Rsync based two way sync engine with fault tolerance
 AUTHOR="(C) 2013-2016 by Orsiris de Jong"
 CONTACT="http://www.netpower.fr/osync - ozy@netpower.fr"
 PROGRAM_VERSION=1.2-beta3
-PROGRAM_BUILD=2016120801
+PROGRAM_BUILD=2016120802
 IS_STABLE=no
 
 #TODO: update waitfor parallelexec and checkarguments
 #TODO: update coding style checkarguments
 #TODO: update common install with includes
 #TODO: revamp quicklogger
+#TODO: is debug subset relevant ?
 
 # Execution order						#__WITH_PARANOIA_DEBUG
 #	Function Name				Is parallel	#__WITH_PARANOIA_DEBUG
@@ -252,7 +253,8 @@ function _CheckReplicasRemote {
 	CheckConnectivity3rdPartyHosts
 	CheckConnectivityRemoteHost
 
-$SSH_CMD _DEBUG="'$_DEBUG'" _PARANOIA_DEBUG="'$_PARANOIA_DEBUG'" _LOGGER_SILENT="'$_LOGGER_SILENT'" _LOGGER_VERBOSE="'$_LOGGER_VERBOSE'" _LOGGER_PREFIX="'$_LOGGER_PREFIX'" _LOGGER_ERR_ONLY="'$_LOGGER_ERR_ONLY'" replicaPath="'$replicaPath'" CREATE_DIRS="'$CREATE_DIRS'" COMMAND_SUDO="'$COMMAND_SUDO'" DF_CMD="'$DF_CMD'" MINIMUM_SPACE="'$MINIMUM_SPACE'" 'bash -s' << 'ENDSSH' > "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$SCRIPT_PID" 2>&1
+$SSH_CMD env _DEBUG="'$_DEBUG'" env _PARANOIA_DEBUG="'$_PARANOIA_DEBUG'" env _LOGGER_SILENT="'$_LOGGER_SILENT'" env _LOGGER_VERBOSE="'$_LOGGER_VERBOSE'" env _LOGGER_PREFIX="'$_LOGGER_PREFIX'" env _LOGGER_ERR_ONLY="'$_LOGGER_ERR_ONLY'" \
+env replicaPath="'$replicaPath'" env CREATE_DIRS="'$CREATE_DIRS'" env COMMAND_SUDO="'$COMMAND_SUDO'" env DF_CMD="'$DF_CMD'" env MINIMUM_SPACE="'$MINIMUM_SPACE'" 'bash -s' << 'ENDSSH' > "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$SCRIPT_PID" 2>&1
 include #### DEBUG SUBSET ####
 include #### TrapError SUBSET ####
 include #### IsInteger SUBSET ####
@@ -427,7 +429,9 @@ function _HandleLocksRemote {
 	read -a initiatorRunningPids <<< $(ps -A | tail -n +2 | awk '{print $1}')
 
 # passing initiatorRunningPids as litteral string (has to be run through eval to be an array again)
-$SSH_CMD _DEBUG="'$_DEBUG'" _PARANOIA_DEBUG="'$_PARANOIA_DEBUG'" _LOGGER_SILENT="'$_LOGGER_SILENT'" _LOGGER_VERBOSE="'$_LOGGER_VERBOSE'" _LOGGER_PREFIX="'$_LOGGER_PREFIX'" _LOGGER_ERR_ONLY="'$_LOGGER_ERR_ONLY'" replicaStateDir="'$replicaStateDir'" initiatorRunningPidsFlat="(${initiatorRunningPids[@]})" lockfile="'$lockfile'" replicaType="'$replicaType'" overwrite="'$overwrite'" SCRIPT_PID="'$SCRIPT_PID'" INSTANCE_ID="'$INSTANCE_ID'" FORCE_STRANGER_LOCK_RESUME="'$FORCE_STRANGER_LOCK_RESUME'"  'bash -s' << 'ENDSSH' > "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$SCRIPT_PID" 2>&1
+$SSH_CMD env _DEBUG="'$_DEBUG'" env _PARANOIA_DEBUG="'$_PARANOIA_DEBUG'" env _LOGGER_SILENT="'$_LOGGER_SILENT'" env _LOGGER_VERBOSE="'$_LOGGER_VERBOSE'" env _LOGGER_PREFIX="'$_LOGGER_PREFIX'" env _LOGGER_ERR_ONLY="'$_LOGGER_ERR_ONLY'" \
+env replicaStateDir="'$replicaStateDir'" env initiatorRunningPidsFlat="\"(${initiatorRunningPids[@]})\"" env lockfile="'$lockfile'" env replicaType="'$replicaType'" env overwrite="'$overwrite'" env SCRIPT_PID="'$SCRIPT_PID'" \
+env INSTANCE_ID="'$INSTANCE_ID'" env FORCE_STRANGER_LOCK_RESUME="'$FORCE_STRANGER_LOCK_RESUME'"  'bash -s' << 'ENDSSH' > "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$SCRIPT_PID" 2>&1
 include #### DEBUG SUBSET ####
 include #### TrapError SUBSET ####
 include #### ArrayContains SUBSET ####
@@ -583,7 +587,8 @@ function _UnlockReplicasRemote {
 	CheckConnectivity3rdPartyHosts
 	CheckConnectivityRemoteHost
 
-$SSH_CMD lockfile="'$lockfile'" COMMAND_SUDO="'$COMMAND_SUDO'" 'bash -s' << 'ENDSSH' > "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$SCRIPT_PID" 2>&1
+#TODO: missing logger entry
+$SSH_CMD env lockfile="'$lockfile'" env COMMAND_SUDO="'$COMMAND_SUDO'" 'bash -s' << 'ENDSSH' > "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$SCRIPT_PID" 2>&1
 if [ -f "$lockfile" ]; then
 	$COMMAND_SUDO rm -f "$lockfile"
 fi
@@ -1080,7 +1085,10 @@ function _deleteRemote {
 		exit 1
 	fi
 
-$SSH_CMD _DEBUG="'$_DEBUG'" _PARANOIA_DEBUG="'$_PARANOIA_DEBUG'" _LOGGER_SILENT="'$_LOGGER_SILENT'" _LOGGER_VERBOSE="'$_LOGGER_VERBOSE'" _LOGGER_PREFIX="'$_LOGGER_PREFIX'" _LOGGER_ERR_ONLY="'$_LOGGER_ERR_ONLY'" ERROR_ALERT=0 sync_on_changes=$sync_on_changes _DEBUG=$_DEBUG _DRYRUN=$_DRYRUN COMMAND_SUDO=$COMMAND_SUDO FILE_LIST="$(EscapeSpaces "${TARGET[$__replicaDir]}${TARGET[$__stateDir]}/$deletionListFromReplica${INITIATOR[$__deletedListFile]}")" REPLICA_DIR="$(EscapeSpaces "$replicaDir")" SOFT_DELETE=$SOFT_DELETE DELETION_DIR="$(EscapeSpaces "$deletionDir")" FAILED_DELETE_LIST="$failedDeleteList" SUCCESS_DELETE_LIST="$successDeleteList" 'bash -s' << 'ENDSSH' >> "$RUN_DIR/$PROGRAM.remote_deletion.$SCRIPT_PID" 2>&1
+$SSH_CMD env _DEBUG="'$_DEBUG'" env _PARANOIA_DEBUG="'$_PARANOIA_DEBUG'" env _LOGGER_SILENT="'$_LOGGER_SILENT'" env _LOGGER_VERBOSE="'$_LOGGER_VERBOSE'" env _LOGGER_PREFIX="'$_LOGGER_PREFIX'" env _LOGGER_ERR_ONLY="'$_LOGGER_ERR_ONLY'" \
+env sync_on_changes=$sync_on_changes env _DRYRUN="'$_DRYRUN'" env COMMAND_SUDO="'$COMMAND_SUDO'" \
+env FILE_LIST="'$(EscapeSpaces "${TARGET[$__replicaDir]}${TARGET[$__stateDir]}/$deletionListFromReplica${INITIATOR[$__deletedListFile]}")'" env REPLICA_DIR="'$(EscapeSpaces "$replicaDir")'" env SOFT_DELETE="'$SOFT_DELETE'" \
+env DELETION_DIR="'$(EscapeSpaces "$deletionDir")'" env FAILED_DELETE_LIST="'$failedDeleteList'" env SUCCESS_DELETE_LIST="'$successDeleteList'" 'bash -s' << 'ENDSSH' >> "$RUN_DIR/$PROGRAM.remote_deletion.$SCRIPT_PID" 2>&1
 include #### DEBUG SUBSET ####
 include #### TrapError SUBSET ####
 include #### RemoteLogger SUBSET ####
@@ -1634,7 +1642,8 @@ function _SoftDeleteRemote {
 	fi
 
 	#TODO: fixed find directory -ctime was missing +, test it
-$SSH_CMD _LOGGER_VERBOSE="'$_LOGGER_VERBOSE'" _DRYRUN="'$_DRYRUN'" replicaDeletionPath="'$replicaDeletionPath'" changeTime="'$changeTime'" COMAMND_SUDO="'$COMMAND_SUDO'" REMOTE_FIND_CMD="'$REMOTE_FIND_CMD'" 'bash -s' << 'ENDSSH' > "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$SCRIPT_PID" 2>&1
+#TODO: missing logger vars
+$SSH_CMD env _LOGGER_VERBOSE="'$_LOGGER_VERBOSE'" env _DRYRUN="'$_DRYRUN'" env replicaDeletionPath="'$replicaDeletionPath'" env changeTime="'$changeTime'" env COMAMND_SUDO="'$COMMAND_SUDO'" env REMOTE_FIND_CMD="'$REMOTE_FIND_CMD'" 'bash -s' << 'ENDSSH' > "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$SCRIPT_PID" 2>&1
 
 # Cannot launch log function from xargs, ugly hack
 if [ -d "$replicaDeletionPath" ]; then
