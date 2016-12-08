@@ -2,7 +2,7 @@
 #### OFUNCTIONS MINI SUBSET ####
 
 _OFUNCTIONS_VERSION=2.1
-_OFUNCTIONS_BUILD=2016120701
+_OFUNCTIONS_BUILD=2016120801
 ## BEGIN Generic bash functions written in 2013-2016 by Orsiris de Jong - http://www.netpower.fr - ozy@netpower.fr
 
 ## To use in a program, define the following variables:
@@ -1049,7 +1049,7 @@ function HumanToNumeric {
 #### HumanToNumeric SUBSET END ####
 
 ## from https://gist.github.com/cdown/1163649
-function urlEncode {
+function UrlEncode {
 	local length="${#1}"
 
 	local LANG=C
@@ -1066,7 +1066,7 @@ function urlEncode {
 	done
 }
 
-function urlDecode {
+function UrlDecode {
 	local urlEncoded="${1//+/ }"
 
 	printf '%b' "${urlEncoded//%/\\x}"
@@ -1074,7 +1074,7 @@ function urlDecode {
 
 #### ArrayContains SUBSET ####
 ## Modified version of http://stackoverflow.com/a/8574392
-## Usage: arrayContains "needle" "${haystack[@]}"
+## Usage: [ $(ArrayContains "needle" "${haystack[@]}") -eq 1 ]
 function ArrayContains () {
 	local needle="${1}"
 	local haystack="${2}"
