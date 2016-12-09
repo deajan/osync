@@ -196,7 +196,7 @@ function oneTimeSetUp () {
 	else
 		echo "Running with local settings"
 		REMOTE_USER="root"
-		SetConfFileValue "$CONF_DIR/$REMOTE_CONF" "REMOTE_3RD_PARTY_HOSTS" "www.kernel.org www.google.com"
+		SetConfFileValue "$CONF_DIR/$REMOTE_CONF" "REMOTE_3RD_PARTY_HOSTS" "\"www.kernel.org www.google.com\""
 	fi
 
 	# Get default ssh port from env
@@ -276,6 +276,7 @@ function oneTimeTearDown () {
 
 	#TODO: uncomment this when dev is done
 	#rm -rf "$OSYNC_TESTS_DIR"
+	rm -f "$TMP_FILE"
 
 	ELAPSED_TIME=$(($SECONDS - $START_TIME))
 	echo "It took $ELAPSED_TIME seconds to run these tests."
@@ -387,7 +388,7 @@ function test_Deletetion () {
 }
 
 function test_deletion_failure () {
-	if [ "$LOCAL_OS" == "WinNT10" ]; then
+	if [ "$LOCAL_OS" == "WinNT10" ] || [ "$LOCAL_OS" == "msys" ]; then
 		echo "Skipping deletion failure test as Win10 does not have chattr  support."
 		return 0
 	fi
@@ -739,7 +740,7 @@ function test_softdeletion_cleanup () {
 
 			touch "$file.new"
 
-			if [ "$TRAVIS_RUN" == true ] || [ "$LOCAL_OS" == "BSD" ] || [ "$LOCAL_OS" == "MacOSX" ] || [ "$LOCAL_OS" == "WinNT10" ] || [ "LOCAL_OS" == "msys" ] || [ "$LOCAL_OS" == "Cygwin" ]; then
+			if [ "$TRAVIS_RUN" == true ] || [ "$LOCAL_OS" == "BSD" ] || [ "$LOCAL_OS" == "MacOSX" ] || [ "$LOCAL_OS" == "WinNT10" ] || [ "$LOCAL_OS" == "msys" ] || [ "$LOCAL_OS" == "Cygwin" ]; then
 				echo "Skipping changing ctime on file because travis / bsd / macos / Win10 / msys / cygwin does not support debugfs"
 			else
 				CreateOldFile "$file.old"
@@ -773,8 +774,8 @@ function test_FileAttributePropagation () {
 		return 0
 	fi
 
-	if [ "$LOCAL_OS" == "MacOSX" ]; then
-		echo "Skipping FileAttributePropagation tests because Mac OSX does not support ACL."
+	if [ "$LOCAL_OS" == "MacOSX" ] || [ "$LOCAL_OS" == "msys" ]; then
+		echo "Skipping FileAttributePropagation tests because [$LOCAL_OS]  does not support ACL."
 		return 0
 	fi
 
@@ -979,19 +980,21 @@ function test_Locking () {
 	REMOTE_HOST_PING=no ./$OSYNC_EXECUTABLE ${osyncParameters[$__confLocal]}
 	assertEquals "Should be able to resume locked target with same instance_id in confLocal mode." "0" $?
 
-	PrepareLocalDirs
-	mkdir -p "$TARGET_DIR/$OSYNC_WORKDIR"
-	echo 65536@quickremote > "$TARGET_DIR/$OSYNC_WORKDIR/lock"
+	if [ "$LOCAL_OS" != "msys" ]; then
+		PrepareLocalDirs
+		mkdir -p "$TARGET_DIR/$OSYNC_WORKDIR"
+		echo 65536@quickremote > "$TARGET_DIR/$OSYNC_WORKDIR/lock"
 
-	REMOTE_HOST_PING=no ./$OSYNC_EXECUTABLE ${osyncParameters[$__quickRemote]}
-	assertEquals "Should be able to resume locked target with same instance_id in quickRemote mode." "0" $?
+		REMOTE_HOST_PING=no ./$OSYNC_EXECUTABLE ${osyncParameters[$__quickRemote]}
+		assertEquals "Should be able to resume locked target with same instance_id in quickRemote mode." "0" $?
 
-	PrepareLocalDirs
-	mkdir -p "$TARGET_DIR/$OSYNC_WORKDIR"
-	echo 65536@remote > "$TARGET_DIR/$OSYNC_WORKDIR/lock"
+		PrepareLocalDirs
+		mkdir -p "$TARGET_DIR/$OSYNC_WORKDIR"
+		echo 65536@remote > "$TARGET_DIR/$OSYNC_WORKDIR/lock"
 
-	REMOTE_HOST_PING=no ./$OSYNC_EXECUTABLE ${osyncParameters[$__confRemote]}
-	assertEquals "Should be able to resume locked target with same instance_id in confRemote mode." "0" $?
+		REMOTE_HOST_PING=no ./$OSYNC_EXECUTABLE ${osyncParameters[$__confRemote]}
+		assertEquals "Should be able to resume locked target with same instance_id in confRemote mode." "0" $?
+	fi
 
 	# Remote Target lock present should not be resumed if instance ID is NOT the same as current one, local target lock is resumed
 	PrepareLocalDirs
@@ -1008,19 +1011,21 @@ function test_Locking () {
 	REMOTE_HOST_PING=no ./$OSYNC_EXECUTABLE ${osyncParameters[$__confLocal]}
 	assertEquals "Should be able to resume locked local target with bogus instance_id in confLocal mode." "0" $?
 
-	PrepareLocalDirs
-	mkdir -p "$TARGET_DIR/$OSYNC_WORKDIR"
-	echo 65536@bogusinstance > "$TARGET_DIR/$OSYNC_WORKDIR/lock"
+	if [ "$LOCAL_OS" != "msys" ]; then
+		PrepareLocalDirs
+		mkdir -p "$TARGET_DIR/$OSYNC_WORKDIR"
+		echo 65536@bogusinstance > "$TARGET_DIR/$OSYNC_WORKDIR/lock"
 
-	REMOTE_HOST_PING=no ./$OSYNC_EXECUTABLE ${osyncParameters[$__quickRemote]}
-	assertEquals "Should not be able to resume remote locked target with bogus instance_id in quickRemote mode." "1" $?
+		REMOTE_HOST_PING=no ./$OSYNC_EXECUTABLE ${osyncParameters[$__quickRemote]}
+		assertEquals "Should not be able to resume remote locked target with bogus instance_id in quickRemote mode." "1" $?
 
-	PrepareLocalDirs
-	mkdir -p "$TARGET_DIR/$OSYNC_WORKDIR"
-	echo 65536@bogusinstance > "$TARGET_DIR/$OSYNC_WORKDIR/lock"
+		PrepareLocalDirs
+		mkdir -p "$TARGET_DIR/$OSYNC_WORKDIR"
+		echo 65536@bogusinstance > "$TARGET_DIR/$OSYNC_WORKDIR/lock"
 
-	REMOTE_HOST_PING=no ./$OSYNC_EXECUTABLE ${osyncParameters[$__confRemote]}
-	assertEquals "Should not be able to resume remote locked target with bgous instance_id in confRemote mode." "1" $?
+		REMOTE_HOST_PING=no ./$OSYNC_EXECUTABLE ${osyncParameters[$__confRemote]}
+		assertEquals "Should not be able to resume remote locked target with bogus instance_id in confRemote mode." "1" $?
+	fi
 
 	# Target lock present should be resumed if instance ID is NOT the same as current one but FORCE_STRANGER_UNLOCK=yes
 
@@ -1196,7 +1201,6 @@ function test_ParallelExec () {
 	cmd="sleep 4;du /none;sleep 3;du /none;sleep 2"
 	ParallelExec 3 "$cmd" false 1 2 .05 7000 true true false ${FUNCNAME[0]}
 	assertNotEquals "ParallelExec full test 3" "0" $?
-
 }
 
 function test_timedExecution () {
