@@ -2,7 +2,7 @@
 #### OFUNCTIONS MINI SUBSET ####
 
 _OFUNCTIONS_VERSION=2.1
-_OFUNCTIONS_BUILD=2016120901
+_OFUNCTIONS_BUILD=2016120902
 _OFUNCTIONS_BOOTSTRAP=true
 ## BEGIN Generic bash functions written in 2013-2016 by Orsiris de Jong - http://www.netpower.fr - ozy@netpower.fr
 
@@ -595,37 +595,16 @@ function LoadConfigFile {
 	CONFIG_FILE="$configFile"
 }
 
+_OFUNCTIONS_SPINNER='|/-\'
 function Spinner {
 	if [ $_LOGGER_SILENT == true ] || [ "$_LOGGER_ERR_ONLY" == true ]; then
 		return 0
+	else
+		printf " [%c]  " "$_OFUNCTIONS_SPINNER"
+		printf "\b\b\b\b\b\b"
+		_OFUNCTIONS_SPINNER=${_OFUNCTIONS_SPINNER#?}${_OFUNCTIONS_SPINNER%%???}
+		return 0
 	fi
-
-	case $_OFUNCTIONS_SPINNER_TOGGLE
-	in
-	1)
-	echo -n " \ "
-	echo -ne "\r"
-	_OFUNCTIONS_SPINNER_TOGGLE=2
-	;;
-
-	2)
-	echo -n " | "
-	echo -ne "\r"
-	_OFUNCTIONS_SPINNER_TOGGLE=3
-	;;
-
-	3)
-	echo -n " / "
-	echo -ne "\r"
-	_OFUNCTIONS_SPINNER_TOGGLE=4
-	;;
-
-	*)
-	echo -n " - "
-	echo -ne "\r"
-	_OFUNCTIONS_SPINNER_TOGGLE=1
-	;;
-	esac
 }
 
 # Array to string converter, see http://stackoverflow.com/questions/1527049/bash-join-elements-of-an-array
