@@ -2,7 +2,7 @@
 #### OFUNCTIONS MINI SUBSET ####
 
 _OFUNCTIONS_VERSION=2.1
-_OFUNCTIONS_BUILD=2016120802
+_OFUNCTIONS_BUILD=2016120901
 _OFUNCTIONS_BOOTSTRAP=true
 ## BEGIN Generic bash functions written in 2013-2016 by Orsiris de Jong - http://www.netpower.fr - ozy@netpower.fr
 
@@ -1128,8 +1128,11 @@ function GetLocalOS {
 		*"BSD"*)
 		LOCAL_OS="BSD"
 		;;
-		*"MINGW32"*|*"MSYS"*|*"CYGWIN"*)
+		*"MINGW32"*|*"MSYS"*)
 		LOCAL_OS="msys"
+		;;
+		*"CYGWIN"*)
+		LOCAL_OS="Cygwin"
 		;;
 		*"Microsoft"*)
 		LOCAL_OS="WinNT10"
@@ -1204,8 +1207,11 @@ ENDSSH
 			*"BSD"*)
 			REMOTE_OS="BSD"
 			;;
-			*"MINGW32"*|*"MSYS"*|*"CYGWIN"*)
+			*"MINGW32"*|*"MSYS"*)
 			REMOTE_OS="msys"
+			;;
+			*"CYGWIN"*)
+			REMOTE_OS="Cygwin"
 			;;
 			*"Microsoft"*)
 			REMOTE_OS="WinNT10"
@@ -1599,7 +1605,7 @@ function InitLocalOSDependingSettings {
 	## Using mingw version of find instead of windows one
 	## Getting running processes is quite different
 	## Ping command is not the same
-	if [ "$LOCAL_OS" == "msys" ]; then
+	if [ "$LOCAL_OS" == "msys" ] || [ "$LOCAL_OS" == "Cygwin" ]; then
 		FIND_CMD=$(dirname $BASH)/find
 		PING_CMD='$SYSTEMROOT\system32\ping -n 2'
 	else
@@ -1607,7 +1613,7 @@ function InitLocalOSDependingSettings {
 		PING_CMD="ping -c 2 -i .2"
 	fi
 
-	if [ "$LOCAL_OS" == "BusyBox" ] || [ "$LOCAL_OS" == "Android" ] || [ "$LOCAL_OS" == "msys" ]; then
+	if [ "$LOCAL_OS" == "BusyBox" ] || [ "$LOCAL_OS" == "Android" ] || [ "$LOCAL_OS" == "msys" ] || [ "$LOCAL_OS" == "Cygwin" ]; then
 		PROCESS_STATE_CMD="echo none"
 		DF_CMD="df"
 	else
@@ -1631,7 +1637,7 @@ function InitLocalOSDependingSettings {
 function InitRemoteOSDependingSettings {
 	__CheckArguments 0 $# "$@"    #__WITH_PARANOIA_DEBUG
 
-	if [ "$REMOTE_OS" == "msys" ]; then
+	if [ "$REMOTE_OS" == "msys" ] || [ "$LOCAL_OS" == "Cygwin" ]; then
 		REMOTE_FIND_CMD=$(dirname $BASH)/find
 	else
 		REMOTE_FIND_CMD=find
@@ -1668,7 +1674,7 @@ function InitRemoteOSDependingSettings {
 	if [ "$PRESERVE_EXECUTABILITY" != "no" ]; then
 		RSYNC_ATTR_ARGS=$RSYNC_ATTR_ARGS" --executability"
 	fi
-	if [ "$LOCAL_OS" != "MacOSX" ] && [ "$REMOTE_OS" != "MacOSX" ] && [ "$LOCAL_OS" != "msys" ] && [ "$REMOTE_OS" != "MacOSX" ]; then
+	if [ "$LOCAL_OS" != "MacOSX" ] && [ "$REMOTE_OS" != "MacOSX" ] && [ "$LOCAL_OS" != "msys" ] && [ "$LOCAL_OS" != "Cygwin" ] && [ "$REMOTE_OS" != "MacOSX" ]; then
 		if [ "$PRESERVE_ACL" == "yes" ]; then
 			RSYNC_ATTR_ARGS=$RSYNC_ATTR_ARGS" -A"
 		fi
