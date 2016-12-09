@@ -1,142 +1,156 @@
 #!/usr/bin/env bash
 
-## MERGE 2016112001
+## MERGE 2016120802
 
 ## Merges ofunctions.sh and n_program.sh into program.sh
 ## Adds installer
 
-PROGRAM=osync
-VERSION=$(grep "PROGRAM_VERSION=" n_$PROGRAM.sh)
-VERSION=${VERSION#*=}
+function __PREPROCESSOR_Merge {
+	PROGRAM=osync
+	VERSION=$(grep "PROGRAM_VERSION=" n_$PROGRAM.sh)
+	VERSION=${VERSION#*=}
 
-PARANOIA_DEBUG_LINE="__WITH_PARANOIA_DEBUG"
-PARANOIA_DEBUG_BEGIN="#__BEGIN_WITH_PARANOIA_DEBUG"
-PARANOIA_DEBUG_END="#__END_WITH_PARANOIA_DEBUG"
-MINIMUM_FUNCTION_BEGIN="#### MINIMAL-FUNCTION-SET BEGIN ####"
-MINIMUM_FUNCTION_END="#### MINIMAL-FUNCTION-SET END ####"
+	__PREPROCESSOR_Constants
 
-source "ofunctions.sh"
-if [ $? != 0 ]; then
-	echo "Please run $0 in dev directory with ofunctions.sh"
-	exit 1
-fi
-
-function Unexpand {
-	unexpand n_$PROGRAM.sh > tmp_$PROGRAM.sh
-}
-
-function MergeAll {
-
-	sed "/source \"\.\/ofunctions.sh\"/r ofunctions.sh" tmp_$PROGRAM.sh | grep -v 'source "./ofunctions.sh"' > debug_$PROGRAM.sh
+	source "ofunctions.sh"
 	if [ $? != 0 ]; then
-		QuickLogger "Cannot sed ofunctions" "stdout"
+		echo "Please run $0 in dev directory with ofunctions.sh"
 		exit 1
 	fi
-	chmod +x debug_$PROGRAM.sh
+
+	__PREPROCESSOR_Unexpand "n_$PROGRAM.sh" "debug_$PROGRAM.sh"
+
+	for subset in "${__PREPROCESSOR_SUBSETS[@]}"; do
+		__PREPROCESSOR_MergeSubset "$subset" "${subset//SUBSET/SUBSET END}" "ofunctions.sh" "debug_$PROGRAM.sh"
+	done
+
+	__PREPROCESSOR_CleanDebug
+	__PREPROCESSOR_CopyCommons
+	rm -f tmp_$PROGRAM.sh
 	if [ $? != 0 ]; then
-		QuickLogger "Cannot chmod $PROGRAM.sh" "stdout"
+		QuickLogger "Cannot remove tmp_$PROGRAM.sh" "stderr"
 		exit 1
 	fi
 }
 
-function MergeMinimum {
-        sed -n "/$MINIMUM_FUNCTION_BEGIN/,/$MINIMUM_FUNCTION_END/p" ofunctions.sh > tmp_minimal.sh
-	if [ $? != 0 ]; then
-		QuickLogger "Cannot sed minimum functions." "stdout"
-		exit 1
-	fi
-        sed "/source \"\.\/ofunctions.sh\"/r tmp_minimal.sh" tmp_$PROGRAM.sh | grep -v 'source "./ofunctions.sh"' | grep -v "$PARANOIA_DEBUG_LINE" > debug_$PROGRAM.sh
-	if [ $? != 0 ]; then
-		QuickLogger "Cannot remove PARANOIA_DEBUG code from tmp_minimum.." "stdout"
-		exit 1
-	fi
-	rm -f tmp_minimal.sh
-	if [ $? != 0 ]; then
-		QuickLogger "Cannot remove tmp_minimal.sh" "stdout"
-		exit 1
-	fi
+function __PREPROCESSOR_Constants {
+	PARANOIA_DEBUG_LINE="#__WITH_PARANOIA_DEBUG"
+	PARANOIA_DEBUG_BEGIN="#__BEGIN_WITH_PARANOIA_DEBUG"
+	PARANOIA_DEBUG_END="#__END_WITH_PARANOIA_DEBUG"
 
-        chmod +x debug_$PROGRAM.sh
-	if [ $? != 0 ]; then
-		QuickLogger "Cannot chmod debug_$PROGRAM.sh" "stdout"
-		exit 1
-	fi
-
+	__PREPROCESSOR_SUBSETS=(
+	'#### OFUNCTIONS FULL SUBSET ####'
+	'#### OFUNCTIONS MINIMAL SUBSET ####'
+	'#### DEBUG SUBSET ####'
+	'#### TrapError SUBSET ####'
+	'#### RemoteLogger SUBSET ####'
+	'#### IsInteger SUBSET ####'
+	'#### HumanToNumeric SUBSET ####'
+	'#### ArrayContains SUBSET ####'
+	)
 }
 
+function __PREPROCESSOR_Unexpand {
+	local source="${1}"
+	local destination="${2}"
 
-function CleanDebug {
+	unexpand "$source" > "$destination"
+	if [ $? != 0 ]; then
+		QuickLogger "Cannot unexpand [$source] to [$destination]." "stderr"
+		exit 1
+	fi
+}
 
-# sed explanation
-#/pattern1/{         # if pattern1 is found
-#    p               # print it
-#    :a              # loop
-#        N           # and accumulate lines
-#    /pattern2/!ba   # until pattern2 is found
-#    s/.*\n//        # delete the part before pattern2
-#}
-#p
-#	sed -n '/'$PARANOIA_DEBUG_BEGIN'/{p; :a; N; /'$PARANOIA_DEBUG_END'/!ba; s/.*\n//}; p' debug_$PROGRAM.sh | grep -v "$PARANOIA_DEBUG_LINE" > ../$PROGRAM.sh
+function __PREPROCESSOR_MergeSubset {
+	local subsetBegin="${1}"
+	local subsetEnd="${2}"
+	local subsetFile="${3}"
+	local mergedFile="${4}"
 
-	# Way simpler version of the above, compatible with BSD
+        sed -n "/$subsetBegin/,/$subsetEnd/p" "$subsetFile" > "$subsetFile.$subsetBegin"
+	if [ $? != 0 ]; then
+		QuickLogger "Cannot sed subset [$subsetBegin -- $subsetEnd] in [$subsetFile]." "stderr"
+		exit 1
+	fi
+        sed "/include $subsetBegin/r $subsetFile.$subsetBegin" "$mergedFile" | grep -v -E "$subsetBegin\$|$subsetEnd\$" > "$mergedFile.tmp"
+	if [ $? != 0 ]; then
+		QuickLogger "Cannot add subset [$subsetBegin] to [$mergedFile]." "stderr"
+		exit 1
+	fi
+	rm -f "$subsetFile.$subsetBegin"
+	if [ $? != 0 ]; then
+		QuickLogger "Cannot remove temporary subset [$subsetFile.$subsetBeign]." "stderr"
+		exit 1
+	fi
+
+        rm -f "$mergedFile"
+	if [ $? != 0 ]; then
+		QuickLogger "Cannot remove merged original file [$mergedFile]." "stderr"
+		exit 1
+	fi
+
+        mv "$mergedFile.tmp" "$mergedFile"
+	if [ $? != 0 ]; then
+		QuickLogger "Cannot move merged tmp file to original [$mergedFile]." "stderr"
+		exit 1
+	fi
+}
+
+function __PREPROCESSOR_CleanDebug {
 	sed '/'$PARANOIA_DEBUG_BEGIN'/,/'$PARANOIA_DEBUG_END'/d' debug_$PROGRAM.sh | grep -v "$PARANOIA_DEBUG_LINE" > ../$PROGRAM.sh
 	if [ $? != 0 ]; then
-		QuickLogger "Cannot remove PARANOIA_DEBUG code from standard build." "stdout"
+		QuickLogger "Cannot remove PARANOIA_DEBUG code from standard build." "stderr"
 		exit 1
 	fi
 
-	chmod +x ../$PROGRAM.sh
+	chmod +x "debug_$PROGRAM.sh"
 	if [ $? != 0 ]; then
-		QuickLogger "Cannot chmod $PROGRAM.sh" "stdout"
+		QuickLogger "Cannot chmod debug_$PROGRAM.sh" "stderr"
+		exit 1
+	fi
+	chmod +x "../$PROGRAM.sh"
+	if [ $? != 0 ]; then
+		QuickLogger "Cannot chmod $PROGRAM.sh" "stderr"
 		exit 1
 	fi
 }
 
-function CopyCommons {
+function __PREPROCESSOR_CopyCommons {
 	sed "s/\[prgname\]/$PROGRAM/g" common_install.sh > ../tmp_install.sh
 	if [ $? != 0 ]; then
-		QuickLogger "Cannot assemble install." "stdout"
+		QuickLogger "Cannot assemble install." "stderr"
 		exit 1
 	fi
 	sed "s/\[version\]/$VERSION/g" ../tmp_install.sh > ../install.sh
 	if [ $? != 0 ]; then
-		QuickLogger "Cannot change install version." "stdout"
+		QuickLogger "Cannot change install version." "stderr"
 		exit 1
 	fi
 	if [ -f "common_batch.sh" ]; then
 		sed "s/\[prgname\]/$PROGRAM/g" common_batch.sh > ../$PROGRAM-batch.sh
 		if [ $? != 0 ]; then
-			QuickLogger "Cannot assemble batch runner." "stdout"
+			QuickLogger "Cannot assemble batch runner." "stderr"
 			exit 1
 		fi
 		chmod +x ../$PROGRAM-batch.sh
 		if [ $? != 0 ]; then
-			QuickLogger "Cannot chmod $PROGRAM-batch.sh" "stdout"
+			QuickLogger "Cannot chmod $PROGRAM-batch.sh" "stderr"
 			exit 1
 		fi
 	fi
 	chmod +x ../install.sh
 	if [ $? != 0 ]; then
-		QuickLogger "Cannot chmod install.sh" "stdout"
+		QuickLogger "Cannot chmod install.sh" "stderr"
 		exit 1
 	fi
 	rm -f ../tmp_install.sh
 	if [ $? != 0 ]; then
-		QuickLogger "Cannot chmod $PROGRAM.sh" "stdout"
+		QuickLogger "Cannot chmod $PROGRAM.sh" "stderr"
 		exit 1
 	fi
 }
 
-Unexpand
-if [ "$PROGRAM" == "osync" ] || [ "$PROGRAM" == "obackup" ]; then
-	MergeAll
-else
-	MergeMinimum
-fi
-CleanDebug
-CopyCommons
-rm -f tmp_$PROGRAM.sh
-if [ $? != 0 ]; then
-	QuickLogger "Cannot remove tmp_$PROGRAM.sh" "stdout"
-	exit 1
+# If sourced don't do anything
+if [ "$(basename $0)" == "merge.sh" ]; then
+	__PREPROCESSOR_Merge
 fi
