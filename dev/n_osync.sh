@@ -4,7 +4,7 @@ PROGRAM="osync" # Rsync based two way sync engine with fault tolerance
 AUTHOR="(C) 2013-2016 by Orsiris de Jong"
 CONTACT="http://www.netpower.fr/osync - ozy@netpower.fr"
 PROGRAM_VERSION=1.2-beta3
-PROGRAM_BUILD=2016120902
+PROGRAM_BUILD=2016120903
 IS_STABLE=no
 
 #TODO: update waitfor parallelexec and checkarguments
@@ -791,6 +791,9 @@ ENDSSH
 			Logger "Command output:\n$(cat $RUN_DIR/$PROGRAM.ctime_mtime.$replicaType.$SCRIPT_PID)" "VERBOSE"
 		fi
 		return 1
+	else
+		# Ugly fix for csh in FreeBSD 11 that adds leading and trailing '\"'
+		sed -i.tmp -e 's/^\\"//' -e 's/\\"$//' "$RUN_DIR/$PROGRAM.ctime_mtime.$replicaType.$SCRIPT_PID"
 	fi
 }
 
