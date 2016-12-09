@@ -535,6 +535,11 @@ function test_handle_symlinks () {
 		return 0
 	fi
 
+	if [ "$LOCAL_OS" == "msys" ]; then
+		echo "Skipping symlink tests because msys handles them strangely or not at all."
+		return 0
+	fi
+
 	# Check with and without copySymlinks
 	copySymlinks="no"
 
