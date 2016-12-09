@@ -4,7 +4,7 @@ PROGRAM="osync" # Rsync based two way sync engine with fault tolerance
 AUTHOR="(C) 2013-2016 by Orsiris de Jong"
 CONTACT="http://www.netpower.fr/osync - ozy@netpower.fr"
 PROGRAM_VERSION=1.2-beta3
-PROGRAM_BUILD=2016120805
+PROGRAM_BUILD=2016120901
 IS_STABLE=no
 
 #TODO: update waitfor parallelexec and checkarguments
@@ -2036,11 +2036,11 @@ function SyncOnChanges {
 
 		Logger "#### Monitoring now." "NOTICE"
 		if [ "$LOCAL_OS" == "MacOSX" ]; then
-			fswatch --exclude $RSYNC_PATTERNS $RSYNC_PARTIAL_EXCLUDE "$OSYNC_DIR" -1 "$INITIATOR_SYNC_DIR" > /dev/null &
+			fswatch $RSYNC_EXCLUDDE_PATTERNS $RSYNC_PARTIAL_EXCLUDE --exclude "$OSYNC_DIR" -1 "$INITIATOR_SYNC_DIR" > /dev/null &
 			# Mac fswatch doesn't have timeout switch, replacing wait $! with WaitForTaskCompletion without warning nor spinner and increased SLEEP_TIME to avoid cpu hogging. This sims wait $! with timeout
 			WaitForTaskCompletion $! 0 $MAX_WAIT 1 0 true false true
 		else
-			inotifywait --exclude $RSYNC_PATTERNS $RSYNC_PARTIAL_EXCLUDE "$OSYNC_DIR" -qq -r -e create -e modify -e delete -e move -e attrib --timeout "$MAX_WAIT" "$INITIATOR_SYNC_DIR" &
+			inotifywait $RSYNC_EXCLUDE_PATTERNS $RSYNC_PARTIAL_EXCLUDE --exclude "$OSYNC_DIR" -qq -r -e create -e modify -e delete -e move -e attrib --timeout "$MAX_WAIT" "$INITIATOR_SYNC_DIR" &
 			wait $!
 		fi
 		retval=$?
