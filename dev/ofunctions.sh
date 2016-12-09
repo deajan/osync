@@ -600,8 +600,8 @@ function Spinner {
 	if [ $_LOGGER_SILENT == true ] || [ "$_LOGGER_ERR_ONLY" == true ]; then
 		return 0
 	else
-		printf " [%c]  " "$_OFUNCTIONS_SPINNER"
-		printf "\b\b\b\b\b\b"
+		printf " [%c]  \b\b\b\b\b\b" "$_OFUNCTIONS_SPINNER"
+		#printf "\b\b\b\b\b\b"
 		_OFUNCTIONS_SPINNER=${_OFUNCTIONS_SPINNER#?}${_OFUNCTIONS_SPINNER%%???}
 		return 0
 	fi
