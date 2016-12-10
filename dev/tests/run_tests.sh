@@ -7,7 +7,7 @@
 
 ## On CYGWIN / MSYS, ACL and extended attributes aren't supported
 
-# osync test suite 2016120401
+# osync test suite 2016120901
 
 # 4 tests:
 # quicklocal
@@ -37,13 +37,16 @@
 # setfacl needs double ':' to be compatible with both linux and BSD
 # setfacl -m o::rwx file
 
-LARGE_FILESET_URL="http://ftp.drupal.org/files/projects/drupal-8.2.2.tar.gz"
+# drupal servers are often unreachable for whetever reason or give 0 bytes files
+#LARGE_FILESET_URL="http://ftp.drupal.org/files/projects/drupal-8.2.2.tar.gz"
+LARGE_FILESET_URL="http://www.netpower.fr/sites/default/files/osync-test-files-drupal-8.2.2.tar.gz"
 
 OSYNC_DIR="$(pwd)"
 OSYNC_DIR=${OSYNC_DIR%%/dev*}
 DEV_DIR="$OSYNC_DIR/dev"
 TESTS_DIR="$DEV_DIR/tests"
 
+CONF_DIR="$TESTS_DIR/conf"
 LOCAL_CONF="local.conf"
 REMOTE_CONF="remote.conf"
 OLD_CONF="old.conf"
@@ -54,17 +57,6 @@ OSYNC_DEV_EXECUTABLE="dev/n_osync.sh"
 OSYNC_UPGRADE="upgrade-v1.0x-v1.2x.sh"
 TMP_FILE="$DEV_DIR/tmp"
 
-
-
-if [ "$TRAVIS_RUN" == true ]; then
-	echo "Running with travis settings"
-	CONF_DIR="$TESTS_DIR/conf-travis"
-	SSH_PORT=22
-else
-	echo "Running with local settings"
-	CONF_DIR="$TESTS_DIR/conf-local"
-	SSH_PORT=49999
-fi
 
 OSYNC_TESTS_DIR="${HOME}/osync-tests"
 INITIATOR_DIR="$OSYNC_TESTS_DIR/initiator"
@@ -122,6 +114,9 @@ function SetupSSH {
 	if [ -z "$(ssh-keygen -F localhost)" ]; then
 		ssh-keyscan -H localhost >> "${HOME}/.ssh/known_hosts"
 	fi
+
+	# Update remote conf files with SSH port
+	sed -i.tmp 's#ssh://.*@localhost:[0-9]*/${HOME}/osync-tests/target#ssh://'$REMOTE_USER'@localhost:'$SSH_PORT'/${HOME}/osync-tests/target#' "$CONF_DIR/$REMOTE_CONF"
 }
 
 function RemoveSSH {
@@ -178,7 +173,7 @@ function PrepareLocalDirs () {
 		rm -rf "$INITIATOR_DIR"
 	fi
 	mkdir -p "$INITIATOR_DIR"
- 
+
 	if [ -d "$TARGET_DIR" ]; then
  		rm -rf "$TARGET_DIR"
 	fi
@@ -190,6 +185,24 @@ function oneTimeSetUp () {
 
 	source "$DEV_DIR/ofunctions.sh"
 	GetLocalOS
+
+	echo "Detected OS: $LOCAL_OS"
+
+	# Set some travis related changes
+	if [ "$TRAVIS_RUN" == true ]; then
+	echo "Running with travis settings"
+		REMOTE_USER="travis"
+		SetConfFileValue "$CONF_DIR/$REMOTE_CONF" "REMOTE_3RD_PARTY_HOSTS" ""
+	else
+		echo "Running with local settings"
+		REMOTE_USER="root"
+		SetConfFileValue "$CONF_DIR/$REMOTE_CONF" "REMOTE_3RD_PARTY_HOSTS" "\"www.kernel.org www.google.com\""
+	fi
+
+	# Get default ssh port from env
+	if [ "$SSH_PORT" == "" ]; then
+		SSH_PORT=22
+	fi
 
 	# Setup modes per test
 	readonly __quickLocal=0
@@ -208,7 +221,7 @@ function oneTimeSetUp () {
 
 	osyncDaemonParameters[$__local]="$CONF_DIR/$LOCAL_CONF --on-changes"
 
-	if [ "$LOCAL_OS" != "msys" ]; then
+	if [ "$LOCAL_OS" != "msys" ] || [ "$LOCAL_OS" == "Cygwin" ]; then
 		osyncParameters[$__quickRemote]="--initiator=$INITIATOR_DIR --target=ssh://localhost:$SSH_PORT/$TARGET_DIR --rsakey=${HOME}/.ssh/id_rsa_local --instance-id=quickremote"
 		osyncParameters[$__confRemote]="$CONF_DIR/$REMOTE_CONF"
 
@@ -263,6 +276,7 @@ function oneTimeTearDown () {
 
 	#TODO: uncomment this when dev is done
 	#rm -rf "$OSYNC_TESTS_DIR"
+	rm -f "$TMP_FILE"
 
 	ELAPSED_TIME=$(($SECONDS - $START_TIME))
 	echo "It took $ELAPSED_TIME seconds to run these tests."
@@ -374,7 +388,7 @@ function test_Deletetion () {
 }
 
 function test_deletion_failure () {
-	if [ "$LOCAL_OS" == "WinNT10" ]; then
+	if [ "$LOCAL_OS" == "WinNT10" ] || [ "$LOCAL_OS" == "msys" ]; then
 		echo "Skipping deletion failure test as Win10 does not have chattr  support."
 		return 0
 	fi
@@ -448,7 +462,12 @@ function test_skip_deletion () {
 		return 0
 	fi
 
-	modes=('initiator' 'target' 'initiator,target')
+	# TRAVIS SPECIFIC - time limitation
+	if [ "$TRAVIS_RUN" != true ]; then
+		modes=('initiator' 'target' 'initiator,target')
+	else
+		modes=('target')
+	fi
 
 	for mode in "${modes[@]}"; do
 
@@ -514,6 +533,98 @@ function test_skip_deletion () {
 function test_handle_symlinks () {
 	if [ "$OSYNC_MIN_VERSION" == "1" ]; then
 		echo "Skipping symlink tests as osync v1.1x didn't handle this."
+		return 0
+	fi
+
+	if [ "$LOCAL_OS" == "msys" ]; then
+		echo "Skipping symlink tests because msys handles them strangely or not at all."
+		return 0
+	fi
+
+	# Check with and without copySymlinks
+	copySymlinks="no"
+
+	echo "Running with COPY_SYMLINKS=$copySymlinks"
+
+	SetConfFileValue "$CONF_DIR/$LOCAL_CONF" "COPY_SYMLINKS" "$copySymlinks"
+	SetConfFileValue "$CONF_DIR/$REMOTE_CONF" "COPY_SYMLINKS" "$copySymlinks"
+
+	for i in "${osyncParameters[@]}"; do
+		cd "$OSYNC_DIR"
+
+		PrepareLocalDirs
+
+		DirA="some directory with spaces"
+		DirB="another directoy/and sub directory"
+
+		mkdir -p "$INITIATOR_DIR/$DirA"
+		mkdir -p "$TARGET_DIR/$DirB"
+
+		FileA="$DirA/File A"
+		FileB="$DirB/File B"
+		FileAL="$DirA/File A symlink"
+		FileBL="$DirB/File B symlink"
+
+		# Create symlinks
+		touch "$INITIATOR_DIR/$FileA"
+		touch "$TARGET_DIR/$FileB"
+		ln -s "$INITIATOR_DIR/$FileA" "$INITIATOR_DIR/$FileAL"
+		ln -s "$TARGET_DIR/$FileB" "$TARGET_DIR/$FileBL"
+
+		COPY_SYMLINKS=$copySymlinks REMOTE_HOST_PING=no ./$OSYNC_EXECUTABLE $i
+		assertEquals "First symlink run with parameters [$i]." "0" $?
+
+		# Delete symlinks
+		rm -f "$INITIATOR_DIR/$FileAL"
+		rm -f "$TARGET_DIR/$FileBL"
+
+		COPY_SYMLINKS=$copySymlinks REMOTE_HOST_PING=no ./$OSYNC_EXECUTABLE $i
+		assertEquals "Second symlink deletion run with parameters [$i]." "0" $?
+
+		# symlink deletion propagation
+		[ ! -L "$TARGET_DIR/$FileAL" ]
+		assertEquals "File [$TARGET_DIR/$FileAL] is still present in replica dir." "0" $?
+		[ -L "$TARGET_DIR/$OSYNC_DELETE_DIR/$FileAL" ]
+		assertEquals "File [$TARGET_DIR/$OSYNC_DELETE_DIR/$FileAL] is not present in deletion dir." "0" $?
+		[ ! -L "$INITIATOR_DIR/$FileBL" ]
+		assertEquals "File [$INITIATOR_DIR/$FileBL] is still present in replica dir." "0" $?
+		[ -L "$INITIATOR_DIR/$OSYNC_DELETE_DIR/$FileBL" ]
+		assertEquals "File [$INITIATOR_DIR/$OSYNC_DELETE_DIR/$FileBL] is not present in deletion dir." "0" $?
+
+		# Create broken symlinks and propagate them
+		ln -s "$INITIATOR_DIR/$FileA" "$INITIATOR_DIR/$FileAL"
+		ln -s "$TARGET_DIR/$FileB" "$TARGET_DIR/$FileBL"
+		rm -f "$INITIATOR_DIR/$FileA"
+		rm -f "$TARGET_DIR/$FileB"
+
+		COPY_SYMLINKS=$copySymlinks REMOTE_HOST_PING=no ./$OSYNC_EXECUTABLE $i
+		assertEquals "Third broken symlink run with parameters [$i]." "0" $?
+
+		[ -L "$TARGET_DIR/$FileAL" ]
+		assertEquals "File [$TARGET_DIR/$FileAL] is present in replica dir." "0" $?
+
+		[ -L "$INITIATOR_DIR/$FileBL" ]
+		assertEquals "File [$INITIATOR_DIR/$FileBL] is present in replica dir." "0" $?
+
+		# Check broken symlink deletion propagation
+		rm -f "$INITIATOR_DIR/$FileAL"
+		rm -f "$TARGET_DIR/$FileBL"
+
+		COPY_SYMLINKS=$copySymlinks REMOTE_HOST_PING=no ./$OSYNC_EXECUTABLE $i
+		assertEquals "Fourth symlink deletion run with parameters [$i]." "0" $?
+
+		[ ! -L "$TARGET_DIR/$FileAL" ]
+		assertEquals "File [$TARGET_DIR/$FileAL] is still present in replica dir." "0" $?
+		[ -L "$TARGET_DIR/$OSYNC_DELETE_DIR/$FileAL" ]
+		assertEquals "File [$TARGET_DIR/$OSYNC_DELETE_DIR/$FileAL] is not present in deletion dir." "0" $?
+		[ ! -L "$INITIATOR_DIR/$FileBL" ]
+		assertEquals "File [$INITIATOR_DIR/$FileBL] is still present in replica dir." "0" $?
+		[ -L "$INITIATOR_DIR/$OSYNC_DELETE_DIR/$FileBL" ]
+		assertEquals "File [$INITIATOR_DIR/$OSYNC_DELETE_DIR/$FileBL] is not present in deletion dir." "0" $?
+	done
+
+	# TRAVIS SPECIFIC - time limitation
+	if [ "$TRAVIS_RUN" != true ]; then
 		return 0
 	fi
 
@@ -598,88 +709,6 @@ function test_handle_symlinks () {
 		[ -f "$INITIATOR_DIR/$OSYNC_DELETE_DIR/$FileBL" ]
 		assertEquals "File [$INITIATOR_DIR/$OSYNC_DELETE_DIR/$FileBL] is not present in deletion dir." "0" $?
 	done
-
-	# Check with and without copySymlinks
-	copySymlinks="no"
-
-	echo "Running with COPY_SYMLINKS=$copySymlinks"
-
-	SetConfFileValue "$CONF_DIR/$LOCAL_CONF" "COPY_SYMLINKS" "$copySymlinks"
-	SetConfFileValue "$CONF_DIR/$REMOTE_CONF" "COPY_SYMLINKS" "$copySymlinks"
-
-	for i in "${osyncParameters[@]}"; do
-		cd "$OSYNC_DIR"
-
-		PrepareLocalDirs
-
-		DirA="some directory with spaces"
-		DirB="another directoy/and sub directory"
-
-		mkdir -p "$INITIATOR_DIR/$DirA"
-		mkdir -p "$TARGET_DIR/$DirB"
-
-		FileA="$DirA/File A"
-		FileB="$DirB/File B"
-		FileAL="$DirA/File A symlink"
-		FileBL="$DirB/File B symlink"
-
-		# Create symlinks
-		touch "$INITIATOR_DIR/$FileA"
-		touch "$TARGET_DIR/$FileB"
-		ln -s "$INITIATOR_DIR/$FileA" "$INITIATOR_DIR/$FileAL"
-		ln -s "$TARGET_DIR/$FileB" "$TARGET_DIR/$FileBL"
-
-		COPY_SYMLINKS=$copySymlinks REMOTE_HOST_PING=no ./$OSYNC_EXECUTABLE $i
-		assertEquals "First symlink run with parameters [$i]." "0" $?
-
-		# Delete symlinks
-		rm -f "$INITIATOR_DIR/$FileAL"
-		rm -f "$TARGET_DIR/$FileBL"
-
-		COPY_SYMLINKS=$copySymlinks REMOTE_HOST_PING=no ./$OSYNC_EXECUTABLE $i
-		assertEquals "Second symlink deletion run with parameters [$i]." "0" $?
-
-		# symlink deletion propagation
-		[ ! -L "$TARGET_DIR/$FileAL" ]
-		assertEquals "File [$TARGET_DIR/$FileAL] is still present in replica dir." "0" $?
-		[ -L "$TARGET_DIR/$OSYNC_DELETE_DIR/$FileAL" ]
-		assertEquals "File [$TARGET_DIR/$OSYNC_DELETE_DIR/$FileAL] is not present in deletion dir." "0" $?
-		[ ! -L "$INITIATOR_DIR/$FileBL" ]
-		assertEquals "File [$INITIATOR_DIR/$FileBL] is still present in replica dir." "0" $?
-		[ -L "$INITIATOR_DIR/$OSYNC_DELETE_DIR/$FileBL" ]
-		assertEquals "File [$INITIATOR_DIR/$OSYNC_DELETE_DIR/$FileBL] is not present in deletion dir." "0" $?
-
-		# Create broken symlinks and propagate them
-		ln -s "$INITIATOR_DIR/$FileA" "$INITIATOR_DIR/$FileAL"
-		ln -s "$TARGET_DIR/$FileB" "$TARGET_DIR/$FileBL"
-		rm -f "$INITIATOR_DIR/$FileA"
-		rm -f "$TARGET_DIR/$FileB"
-
-		COPY_SYMLINKS=$copySymlinks REMOTE_HOST_PING=no ./$OSYNC_EXECUTABLE $i
-		assertEquals "Third broken symlink run with parameters [$i]." "0" $?
-
-		[ -L "$TARGET_DIR/$FileAL" ]
-		assertEquals "File [$TARGET_DIR/$FileAL] is present in replica dir." "0" $?
-
-		[ -L "$INITIATOR_DIR/$FileBL" ]
-		assertEquals "File [$INITIATOR_DIR/$FileBL] is present in replica dir." "0" $?
-
-		# Check broken symlink deletion propagation
-		rm -f "$INITIATOR_DIR/$FileAL"
-		rm -f "$TARGET_DIR/$FileBL"
-
-		COPY_SYMLINKS=$copySymlinks REMOTE_HOST_PING=no ./$OSYNC_EXECUTABLE $i
-		assertEquals "Fourth symlink deletion run with parameters [$i]." "0" $?
-
-		[ ! -L "$TARGET_DIR/$FileAL" ]
-		assertEquals "File [$TARGET_DIR/$FileAL] is still present in replica dir." "0" $?
-		[ -L "$TARGET_DIR/$OSYNC_DELETE_DIR/$FileAL" ]
-		assertEquals "File [$TARGET_DIR/$OSYNC_DELETE_DIR/$FileAL] is not present in deletion dir." "0" $?
-		[ ! -L "$INITIATOR_DIR/$FileBL" ]
-		assertEquals "File [$INITIATOR_DIR/$FileBL] is still present in replica dir." "0" $?
-		[ -L "$INITIATOR_DIR/$OSYNC_DELETE_DIR/$FileBL" ]
-		assertEquals "File [$INITIATOR_DIR/$OSYNC_DELETE_DIR/$FileBL] is not present in deletion dir." "0" $?
-	done
 }
 
 function test_softdeletion_cleanup () {
@@ -711,7 +740,7 @@ function test_softdeletion_cleanup () {
 
 			touch "$file.new"
 
-			if [ "$TRAVIS_RUN" == true ] || [ "$LOCAL_OS" == "BSD" ] || [ "$LOCAL_OS" == "MacOSX" ] || [ "$LOCAL_OS" == "WinNT10" ] || [ "LOCAL_OS" == "msys" ]; then
+			if [ "$TRAVIS_RUN" == true ] || [ "$LOCAL_OS" == "BSD" ] || [ "$LOCAL_OS" == "MacOSX" ] || [ "$LOCAL_OS" == "WinNT10" ] || [ "$LOCAL_OS" == "msys" ] || [ "$LOCAL_OS" == "Cygwin" ]; then
 				echo "Skipping changing ctime on file because travis / bsd / macos / Win10 / msys / cygwin does not support debugfs"
 			else
 				CreateOldFile "$file.old"
@@ -726,7 +755,7 @@ function test_softdeletion_cleanup () {
 			[ -f "$file.new" ]
 			assertEquals "New softdeleted / backed up file [$file.new] exists." "0" $?
 
-			if [ "$TRAVIS_RUN" == true ] || [ "$LOCAL_OS" == "BSD" ] || [ "$LOCAL_OS" == "MacOSX" ] || [ "$LOCAL_OS" == "WinNT10" ] || [ "$LOCAL_OS" == "msys" ]; then
+			if [ "$TRAVIS_RUN" == true ] || [ "$LOCAL_OS" == "BSD" ] || [ "$LOCAL_OS" == "MacOSX" ] || [ "$LOCAL_OS" == "WinNT10" ] || [ "$LOCAL_OS" == "msys" ] || [ "$LOCAL_OS" == "Cygwin" ]; then
 				[ ! -f "$file.old" ]
 				assertEquals "Old softdeleted / backed up file [$file.old] is deleted permanently." "0" $?
 			else
@@ -745,8 +774,8 @@ function test_FileAttributePropagation () {
 		return 0
 	fi
 
-	if [ "$LOCAL_OS" == "MacOSX" ]; then
-		echo "Skipping FileAttributePropagation tests because Mac OSX does not support ACL."
+	if [ "$LOCAL_OS" == "MacOSX" ] || [ "$LOCAL_OS" == "msys" ]; then
+		echo "Skipping FileAttributePropagation tests because [$LOCAL_OS]  does not support ACL."
 		return 0
 	fi
 
@@ -951,19 +980,21 @@ function test_Locking () {
 	REMOTE_HOST_PING=no ./$OSYNC_EXECUTABLE ${osyncParameters[$__confLocal]}
 	assertEquals "Should be able to resume locked target with same instance_id in confLocal mode." "0" $?
 
-	PrepareLocalDirs
-	mkdir -p "$TARGET_DIR/$OSYNC_WORKDIR"
-	echo 65536@quickremote > "$TARGET_DIR/$OSYNC_WORKDIR/lock"
+	if [ "$LOCAL_OS" != "msys" ]; then
+		PrepareLocalDirs
+		mkdir -p "$TARGET_DIR/$OSYNC_WORKDIR"
+		echo 65536@quickremote > "$TARGET_DIR/$OSYNC_WORKDIR/lock"
 
-	REMOTE_HOST_PING=no ./$OSYNC_EXECUTABLE ${osyncParameters[$__quickRemote]}
-	assertEquals "Should be able to resume locked target with same instance_id in quickRemote mode." "0" $?
+		REMOTE_HOST_PING=no ./$OSYNC_EXECUTABLE ${osyncParameters[$__quickRemote]}
+		assertEquals "Should be able to resume locked target with same instance_id in quickRemote mode." "0" $?
 
-	PrepareLocalDirs
-	mkdir -p "$TARGET_DIR/$OSYNC_WORKDIR"
-	echo 65536@remote > "$TARGET_DIR/$OSYNC_WORKDIR/lock"
+		PrepareLocalDirs
+		mkdir -p "$TARGET_DIR/$OSYNC_WORKDIR"
+		echo 65536@remote > "$TARGET_DIR/$OSYNC_WORKDIR/lock"
 
-	REMOTE_HOST_PING=no ./$OSYNC_EXECUTABLE ${osyncParameters[$__confRemote]}
-	assertEquals "Should be able to resume locked target with same instance_id in confRemote mode." "0" $?
+		REMOTE_HOST_PING=no ./$OSYNC_EXECUTABLE ${osyncParameters[$__confRemote]}
+		assertEquals "Should be able to resume locked target with same instance_id in confRemote mode." "0" $?
+	fi
 
 	# Remote Target lock present should not be resumed if instance ID is NOT the same as current one, local target lock is resumed
 	PrepareLocalDirs
@@ -980,19 +1011,21 @@ function test_Locking () {
 	REMOTE_HOST_PING=no ./$OSYNC_EXECUTABLE ${osyncParameters[$__confLocal]}
 	assertEquals "Should be able to resume locked local target with bogus instance_id in confLocal mode." "0" $?
 
-	PrepareLocalDirs
-	mkdir -p "$TARGET_DIR/$OSYNC_WORKDIR"
-	echo 65536@bogusinstance > "$TARGET_DIR/$OSYNC_WORKDIR/lock"
+	if [ "$LOCAL_OS" != "msys" ]; then
+		PrepareLocalDirs
+		mkdir -p "$TARGET_DIR/$OSYNC_WORKDIR"
+		echo 65536@bogusinstance > "$TARGET_DIR/$OSYNC_WORKDIR/lock"
 
-	REMOTE_HOST_PING=no ./$OSYNC_EXECUTABLE ${osyncParameters[$__quickRemote]}
-	assertEquals "Should not be able to resume remote locked target with bogus instance_id in quickRemote mode." "1" $?
+		REMOTE_HOST_PING=no ./$OSYNC_EXECUTABLE ${osyncParameters[$__quickRemote]}
+		assertEquals "Should not be able to resume remote locked target with bogus instance_id in quickRemote mode." "1" $?
 
-	PrepareLocalDirs
-	mkdir -p "$TARGET_DIR/$OSYNC_WORKDIR"
-	echo 65536@bogusinstance > "$TARGET_DIR/$OSYNC_WORKDIR/lock"
+		PrepareLocalDirs
+		mkdir -p "$TARGET_DIR/$OSYNC_WORKDIR"
+		echo 65536@bogusinstance > "$TARGET_DIR/$OSYNC_WORKDIR/lock"
 
-	REMOTE_HOST_PING=no ./$OSYNC_EXECUTABLE ${osyncParameters[$__confRemote]}
-	assertEquals "Should not be able to resume remote locked target with bgous instance_id in confRemote mode." "1" $?
+		REMOTE_HOST_PING=no ./$OSYNC_EXECUTABLE ${osyncParameters[$__confRemote]}
+		assertEquals "Should not be able to resume remote locked target with bogus instance_id in confRemote mode." "1" $?
+	fi
 
 	# Target lock present should be resumed if instance ID is NOT the same as current one but FORCE_STRANGER_UNLOCK=yes
 
@@ -1168,7 +1201,6 @@ function test_ParallelExec () {
 	cmd="sleep 4;du /none;sleep 3;du /none;sleep 2"
 	ParallelExec 3 "$cmd" false 1 2 .05 7000 true true false ${FUNCNAME[0]}
 	assertNotEquals "ParallelExec full test 3" "0" $?
-
 }
 
 function test_timedExecution () {
@@ -1241,8 +1273,8 @@ function test_UpgradeConfRun () {
 }
 
 function test_DaemonMode () {
-	if [ "$LOCAL_OS" == "WinNT10" ] || [ "$LOCAL_OS" == "msys" ]; then
-		echo "Skipping daemon mode test as Win10 does not have inotifywait support."
+	if [ "$LOCAL_OS" == "WinNT10" ] || [ "$LOCAL_OS" == "msys" ] || [ "$LOCAL_OS" == "Cygwin" ]; then
+		echo "Skipping daemon mode test as [$LOCAL_OS] does not have inotifywait support."
 		return 0
 	fi
 
