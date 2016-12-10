@@ -427,6 +427,8 @@ function SendEmail {
 	local smtpUser="${9}"
 	local smtpPassword="${10}"
 
+	echo "$subject $message $destinationMails $attachment $senderMail $smtpServer $smtpPort $encryption $smtpUser $smtpPassword"
+
 	__CheckArguments 3-10 $# "$@"	#__WITH_PARANOIA_DEBUG
 
 	local mail_no_attachment=
