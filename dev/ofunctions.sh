@@ -1,8 +1,9 @@
+#!/usr/bin/env bash
 #### OFUNCTIONS FULL SUBSET ####
 #### OFUNCTIONS MINI SUBSET ####
 
 _OFUNCTIONS_VERSION=2.1
-_OFUNCTIONS_BUILD=2016121002
+_OFUNCTIONS_BUILD=2016121003
 _OFUNCTIONS_BOOTSTRAP=true
 ## BEGIN Generic bash functions written in 2013-2016 by Orsiris de Jong - http://www.netpower.fr - ozy@netpower.fr
 
@@ -216,17 +217,17 @@ function Logger {
 		_Logger "$prefix($level):$value" "$prefix\e[41m$value\e[0m" true
 		ERROR_ALERT=true
 		# ERROR_ALERT / WARN_ALERT isn't set in main when Logger is called from a subprocess. Need to keep this flag.
-		echo "[$retval] in [${FUNCNAME[@]}] SP=$SCRIPT_PID P=$$" >> "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.error.$SCRIPT_PID"
+		echo "[$retval] in [$(joinstring < ${FUNCNAME[@]})] SP=$SCRIPT_PID P=$$" >> "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.error.$SCRIPT_PID"
 		return
 	elif [ "$level" == "ERROR" ]; then
 		_Logger "$prefix($level):$value" "$prefix\e[91m$value\e[0m" true
 		ERROR_ALERT=true
-		echo "[$retval] in [${FUNCNAME[@]}] SP=$SCRIPT_PID P=$$" >> "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.error.$SCRIPT_PID"
+		echo "[$retval] in [$(joinstring < ${FUNCNAME[@]})] SP=$SCRIPT_PID P=$$" >> "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.error.$SCRIPT_PID"
 		return
 	elif [ "$level" == "WARN" ]; then
 		_Logger "$prefix($level):$value" "$prefix\e[33m$value\e[0m" true
 		WARN_ALERT=true
-		echo "[$retval] in [${FUNCNAME[@]}] SP=$SCRIPT_PID P=$$" >> "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.warn.$SCRIPT_PID"
+		echo "[$retval] in [$(joinstring < ${FUNCNAME[@]})] SP=$SCRIPT_PID P=$$" >> "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.warn.$SCRIPT_PID"
 		return
 	elif [ "$level" == "NOTICE" ]; then
 		if [ "$_LOGGER_ERR_ONLY" != true ]; then
@@ -395,7 +396,7 @@ function SendAlert {
 		attachmentFile="$ALERT_LOG_FILE"
 	fi
 
-	SendEmail "$subject" "$body" "$DESTINATION_MAILS" "$attachmentFile" "$SENDER_MAIL" "$SMTP_SERVER" "$SMTP_PORT" "$SMTP_ENCRYPTION" "SMTP_USER" "$SMTP_PASSWORD"
+	SendEmail "$subject" "$body" "$DESTINATION_MAILS" "$attachmentFile" "$SENDER_MAIL" "$SMTP_SERVER" "$SMTP_PORT" "$SMTP_ENCRYPTION" "$SMTP_USER" "$SMTP_PASSWORD"
 
 	# Delete tmp log file
 	if [ "$attachment" == true ]; then
@@ -447,12 +448,12 @@ function SendEmail {
 			smtpPort=25
 		fi
 		if type sendmail > /dev/null 2>&1; then
-			if [ "$ENCRYPTION" == "tls" ]; then
-				echo -e "Subject:$subject\r\n$message" | $(type -p sendmail) -f "$SenderMail" -H "exec openssl s_client -quiet -tls1_2 -starttls smtp -connect $smtpServer:$smtpPort" -au"$smtpUser" -ap"$smtpPassword" "$destinationMails"
-			elif [ "$ENCRYPTION" == "ssl" ]; then
-				echo -e "Subject:$subject\r\n$message" | $(type -p sendmail) -f "$SenderMail" -H "exec openssl s_client -quiet -connect $smtpServer:$smtpPort" -au"$smtpUser" -ap"$smtpPassword" "$destinationMails"
+			if [ "$encryption" == "tls" ]; then
+				echo -e "Subject:$subject\r\n$message" | $(type -p sendmail) -f "$senderMail" -H "exec openssl s_client -quiet -tls1_2 -starttls smtp -connect $smtpServer:$smtpPort" -au"$smtpUser" -ap"$smtpPassword" "$destinationMails"
+			elif [ "$encryption" == "ssl" ]; then
+				echo -e "Subject:$subject\r\n$message" | $(type -p sendmail) -f "$senderMail" -H "exec openssl s_client -quiet -connect $smtpServer:$smtpPort" -au"$smtpUser" -ap"$smtpPassword" "$destinationMails"
 			else
-				echo -e "Subject:$subject\r\n$message" | $(type -p sendmail) -f "$SenderMail" -S "$smtpServer:$smtpPort" -au"$smtpUser" -ap"$smtpPassword" "$destinationMails"
+				echo -e "Subject:$subject\r\n$message" | $(type -p sendmail) -f "$senderMail" -S "$smtpServer:$smtpPort" -au"$smtpUser" -ap"$smtpPassword" "$destinationMails"
 			fi
 
 			if [ $? != 0 ]; then
