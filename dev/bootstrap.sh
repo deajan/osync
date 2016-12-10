@@ -23,5 +23,10 @@ if [ $? != 0 ]; then
 	exit 1
 fi
 
+# Termux fix
+if type termux-fix-shebang > /dev/null 2>&1; then
+	termux-fix-shebang "$outputFileName.tmp.sh"
+fi
+
 "$outputFileName.tmp.sh" "$@"
 
