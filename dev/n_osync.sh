@@ -4,7 +4,7 @@ PROGRAM="osync" # Rsync based two way sync engine with fault tolerance
 AUTHOR="(C) 2013-2016 by Orsiris de Jong"
 CONTACT="http://www.netpower.fr/osync - ozy@netpower.fr"
 PROGRAM_VERSION=1.2-beta3
-PROGRAM_BUILD=2016120903
+PROGRAM_BUILD=2016121010
 IS_STABLE=no
 
 #TODO: update waitfor parallelexec and checkarguments
@@ -48,7 +48,7 @@ IS_STABLE=no
 
 include #### OFUNCTIONS FULL SUBSET ####
 
-# Hopefully multishell compatible (bash & csh seem to like it)
+# If using "include" statements, make sure the script does not get executed unless it's loaded by bootstrap
 [ "$_OFUNCTIONS_BOOTSTRAP" != true ] && echo "Please use bootstrap.sh to load this dev version of $(basename $0)" && exit 1
 
 _LOGGER_PREFIX="time"
@@ -115,8 +115,8 @@ function TrapQuit {
 		Logger "$PROGRAM finished." "ALWAYS"
 		exitcode=0
 	fi
-
-	CleanUp
+	#WIP
+	#CleanUp
 	KillChilds $$ > /dev/null 2>&1
 
 	exit $exitcode
