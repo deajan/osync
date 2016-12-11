@@ -68,12 +68,12 @@ function __PREPROCESSOR_MergeSubset {
 	local subsetFile="${3}"
 	local mergedFile="${4}"
 
-        sed -n "/$subsetBegin/,/$subsetEnd/p" "$subsetFile" > "$subsetFile.$subsetBegin"
+	sed -n "/$subsetBegin/,/$subsetEnd/p" "$subsetFile" > "$subsetFile.$subsetBegin"
 	if [ $? != 0 ]; then
 		QuickLogger "Cannot sed subset [$subsetBegin -- $subsetEnd] in [$subsetFile]." "stderr"
 		exit 1
 	fi
-        sed "/include $subsetBegin/r $subsetFile.$subsetBegin" "$mergedFile" | grep -v -E "$subsetBegin\$|$subsetEnd\$" > "$mergedFile.tmp"
+	sed "/include $subsetBegin/r $subsetFile.$subsetBegin" "$mergedFile" | grep -v -E "$subsetBegin\$|$subsetEnd\$" > "$mergedFile.tmp"
 	if [ $? != 0 ]; then
 		QuickLogger "Cannot add subset [$subsetBegin] to [$mergedFile]." "stderr"
 		exit 1
@@ -84,13 +84,13 @@ function __PREPROCESSOR_MergeSubset {
 		exit 1
 	fi
 
-        rm -f "$mergedFile"
+	rm -f "$mergedFile"
 	if [ $? != 0 ]; then
 		QuickLogger "Cannot remove merged original file [$mergedFile]." "stderr"
 		exit 1
 	fi
 
-        mv "$mergedFile.tmp" "$mergedFile"
+	mv "$mergedFile.tmp" "$mergedFile"
 	if [ $? != 0 ]; then
 		QuickLogger "Cannot move merged tmp file to original [$mergedFile]." "stderr"
 		exit 1

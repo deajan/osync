@@ -156,7 +156,7 @@ function CreateOldFile () {
 	assertEquals "touch [$filePath]" "0" $?
 
 	# Get current drive
-        drive=$(df "$OSYNC_DIR" | tail -1 | awk '{print $1}')
+	drive=$(df "$OSYNC_DIR" | tail -1 | awk '{print $1}')
 
 	# modify ctime on ext4 so osync thinks it has to delete the old files
 	debugfs -w -R 'set_inode_field "'$filePath'" ctime 201001010101' $drive
@@ -175,7 +175,7 @@ function PrepareLocalDirs () {
 	mkdir -p "$INITIATOR_DIR"
 
 	if [ -d "$TARGET_DIR" ]; then
- 		rm -rf "$TARGET_DIR"
+		rm -rf "$TARGET_DIR"
 	fi
 	mkdir -p "$TARGET_DIR"
 }
@@ -283,8 +283,8 @@ function oneTimeTearDown () {
 }
 
 function setUp () {
-        rm -rf "$INITIATOR_DIR"
-        rm -rf "$TARGET_DIR"
+	rm -rf "$INITIATOR_DIR"
+	rm -rf "$TARGET_DIR"
 }
 
 # This test has to be done everytime in order for osync executable to be fresh
@@ -1235,15 +1235,15 @@ function test_timedExecution () {
 			SLEEP_TIME=1 SOFT_MAX_EXEC_TIME=${softTimes[$x]} HARD_MAX_EXEC_TIME=${hardTimes[$x]} ./$OSYNC_EXECUTABLE $i
 			retval=$?
 			if [ "$OSYNC_MIN_VERSION" -gt 1 ]; then
-	        		assertEquals "Timed Execution test with timed SOFT_MAX_EXEC_TIME=${softTimes[$x]} and HARD_MAX_EXEC_TIME=${hardTimes[$x]}." $x $retval
+				assertEquals "Timed Execution test with timed SOFT_MAX_EXEC_TIME=${softTimes[$x]} and HARD_MAX_EXEC_TIME=${hardTimes[$x]}." $x $retval
 			else
 				# osync v1.1 had different exit codes, 240 was warning, anything else than 0 was error
 				if [ $x -eq 2 ]; then
-		        		assertEquals "Timed Execution test with timed SOFT_MAX_EXEC_TIME=${softTimes[$x]} and HARD_MAX_EXEC_TIME=${hardTimes[$x]}." 240 $retval
+					assertEquals "Timed Execution test with timed SOFT_MAX_EXEC_TIME=${softTimes[$x]} and HARD_MAX_EXEC_TIME=${hardTimes[$x]}." 240 $retval
 				elif [ $x -eq 1 ]; then
-		        		assertNotEquals "Timed Execution test with timed SOFT_MAX_EXEC_TIME=${softTimes[$x]} and HARD_MAX_EXEC_TIME=${hardTimes[$x]}." 0 $retval
+					assertNotEquals "Timed Execution test with timed SOFT_MAX_EXEC_TIME=${softTimes[$x]} and HARD_MAX_EXEC_TIME=${hardTimes[$x]}." 0 $retval
 				else
-		        		assertEquals "Timed Execution test with timed SOFT_MAX_EXEC_TIME=${softTimes[$x]} and HARD_MAX_EXEC_TIME=${hardTimes[$x]}." 0 $retval
+					assertEquals "Timed Execution test with timed SOFT_MAX_EXEC_TIME=${softTimes[$x]} and HARD_MAX_EXEC_TIME=${hardTimes[$x]}." 0 $retval
 				fi
 			fi
 		done
@@ -1256,20 +1256,20 @@ function test_UpgradeConfRun () {
 		return 0
 	fi
 
-        # Basic return code tests. Need to go deep into file presence testing
-        cd "$OSYNC_DIR"
+	# Basic return code tests. Need to go deep into file presence testing
+	cd "$OSYNC_DIR"
 	PrepareLocalDirs
 
-        # Make a security copy of the old config file
-        cp "$CONF_DIR/$OLD_CONF" "$CONF_DIR/$TMP_OLD_CONF"
+	# Make a security copy of the old config file
+	cp "$CONF_DIR/$OLD_CONF" "$CONF_DIR/$TMP_OLD_CONF"
 
-        ./$OSYNC_UPGRADE "$CONF_DIR/$TMP_OLD_CONF"
-        assertEquals "Conf file upgrade" "0" $?
-        ./$OSYNC_EXECUTABLE "$CONF_DIR/$TMP_OLD_CONF"
-        assertEquals "Upgraded conf file execution test" "0" $?
+	./$OSYNC_UPGRADE "$CONF_DIR/$TMP_OLD_CONF"
+	assertEquals "Conf file upgrade" "0" $?
+	./$OSYNC_EXECUTABLE "$CONF_DIR/$TMP_OLD_CONF"
+	assertEquals "Upgraded conf file execution test" "0" $?
 
-        rm -f "$CONF_DIR/$TMP_OLD_CONF"
-        rm -f "$CONF_DIR/$TMP_OLD_CONF.save"
+	rm -f "$CONF_DIR/$TMP_OLD_CONF"
+	rm -f "$CONF_DIR/$TMP_OLD_CONF.save"
 }
 
 function test_DaemonMode () {
@@ -1330,7 +1330,7 @@ function test_DaemonMode () {
 function test_NoRemoteAccessTest () {
 	RemoveSSH
 
-        cd "$OSYNC_DIR"
+	cd "$OSYNC_DIR"
 	PrepareLocalDirs
 
 	REMOTE_HOST_PING=no ./$OSYNC_EXECUTABLE ${osyncParameters[$__confLocal]}

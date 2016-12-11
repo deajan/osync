@@ -4,7 +4,7 @@ PROGRAM=[prgname]
 PROGRAM_VERSION=[version]
 PROGRAM_BINARY=$PROGRAM".sh"
 PROGRAM_BATCH=$PROGRAM"-batch.sh"
-SCRIPT_BUILD=2016112401
+SCRIPT_BUILD=2016120801
 
 ## osync / obackup / pmocr / zsnap install script
 ## Tested on RHEL / CentOS 6 & 7, Fedora 23, Debian 7 & 8, Mint 17 and FreeBSD 8 & 10
@@ -35,23 +35,23 @@ PMOCR_SERVICE_FILE_SYSTEMD_SYSTEM="pmocr-srv@.service"
 
 ## Default log file
 if [ -w $FAKEROOT/var/log ]; then
-        LOG_FILE="$FAKEROOT/var/log/$PROGRAM-install.log"
+	LOG_FILE="$FAKEROOT/var/log/$PROGRAM-install.log"
 elif ([ "$HOME" != "" ] && [ -w "$HOME" ]); then
-        LOG_FILE="$HOME/$PROGRAM-install.log"
+	LOG_FILE="$HOME/$PROGRAM-install.log"
 else
-    	LOG_FILE="./$PROGRAM-install.log"
+	LOG_FILE="./$PROGRAM-install.log"
 fi
 
 # Generic quick logging function
 function _QuickLogger {
-        local value="${1}"
-       	local destination="${2}" # Destination: stdout, log, both
+	local value="${1}"
+	local destination="${2}" # Destination: stdout, log, both
 
-        if ([ "$destination" == "log" ] || [ "$destination" == "both" ]); then
-                echo -e "$(date) - $value" >> "$LOG_FILE"
-        elif ([ "$destination" == "stdout" ] || [ "$destination" == "both" ]); then
-                echo -e "$value"
-       	fi
+	if ([ "$destination" == "log" ] || [ "$destination" == "both" ]); then
+		echo -e "$(date) - $value" >> "$LOG_FILE"
+	elif ([ "$destination" == "stdout" ] || [ "$destination" == "both" ]); then
+		echo -e "$value"
+	fi
 }
 
 function QuickLogger {
@@ -64,17 +64,17 @@ function QuickLogger {
 	fi
 }
 
-function urlencode() {
+function UrlEncode() {
     # urlencode <string>
 
     local LANG=C
     local length="${#1}"
     for (( i = 0; i < length; i++ )); do
-        local c="${1:i:1}"
-        case $c in
-            [a-zA-Z0-9.~_-]) printf "$c" ;;
-            *) printf '%%%02X' "'$c" ;;
-        esac
+	local c="${1:i:1}"
+	case $c in
+	    [a-zA-Z0-9.~_-]) printf "$c" ;;
+	    *) printf '%%%02X' "'$c" ;;
+	esac
     done
 }
 
@@ -83,23 +83,23 @@ function SetOSSettings {
 
 	USER=root
 
-        # There's no good way to tell if currently running in BusyBox shell. Using sluggish way.
-        if ls --help 2>&1 | grep -i "BusyBox" > /dev/null; then
-                localOsVar="BusyBox"
-        else
-                # Detecting the special ubuntu userland in Windows 10 bash
-                if grep -i Microsoft /proc/sys/kernel/osrelease > /dev/null 2>&1; then
-                        localOsVar="Microsoft"
-                else
-                        localOsVar="$(uname -spio 2>&1)"
-                        if [ $? != 0 ]; then
-                                localOsVar="$(uname -v 2>&1)"
-                                if [ $? != 0 ]; then
-                                        localOsVar="$(uname)"
-                                fi
-                        fi
-                fi
-        fi
+	# There's no good way to tell if currently running in BusyBox shell. Using sluggish way.
+	if ls --help 2>&1 | grep -i "BusyBox" > /dev/null; then
+		localOsVar="BusyBox"
+	else
+		# Detecting the special ubuntu userland in Windows 10 bash
+		if grep -i Microsoft /proc/sys/kernel/osrelease > /dev/null 2>&1; then
+			localOsVar="Microsoft"
+		else
+			localOsVar="$(uname -spio 2>&1)"
+			if [ $? != 0 ]; then
+				localOsVar="$(uname -v 2>&1)"
+				if [ $? != 0 ]; then
+					localOsVar="$(uname)"
+				fi
+			fi
+		fi
+	fi
 
 	case $localOsVar in
 		*"BSD"*)
@@ -118,11 +118,11 @@ function SetOSSettings {
 	esac
 
 	if ([ "$USER" != "" ] && [ "$(whoami)" != "$USER" ] && [ "$FAKEROOT" == "" ]); then
-	  	QuickLogger "Must be run as $USER."
+		QuickLogger "Must be run as $USER."
 		exit 1
 	fi
 
-	OS=$(urlencode "$localOsVar")
+	OS=$(UrlEncode "$localOsVar")
 }
 
 function GetInit {
@@ -262,22 +262,22 @@ function CopyServiceFiles {
 }
 
 function Statistics {
-        if type wget > /dev/null; then
-                wget -qO- "$STATS_LINK" > /dev/null 2>&1
-                if [ $? == 0 ]; then
-                        return 0
-                fi
+	if type wget > /dev/null; then
+		wget -qO- "$STATS_LINK" > /dev/null 2>&1
+		if [ $? == 0 ]; then
+			return 0
+		fi
 	fi
 
-        if type curl > /dev/null; then
-                curl "$STATS_LINK" -o /dev/null > /dev/null 2>&1
-                if [ $? == 0 ]; then
-                        return 0
-                fi
+	if type curl > /dev/null; then
+		curl "$STATS_LINK" -o /dev/null > /dev/null 2>&1
+		if [ $? == 0 ]; then
+			return 0
+		fi
 	fi
 
-       	QuickLogger "Neiter wget nor curl could be used for. Cannot run statistics. Use the provided link please."
-        return 1
+	QuickLogger "Neiter wget nor curl could be used for. Cannot run statistics. Use the provided link please."
+	return 1
 }
 
 function Usage {

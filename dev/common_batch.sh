@@ -9,8 +9,8 @@ PROGRAM_BUILD=2016120401
 ## If an instance fails, run it again if time permits
 
 if ! type "$BASH" > /dev/null; then
-        echo "Please run this script only with bash shell. Tested on bash >= 3.2"
-        exit 127
+	echo "Please run this script only with bash shell. Tested on bash >= 3.2"
+	exit 127
 fi
 
 ## If maximum execution time is not reached, failed instances will be rerun. Max exec time is in seconds. Example is set to 10 hours.

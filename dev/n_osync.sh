@@ -124,60 +124,60 @@ function TrapQuit {
 }
 
 function CheckEnvironment {
-        __CheckArguments 0 $# "$@"    #__WITH_PARANOIA_DEBUG
+	__CheckArguments 0 $# "$@"    #__WITH_PARANOIA_DEBUG
 
-        if [ "$REMOTE_OPERATION" == "yes" ]; then
-                if ! type ssh > /dev/null 2>&1 ; then
-                        Logger "ssh not present. Cannot start sync." "CRITICAL"
-                        exit 1
-                fi
+	if [ "$REMOTE_OPERATION" == "yes" ]; then
+		if ! type ssh > /dev/null 2>&1 ; then
+			Logger "ssh not present. Cannot start sync." "CRITICAL"
+			exit 1
+		fi
 
 		if [ "$SSH_PASSWORD_FILE" != "" ] && ! type sshpass > /dev/null 2>&1 ; then
 			Logger "sshpass not present. Cannot use password authentication." "CRITICAL"
 			exit 1
 		fi
-        fi
+	fi
 
-        if ! type rsync > /dev/null 2>&1 ; then
-                Logger "rsync not present. Sync cannot start." "CRITICAL"
-                exit 1
-        fi
+	if ! type rsync > /dev/null 2>&1 ; then
+		Logger "rsync not present. Sync cannot start." "CRITICAL"
+		exit 1
+	fi
 
-        if ! type pgrep > /dev/null 2>&1 ; then
-                Logger "pgrep not present. Sync cannot start." "CRITICAL"
-                exit 1
-        fi
+	if ! type pgrep > /dev/null 2>&1 ; then
+		Logger "pgrep not present. Sync cannot start." "CRITICAL"
+		exit 1
+	fi
 }
 
 # Only gets checked in config file mode where all values should be present
 function CheckCurrentConfig {
-        __CheckArguments 0 $# "$@"    #__WITH_PARANOIA_DEBUG
+	__CheckArguments 0 $# "$@"    #__WITH_PARANOIA_DEBUG
 
-        # Check all variables that should contain "yes" or "no"
-        declare -a yes_no_vars=(CREATE_DIRS SUDO_EXEC SSH_COMPRESSION SSH_IGNORE_KNOWN_HOSTS REMOTE_HOST_PING PRESERVE_PERMISSIONS PRESERVE_OWNER PRESERVE_GROUP PRESERVE_EXECUTABILITY PRESERVE_ACL PRESERVE_XATTR COPY_SYMLINKS KEEP_DIRLINKS PRESERVE_HARDLINKS CHECKSUM RSYNC_COMPRESS CONFLICT_BACKUP CONFLICT_BACKUP_MULTIPLE SOFT_DELETE RESUME_SYNC FORCE_STRANGER_LOCK_RESUME PARTIAL DELTA_COPIES STOP_ON_CMD_ERROR RUN_AFTER_CMD_ON_ERROR)
-        for i in "${yes_no_vars[@]}"; do
-                test="if [ \"\$$i\" != \"yes\" ] && [ \"\$$i\" != \"no\" ]; then Logger \"Bogus $i value [\$$i] defined in config file. Correct your config file or update it using the update script if using and old version.\" \"CRITICAL\"; exit 1; fi"
-                eval "$test"
-        done
+	# Check all variables that should contain "yes" or "no"
+	declare -a yes_no_vars=(CREATE_DIRS SUDO_EXEC SSH_COMPRESSION SSH_IGNORE_KNOWN_HOSTS REMOTE_HOST_PING PRESERVE_PERMISSIONS PRESERVE_OWNER PRESERVE_GROUP PRESERVE_EXECUTABILITY PRESERVE_ACL PRESERVE_XATTR COPY_SYMLINKS KEEP_DIRLINKS PRESERVE_HARDLINKS CHECKSUM RSYNC_COMPRESS CONFLICT_BACKUP CONFLICT_BACKUP_MULTIPLE SOFT_DELETE RESUME_SYNC FORCE_STRANGER_LOCK_RESUME PARTIAL DELTA_COPIES STOP_ON_CMD_ERROR RUN_AFTER_CMD_ON_ERROR)
+	for i in "${yes_no_vars[@]}"; do
+		test="if [ \"\$$i\" != \"yes\" ] && [ \"\$$i\" != \"no\" ]; then Logger \"Bogus $i value [\$$i] defined in config file. Correct your config file or update it using the update script if using and old version.\" \"CRITICAL\"; exit 1; fi"
+		eval "$test"
+	done
 
-        # Check all variables that should contain a numerical value >= 0
-        declare -a num_vars=(MINIMUM_SPACE BANDWIDTH SOFT_MAX_EXEC_TIME HARD_MAX_EXEC_TIME KEEP_LOGGING MIN_WAIT MAX_WAIT CONFLICT_BACKUP_DAYS SOFT_DELETE_DAYS RESUME_TRY MAX_EXEC_TIME_PER_CMD_BEFORE MAX_EXEC_TIME_PER_CMD_AFTER)
-        for i in "${num_vars[@]}"; do
+	# Check all variables that should contain a numerical value >= 0
+	declare -a num_vars=(MINIMUM_SPACE BANDWIDTH SOFT_MAX_EXEC_TIME HARD_MAX_EXEC_TIME KEEP_LOGGING MIN_WAIT MAX_WAIT CONFLICT_BACKUP_DAYS SOFT_DELETE_DAYS RESUME_TRY MAX_EXEC_TIME_PER_CMD_BEFORE MAX_EXEC_TIME_PER_CMD_AFTER)
+	for i in "${num_vars[@]}"; do
 		test="if [ $(IsNumericExpand \"\$$i\") -eq 0 ]; then Logger \"Bogus $i value [\$$i] defined in config file. Correct your config file or update it using the update script if using and old version.\" \"CRITICAL\"; exit 1; fi"
-                eval "$test"
-        done
+		eval "$test"
+	done
 }
 
 # Gets checked in quicksync and config file mode
 function CheckCurrentConfigAll {
-        __CheckArguments 0 $# "$@"    #__WITH_PARANOIA_DEBUG
+	__CheckArguments 0 $# "$@"    #__WITH_PARANOIA_DEBUG
 
 	local tmp
 
-        if [ "$INSTANCE_ID" == "" ]; then
-                Logger "No INSTANCE_ID defined in config file." "CRITICAL"
-                exit 1
-        fi
+	if [ "$INSTANCE_ID" == "" ]; then
+		Logger "No INSTANCE_ID defined in config file." "CRITICAL"
+		exit 1
+	fi
 
 	if [ "$INITIATOR_SYNC_DIR" == "" ]; then
 		Logger "No INITIATOR_SYNC_DIR set in config file." "CRITICAL"
@@ -564,22 +564,22 @@ function HandleLocks {
 			_HandleLocksRemote "${TARGET[$__replicaDir]}${TARGET[$__stateDir]}" "${TARGET[$__lockFile]}" "${TARGET[$__type]}" $overwrite &
 			pids="$pids;$!"
 		fi
-	        INITIATOR_LOCK_FILE_EXISTS=true
-        	TARGET_LOCK_FILE_EXISTS=true
+		INITIATOR_LOCK_FILE_EXISTS=true
+		TARGET_LOCK_FILE_EXISTS=true
 		WaitForTaskCompletion $pids 720 1800 $SLEEP_TIME $KEEP_LOGGING true true false
 		retval=$?
 		if [ $retval -ne 0 ]; then
-	                IFS=';' read -r -a pidArray <<< "$(eval echo \"\$WAIT_FOR_TASK_COMPLETION_${FUNCNAME[0]}\")"
-        	        for pid in "${pidArray[@]}"; do
-                	        pid=${pid%:*}
-                        	if [ "$pid" == "$initiatorPid" ]; then
-                                	INITIATOR_LOCK_FILE_EXISTS=false
-                        	elif [ "$pid" == "$targetPid" ]; then
-                                	TARGET_LOCK_FILE_EXISTS=false
-                        	fi
-                	done
+			IFS=';' read -r -a pidArray <<< "$(eval echo \"\$WAIT_FOR_TASK_COMPLETION_${FUNCNAME[0]}\")"
+			for pid in "${pidArray[@]}"; do
+				pid=${pid%:*}
+				if [ "$pid" == "$initiatorPid" ]; then
+					INITIATOR_LOCK_FILE_EXISTS=false
+				elif [ "$pid" == "$targetPid" ]; then
+					TARGET_LOCK_FILE_EXISTS=false
+				fi
+			done
 
-                	Logger "Cancelling task." "CRITICAL" $retval
+			Logger "Cancelling task." "CRITICAL" $retval
 			exit 1
 		fi
 	fi
@@ -817,9 +817,9 @@ function _getFileCtimeMtimeRemote {
 
 $SSH_CMD env PROGRAM="'$PROGRAM'" env SCRIPT_PID="'$SCRIPT_PID'" env replicaPath="'$replicaPath'" env replicaType="'$replicaType'" env REMOTE_STAT_CTIME_MTIME_CMD="'$REMOTE_STAT_CTIME_MTIME_CMD'" 'bash -s' << 'ENDSSH' > "$RUN_DIR/$PROGRAM.ctime_mtime.$replicaType.$SCRIPT_PID"
 	while read -r file; do $REMOTE_STAT_CTIME_MTIME_CMD "$replicaPath$file" | sort; done < ".$PROGRAM.ctime_mtime.$replicaType.$SCRIPT_PID"
-        	if [ -f ".$PROGRAM.ctime_mtime.$replicaType.$SCRIPT_PID" ]; then
-                	rm -f ".$PROGRAM.ctime_mtime.$replicaType.$SCRIPT_PID"
-        	fi
+		if [ -f ".$PROGRAM.ctime_mtime.$replicaType.$SCRIPT_PID" ]; then
+			rm -f ".$PROGRAM.ctime_mtime.$replicaType.$SCRIPT_PID"
+		fi
 ENDSSH
 	retval=$?
 	if [ $retval -ne 0 ]; then
@@ -955,7 +955,7 @@ function syncAttrs {
 	WaitForTaskCompletion $! $SOFT_MAX_EXEC_TIME $HARD_MAX_EXEC_TIME $SLEEP_TIME $KEEP_LOGGING false true false
 	retval=$?
 
-	if [ $retval !-ne 0 ] && [ $retval -ne 24 ]; then
+	if [ $retval -ne 0 ] && [ $retval -ne 24 ]; then
 		Logger "Updating file attributes on $destReplica [$retval]. Stopping execution." "CRITICAL" $retval
 		if [ -f "$RUN_DIR/$PROGRAM.attr-update.$destReplica.$SCRIPT_PID" ]; then
 			Logger "Rsync output:\n$(cat $RUN_DIR/$PROGRAM.attr-update.$destReplica.$SCRIPT_PID)" "NOTICE"
@@ -1414,7 +1414,7 @@ function Sync {
 				echo "${SYNC_ACTION[1]}" > "${INITIATOR[$__targetLastActionFile]}"
 			fi
 
-		 	exit 1
+			exit 1
 		else
 			echo "${SYNC_ACTION[1]}" > "${INITIATOR[$__initiatorLastActionFile]}"
 			echo "${SYNC_ACTION[1]}" > "${INITIATOR[$__targetLastActionFile]}"
@@ -1459,7 +1459,7 @@ function Sync {
 				echo "${SYNC_ACTION[2]}" > "${INITIATOR[$__targetLastActionFile]}"
 			fi
 
-		 	exit 1
+			exit 1
 		else
 			echo "${SYNC_ACTION[2]}" > "${INITIATOR[$__initiatorLastActionFile]}"
 			echo "${SYNC_ACTION[2]}" > "${INITIATOR[$__targetLastActionFile]}"
@@ -1583,7 +1583,7 @@ function Sync {
 				echo "${SYNC_ACTION[5]}" > "${INITIATOR[$__targetLastActionFile]}"
 			fi
 
-		 	exit 1
+			exit 1
 		else
 			echo "${SYNC_ACTION[5]}" > "${INITIATOR[$__initiatorLastActionFile]}"
 			echo "${SYNC_ACTION[5]}" > "${INITIATOR[$__targetLastActionFile]}"
@@ -1629,7 +1629,7 @@ function Sync {
 				echo "${SYNC_ACTION[6]}" > "${INITIATOR[$__targetLastActionFile]}"
 			fi
 
-		 	exit 1
+			exit 1
 		else
 			echo "${SYNC_ACTION[6]}" > "${INITIATOR[$__initiatorLastActionFile]}"
 			echo "${SYNC_ACTION[6]}" > "${INITIATOR[$__targetLastActionFile]}"
@@ -1885,10 +1885,10 @@ function Init {
 	INITIATOR_SYNC_DIR="${INITIATOR_SYNC_DIR%/}/"
 	TARGET_SYNC_DIR="${TARGET_SYNC_DIR%/}/"
 
-        # Expand ~ if exists
-        INITIATOR_SYNC_DIR="${INITIATOR_SYNC_DIR/#\~/$HOME}"
-        TARGET_SYNC_DIR="${TARGET_SYNC_DIR/#\~/$HOME}"
-        SSH_RSA_PRIVATE_KEY="${SSH_RSA_PRIVATE_KEY/#\~/$HOME}"
+	# Expand ~ if exists
+	INITIATOR_SYNC_DIR="${INITIATOR_SYNC_DIR/#\~/$HOME}"
+	TARGET_SYNC_DIR="${TARGET_SYNC_DIR/#\~/$HOME}"
+	SSH_RSA_PRIVATE_KEY="${SSH_RSA_PRIVATE_KEY/#\~/$HOME}"
 	SSH_PASSWORD_FILE="${SSH_PASSWORD_FILE/#\~/$HOME}"
 
 	## Replica format
@@ -1900,9 +1900,9 @@ function Init {
 	local deleteDir="deleted"
 	local partialDir="_partial"
 	local lastAction="last-action"
-       	local resumeCount="resume-count"
+	local resumeCount="resume-count"
 	if [ "$_DRYRUN" == true ]; then
-       		local drySuffix="-dry"
+		local drySuffix="-dry"
 	else
 		local drySuffix=
 	fi
@@ -2012,8 +2012,8 @@ function Usage {
 	__CheckArguments 0 $# "$@"	#__WITH_PARANOIA_DEBUG
 
 	if [ "$IS_STABLE" != "yes" ]; then
-                echo -e "\e[93mThis is an unstable dev build. Please use with caution.\e[0m"
-        fi
+		echo -e "\e[93mThis is an unstable dev build. Please use with caution.\e[0m"
+	fi
 
 	echo "$PROGRAM $PROGRAM_VERSION $PROGRAM_BUILD"
 	echo "$AUTHOR"

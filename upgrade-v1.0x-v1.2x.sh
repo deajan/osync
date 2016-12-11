@@ -11,8 +11,8 @@ PROGRAM_BUILD=2016112101
 
 ## type -p does not work on platforms other than linux (bash). If if does not work, always assume output is not a zero exitcode
 if ! type "$BASH" > /dev/null; then
-        echo "Please run this script only with bash shell. Tested on bash >= 3.2"
-        exit 127
+	echo "Please run this script only with bash shell. Tested on bash >= 3.2"
+	exit 127
 fi
 
 # Defines all keywords / value sets in osync configuration files
@@ -458,12 +458,12 @@ function RewriteOldConfigFiles {
 		exit 1
 	fi
 
-        echo "Backing up [$config_file] as [$config_file.save]"
-        cp -p "$config_file" "$config_file.save"
-        if [ $? != 0 ]; then
-                echo "Cannot backup config file."
-                exit 1
-        fi
+	echo "Backing up [$config_file] as [$config_file.save]"
+	cp -p "$config_file" "$config_file.save"
+	if [ $? != 0 ]; then
+		echo "Cannot backup config file."
+		exit 1
+	fi
 
 	echo "Rewriting config file $config_file"
 
@@ -480,34 +480,34 @@ function RewriteOldConfigFiles {
 }
 
 function AddMissingConfigOptions {
-        local config_file="${1}"
-        local counter=0
+	local config_file="${1}"
+	local counter=0
 
-        while [ $counter -lt ${#KEYWORDS[@]} ]; do
-                if ! grep "^${KEYWORDS[$counter]}=" > /dev/null "$config_file"; then
-                        echo "${KEYWORDS[$counter]} not found"
-                        if [ $counter -gt 0 ]; then
-                                sed -i'.tmp' '/^'${KEYWORDS[$((counter-1))]}'=*/a\'$'\n'${KEYWORDS[$counter]}'="'"${VALUES[$counter]}"'"\'$'\n''' "$config_file"
-                                if [ $? -ne 0 ]; then
-                                        echo "Cannot add missing ${[KEYWORDS[$counter]}."
-                                        exit 1
-                                fi
-                        else
-                                sed -i'.tmp' '/onfig file rev*/a\'$'\n'${KEYWORDS[$counter]}'="'"${VALUES[$counter]}"'"\'$'\n''' "$config_file"
-                        fi
-                        echo "Added missing ${KEYWORDS[$counter]} config option with default option [${VALUES[$counter]}]"
-                fi
-                counter=$((counter+1))
-        done
+	while [ $counter -lt ${#KEYWORDS[@]} ]; do
+		if ! grep "^${KEYWORDS[$counter]}=" > /dev/null "$config_file"; then
+			echo "${KEYWORDS[$counter]} not found"
+			if [ $counter -gt 0 ]; then
+				sed -i'.tmp' '/^'${KEYWORDS[$((counter-1))]}'=*/a\'$'\n'${KEYWORDS[$counter]}'="'"${VALUES[$counter]}"'"\'$'\n''' "$config_file"
+				if [ $? -ne 0 ]; then
+					echo "Cannot add missing ${[KEYWORDS[$counter]}."
+					exit 1
+				fi
+			else
+				sed -i'.tmp' '/onfig file rev*/a\'$'\n'${KEYWORDS[$counter]}'="'"${VALUES[$counter]}"'"\'$'\n''' "$config_file"
+			fi
+			echo "Added missing ${KEYWORDS[$counter]} config option with default option [${VALUES[$counter]}]"
+		fi
+		counter=$((counter+1))
+	done
 }
 
 function UpdateConfigHeader {
-        local config_file="${1}"
+	local config_file="${1}"
 
-        # "onfig file rev" to deal with earlier variants of the file where c was lower or uppercase
+	# "onfig file rev" to deal with earlier variants of the file where c was lower or uppercase
 	#sed -i'.tmp' '/onfig file rev/c\###### '$SUBPROGRAM' config file rev '$CONFIG_FILE_VERSION' '$NEW_PROGRAM_VERSION "$config_file"
 	sed -i'.tmp' 's/.*onfig file rev.*/##### '$SUBPROGRAM' config file rev '$CONFIG_FILE_VERSION' '$NEW_PROGRAM_VERSION'/' "$config_file"
-        rm -f "$config_file.tmp"
+	rm -f "$config_file.tmp"
 }
 
 _QUICKSYNC=0
@@ -544,9 +544,9 @@ elif [ "$1" != "" ] && [ -f "$1" ] && [ -w "$1" ]; then
 	CONF_FILE="${CONF_FILE%/}"
 	LoadConfigFile "$CONF_FILE"
 	Init
-        RewriteOldConfigFiles "$CONF_FILE"
-        AddMissingConfigOptions "$CONF_FILE"
-        UpdateConfigHeader "$CONF_FILE"
+	RewriteOldConfigFiles "$CONF_FILE"
+	AddMissingConfigOptions "$CONF_FILE"
+	UpdateConfigHeader "$CONF_FILE"
 	RenameStateFiles
 else
 	Usage
