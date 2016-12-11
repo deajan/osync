@@ -7,7 +7,7 @@ CONTACT="http://www.netpower.fr/osync - ozy@netpower.fr"
 OLD_PROGRAM_VERSION="v1.0x-v1.1x"
 NEW_PROGRAM_VERSION="v1.2x"
 CONFIG_FILE_VERSION=2016111201
-PROGRAM_BUILD=2016112101
+PROGRAM_BUILD=2016121101
 
 ## type -p does not work on platforms other than linux (bash). If if does not work, always assume output is not a zero exitcode
 if ! type "$BASH" > /dev/null; then
@@ -161,7 +161,6 @@ function Init {
 
 	TREE_CURRENT_FILENAME="-tree-current-$SYNC_ID"
 	TREE_AFTER_FILENAME="-tree-after-$SYNC_ID"
-	TREE_AFTER_FILENAME_NO_SUFFIX="-tree-after-$SYNC_ID"
 	DELETED_LIST_FILENAME="-deleted-list-$SYNC_ID"
 	FAILED_DELETE_LIST_FILENAME="-failed-delete-$SYNC_ID"
 
@@ -242,10 +241,10 @@ function LoadConfigFile {
 		echo "Wrong configuration file supplied [$config_file]. Sync cannot start."
 		exit 1
 	else
-		egrep '^#|^[^ ]*=[^;&]*'  "$config_file" > "./$SUBPROGRAM.$FUNCNAME.$$"
+		egrep '^#|^[^ ]*=[^;&]*'  "$config_file" > "./$SUBPROGRAM.${FUNCNAME[0]}.$$"
 		# Shellcheck source=./sync.conf
-		source "./$SUBPROGRAM.$FUNCNAME.$$"
-		rm -f "./$SUBPROGRAM.$FUNCNAME.$$"
+		source "./$SUBPROGRAM.${FUNCNAME[0]}.$$"
+		rm -f "./$SUBPROGRAM.${FUNCNAME[0]}.$$"
 	fi
 }
 
@@ -453,7 +452,7 @@ function RenameStateFiles {
 function RewriteOldConfigFiles {
 	local config_file="${1}"
 
-	if ((! grep "MASTER_SYNC_DIR=" "$config_file" > /dev/null) && (! grep "INITIATOR_SYNC_DIR=" "$config_file" > /dev/null)); then
+	if ! grep "MASTER_SYNC_DIR=" "$config_file" > /dev/null && ! grep "INITIATOR_SYNC_DIR=" "$config_file" > /dev/null; then
 		echo "Config file [$config_file] does not seem to be an osync v1.0x or v1.1x file."
 		exit 1
 	fi
@@ -510,19 +509,18 @@ function UpdateConfigHeader {
 	rm -f "$config_file.tmp"
 }
 
-_QUICKSYNC=0
+_QUICK_SYNC=0
 
 for i in "$@"
 do
 	case $i in
 		--master=*)
-		no_maxtime=1
 		MASTER_SYNC_DIR=${i##*=}
-		QUICK_SYNC=$(($_QUICKSYNC + 1))
+		_QUICK_SYNC=$(($_QUICK_SYNC + 1))
 		;;
 		--slave=*)
 		SLAVE_SYNC_DIR=${i##*=}
-		QUICK_SYNC=$(($_QUICKSYNC + 1))
+		_QUICK_SYNC=$(($_QUICK_SYNC + 1))
 		;;
 		--rsakey=*)
 		SSH_RSA_PRIVATE_KEY=${i##*=}
@@ -533,10 +531,10 @@ do
 	esac
 done
 
-if [ $_QUICKSYNC -eq 2 ]; then
+if [ $_QUICK_SYNC -eq 2 ]; then
 	Init
-	REPLICA_DIR=${i##*=}
-	RenameStateFiles
+	RenameStateFiles "$MASTER_SYNC_DIR"
+	RenameStateFiles "$SLAVE_SYNC_DIR"
 
 elif [ "$1" != "" ] && [ -f "$1" ] && [ -w "$1" ]; then
 	CONF_FILE="$1"
@@ -547,7 +545,8 @@ elif [ "$1" != "" ] && [ -f "$1" ] && [ -w "$1" ]; then
 	RewriteOldConfigFiles "$CONF_FILE"
 	AddMissingConfigOptions "$CONF_FILE"
 	UpdateConfigHeader "$CONF_FILE"
-	RenameStateFiles
+	RenameStateFiles "$MASTER_SYNC_DIR"
+	RenameStateFiles "$SLAVE_SYNC_DIR"
 else
 	Usage
 fi
