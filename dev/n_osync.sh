@@ -4,7 +4,7 @@ PROGRAM="osync" # Rsync based two way sync engine with fault tolerance
 AUTHOR="(C) 2013-2016 by Orsiris de Jong"
 CONTACT="http://www.netpower.fr/osync - ozy@netpower.fr"
 PROGRAM_VERSION=1.2-beta3
-PROGRAM_BUILD=2016121101
+PROGRAM_BUILD=2016121102
 IS_STABLE=no
 
 #TODO: update waitfor parallelexec and checkarguments
@@ -522,8 +522,7 @@ function _HandleLocksRemoteSub {
 }
 
 _HandleLocksRemoteSub
-result=$?
-exit $result
+exit $?
 ENDSSH
 	retval=$?
 	if [ $retval -ne 0 ]; then
@@ -1664,26 +1663,25 @@ function _SoftDeleteLocal {
 			Logger "Removing files older than $changeTime days on $replicaType replica for $deletionType deletion." "NOTICE"
 		fi
 
-		if [ $_LOGGER_VERBOSE == true ]; then
-			# Cannot launch log function from xargs, ugly hack
-			$COMMAND_SUDO $FIND_CMD "$replicaDeletionPath/" -type f -ctime +$changeTime -print0 | xargs -0 -I {} echo "Will delete file {}" >> "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$SCRIPT_PID"
+		$COMMAND_SUDO $REMOTE_FIND_CMD "$replicaDeletionPath" -type f -ctime +"$changeTime" -print0 | xargs -0 -I {} bash -c 'export file="{}"; if [ '$_LOGGER_VERBOSE' == true ]; then echo "Will delete file {}"; if [ '$DRYRUN' == false ]; then '$COMMAND_SUDO' rm -f "$file"' >> "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$SCRIPT_PID" 2>&1
+		retval=$?
+		if [ $retval -ne 0 ]; then
+			Logger "Error while executing file cleanup on $replicaType replica." "ERROR" $retval
+			Logger "Command output:\n$(cat $RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$SCRIPT_PID)" "NOTICE"
+		else
+			Logger "File cleanup complete on $replicaType replica." "NOTICE"
 			Logger "Command output:\n$(cat $RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$SCRIPT_PID)" "VERBOSE"
-			$COMMAND_SUDO $FIND_CMD "$replicaDeletionPath/" -type d -empty -ctime +$changeTime -print0 | xargs -0 -I {} echo "Will delete directory {}" >> "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$SCRIPT_PID"
+		fi
+		$COMMAND_SUDO $REMOTE_FIND_CMD "$replicaDeletionPath" -type d -empty -ctime +"$changeTime" -print0 | xargs -0 -I {} bash -c 'export file="{}"; if [ '$_LOGGER_VERBOSE' == true ]; then echo "Will delete directory {}"; if [ '$DRY_RUN' == false ]; then '$COMMAND_SUDO' rm -f "{}"' >> "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$SCRIPT_PID" 2>&1
+		retval=$?
+		if [ $retval -ne 0 ]; then
+			Logger "Error while executing directory cleanup on $replicaType replica." "ERROR" $retval
+			Logger "Command output:\n$(cat $RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$SCRIPT_PID)" "NOTICE"
+		else
+			Logger "Directory cleanup complete on $replicaType replica." "NOTICE"
 			Logger "Command output:\n$(cat $RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$SCRIPT_PID)" "VERBOSE"
 		fi
 
-		if [ $_DRYRUN == false ]; then
-			$COMMAND_SUDO $FIND_CMD "$replicaDeletionPath/" -type f -ctime +$changeTime -print0 | xargs -0 -I {} $COMMAND_SUDO rm -f "{}" && $COMMAND_SUDO $FIND_CMD "$replicaDeletionPath/" -type d -empty -ctime +$changeTime -print0 | xargs -0 -I {} $COMMAND_SUDO rm -rf "{}" >> "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$SCRIPT_PID" 2>&1
-		else
-			Dummy
-		fi
-		retval=$?
-		if [ $retval -ne 0 ]; then
-			Logger "Error while executing cleanup on $replicaType replica." "ERROR" $retval
-			Logger "Command output:\n$(cat $RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$SCRIPT_PID)" "NOTICE"
-		else
-			Logger "Cleanup complete on $replicaType replica." "NOTICE"
-		fi
 	elif [ -d "$replicaDeletionPath" ] && ! [ -w "$replicaDeletionPath" ]; then
 		Logger "The $replicaType replica dir [$replicaDeletionPath] is not writable. Cannot clean old files." "ERROR"
 	else
@@ -1721,11 +1719,14 @@ $SSH_CMD env _LOGGER_VERBOSE="'$_LOGGER_VERBOSE'" env _DRYRUN="'$_DRYRUN'" env r
 
 # Cannot launch log function from xargs, ugly hack
 if [ -d "$replicaDeletionPath" ]; then
-$COMMAND_SUDO $REMOTE_FIND_CMD "$replicaDeletionPath" -type f -ctime +"$changeTime" -print0 | xargs -0 -I {} bash -c 'export file="{}"; if [ '$_LOGGER_VERBOSE' == true ]; then echo "Will delete file {}"; if [ '$DRYRUN' == false ]; then '$COMMAND_SUDO' rm -f "$file"'
-$COMMAND_SUDO $REMOTE_FIND_CMD "$replicaDeletionPath" -type d -empty -ctime +"$changeTime" -print0 | xargs -0 -I {} bash -c 'export file="{}"; if [ '$_LOGGER_VERBOSE' == true ]; then echo "Will delete directory {}"; if [ '$DRY_RUN' == false ]; then '$COMMAND_SUDO' rm -f "{}"'
+	$COMMAND_SUDO $REMOTE_FIND_CMD "$replicaDeletionPath" -type f -ctime +"$changeTime" -print0 | xargs -0 -I {} bash -c 'export file="{}"; if [ '$_LOGGER_VERBOSE' == true ]; then echo "Will delete file {}"; if [ '$DRYRUN' == false ]; then '$COMMAND_SUDO' rm -f "$file"'
+	retval1=$?
+	$COMMAND_SUDO $REMOTE_FIND_CMD "$replicaDeletionPath" -type d -empty -ctime +"$changeTime" -print0 | xargs -0 -I {} bash -c 'export file="{}"; if [ '$_LOGGER_VERBOSE' == true ]; then echo "Will delete directory {}"; if [ '$DRY_RUN' == false ]; then '$COMMAND_SUDO' rm -f "{}"'
+	retval2=$?
 else
 	echo "The $replicaType replica dir [$replicaDeletionPath] does not exist. Skipping cleaning of old files"
 fi
+return $((retval1 + retval2))
 ENDSSH
 	retval=$?
 	if [ $retval -ne 0 ]; then
