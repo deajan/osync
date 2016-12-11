@@ -3,7 +3,7 @@
 #### OFUNCTIONS MINI SUBSET ####
 
 _OFUNCTIONS_VERSION=2.1-dev
-_OFUNCTIONS_BUILD=2016121105
+_OFUNCTIONS_BUILD=2016121106
 #### _OFUNCTIONS_BOOTSTRAP SUBSET ####
 _OFUNCTIONS_BOOTSTRAP=true
 #### _OFUNCTIONS_BOOTSTRAP SUBSET END ####
@@ -613,7 +613,7 @@ function LoadConfigFile {
 	CONFIG_FILE="$configFile"
 }
 
-_OFUNCTIONS_SPINNER='|/-\'
+_OFUNCTIONS_SPINNER="|/-\\"
 function Spinner {
 	if [ $_LOGGER_SILENT == true ] || [ "$_LOGGER_ERR_ONLY" == true ]; then
 		return 0
@@ -815,7 +815,8 @@ function ParallelExec {
 
 	local hasPids=false # Are any valable pids given to function ?		#__WITH_PARANOIA_DEBUG
 
-	HARD_MAX_EXEC_TIME_REACHED=false
+	# Set global var default
+	eval "HARD_MAX_EXEC_TIME_REACHED_$callerName=false"
 
 	if [ $counting == true ]; then 	# If counting == false _SOFT_ALERT should be a global value so no more than one soft alert is shown
 		local _SOFT_ALERT=false # Does a soft alert need to be triggered, if yes, send an alert once
@@ -877,7 +878,7 @@ function ParallelExec {
 			if [ $noErrorLog != true ]; then
 				SendAlert true
 			fi
-			HARD_MAX_EXEC_TIME_REACHED=true
+			eval "HARD_MAX_EXEC_TIME_REACHED_$callerName=true"
 			# Return the number of commands that haven't run / finished run
 			return $(($commandCount - $counter + ${#pidsArray[@]}))
 		fi
@@ -980,8 +981,6 @@ function EscapeSpaces {
 
 function IsNumericExpand {
 	eval "local value=\"${1}\"" # Needed eval so variable variables can be processed
-
-	local re="^-?[0-9]+([.][0-9]+)?$"
 
 	if [[ $value =~ ^-?[0-9]+([.][0-9]+)?$ ]]; then
 		echo 1
@@ -1418,7 +1417,7 @@ function __CheckArguments {
 		while [ $fetchArguments == true ]; do
 			cmd='argument=${'$iterate'}'
 			eval $cmd
-			if [ "$argument" = "" ]; then
+			if [ "$argument" == "" ]; then
 				fetchArguments=false
 			else
 				argList="$argList[Argument $(($iterate-2)): $argument] "
@@ -1465,7 +1464,7 @@ function RsyncPatternsAdd {
 		# Take the string until first occurence until $PATH_SEPARATOR_CHAR
 		str="${rest%%$PATH_SEPARATOR_CHAR*}"
 		# Handle the last case
-		if [ "$rest" = "${rest/$PATH_SEPARATOR_CHAR/}" ]; then
+		if [ "$rest" == "${rest/$PATH_SEPARATOR_CHAR/}" ]; then
 			rest=
 		else
 			# Cut everything before the first occurence of $PATH_SEPARATOR_CHAR
@@ -1643,10 +1642,10 @@ function InitRemoteOSDependingSettings {
 	## Stat command has different syntax on Linux and FreeBSD/MacOSX
 	if [ "$LOCAL_OS" == "MacOSX" ] || [ "$LOCAL_OS" == "BSD" ]; then
 		REMOTE_STAT_CMD="stat -f \"%Sm\""
-		REMOTE_STAT_CTIME_MTIME_CMD="stat -f \\\"%N;%c;%m\\\""
+		REMOTE_STAT_CTIME_MTIME_CMD="stat -f \"%N;%c;%m\""
 	else
 		REMOTE_STAT_CMD="stat --format %y"
-		REMOTE_STAT_CTIME_MTIME_CMD="stat -c \\\"%n;%Z;%Y\\\""
+		REMOTE_STAT_CTIME_MTIME_CMD="stat -c \"%n;%Z;%Y\""
 	fi
 
 	## Set rsync default arguments
