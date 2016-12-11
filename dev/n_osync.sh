@@ -4,7 +4,7 @@ PROGRAM="osync" # Rsync based two way sync engine with fault tolerance
 AUTHOR="(C) 2013-2016 by Orsiris de Jong"
 CONTACT="http://www.netpower.fr/osync - ozy@netpower.fr"
 PROGRAM_VERSION=1.2-beta3
-PROGRAM_BUILD=2016121103
+PROGRAM_BUILD=2016121104
 IS_STABLE=no
 
 #TODO: update waitfor parallelexec and checkarguments
@@ -49,6 +49,7 @@ IS_STABLE=no
 include #### OFUNCTIONS FULL SUBSET ####
 
 # If using "include" statements, make sure the script does not get executed unless it's loaded by bootstrap
+include #### _OFUNCTIONS_BOOTSTRAP SUBSET ####
 [ "$_OFUNCTIONS_BOOTSTRAP" != true ] && echo "Please use bootstrap.sh to load this dev version of $(basename $0)" && exit 1
 
 _LOGGER_PREFIX="time"
