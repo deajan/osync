@@ -4,7 +4,7 @@ PROGRAM="osync" # Rsync based two way sync engine with fault tolerance
 AUTHOR="(C) 2013-2016 by Orsiris de Jong"
 CONTACT="http://www.netpower.fr/osync - ozy@netpower.fr"
 PROGRAM_VERSION=1.2-beta3
-PROGRAM_BUILD=2016121102
+PROGRAM_BUILD=2016121103
 IS_STABLE=no
 
 #TODO: update waitfor parallelexec and checkarguments
@@ -1726,7 +1726,7 @@ if [ -d "$replicaDeletionPath" ]; then
 else
 	echo "The $replicaType replica dir [$replicaDeletionPath] does not exist. Skipping cleaning of old files"
 fi
-return $((retval1 + retval2))
+exit $((retval1 + retval2))
 ENDSSH
 	retval=$?
 	if [ $retval -ne 0 ]; then
@@ -2098,10 +2098,13 @@ function SyncOnChanges {
 		if [ $retval -eq 0 ]; then
 			Logger "#### Changes detected, waiting $MIN_WAIT seconds before running next sync." "NOTICE"
 			sleep $MIN_WAIT
+		# inotifywait --timeout result is 2, WaitForTaskCompletion HardTimeout is 1
+		elif [ "$LOCAL_OS" == "MacOSX" ]; then
+			Logger "#### Changes or error detected, waiting $MIN_WAIT seconds before running next sync." "NOTICE"
 		elif [ $retval -eq 2 ]; then
 			Logger "#### $MAX_WAIT timeout reached, running sync." "NOTICE"
-		else
-			Logger "#### inotify error detected, waiting $MIN_WAIT seconds before running next sync." "ERROR" $retval
+		elif [ $retval -eq 1 ]; then
+			Logger "#### inotify error  detected, waiting $MIN_WAIT seconds before running next sync." "ERROR" $retval
 			sleep $MIN_WAIT
 		fi
 	done
