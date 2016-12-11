@@ -3,7 +3,7 @@
 #### OFUNCTIONS MINI SUBSET ####
 
 _OFUNCTIONS_VERSION=2.1
-_OFUNCTIONS_BUILD=2016121102
+_OFUNCTIONS_BUILD=2016121103
 _OFUNCTIONS_BOOTSTRAP=true
 ## BEGIN Generic bash functions written in 2013-2016 by Orsiris de Jong - http://www.netpower.fr - ozy@netpower.fr
 
@@ -135,8 +135,9 @@ function _Logger {
 
 # Remote logger similar to below Logger, without log to file and alert flags
 function RemoteLogger {
-	local value="${1}" # Sentence to log (in double quotes)
-	local level="${2}" # Log level
+	local value="${1}"		# Sentence to log (in double quotes)
+	local level="${2}"		# Log level
+	local retval="${3:-undef}"	# optional return value of command
 
 	if [ "$_LOGGER_PREFIX" == "time" ]; then
 		prefix="TIME: $SECONDS - "
@@ -148,12 +149,21 @@ function RemoteLogger {
 
 	if [ "$level" == "CRITICAL" ]; then
 		_Logger "" "$prefix\e[41m$value\e[0m" true
+		if [ $_LOGGER_DEBUG == true ]; then
+			_Logger -e "" "[$retval] in [$(joinString , ${FUNCNAME[@]})] SP=$SCRIPT_PID P=$$" true
+		fi
 		return
 	elif [ "$level" == "ERROR" ]; then
 		_Logger "" "$prefix\e[91m$value\e[0m" true
+		if [ $_LOGGER_DEBUG == true ]; then
+			_Logger -e "" "[$retval] in [$(joinString , ${FUNCNAME[@]})] SP=$SCRIPT_PID P=$$" true
+		fi
 		return
 	elif [ "$level" == "WARN" ]; then
 		_Logger "" "$prefix\e[33m$value\e[0m" true
+		if [ $_LOGGER_DEBUG == true ]; then
+			_Logger -e "" "[$retval] in [$(joinString , ${FUNCNAME[@]})] SP=$SCRIPT_PID P=$$" true
+		fi
 		return
 	elif [ "$level" == "NOTICE" ]; then
 		if [ $_LOGGER_ERR_ONLY != true ]; then
@@ -217,17 +227,17 @@ function Logger {
 		_Logger "$prefix($level):$value" "$prefix\e[41m$value\e[0m" true
 		ERROR_ALERT=true
 		# ERROR_ALERT / WARN_ALERT isn't set in main when Logger is called from a subprocess. Need to keep this flag.
-		echo "[$retval] in [$(joinString , ${FUNCNAME[@]})] SP=$SCRIPT_PID P=$$" >> "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.error.$SCRIPT_PID"
+		echo -e "[$retval] in [$(joinString , ${FUNCNAME[@]})] SP=$SCRIPT_PID P=$$\n$prefix($level):$value" >> "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.error.$SCRIPT_PID"
 		return
 	elif [ "$level" == "ERROR" ]; then
 		_Logger "$prefix($level):$value" "$prefix\e[91m$value\e[0m" true
 		ERROR_ALERT=true
-		echo "[$retval] in [$(joinString , ${FUNCNAME[@]})] SP=$SCRIPT_PID P=$$" >> "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.error.$SCRIPT_PID"
+		echo "[$retval] in [$(joinString , ${FUNCNAME[@]})] SP=$SCRIPT_PID P=$$\n$prefix($level):$value" >> "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.error.$SCRIPT_PID"
 		return
 	elif [ "$level" == "WARN" ]; then
 		_Logger "$prefix($level):$value" "$prefix\e[33m$value\e[0m" true
 		WARN_ALERT=true
-		echo "[$retval] in [$(joinString , ${FUNCNAME[@]})] SP=$SCRIPT_PID P=$$" >> "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.warn.$SCRIPT_PID"
+		echo "[$retval] in [$(joinString , ${FUNCNAME[@]})] SP=$SCRIPT_PID P=$$\n$prefix($level):$value" >> "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.warn.$SCRIPT_PID"
 		return
 	elif [ "$level" == "NOTICE" ]; then
 		if [ "$_LOGGER_ERR_ONLY" != true ]; then
