@@ -1,4 +1,5 @@
 Coding style used for my bash projects (v3.0 Dec 2016)
+As bash is clearly an error prone script language, we'll use as much standard coding as possible, including some quick and dirty debug techniques described here.
 
 ++++++ Header
 
@@ -69,7 +70,7 @@ __CheckArguments will only trigger when the script is launched with _PARANOIA_DE
 Use the following convention for function definition:
 
 function SomeFunction {
-	__CheckArguments 0 $# ${FUNCNAME[0]} "$@"               #__WITH_PARANOIA_DEBUG
+	__CheckArguments 0 $# "$@"               #__WITH_PARANOIA_DEBUG
 	...	
 }
 
@@ -81,7 +82,7 @@ Declare arguments before launching __CheckArguments:
 function AnotherFunction {
 	local varName="${1}"
 	local otherVarName="${2}" # This variable contains stuff
-	__CheckArguments 2 $# ${FUNCNAME[0]} "$@"		#__WITH_PARANOIA_DEBUG
+	__CheckArguments 2 $# "$@"		#__WITH_PARANOIA_DEBUG
 	...
 }
 
@@ -155,7 +156,7 @@ The basic way of doing is:
 
 cmd='"something '$somevar'" > some_file 2>&1'
 eval $cmd &
-WaitForTaskCompletion $! 0 0 $FUNCNAME
+WaitForTaskCompletion $! 0 0 1 0 true false true false
 retval=$?
 if [ $retval -ne 0 ]; then
 	Logger "Some error message" "ERROR" $retval
