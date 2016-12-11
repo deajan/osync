@@ -4,14 +4,13 @@ PROGRAM="osync" # Rsync based two way sync engine with fault tolerance
 AUTHOR="(C) 2013-2016 by Orsiris de Jong"
 CONTACT="http://www.netpower.fr/osync - ozy@netpower.fr"
 PROGRAM_VERSION=1.2-beta3
-PROGRAM_BUILD=2016121104
+PROGRAM_BUILD=2016121105
 IS_STABLE=no
 
 #TODO: update waitfor parallelexec and checkarguments
 #TODO: update coding style checkarguments
-#TODO: update common install with includes
-#TODO: revamp quicklogger
 #TODO: is debug subset relevant ?
+#TODO: missing _Logger vars ins heredocs
 
 # Execution order						#__WITH_PARANOIA_DEBUG
 #	Function Name				Is parallel	#__WITH_PARANOIA_DEBUG
@@ -443,7 +442,6 @@ function _HandleLocksRemote {
 	CheckConnectivityRemoteHost
 
 	# Create an array of all currently running pids
-	# TODO: check portability
 	read -a initiatorRunningPids <<< $(ps -A | tail -n +2 | awk '{print $1}')
 
 # passing initiatorRunningPids as litteral string (has to be run through eval to be an array again)
@@ -457,7 +455,6 @@ include #### IsInteger SUBSET ####
 include #### RemoteLogger SUBSET ####
 
 function _HandleLocksRemoteSub {
-	#WIP do not remote log to file as output is already logged from ssh
 	if [ ! -d "$replicaStateDir" ]; then
 		$COMMAND_SUDO mkdir -p "$replicaStateDir"
 		retval=$?
@@ -800,9 +797,6 @@ function _getFileCtimeMtimeRemote {
 	local retval
 	local cmd
 
-	#TODO WIP
-	# Quoting ' in single quote with '"'"' in order to have cmd='some stuff \'bash -c "some other stuff"\''
-	#cmd='cat "'$fileList'" | '$SSH_CMD' '"'"'bash -c "while read -r file; do '$REMOTE_STAT_CTIME_MTIME_CMD' \"'$replicaPath'\$file\"; done | sort"'"'"' > "'$RUN_DIR/$PROGRAM.ctime_mtime.$replicaType.$SCRIPT_PID'"'
 	cmd='cat "'$fileList'" | '$SSH_CMD' "cat > \".$PROGRAM.ctime_mtime.$replicaType.$SCRIPT_PID\""'
 	Logger "CMD: $cmd" "DEBUG"
 	eval "$cmd"
@@ -2056,8 +2050,6 @@ function SyncOnChanges {
 
 	local cmd
 	local retval
-
-	local sleepTime
 
 	if [ "$LOCAL_OS" == "MacOSX" ]; then
 		if ! type fswatch > /dev/null 2>&1 ; then
