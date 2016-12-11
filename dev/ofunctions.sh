@@ -3,7 +3,7 @@
 #### OFUNCTIONS MINI SUBSET ####
 
 _OFUNCTIONS_VERSION=2.1
-_OFUNCTIONS_BUILD=2016121101
+_OFUNCTIONS_BUILD=2016121102
 _OFUNCTIONS_BOOTSTRAP=true
 ## BEGIN Generic bash functions written in 2013-2016 by Orsiris de Jong - http://www.netpower.fr - ozy@netpower.fr
 
@@ -1660,7 +1660,7 @@ function InitRemoteOSDependingSettings {
 		RSYNC_ATTR_ARGS=$RSYNC_ATTR_ARGS" --executability"
 	fi
 	if [ "$PRESERVE_ACL" == "yes" ]; then
-		if [ "$LOCAL_OS" != "MacOSX" ] && [ "$REMOTE_OS" != "MacOSX" ] && [ "$LOCAL_OS" != "msys" ] && [ "$REMOTE_OS" != "msys" ] && [ "$LOCAL_OS" != "Cygwin" ] && [ "$REMOTE_OS" != "Cygwin" ] && [ "$LOCAL_OS" != "BusyBox" ] && [ "$REMOTE_OS" != "BusyBox" ]; then
+		if [ "$LOCAL_OS" != "MacOSX" ] && [ "$REMOTE_OS" != "MacOSX" ] && [ "$LOCAL_OS" != "msys" ] && [ "$REMOTE_OS" != "msys" ] && [ "$LOCAL_OS" != "Cygwin" ] && [ "$REMOTE_OS" != "Cygwin" ] && [ "$LOCAL_OS" != "BusyBox" ] && [ "$REMOTE_OS" != "BusyBox" ] && [ "$LOCAL_OS" != "Android" ] && [ "$REMOTE_OS" != "Android" ]; then
 			RSYNC_ATTR_ARGS=$RSYNC_ATTR_ARGS" -A"
 		else
 			Logger "Disabling ACL synchronization on [$LOCAL_OS]." "NOTICE"
