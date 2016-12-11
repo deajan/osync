@@ -6,13 +6,11 @@ PROGRAM=[prgname]
 PROGRAM_VERSION=[version]
 PROGRAM_BINARY=$PROGRAM".sh"
 PROGRAM_BATCH=$PROGRAM"-batch.sh"
-SCRIPT_BUILD=2016121101
+SCRIPT_BUILD=2016121102
 
 ## osync / obackup / pmocr / zsnap install script
-## Tested on RHEL / CentOS 6 & 7, Fedora 23, Debian 7 & 8, Mint 17 and FreeBSD 8 & 10
+## Tested on RHEL / CentOS 6 & 7, Fedora 23, Debian 7 & 8, Mint 17 and FreeBSD 8, 10 and 11
 ## Please adapt this to fit your distro needs
-
-#TODO: silent mode and no stats mode
 
 # Get current install.sh path from http://stackoverflow.com/a/246128/2635443
 SCRIPT_PATH="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
@@ -242,13 +240,13 @@ function Usage {
 	exit 127
 }
 
-_SILENT=0
+_LOGGER_SILENT=false
 _STATS=1
 for i in "$@"
 do
 	case $i in
 		--silent)
-		_SILENT=1
+		_LOGGER_SILENT=true
 		;;
 		--no-stats)
 		_STATS=0
@@ -274,7 +272,7 @@ STATS_LINK="http://instcount.netpower.fr?program=$PROGRAM&version=$PROGRAM_VERSI
 
 QuickLogger "$PROGRAM installed. Use with $BIN_DIR/$PROGRAM"
 if [ $_STATS -eq 1 ]; then
-	if [ $_SILENT -eq 1 ]; then
+	if [ $_LOGGER_SILENT -eq 1 ]; then
 		Statistics
 	else
 		QuickLogger "In order to make install statistics, the script would like to connect to $STATS_LINK"
