@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-## dev pre-processor bootstrap rev 2016120701
+## dev pre-processor bootstrap rev 2016121101
 ## Yeah !!! A really tech sounding name... In fact it's just include emulation in bash
 
 outputFileName="$0"
@@ -11,7 +11,7 @@ __PREPROCESSOR_Constants
 
 cp "n_$__PREPROCESSOR_PROGRAM.sh" "$outputFileName.tmp.sh"
 if [ $? != 0 ]; then
-	QuickLogger "Cannot copy original file [n_$__PREPROCESSOR_PROGRAM.sh] to [$outputFileName.tmp.sh]." "stderr"
+	echo "Cannot copy original file [n_$__PREPROCESSOR_PROGRAM.sh] to [$outputFileName.tmp.sh]."
 	exit 1
 fi
 for subset in "${__PREPROCESSOR_SUBSETS[@]}"; do
@@ -19,7 +19,7 @@ for subset in "${__PREPROCESSOR_SUBSETS[@]}"; do
 done
 chmod +x "$0.tmp.sh"
 if [ $? != 0 ]; then
-	QuickLogger "Cannot make [$outputFileName] executable.." "stderr"
+	echo "Cannot make [$outputFileName] executable.."
 	exit 1
 fi
 
@@ -29,4 +29,3 @@ if type termux-fix-shebang > /dev/null 2>&1; then
 fi
 
 "$outputFileName.tmp.sh" "$@"
-

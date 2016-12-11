@@ -3,7 +3,7 @@
 #### OFUNCTIONS MINI SUBSET ####
 
 _OFUNCTIONS_VERSION=2.1-dev
-_OFUNCTIONS_BUILD=2016121106
+_OFUNCTIONS_BUILD=2016121107
 #### _OFUNCTIONS_BOOTSTRAP SUBSET ####
 _OFUNCTIONS_BOOTSTRAP=true
 #### _OFUNCTIONS_BOOTSTRAP SUBSET END ####
@@ -271,12 +271,11 @@ function Logger {
 }
 #### Logger SUBSET END ####
 
+#### QuickLogger SUBSET ####
 # QuickLogger subfunction, can be called directly
 function _QuickLogger {
 	local value="${1}"
 	local destination="${2}" # Destination: stdout, log, both
-
-	__CheckArguments 2 $# "$@"	#__WITH_PARANOIA_DEBUG
 
 	if ([ "$destination" == "log" ] || [ "$destination" == "both" ]); then
 		echo -e "$(date) - $value" >> "$LOG_FILE"
@@ -289,14 +288,13 @@ function _QuickLogger {
 function QuickLogger {
 	local value="${1}"
 
-	__CheckArguments 1 $# "$@"	#__WITH_PARANOIA_DEBUG
-
-	if [ $_LOGGER_SILENT == true ]; then
+	if [ "$_LOGGER_SILENT" == true ]; then
 		_QuickLogger "$value" "log"
 	else
 		_QuickLogger "$value" "stdout"
 	fi
 }
+#### QuickLogger SUBSET END ####
 
 # Portable child (and grandchild) kill function tester under Linux, BSD and MacOS X
 function KillChilds {
@@ -1045,6 +1043,7 @@ function HumanToNumeric {
 }
 #### HumanToNumeric SUBSET END ####
 
+#### UrlEncode SUBSET ####
 ## from https://gist.github.com/cdown/1163649
 function UrlEncode {
 	local length="${#1}"
@@ -1062,6 +1061,7 @@ function UrlEncode {
 		esac
 	done
 }
+#### UrlEncode SUBSET END ####
 
 function UrlDecode {
 	local urlEncoded="${1//+/ }"
@@ -1090,9 +1090,8 @@ function ArrayContains () {
 }
 #### ArrayContains SUBSET END ####
 
+#### GetLocalOS SUBSET ####
 function GetLocalOS {
-	__CheckArguments 0 $# "$@"	#__WITH_PARANOIA_DEBUG
-
 	local localOsVar
 
 	# There's no good way to tell if currently running in BusyBox shell. Using sluggish way.
@@ -1144,12 +1143,17 @@ function GetLocalOS {
 			Logger "Running on unknown local OS [$localOsVar]." "WARN"
 			return
 		fi
-		Logger "Running on >> $localOsVar << not supported. Please report to the author." "ERROR"
+		if [ "$_OFUNCTIONS_VERSION" != "" ]; then
+			Logger "Running on >> $localOsVar << not supported. Please report to the author." "ERROR"
+		fi
 		exit 1
 		;;
 	esac
-	Logger "Local OS: [$localOsVar]." "DEBUG"
+	if [ "$_OFUNCTIONS_VERSION" != "" ]; then
+		Logger "Local OS: [$localOsVar]." "DEBUG"
+	fi
 }
+#### GetLocalOS SUBSET END ####
 
 #### OFUNCTIONS MINI SUBSET END ####
 
