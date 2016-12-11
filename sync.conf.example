@@ -159,9 +159,9 @@ DELTA_COPIES=yes
 ## on pfSense platform, smtp support needs to be configured in System > Advanced > Notifications
 DESTINATION_MAILS="your@alert.tld"
 
-## Busybox / msys / cygwin environment only mail options
-## Busybox relies on sendmail
-## MSYS / Cygwin Windows mail support relies on mailsend.exe from muquit, http://github.com/muquit/mailsend which needs to be in %PATH% environment variable
+## Additional mail parameters needed for Android / Busybox / Cygwin / MSYS
+## Android & Busybox use sendmail (and openssl if encryption is needed)
+## MSYS & Cygwin Windows mail support relies on mailsend.exe from muquit, http://github.com/muquit/mailsend which needs to be in %PATH% environment variable
 
 SENDER_MAIL="alert@your.system.tld"
 SMTP_SERVER=smtp.your.isp.tld
