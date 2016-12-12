@@ -3,7 +3,7 @@
 #### OFUNCTIONS MINI SUBSET ####
 
 _OFUNCTIONS_VERSION=2.1-dev
-_OFUNCTIONS_BUILD=2016121108
+_OFUNCTIONS_BUILD=2016121201
 #### _OFUNCTIONS_BOOTSTRAP SUBSET ####
 _OFUNCTIONS_BOOTSTRAP=true
 #### _OFUNCTIONS_BOOTSTRAP SUBSET END ####
@@ -1646,10 +1646,10 @@ function InitRemoteOSDependingSettings {
 	## Stat command has different syntax on Linux and FreeBSD/MacOSX
 	if [ "$LOCAL_OS" == "MacOSX" ] || [ "$LOCAL_OS" == "BSD" ]; then
 		REMOTE_STAT_CMD="stat -f \"%Sm\""
-		REMOTE_STAT_CTIME_MTIME_CMD="stat -f \"%N;%c;%m\""
+		REMOTE_STAT_CTIME_MTIME_CMD="stat -f \\\"%N;%c;%m\\\""
 	else
 		REMOTE_STAT_CMD="stat --format %y"
-		REMOTE_STAT_CTIME_MTIME_CMD="stat -c \"%n;%Z;%Y\""
+		REMOTE_STAT_CTIME_MTIME_CMD="stat -c \\\"%n;%Z;%Y\\\""
 	fi
 
 	## Set rsync default arguments
