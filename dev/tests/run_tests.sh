@@ -895,6 +895,8 @@ function test_MultipleConflictBackups () {
 
 	for i in "${osyncParameters[@]}"; do
 
+		echo "Running with parameters [$î]."
+
 		cd "$OSYNC_DIR"
 		PrepareLocalDirs
 
