@@ -7,7 +7,7 @@
 
 ## On CYGWIN / MSYS, ACL and extended attributes aren't supported
 
-# osync test suite 2016121201
+# osync test suite 2016121202
 
 # 4 tests:
 # quicklocal
@@ -151,8 +151,15 @@ function DownloadLargeFileSet() {
 function CreateOldFile () {
 	local drive
 	local filePath="${1}"
+	local type="${2:-false}"
 
-	touch "$filePath"
+	if [ $type == true ]; then
+		mkdir -p "$filePath"
+	else
+		mkdir -p "$(dirname $filePath)"
+		touch "$filePath"
+	fi
+
 	assertEquals "touch [$filePath]" "0" $?
 
 	# Get current drive
@@ -720,13 +727,16 @@ function test_softdeletion_cleanup () {
 	files[2]="$INITIATOR_DIR/$OSYNC_BACKUP_DIR/someBackedUpFileInitiator"
 	files[3]="$TARGET_DIR/$OSYNC_BACKUP_DIR/someBackedUpFileTarget"
 
+	DirA="$INITIATOR_DIR/$OSYNC_DELETE_DIR/somedir"
+	DirB="$TARGET_DIR/$OSYNC_DELETE_DIR/someotherdir"
+
 	for i in "${osyncParameters[@]}"; do
 		cd "$OSYNC_DIR"
 		PrepareLocalDirs
 
 		# First run
-		REMOTE_HOST_PING=no ./$OSYNC_EXECUTABLE $i
-		assertEquals "First deletion run with parameters [$i]." "0" $?
+		#REMOTE_HOST_PING=no ./$OSYNC_EXECUTABLE $i
+		#assertEquals "First deletion run with parameters [$i]." "0" $?
 
 		# Get current drive
 		drive=$(df "$OSYNC_DIR" | tail -1 | awk '{print $1}')
@@ -746,6 +756,12 @@ function test_softdeletion_cleanup () {
 				CreateOldFile "$file.old"
 			fi
 		done
+		if [ "$TRAVIS_RUN" == true ] || [ "$LOCAL_OS" == "BSD" ] || [ "$LOCAL_OS" == "MacOSX" ] || [ "$LOCAL_OS" == "WinNT10" ] || [ "$LOCAL_OS" == "msys" ] || [ "$LOCAL_OS" == "Cygwin" ]; then
+			echo "Skipping changing ctime on dir too"
+		else
+			CreateOldFile "$DirA" true
+			CreateOldFile "$DirB" true
+		fi
 
 		# Second run
 		REMOTE_HOST_PING=no ./$OSYNC_EXECUTABLE $i
@@ -763,6 +779,18 @@ function test_softdeletion_cleanup () {
 				assertEquals "Old softdeleted / backed up file [$file.old] is deleted permanently." "1" $?
 			fi
 		done
+
+		if [ "$TRAVIS_RUN" == true ] || [ "$LOCAL_OS" == "BSD" ] || [ "$LOCAL_OS" == "MacOSX" ] || [ "$LOCAL_OS" == "WinNT10" ] || [ "$LOCAL_OS" == "msys" ] || [ "$LOCAL_OS" == "Cygwin" ]; then
+			[ ! -d "$DirA" ]
+			assertEquals "Old softdeleted / backed up directory [$dirA] is deleted permanently." "0" $?
+			[ ! -d "$DirB" ]
+			assertEquals "Old softdeleted / backed up directory [$dirB] is deleted permanently." "0" $?
+		else
+			[ ! -d "$DirA" ]
+			assertEquals "Old softdeleted / backed up directory [$DirA] is deleted permanently." "1" $?
+			[ ! -d "$DirB" ]
+			assertEquals "Old softdeleted / backed up directory [$DirB] is deleted permanently." "1" $?
+		fi
 	done
 
 }
