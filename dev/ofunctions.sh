@@ -1694,6 +1694,7 @@ function InitRemoteOSDependingSettings {
 			RSYNC_ARGS=$RSYNC_ARGS" -zz --skip-compress=gz/xz/lz/lzma/lzo/rz/jpg/mp3/mp4/7z/bz2/rar/zip/sfark/s7z/ace/apk/arc/cab/dmg/jar/kgb/lzh/lha/lzx/pak/sfx"
 		else
 			Logger "Disabling compression skips on synchronization on [$LOCAL_OS] due to lack of support." "NOTICE"
+		fi
 	fi
 	if [ "$COPY_SYMLINKS" == "yes" ]; then
 		RSYNC_ARGS=$RSYNC_ARGS" -L"
