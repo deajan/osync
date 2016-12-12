@@ -143,11 +143,11 @@ function RemoteLogger {
 	local retval="${3:-undef}"	# optional return value of command
 
 	if [ "$_LOGGER_PREFIX" == "time" ]; then
-		prefix="TIME: $SECONDS - "
+		prefix="Remote TIME: $SECONDS - "
 	elif [ "$_LOGGER_PREFIX" == "date" ]; then
-		prefix="$(date) - "
+		prefix="Remote $(date) - "
 	else
-		prefix=""
+		prefix="Remote "
 	fi
 
 	if [ "$level" == "CRITICAL" ]; then
