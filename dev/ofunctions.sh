@@ -3,7 +3,7 @@
 #### OFUNCTIONS MINI SUBSET ####
 
 _OFUNCTIONS_VERSION=2.1-dev
-_OFUNCTIONS_BUILD=2016121203
+_OFUNCTIONS_BUILD=2016121204
 #### _OFUNCTIONS_BOOTSTRAP SUBSET ####
 _OFUNCTIONS_BOOTSTRAP=true
 #### _OFUNCTIONS_BOOTSTRAP SUBSET END ####
@@ -371,13 +371,6 @@ function SendAlert {
 		return 0
 	fi
 
-	# <OSYNC SPECIFIC>
-	if [ "$_QUICK_SYNC" == "2" ]; then
-		Logger "Current task is a quicksync task. Will not send any alert." "NOTICE"
-		return 0
-	fi
-	# </OSYNC SPECIFIC>
-
 	eval "cat \"$LOG_FILE\" $COMPRESSION_PROGRAM > $ALERT_LOG_FILE"
 	if [ $? != 0 ]; then
 		Logger "Cannot create [$ALERT_LOG_FILE]" "WARN"
@@ -400,7 +393,7 @@ function SendAlert {
 	if [ $runAlert == true ]; then
 		subject="Currently runing - $subject"
 	else
-		subject="Fnished run - $subject"
+		subject="Finished run - $subject"
 	fi
 
 	if [ "$attachment" == true ]; then
