@@ -3,7 +3,7 @@
 #### OFUNCTIONS MINI SUBSET ####
 
 _OFUNCTIONS_VERSION=2.1-dev
-_OFUNCTIONS_BUILD=2016121204
+_OFUNCTIONS_BUILD=2016121205
 #### _OFUNCTIONS_BOOTSTRAP SUBSET ####
 _OFUNCTIONS_BOOTSTRAP=true
 #### _OFUNCTIONS_BOOTSTRAP SUBSET END ####
@@ -19,7 +19,7 @@ _OFUNCTIONS_BOOTSTRAP=true
 ## _LOGGER_PREFIX="date"/"time"/""
 
 ## Logger sets {ERROR|WARN}_ALERT variable when called with critical / error / warn loglevel
-## When called from subprocesses, variable of main process can't be set. Status needs to be get via $RUN_DIR/$PROGRAM.Logger.{error|warn}.$SCRIPT_PID.$TSAMP.$TSTAMP
+## When called from subprocesses, variable of main process can't be set. Status needs to be get via $RUN_DIR/$PROGRAM.Logger.{error|warn}.$SCRIPT_PID.$TSTAMP
 
 if ! type "$BASH" > /dev/null; then
 	echo "Please run this script only with bash shell. Tested on bash >= 3.2"
@@ -230,17 +230,17 @@ function Logger {
 		_Logger "$prefix($level):$value" "$prefix\e[41m$value\e[0m" true
 		ERROR_ALERT=true
 		# ERROR_ALERT / WARN_ALERT isn't set in main when Logger is called from a subprocess. Need to keep this flag.
-		echo -e "[$retval] in [$(joinString , ${FUNCNAME[@]})] SP=$SCRIPT_PID P=$$\n$prefix($level):$value" >> "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.error.$SCRIPT_PID.$TSAMP"
+		echo -e "[$retval] in [$(joinString , ${FUNCNAME[@]})] SP=$SCRIPT_PID P=$$\n$prefix($level):$value" >> "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.error.$SCRIPT_PID.$TSTAMP"
 		return
 	elif [ "$level" == "ERROR" ]; then
 		_Logger "$prefix($level):$value" "$prefix\e[91m$value\e[0m" true
 		ERROR_ALERT=true
-		echo -e "[$retval] in [$(joinString , ${FUNCNAME[@]})] SP=$SCRIPT_PID P=$$\n$prefix($level):$value" >> "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.error.$SCRIPT_PID.$TSAMP"
+		echo -e "[$retval] in [$(joinString , ${FUNCNAME[@]})] SP=$SCRIPT_PID P=$$\n$prefix($level):$value" >> "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.error.$SCRIPT_PID.$TSTAMP"
 		return
 	elif [ "$level" == "WARN" ]; then
 		_Logger "$prefix($level):$value" "$prefix\e[33m$value\e[0m" true
 		WARN_ALERT=true
-		echo -e "[$retval] in [$(joinString , ${FUNCNAME[@]})] SP=$SCRIPT_PID P=$$\n$prefix($level):$value" >> "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.warn.$SCRIPT_PID.$TSAMP"
+		echo -e "[$retval] in [$(joinString , ${FUNCNAME[@]})] SP=$SCRIPT_PID P=$$\n$prefix($level):$value" >> "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.warn.$SCRIPT_PID.$TSTAMP"
 		return
 	elif [ "$level" == "NOTICE" ]; then
 		if [ "$_LOGGER_ERR_ONLY" != true ]; then
@@ -378,8 +378,8 @@ function SendAlert {
 	else
 		attachment=true
 	fi
-	if [ -e "$RUN_DIR/$PROGRAM._Logger.$SCRIPT_PID.$TSAMP" ]; then
-		body="$MAIL_ALERT_MSG"$'\n\n'"$(cat $RUN_DIR/$PROGRAM._Logger.$SCRIPT_PID.$TSAMP)"
+	if [ -e "$RUN_DIR/$PROGRAM._Logger.$SCRIPT_PID.$TSTAMP" ]; then
+		body="$MAIL_ALERT_MSG"$'\n\n'"$(cat $RUN_DIR/$PROGRAM._Logger.$SCRIPT_PID.$TSTAMP)"
 	fi
 
 	if [ $ERROR_ALERT == true ]; then
@@ -598,8 +598,8 @@ function LoadConfigFile {
 		exit 1
 	else
 		# Remove everything that is not a variable assignation
-		grep '^[^ ]*=[^;&]*' "$configFile" > "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$SCRIPT_PID.$TSAMP"
-		source "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$SCRIPT_PID.$TSAMP"
+		grep '^[^ ]*=[^;&]*' "$configFile" > "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$SCRIPT_PID.$TSTAMP"
+		source "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$SCRIPT_PID.$TSTAMP"
 	fi
 
 	CONFIG_FILE="$configFile"
@@ -882,7 +882,7 @@ function ParallelExec {
 				command="${commandsArray[$counter]}"
 			fi
 			Logger "Running command [$command]." "DEBUG"
-			eval "$command" >> "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$callerName.$SCRIPT_PID.$TSAMP" 2>&1 &
+			eval "$command" >> "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$callerName.$SCRIPT_PID.$TSTAMP" 2>&1 &
 			pid=$!
 			pidsArray+=($pid)
 			commandsArrayPid[$pid]="$command"
@@ -929,9 +929,9 @@ function CleanUp {
 	__CheckArguments 0 $# "$@"	#__WITH_PARANOIA_DEBUG
 
 	if [ "$_DEBUG" != "yes" ]; then
-		rm -f "$RUN_DIR/$PROGRAM."*".$SCRIPT_PID.$TSAMP"
+		rm -f "$RUN_DIR/$PROGRAM."*".$SCRIPT_PID.$TSTAMP"
 		# Fix for sed -i requiring backup extension for BSD & Mac (see all sed -i statements)
-		rm -f "$RUN_DIR/$PROGRAM."*".$SCRIPT_PID.$TSAMP.tmp"
+		rm -f "$RUN_DIR/$PROGRAM."*".$SCRIPT_PID.$TSTAMP.tmp"
 	fi
 }
 
@@ -1160,7 +1160,7 @@ function GetRemoteOS {
 
 	local remoteOsVar
 
-$SSH_CMD bash -s << 'ENDSSH' >> "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$SCRIPT_PID.$TSAMP" 2>&1
+$SSH_CMD bash -s << 'ENDSSH' >> "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$SCRIPT_PID.$TSTAMP" 2>&1
 
 function GetOs {
 	local localOsVar
@@ -1189,8 +1189,8 @@ GetOs
 
 ENDSSH
 
-	if [ -f "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$SCRIPT_PID.$TSAMP" ]; then
-		remoteOsVar=$(cat "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$SCRIPT_PID.$TSAMP")
+	if [ -f "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$SCRIPT_PID.$TSTAMP" ]; then
+		remoteOsVar=$(cat "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$SCRIPT_PID.$TSTAMP")
 		case $remoteOsVar in
 			*"Android"*)
 			REMOTE_OS="Android"
@@ -1246,7 +1246,7 @@ function RunLocalCommand {
 	fi
 
 	Logger "Running command [$command] on local host." "NOTICE"
-	eval "$command" > "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$SCRIPT_PID.$TSAMP" 2>&1 &
+	eval "$command" > "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$SCRIPT_PID.$TSTAMP" 2>&1 &
 
 	WaitForTaskCompletion $! 0 $hardMaxTime $SLEEP_TIME $KEEP_LOGGING true true false ${FUNCNAME[0]}
 	retval=$?
@@ -1257,7 +1257,7 @@ function RunLocalCommand {
 	fi
 
 	if [ $_LOGGER_VERBOSE == true ] || [ $retval -ne 0 ]; then
-		Logger "Command output:\n$(cat $RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$SCRIPT_PID.$TSAMP)" "NOTICE"
+		Logger "Command output:\n$(cat $RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$SCRIPT_PID.$TSTAMP)" "NOTICE"
 	fi
 
 	if [ "$STOP_ON_CMD_ERROR" == "yes" ] && [ $retval -ne 0 ]; then
@@ -1280,7 +1280,7 @@ function RunRemoteCommand {
 	fi
 
 	Logger "Running command [$command] on remote host." "NOTICE"
-	cmd=$SSH_CMD' "$command" > "'$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$SCRIPT_PID.$TSAMP'" 2>&1'
+	cmd=$SSH_CMD' "$command" > "'$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$SCRIPT_PID.$TSTAMP'" 2>&1'
 	Logger "cmd: $cmd" "DEBUG"
 	eval "$cmd" &
 	WaitForTaskCompletion $! 0 $hardMaxTime $SLEEP_TIME $KEEP_LOGGING true true false ${FUNCNAME[0]}
@@ -1291,9 +1291,9 @@ function RunRemoteCommand {
 		Logger "Command failed." "ERROR"
 	fi
 
-	if [ -f "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$SCRIPT_PID.$TSAMP" ] && ([ $_LOGGER_VERBOSE == true ] || [ $retval -ne 0 ])
+	if [ -f "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$SCRIPT_PID.$TSTAMP" ] && ([ $_LOGGER_VERBOSE == true ] || [ $retval -ne 0 ])
 	then
-		Logger "Command output:\n$(cat $RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$SCRIPT_PID.$TSAMP)" "NOTICE"
+		Logger "Command output:\n$(cat $RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$SCRIPT_PID.$TSTAMP)" "NOTICE"
 	fi
 
 	if [ "$STOP_ON_CMD_ERROR" == "yes" ] && [ $retval -ne 0 ]; then

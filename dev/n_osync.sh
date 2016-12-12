@@ -4,7 +4,7 @@ PROGRAM="osync" # Rsync based two way sync engine with fault tolerance
 AUTHOR="(C) 2013-2016 by Orsiris de Jong"
 CONTACT="http://www.netpower.fr/osync - ozy@netpower.fr"
 PROGRAM_VERSION=1.2-beta3
-PROGRAM_BUILD=2016121203
+PROGRAM_BUILD=2016121204
 IS_STABLE=no
 
 #TODO: is debug subset relevant ?
@@ -259,7 +259,7 @@ function _CheckReplicasRemote {
 	CheckConnectivityRemoteHost
 
 $SSH_CMD env _DEBUG="'$_DEBUG'" env _PARANOIA_DEBUG="'$_PARANOIA_DEBUG'" env _LOGGER_SILENT="'$_LOGGER_SILENT'" env _LOGGER_VERBOSE="'$_LOGGER_VERBOSE'" env _LOGGER_PREFIX="'$_LOGGER_PREFIX'" env _LOGGER_ERR_ONLY="'$_LOGGER_ERR_ONLY'" \
-env PROGRAM="'$PROGRAM'" env SCRIPT_PID="'$SCRIPT_PID'" TSTAMP="'$TSTAMP'" \ 
+env PROGRAM="'$PROGRAM'" env SCRIPT_PID="'$SCRIPT_PID'" TSTAMP="'$TSTAMP'" \
 env replicaPath="'$replicaPath'" env CREATE_DIRS="'$CREATE_DIRS'" env COMMAND_SUDO="'$COMMAND_SUDO'" env DF_CMD="'$DF_CMD'" env MINIMUM_SPACE="'$MINIMUM_SPACE'" 'bash -s' << 'ENDSSH' > "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$SCRIPT_PID.$TSTAMP" 2>&1
 include #### DEBUG SUBSET ####
 include #### TrapError SUBSET ####
@@ -2218,7 +2218,7 @@ for i in "$@"; do
 		_LOGGER_PREFIX=""
 		;;
 		--destination-mails=*)
-		DESTINATION_MAILS=${##*=}
+		DESTINATION_MAILS=${i##*=}
 		;;
 		*)
 		if [ $first == "0" ]; then
