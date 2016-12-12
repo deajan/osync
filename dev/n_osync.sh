@@ -4,7 +4,7 @@ PROGRAM="osync" # Rsync based two way sync engine with fault tolerance
 AUTHOR="(C) 2013-2016 by Orsiris de Jong"
 CONTACT="http://www.netpower.fr/osync - ozy@netpower.fr"
 PROGRAM_VERSION=1.2-beta3
-PROGRAM_BUILD=2016121206
+PROGRAM_BUILD=2016121207
 IS_STABLE=no
 
 #TODO(low): is debug subset relevant in remote env
@@ -1789,7 +1789,7 @@ function _SummaryFromFile {
 			# grep -E "^<|^>|^\." = Remove all lines that do not begin with <, > or . to deal with a bizarre bug involving rsync 3.0.6 / CentOS 6 and --skip-compress showing 'adding zip' line for every skipped compressed extension
 			if echo "$file" | grep -E "^<|^>|^\." > /dev/null 2>&1; then
 				# awk removes first part of line until space, then show all others
-				Logger "$direction $replicaPath$(echo $file | (grep -E "^<|^>|^\." || :) awk '{for (i=2; i<NF; i++) printf $i " "; print $NF}')" "ALWAYS"
+				Logger "$direction $replicaPath$(echo $file | awk '{for (i=2; i<NF; i++) printf $i " "; print $NF}')" "ALWAYS"
 			fi
 		done < "$summaryFile"
 	fi
