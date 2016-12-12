@@ -7,7 +7,7 @@ PROGRAM_VERSION=1.2-beta3
 PROGRAM_BUILD=2016121205
 IS_STABLE=no
 
-#TODO: is debug subset relevant ?
+#TODO(low): is debug subset relevant in remote env
 
 # Execution order						#__WITH_PARANOIA_DEBUG
 #	Function Name				Is parallel	#__WITH_PARANOIA_DEBUG
