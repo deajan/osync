@@ -4,11 +4,9 @@ PROGRAM="osync" # Rsync based two way sync engine with fault tolerance
 AUTHOR="(C) 2013-2016 by Orsiris de Jong"
 CONTACT="http://www.netpower.fr/osync - ozy@netpower.fr"
 PROGRAM_VERSION=1.2-beta3
-PROGRAM_BUILD=2016121105
+PROGRAM_BUILD=2016121201
 IS_STABLE=no
 
-#TODO: update waitfor parallelexec and checkarguments
-#TODO: update coding style checkarguments
 #TODO: is debug subset relevant ?
 #TODO: missing _Logger vars ins heredocs
 
@@ -76,10 +74,10 @@ function TrapQuit {
 	local exitcode
 
 	# Get ERROR / WARN alert flags from subprocesses that call Logger
-	if [ -f "$RUN_DIR/$PROGRAM.Logger.warn.$SCRIPT_PID" ]; then
+	if [ -f "$RUN_DIR/$PROGRAM.Logger.warn.$SCRIPT_PID.$TSTAMP" ]; then
 		WARN_ALERT=true
 	fi
-	if [ -f "$RUN_DIR/$PROGRAM.Logger.error.$SCRIPT_PID" ]; then
+	if [ -f "$RUN_DIR/$PROGRAM.Logger.error.$SCRIPT_PID.$TSTAMP" ]; then
 		ERROR_ALERT=true
 	fi
 
@@ -214,11 +212,11 @@ function _CheckReplicasLocal {
 
 	if [ ! -d "$replicaPath" ]; then
 		if [ "$CREATE_DIRS" == "yes" ]; then
-			$COMMAND_SUDO mkdir -p "$replicaPath" >> "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$SCRIPT_PID" 2>&1
+			$COMMAND_SUDO mkdir -p "$replicaPath" >> "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$SCRIPT_PID.$TSTAMP" 2>&1
 			retval=$?
 			if [ $retval -ne 0 ]; then
 				Logger "Cannot create local replica path [$replicaPath]." "CRITICAL" $retval
-				Logger "Command output:\n$(cat $RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$SCRIPT_PID)"
+				Logger "Command output:\n$(cat $RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$SCRIPT_PID.$TSTAMP)"
 				return 1
 			else
 				Logger "Created local replica path [$replicaPath]." "NOTICE"
@@ -262,7 +260,7 @@ function _CheckReplicasRemote {
 	CheckConnectivityRemoteHost
 
 $SSH_CMD env _DEBUG="'$_DEBUG'" env _PARANOIA_DEBUG="'$_PARANOIA_DEBUG'" env _LOGGER_SILENT="'$_LOGGER_SILENT'" env _LOGGER_VERBOSE="'$_LOGGER_VERBOSE'" env _LOGGER_PREFIX="'$_LOGGER_PREFIX'" env _LOGGER_ERR_ONLY="'$_LOGGER_ERR_ONLY'" \
-env replicaPath="'$replicaPath'" env CREATE_DIRS="'$CREATE_DIRS'" env COMMAND_SUDO="'$COMMAND_SUDO'" env DF_CMD="'$DF_CMD'" env MINIMUM_SPACE="'$MINIMUM_SPACE'" 'bash -s' << 'ENDSSH' > "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$SCRIPT_PID" 2>&1
+env replicaPath="'$replicaPath'" env CREATE_DIRS="'$CREATE_DIRS'" env COMMAND_SUDO="'$COMMAND_SUDO'" env DF_CMD="'$DF_CMD'" env MINIMUM_SPACE="'$MINIMUM_SPACE'" 'bash -s' << 'ENDSSH' > "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$SCRIPT_PID.$TSTAMP" 2>&1
 include #### DEBUG SUBSET ####
 include #### TrapError SUBSET ####
 include #### IsInteger SUBSET ####
@@ -314,10 +312,10 @@ ENDSSH
 	if [ $retval -ne 0 ]; then
 		Logger "Failed to check remote replica." "CRITICAL" $retval
 	fi
-	if [ -s "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$SCRIPT_PID" ]; then
+	if [ -s "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$SCRIPT_PID.$TSTAMP" ]; then
 		(
 		_LOGGER_PREFIX=""
-		Logger "$(cat $RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$SCRIPT_PID)" "NOTICE"
+		Logger "$(cat $RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$SCRIPT_PID.$TSTAMP)" "NOTICE"
 		)
 	fi
 	if [ $retval -ne 0 ]; then
@@ -372,11 +370,11 @@ function _HandleLocksLocal {
 	local writeLocks
 
 	if [ ! -d "$replicaStateDir" ]; then
-		$COMMAND_SUDO mkdir -p "$replicaStateDir" >> "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$SCRIPT_PID" 2>&1
+		$COMMAND_SUDO mkdir -p "$replicaStateDir" >> "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$SCRIPT_PID.$TSTAMP" 2>&1
 		retval=$?
 		if [ $retval -ne 0 ]; then
 			Logger "Cannot create state dir [$replicaStateDir]." "CRITICAL" $retval
-			Logger "Command output:\n$(cat $RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$SCRIPT_PID)" "ERROR"
+			Logger "Command output:\n$(cat $RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$SCRIPT_PID.$TSTAMP)" "ERROR"
 			return 1
 		fi
 	fi
@@ -415,11 +413,11 @@ function _HandleLocksLocal {
 		Logger "This is the final merdier" "WARN"
 		return 1
 	else
-		$COMMAND_SUDO echo "$SCRIPT_PID@$INSTANCE_ID" > "$lockfile" 2> "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}-$replicaType.$SCRIPT_PID"
+		$COMMAND_SUDO echo "$SCRIPT_PID@$INSTANCE_ID" > "$lockfile" 2> "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}-$replicaType.$SCRIPT_PID.$TSTAMP"
 		retval=$?
 		if [ $retval -ne 0 ]; then
 			Logger "Could not create lock file on local $replicaType in [$lockfile]." "CRITICAL" $retval
-			Logger "Command output\n$($RUN_DIR/$PROGRAM.${FUNCNAME[0]}-$replicaType.$SCRIPT_PID)" "NOTICE"
+			Logger "Command output\n$($RUN_DIR/$PROGRAM.${FUNCNAME[0]}-$replicaType.$SCRIPT_PID.$TSTAMP)" "NOTICE"
 			return 1
 		else
 			Logger "Locked local $replicaType replica in [$lockfile]." "DEBUG"
@@ -447,7 +445,7 @@ function _HandleLocksRemote {
 # passing initiatorRunningPids as litteral string (has to be run through eval to be an array again)
 $SSH_CMD env _DEBUG="'$_DEBUG'" env _PARANOIA_DEBUG="'$_PARANOIA_DEBUG'" env _LOGGER_SILENT="'$_LOGGER_SILENT'" env _LOGGER_VERBOSE="'$_LOGGER_VERBOSE'" env _LOGGER_PREFIX="'$_LOGGER_PREFIX'" env _LOGGER_ERR_ONLY="'$_LOGGER_ERR_ONLY'" \
 env replicaStateDir="'$replicaStateDir'" env initiatorRunningPidsFlat="\"(${initiatorRunningPids[@]})\"" env lockfile="'$lockfile'" env replicaType="'$replicaType'" env overwrite="'$overwrite'" env SCRIPT_PID="'$SCRIPT_PID'" \
-env INSTANCE_ID="'$INSTANCE_ID'" env FORCE_STRANGER_LOCK_RESUME="'$FORCE_STRANGER_LOCK_RESUME'"  'bash -s' << 'ENDSSH' > "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$SCRIPT_PID" 2>&1
+env INSTANCE_ID="'$INSTANCE_ID'" env FORCE_STRANGER_LOCK_RESUME="'$FORCE_STRANGER_LOCK_RESUME'"  'bash -s' << 'ENDSSH' > "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$SCRIPT_PID.$TSTAMP" 2>&1
 include #### DEBUG SUBSET ####
 include #### TrapError SUBSET ####
 include #### ArrayContains SUBSET ####
@@ -526,10 +524,10 @@ ENDSSH
 	if [ $retval -ne 0 ]; then
 		Logger "Remote lock handling failed." "CRITICAL" $retval
 	fi
-	if [ -s "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$SCRIPT_PID" ]; then
+	if [ -s "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$SCRIPT_PID.$TSTAMP" ]; then
 		(
 		_LOGGER_PREFIX=""
-		Logger "$(cat $RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$SCRIPT_PID)" "NOTICE"
+		Logger "$(cat $RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$SCRIPT_PID.$TSTAMP)" "NOTICE"
 		)
 	fi
 	if [ $retval -ne 0 ]; then
@@ -610,7 +608,7 @@ function _UnlockReplicasRemote {
 	CheckConnectivityRemoteHost
 
 #TODO: missing logger entry
-$SSH_CMD env lockfile="'$lockfile'" env COMMAND_SUDO="'$COMMAND_SUDO'" 'bash -s' << 'ENDSSH' > "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$SCRIPT_PID" 2>&1
+$SSH_CMD env lockfile="'$lockfile'" env COMMAND_SUDO="'$COMMAND_SUDO'" 'bash -s' << 'ENDSSH' > "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$SCRIPT_PID.$TSTAMP" 2>&1
 if [ -f "$lockfile" ]; then
 	$COMMAND_SUDO rm -f "$lockfile"
 fi
@@ -618,7 +616,7 @@ ENDSSH
 	retval=$?
 	if [ $retval -ne 0 ]; then
 		Logger "Could not unlock remote replica." "ERROR" $retval
-		Logger "Command Output:\n$(cat $RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$SCRIPT_PID)" "NOTICE"
+		Logger "Command Output:\n$(cat $RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$SCRIPT_PID.$TSTAMP)" "NOTICE"
 	else
 		Logger "Removed remote replica lock." "DEBUG"
 	fi
@@ -686,16 +684,16 @@ function treeList {
 	if [ "$REMOTE_OPERATION" == "yes" ] && [ "$replicaType" == "${TARGET[$__type]}" ]; then
 		CheckConnectivity3rdPartyHosts
 		CheckConnectivityRemoteHost
-		rsyncCmd="$(type -p $RSYNC_EXECUTABLE) --rsync-path=\"$RSYNC_PATH\" $RSYNC_ARGS $RSYNC_ATTR_ARGS $RSYNC_TYPE_ARGS -8 --exclude \"$OSYNC_DIR\" $RSYNC_PATTERNS $RSYNC_PARTIAL_EXCLUDE -e \"$RSYNC_SSH_CMD\" --list-only $REMOTE_USER@$REMOTE_HOST:\"$escapedReplicaPath\" 2> \"$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$replicaType.error.$SCRIPT_PID\" | (grep -E \"^-|^d|^l\" || :) | (awk '{\$1=\$2=\$3=\$4=\"\" ;print substr(\$0,5)}' || :) | (awk 'BEGIN { FS=\" -> \" } ; { print \$1 }' || :) | (grep -v \"^\.$\" || :) | sort > \"$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$replicaType.$SCRIPT_PID\""
+		rsyncCmd="$(type -p $RSYNC_EXECUTABLE) --rsync-path=\"$RSYNC_PATH\" $RSYNC_ARGS $RSYNC_ATTR_ARGS $RSYNC_TYPE_ARGS -8 --exclude \"$OSYNC_DIR\" $RSYNC_PATTERNS $RSYNC_PARTIAL_EXCLUDE -e \"$RSYNC_SSH_CMD\" --list-only $REMOTE_USER@$REMOTE_HOST:\"$escapedReplicaPath\" 2> \"$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$replicaType.error.$SCRIPT_PID.$TSTAMP\" | (grep -E \"^-|^d|^l\" || :) | (awk '{\$1=\$2=\$3=\$4=\"\" ;print substr(\$0,5)}' || :) | (awk 'BEGIN { FS=\" -> \" } ; { print \$1 }' || :) | (grep -v \"^\.$\" || :) | sort > \"$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$replicaType.$SCRIPT_PID.$TSTAMP\""
 	else
-		rsyncCmd="$(type -p $RSYNC_EXECUTABLE) --rsync-path=\"$RSYNC_PATH\" $RSYNC_ARGS $RSYNC_ATTR_ARGS $RSYNC_TYPE_ARGS -8 --exclude \"$OSYNC_DIR\" $RSYNC_PATTERNS $RSYNC_PARTIAL_EXCLUDE --list-only \"$replicaPath\" 2> \"$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$replicaType.error.$SCRIPT_PID\" | (grep -E \"^-|^d|^l\" || :) | (awk '{\$1=\$2=\$3=\$4=\"\" ;print substr(\$0,5)}' || :) | (awk 'BEGIN { FS=\" -> \" } ; { print \$1 }' || :) | (grep -v \"^\.$\" || :) | sort > \"$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$replicaType.$SCRIPT_PID\""
+		rsyncCmd="$(type -p $RSYNC_EXECUTABLE) --rsync-path=\"$RSYNC_PATH\" $RSYNC_ARGS $RSYNC_ATTR_ARGS $RSYNC_TYPE_ARGS -8 --exclude \"$OSYNC_DIR\" $RSYNC_PATTERNS $RSYNC_PARTIAL_EXCLUDE --list-only \"$replicaPath\" 2> \"$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$replicaType.error.$SCRIPT_PID.$TSTAMP\" | (grep -E \"^-|^d|^l\" || :) | (awk '{\$1=\$2=\$3=\$4=\"\" ;print substr(\$0,5)}' || :) | (awk 'BEGIN { FS=\" -> \" } ; { print \$1 }' || :) | (grep -v \"^\.$\" || :) | sort > \"$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$replicaType.$SCRIPT_PID.$TSTAMP\""
 	fi
 	Logger "RSYNC_CMD: $rsyncCmd" "DEBUG"
 	eval "$rsyncCmd"
 	retval=$?
 
-	if [ -f "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$replicaType.$SCRIPT_PID" ]; then
-		mv -f "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$replicaType.$SCRIPT_PID" "${INITIATOR[$__replicaDir]}${INITIATOR[$__stateDir]}/$replicaType$treeFilename"
+	if [ -f "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$replicaType.$SCRIPT_PID.$TSTAMP" ]; then
+		mv -f "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$replicaType.$SCRIPT_PID.$TSTAMP" "${INITIATOR[$__replicaDir]}${INITIATOR[$__stateDir]}/$replicaType$treeFilename"
 	fi
 
 	## Retval 24 = some files vanished while creating list
@@ -703,7 +701,7 @@ function treeList {
 		return $?
 	elif [ $retval -eq 23 ]; then
 		Logger "Some files could not be listed in $replicaType replica [$replicaPath]. Check for failing symlinks." "ERROR" $retval
-		Logger "Command output\n$(cat $RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$replicaType.error.$SCRIPT_PID)" "NOTICE"
+		Logger "Command output\n$(cat $RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$replicaType.error.$SCRIPT_PID.$TSTAMP)" "NOTICE"
 		return 0
 	else
 		Logger "Cannot create replica file list in [$replicaPath]." "CRITICAL" $retval
@@ -775,13 +773,13 @@ function _getFileCtimeMtimeLocal {
 
 	local retval
 
-	echo -n "" > "$RUN_DIR/$PROGRAM.ctime_mtime.$replicaType.$SCRIPT_PID"
-	while read -r file; do $STAT_CTIME_MTIME_CMD "$replicaPath$file" | sort >> "$RUN_DIR/$PROGRAM.ctime_mtime.$replicaType.$SCRIPT_PID"; done < "$fileList"
+	echo -n "" > "$RUN_DIR/$PROGRAM.ctime_mtime.$replicaType.$SCRIPT_PID.$TSTAMP"
+	while read -r file; do $STAT_CTIME_MTIME_CMD "$replicaPath$file" | sort >> "$RUN_DIR/$PROGRAM.ctime_mtime.$replicaType.$SCRIPT_PID.$TSTAMP"; done < "$fileList"
 	retval=$?
 	if [ $retval -ne 0 ]; then
 		Logger "Getting file attributes failed [$retval] on $replicaType. Stopping execution." "CRITICAL" $retval
-		if [ -f "$RUN_DIR/$PROGRAM.ctime_mtime.$replicaType.$SCRIPT_PID" ]; then
-			Logger "Command output:\n$(cat $RUN_DIR/$PROGRAM.ctime_mtime.$replicaType.$SCRIPT_PID)" "VERBOSE"
+		if [ -f "$RUN_DIR/$PROGRAM.ctime_mtime.$replicaType.$SCRIPT_PID.$TSTAMP" ]; then
+			Logger "Command output:\n$(cat $RUN_DIR/$PROGRAM.ctime_mtime.$replicaType.$SCRIPT_PID.$TSTAMP)" "VERBOSE"
 		fi
 		return 1
 	fi
@@ -797,34 +795,34 @@ function _getFileCtimeMtimeRemote {
 	local retval
 	local cmd
 
-	cmd='cat "'$fileList'" | '$SSH_CMD' "cat > \".$PROGRAM.ctime_mtime.$replicaType.$SCRIPT_PID\""'
+	cmd='cat "'$fileList'" | '$SSH_CMD' "cat > \".$PROGRAM.ctime_mtime.$replicaType.$SCRIPT_PID.$TSTAMP\""'
 	Logger "CMD: $cmd" "DEBUG"
 	eval "$cmd"
 	retval=$?
 	if [ $retval -ne 0 ]; then
 		Logger "Sending ctime required file list failed with [$retval] on $replicaType. Stopping execution." "CRITICAL" $retval
-		if [ -f "$RUN_DIR/$PROGRAM.ctime_mtime.$replicaType.$SCRIPT_PID" ]; then
-			Logger "Command output:\n$(cat $RUN_DIR/$PROGRAM.ctime_mtime.$replicaType.$SCRIPT_PID)" "VERBOSE"
+		if [ -f "$RUN_DIR/$PROGRAM.ctime_mtime.$replicaType.$SCRIPT_PID.$TSTAMP" ]; then
+			Logger "Command output:\n$(cat $RUN_DIR/$PROGRAM.ctime_mtime.$replicaType.$SCRIPT_PID.$TSTAMP)" "VERBOSE"
 		fi
 		return 1
 	fi
 
-$SSH_CMD env PROGRAM="'$PROGRAM'" env SCRIPT_PID="'$SCRIPT_PID'" env replicaPath="'$replicaPath'" env replicaType="'$replicaType'" env REMOTE_STAT_CTIME_MTIME_CMD="'$REMOTE_STAT_CTIME_MTIME_CMD'" 'bash -s' << 'ENDSSH' > "$RUN_DIR/$PROGRAM.ctime_mtime.$replicaType.$SCRIPT_PID"
-	while read -r file; do $REMOTE_STAT_CTIME_MTIME_CMD "$replicaPath$file" | sort; done < ".$PROGRAM.ctime_mtime.$replicaType.$SCRIPT_PID"
-		if [ -f ".$PROGRAM.ctime_mtime.$replicaType.$SCRIPT_PID" ]; then
-			rm -f ".$PROGRAM.ctime_mtime.$replicaType.$SCRIPT_PID"
+$SSH_CMD env PROGRAM="'$PROGRAM'" env SCRIPT_PID="'$SCRIPT_PID'" env replicaPath="'$replicaPath'" env replicaType="'$replicaType'" env REMOTE_STAT_CTIME_MTIME_CMD="'$REMOTE_STAT_CTIME_MTIME_CMD'" 'bash -s' << 'ENDSSH' > "$RUN_DIR/$PROGRAM.ctime_mtime.$replicaType.$SCRIPT_PID.$TSTAMP"
+	while read -r file; do $REMOTE_STAT_CTIME_MTIME_CMD "$replicaPath$file" | sort; done < ".$PROGRAM.ctime_mtime.$replicaType.$SCRIPT_PID.$TSTAMP"
+		if [ -f ".$PROGRAM.ctime_mtime.$replicaType.$SCRIPT_PID.$TSTAMP" ]; then
+			rm -f ".$PROGRAM.ctime_mtime.$replicaType.$SCRIPT_PID.$TSTAMP"
 		fi
 ENDSSH
 	retval=$?
 	if [ $retval -ne 0 ]; then
 		Logger "Getting file attributes failed [$retval] on $replicaType. Stopping execution." "CRITICAL" $retval
-		if [ -f "$RUN_DIR/$PROGRAM.ctime_mtime.$replicaType.$SCRIPT_PID" ]; then
-			Logger "Command output:\n$(cat $RUN_DIR/$PROGRAM.ctime_mtime.$replicaType.$SCRIPT_PID)" "VERBOSE"
+		if [ -f "$RUN_DIR/$PROGRAM.ctime_mtime.$replicaType.$SCRIPT_PID.$TSTAMP" ]; then
+			Logger "Command output:\n$(cat $RUN_DIR/$PROGRAM.ctime_mtime.$replicaType.$SCRIPT_PID.$TSTAMP)" "VERBOSE"
 		fi
 		return $retval
 	else
 		# Ugly fix for csh in FreeBSD 11 that adds leading and trailing '\"'
-		sed -i.tmp -e 's/^\\"//' -e 's/\\"$//' "$RUN_DIR/$PROGRAM.ctime_mtime.$replicaType.$SCRIPT_PID"
+		sed -i.tmp -e 's/^\\"//' -e 's/\\"$//' "$RUN_DIR/$PROGRAM.ctime_mtime.$replicaType.$SCRIPT_PID.$TSTAMP"
 	fi
 }
 
@@ -854,9 +852,9 @@ function syncAttrs {
 	if [ "$REMOTE_OPERATION" == "yes" ]; then
 		CheckConnectivity3rdPartyHosts
 		CheckConnectivityRemoteHost
-		rsyncCmd="$(type -p $RSYNC_EXECUTABLE) --rsync-path=\"$RSYNC_PATH\" -i -n -8 $RSYNC_ARGS $RSYNC_ATTR_ARGS $RSYNC_PARTIAL_EXCLUDE -e \"$RSYNC_SSH_CMD\" --exclude \"$OSYNC_DIR\" $RSYNC_PATTERNS $RSYNC_PARTIAL_EXCLUDE \"$initiatorReplica\" $REMOTE_USER@$REMOTE_HOST:\"$targetReplica\" >> $RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$SCRIPT_PID 2>&1 &"
+		rsyncCmd="$(type -p $RSYNC_EXECUTABLE) --rsync-path=\"$RSYNC_PATH\" -i -n -8 $RSYNC_ARGS $RSYNC_ATTR_ARGS $RSYNC_PARTIAL_EXCLUDE -e \"$RSYNC_SSH_CMD\" --exclude \"$OSYNC_DIR\" $RSYNC_PATTERNS $RSYNC_PARTIAL_EXCLUDE \"$initiatorReplica\" $REMOTE_USER@$REMOTE_HOST:\"$targetReplica\" >> $RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$SCRIPT_PID.$TSTAMP 2>&1 &"
 	else
-		rsyncCmd="$(type -p $RSYNC_EXECUTABLE) --rsync-path=\"$RSYNC_PATH\" -i -n -8 $RSYNC_ARGS $RSYNC_ATTR_ARGS $RSYNC_PARTIAL_EXCLUDE --exclude \"$OSYNC_DIR\" $RSYNC_PATTERNS $RSYNC_PARTIAL_EXCLUDE \"$initiatorReplica\" \"$targetReplica\" >> $RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$SCRIPT_PID 2>&1 &"
+		rsyncCmd="$(type -p $RSYNC_EXECUTABLE) --rsync-path=\"$RSYNC_PATH\" -i -n -8 $RSYNC_ARGS $RSYNC_ATTR_ARGS $RSYNC_PARTIAL_EXCLUDE --exclude \"$OSYNC_DIR\" $RSYNC_PATTERNS $RSYNC_PARTIAL_EXCLUDE \"$initiatorReplica\" \"$targetReplica\" >> $RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$SCRIPT_PID.$TSTAMP 2>&1 &"
 	fi
 	Logger "RSYNC_CMD: $rsyncCmd" "DEBUG"
 	eval "$rsyncCmd"
@@ -865,15 +863,15 @@ function syncAttrs {
 
 	if [ $retval -ne 0 ] && [ $retval -ne 24 ]; then
 		Logger "Getting list of files that need updates failed [$retval]. Stopping execution." "CRITICAL" $retval
-		if [ -f "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$SCRIPT_PID" ]; then
-			Logger "Rsync output:\n$(cat $RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$SCRIPT_PID)" "NOTICE"
+		if [ -f "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$SCRIPT_PID.$TSTAMP" ]; then
+			Logger "Rsync output:\n$(cat $RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$SCRIPT_PID.$TSTAMP)" "NOTICE"
 		fi
 		return $retval
 	else
-		if [ -f "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$SCRIPT_PID" ]; then
-			Logger "List:\n$(cat $RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$SCRIPT_PID)" "VERBOSE"
+		if [ -f "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$SCRIPT_PID.$TSTAMP" ]; then
+			Logger "List:\n$(cat $RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$SCRIPT_PID.$TSTAMP)" "VERBOSE"
 		fi
-		( grep -Ev "^[^ ]*(c|s|t)[^ ]* " "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$SCRIPT_PID" || :) | ( grep -E "^[^ ]*(p|o|g|a)[^ ]* " || :) | sed -e 's/^[^ ]* //' >> "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}-cleaned.$SCRIPT_PID"
+		( grep -Ev "^[^ ]*(c|s|t)[^ ]* " "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$SCRIPT_PID.$TSTAMP" || :) | ( grep -E "^[^ ]*(p|o|g|a)[^ ]* " || :) | sed -e 's/^[^ ]* //' >> "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}-cleaned.$SCRIPT_PID.$TSTAMP"
 		retval=$?
 		if [ $retval -ne 0 ]; then
 			Logger "Cannot prepare file list for attribute sync." "CRITICAL" $retval
@@ -882,15 +880,15 @@ function syncAttrs {
 	fi
 
 	Logger "Getting ctimes for pending files on initiator." "NOTICE"
-	_getFileCtimeMtimeLocal "${INITIATOR[$__replicaDir]}" "${INITIATOR[$__type]}" "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}-cleaned.$SCRIPT_PID" &
+	_getFileCtimeMtimeLocal "${INITIATOR[$__replicaDir]}" "${INITIATOR[$__type]}" "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}-cleaned.$SCRIPT_PID.$TSTAMP" &
 	pids="$!"
 
 	Logger "Getting ctimes for pending files on target." "NOTICE"
 	if [ "$REMOTE_OPERATION" != "yes" ]; then
-		_getFileCtimeMtimeLocal "${TARGET[$__replicaDir]}" "${TARGET[$__type]}" "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}-cleaned.$SCRIPT_PID" &
+		_getFileCtimeMtimeLocal "${TARGET[$__replicaDir]}" "${TARGET[$__type]}" "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}-cleaned.$SCRIPT_PID.$TSTAMP" &
 		pids="$pids;$!"
 	else
-		_getFileCtimeMtimeRemote "${TARGET[$__replicaDir]}" "${TARGET[$__type]}" "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}-cleaned.$SCRIPT_PID" &
+		_getFileCtimeMtimeRemote "${TARGET[$__replicaDir]}" "${TARGET[$__type]}" "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}-cleaned.$SCRIPT_PID.$TSTAMP" &
 		pids="$pids;$!"
 	fi
 	WaitForTaskCompletion $pids $SOFT_MAX_EXEC_TIME $HARD_MAX_EXEC_TIME $SLEEP_TIME $KEEP_LOGGING false true false
@@ -903,8 +901,8 @@ function syncAttrs {
 	# If target gets updated first, then sync_attr must update initiators attrs first
 	# For join, remove leading replica paths
 
-	sed -i'.tmp' "s;^${INITIATOR[$__replicaDir]};;g" "$RUN_DIR/$PROGRAM.ctime_mtime.${INITIATOR[$__type]}.$SCRIPT_PID"
-	sed -i'.tmp' "s;^${TARGET[$__replicaDir]};;g" "$RUN_DIR/$PROGRAM.ctime_mtime.${TARGET[$__type]}.$SCRIPT_PID"
+	sed -i'.tmp' "s;^${INITIATOR[$__replicaDir]};;g" "$RUN_DIR/$PROGRAM.ctime_mtime.${INITIATOR[$__type]}.$SCRIPT_PID.$TSTAMP"
+	sed -i'.tmp' "s;^${TARGET[$__replicaDir]};;g" "$RUN_DIR/$PROGRAM.ctime_mtime.${TARGET[$__type]}.$SCRIPT_PID.$TSTAMP"
 
 	if [ "$CONFLICT_PREVALANCE" == "${TARGET[$__type]}" ]; then
 		sourceDir="${INITIATOR[$__replicaDir]}"
@@ -912,17 +910,17 @@ function syncAttrs {
 		destDir="${TARGET[$__replicaDir]}"
 		escDestDir=$(EscapeSpaces "${TARGET[$__replicaDir]}")
 		destReplica="${TARGET[$__type]}"
-		join -j 1 -t ';' -o 1.1,1.2,2.2 "$RUN_DIR/$PROGRAM.ctime_mtime.${INITIATOR[$__type]}.$SCRIPT_PID" "$RUN_DIR/$PROGRAM.ctime_mtime.${TARGET[$__type]}.$SCRIPT_PID" | awk -F';' '{if ($2 > $3) print $1}' > "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}-ctime_files.$SCRIPT_PID"
+		join -j 1 -t ';' -o 1.1,1.2,2.2 "$RUN_DIR/$PROGRAM.ctime_mtime.${INITIATOR[$__type]}.$SCRIPT_PID.$TSTAMP" "$RUN_DIR/$PROGRAM.ctime_mtime.${TARGET[$__type]}.$SCRIPT_PID.$TSTAMP" | awk -F';' '{if ($2 > $3) print $1}' > "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}-ctime_files.$SCRIPT_PID.$TSTAMP"
 	else
 		sourceDir="${TARGET[$__replicaDir]}"
 		escSourceDir=$(EscapeSpaces "${TARGET[$__replicaDir]}")
 		destDir="${INITIATOR[$__replicaDir]}"
 		escDestDir=$(EscapeSpaces "${INITIATOR[$__replicaDir]}")
 		destReplica="${INITIATOR[$__type]}"
-		join -j 1 -t ';' -o 1.1,1.2,2.2 "$RUN_DIR/$PROGRAM.ctime_mtime.${TARGET[$__type]}.$SCRIPT_PID" "$RUN_DIR/$PROGRAM.ctime_mtime.${INITIATOR[$__type]}.$SCRIPT_PID" | awk -F';' '{if ($2 > $3) print $1}' > "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}-ctime_files.$SCRIPT_PID"
+		join -j 1 -t ';' -o 1.1,1.2,2.2 "$RUN_DIR/$PROGRAM.ctime_mtime.${TARGET[$__type]}.$SCRIPT_PID.$TSTAMP" "$RUN_DIR/$PROGRAM.ctime_mtime.${INITIATOR[$__type]}.$SCRIPT_PID.$TSTAMP" | awk -F';' '{if ($2 > $3) print $1}' > "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}-ctime_files.$SCRIPT_PID.$TSTAMP"
 	fi
 
-	if [ $(wc -l < "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}-ctime_files.$SCRIPT_PID") -eq 0 ]; then
+	if [ $(wc -l < "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}-ctime_files.$SCRIPT_PID.$TSTAMP") -eq 0 ]; then
 		Logger "Updating file attributes on $destReplica not required" "NOTICE"
 		return 0
 	fi
@@ -935,12 +933,12 @@ function syncAttrs {
 
 		# No rsync args (hence no -r) because files are selected with --from-file
 		if [ "$destReplica" == "${INITIATOR[$__type]}" ]; then
-			rsyncCmd="$(type -p $RSYNC_EXECUTABLE) --rsync-path=\"$RSYNC_PATH\" $RSYNC_DRY_ARG $RSYNC_ATTR_ARGS $SYNC_OPTS -e \"$RSYNC_SSH_CMD\" --exclude \"$OSYNC_DIR\" $RSYNC_PATTERNS $RSYNC_PARTIAL_EXCLUDE --exclude-from=\"${INITIATOR[$__replicaDir]}${INITIATOR[$__stateDir]}/${INITIATOR[$__type]}${INITIATOR[$__deletedListFile]}\" --exclude-from=\"${INITIATOR[$__replicaDir]}${INITIATOR[$__stateDir]}/${TARGET[$__type]}${INITIATOR[$__deletedListFile]}\" --files-from=\"$RUN_DIR/$PROGRAM.${FUNCNAME[0]}-ctime_files.$SCRIPT_PID\" $REMOTE_USER@$REMOTE_HOST:\"$escSourceDir\" \"$destDir\" >> $RUN_DIR/$PROGRAM.attr-update.$destReplica.$SCRIPT_PID 2>&1 &"
+			rsyncCmd="$(type -p $RSYNC_EXECUTABLE) --rsync-path=\"$RSYNC_PATH\" $RSYNC_DRY_ARG $RSYNC_ATTR_ARGS $SYNC_OPTS -e \"$RSYNC_SSH_CMD\" --exclude \"$OSYNC_DIR\" $RSYNC_PATTERNS $RSYNC_PARTIAL_EXCLUDE --exclude-from=\"${INITIATOR[$__replicaDir]}${INITIATOR[$__stateDir]}/${INITIATOR[$__type]}${INITIATOR[$__deletedListFile]}\" --exclude-from=\"${INITIATOR[$__replicaDir]}${INITIATOR[$__stateDir]}/${TARGET[$__type]}${INITIATOR[$__deletedListFile]}\" --files-from=\"$RUN_DIR/$PROGRAM.${FUNCNAME[0]}-ctime_files.$SCRIPT_PID.$TSTAMP\" $REMOTE_USER@$REMOTE_HOST:\"$escSourceDir\" \"$destDir\" >> $RUN_DIR/$PROGRAM.attr-update.$destReplica.$SCRIPT_PID.$TSTAMP 2>&1 &"
 		else
-			rsyncCmd="$(type -p $RSYNC_EXECUTABLE) --rsync-path=\"$RSYNC_PATH\" $RSYNC_DRY_ARG $RSYNC_ATTR_ARGS $SYNC_OPTS -e \"$RSYNC_SSH_CMD\" --exclude \"$OSYNC_DIR\" $RSYNC_PATTERNS $RSYNC_PARTIAL_EXCLUDE --exclude-from=\"${INITIATOR[$__replicaDir]}${INITIATOR[$__stateDir]}/${INITIATOR[$__type]}${INITIATOR[$__deletedListFile]}\" --exclude-from=\"${INITIATOR[$__replicaDir]}${INITIATOR[$__stateDir]}/${TARGET[$__type]}${INITIATOR[$__deletedListFile]}\" --files-from=\"$RUN_DIR/$PROGRAM.${FUNCNAME[0]}-ctime_files.$SCRIPT_PID\" \"$sourceDir\" $REMOTE_USER@$REMOTE_HOST:\"$escDestDir\" >> $RUN_DIR/$PROGRAM.attr-update.$destReplica.$SCRIPT_PID 2>&1 &"
+			rsyncCmd="$(type -p $RSYNC_EXECUTABLE) --rsync-path=\"$RSYNC_PATH\" $RSYNC_DRY_ARG $RSYNC_ATTR_ARGS $SYNC_OPTS -e \"$RSYNC_SSH_CMD\" --exclude \"$OSYNC_DIR\" $RSYNC_PATTERNS $RSYNC_PARTIAL_EXCLUDE --exclude-from=\"${INITIATOR[$__replicaDir]}${INITIATOR[$__stateDir]}/${INITIATOR[$__type]}${INITIATOR[$__deletedListFile]}\" --exclude-from=\"${INITIATOR[$__replicaDir]}${INITIATOR[$__stateDir]}/${TARGET[$__type]}${INITIATOR[$__deletedListFile]}\" --files-from=\"$RUN_DIR/$PROGRAM.${FUNCNAME[0]}-ctime_files.$SCRIPT_PID.$TSTAMP\" \"$sourceDir\" $REMOTE_USER@$REMOTE_HOST:\"$escDestDir\" >> $RUN_DIR/$PROGRAM.attr-update.$destReplica.$SCRIPT_PID.$TSTAMP 2>&1 &"
 		fi
 	else
-		rsyncCmd="$(type -p $RSYNC_EXECUTABLE) --rsync-path=\"$RSYNC_PATH\" $RSYNC_DRY_ARG $RSYNC_ATTR_ARGS $SYNC_OPTS --exclude \"$OSYNC_DIR\" $RSYNC_PATTERNS $RSYNC_PARTIAL_EXCLUDE --exclude-from=\"${INITIATOR[$__replicaDir]}${INITIATOR[$__stateDir]}/${INITIATOR[$__type]}${INITIATOR[$__deletedListFile]}\" --exclude-from=\"${INITIATOR[$__replicaDir]}${INITIATOR[$__stateDir]}/${TARGET[$__type]}${INITIATOR[$__deletedListFile]}\" --files-from=\"$RUN_DIR/$PROGRAM.${FUNCNAME[0]}-ctime_files.$SCRIPT_PID\" \"$sourceDir\" \"$destDir\" >> $RUN_DIR/$PROGRAM.attr-update.$destReplica.$SCRIPT_PID 2>&1 &"
+		rsyncCmd="$(type -p $RSYNC_EXECUTABLE) --rsync-path=\"$RSYNC_PATH\" $RSYNC_DRY_ARG $RSYNC_ATTR_ARGS $SYNC_OPTS --exclude \"$OSYNC_DIR\" $RSYNC_PATTERNS $RSYNC_PARTIAL_EXCLUDE --exclude-from=\"${INITIATOR[$__replicaDir]}${INITIATOR[$__stateDir]}/${INITIATOR[$__type]}${INITIATOR[$__deletedListFile]}\" --exclude-from=\"${INITIATOR[$__replicaDir]}${INITIATOR[$__stateDir]}/${TARGET[$__type]}${INITIATOR[$__deletedListFile]}\" --files-from=\"$RUN_DIR/$PROGRAM.${FUNCNAME[0]}-ctime_files.$SCRIPT_PID.$TSTAMP\" \"$sourceDir\" \"$destDir\" >> $RUN_DIR/$PROGRAM.attr-update.$destReplica.$SCRIPT_PID.$TSTAMP 2>&1 &"
 
 	fi
 
@@ -951,13 +949,13 @@ function syncAttrs {
 
 	if [ $retval -ne 0 ] && [ $retval -ne 24 ]; then
 		Logger "Updating file attributes on $destReplica [$retval]. Stopping execution." "CRITICAL" $retval
-		if [ -f "$RUN_DIR/$PROGRAM.attr-update.$destReplica.$SCRIPT_PID" ]; then
-			Logger "Rsync output:\n$(cat $RUN_DIR/$PROGRAM.attr-update.$destReplica.$SCRIPT_PID)" "NOTICE"
+		if [ -f "$RUN_DIR/$PROGRAM.attr-update.$destReplica.$SCRIPT_PID.$TSTAMP" ]; then
+			Logger "Rsync output:\n$(cat $RUN_DIR/$PROGRAM.attr-update.$destReplica.$SCRIPT_PID.$TSTAMP)" "NOTICE"
 		fi
 		return 1
 	else
-		if [ -f "$RUN_DIR/$PROGRAM.attr-update.$destReplica.$SCRIPT_PID" ]; then
-			Logger "List:\n$(cat $RUN_DIR/$PROGRAM.attr-update.$destReplica.$SCRIPT_PID)" "VERBOSE"
+		if [ -f "$RUN_DIR/$PROGRAM.attr-update.$destReplica.$SCRIPT_PID.$TSTAMP" ]; then
+			Logger "List:\n$(cat $RUN_DIR/$PROGRAM.attr-update.$destReplica.$SCRIPT_PID.$TSTAMP)" "VERBOSE"
 		fi
 		Logger "Successfully updated file attributes on $destReplica replica." "NOTICE"
 	fi
@@ -1000,12 +998,12 @@ function syncUpdate {
 		CheckConnectivity3rdPartyHosts
 		CheckConnectivityRemoteHost
 		if [ "$sourceReplica" == "${INITIATOR[$__type]}" ]; then
-			rsyncCmd="$(type -p $RSYNC_EXECUTABLE) --rsync-path=\"$RSYNC_PATH\" $RSYNC_ARGS $RSYNC_DRY_ARG $RSYNC_ATTR_ARGS $RSYNC_TYPE_ARGS $SYNC_OPTS -e \"$RSYNC_SSH_CMD\" $backupArgs --exclude \"$OSYNC_DIR\" $RSYNC_PATTERNS $RSYNC_PARTIAL_EXCLUDE --exclude-from=\"${INITIATOR[$__replicaDir]}${INITIATOR[$__stateDir]}/$sourceReplica${INITIATOR[$__deletedListFile]}\" --exclude-from=\"${INITIATOR[$__replicaDir]}${INITIATOR[$__stateDir]}/$destinationReplica${INITIATOR[$__deletedListFile]}\" \"$sourceDir\" $REMOTE_USER@$REMOTE_HOST:\"$escDestDir\" >> $RUN_DIR/$PROGRAM.update.$destinationReplica.$SCRIPT_PID 2>&1"
+			rsyncCmd="$(type -p $RSYNC_EXECUTABLE) --rsync-path=\"$RSYNC_PATH\" $RSYNC_ARGS $RSYNC_DRY_ARG $RSYNC_ATTR_ARGS $RSYNC_TYPE_ARGS $SYNC_OPTS -e \"$RSYNC_SSH_CMD\" $backupArgs --exclude \"$OSYNC_DIR\" $RSYNC_PATTERNS $RSYNC_PARTIAL_EXCLUDE --exclude-from=\"${INITIATOR[$__replicaDir]}${INITIATOR[$__stateDir]}/$sourceReplica${INITIATOR[$__deletedListFile]}\" --exclude-from=\"${INITIATOR[$__replicaDir]}${INITIATOR[$__stateDir]}/$destinationReplica${INITIATOR[$__deletedListFile]}\" \"$sourceDir\" $REMOTE_USER@$REMOTE_HOST:\"$escDestDir\" >> $RUN_DIR/$PROGRAM.update.$destinationReplica.$SCRIPT_PID.$TSTAMP 2>&1"
 		else
-			rsyncCmd="$(type -p $RSYNC_EXECUTABLE) --rsync-path=\"$RSYNC_PATH\" $RSYNC_ARGS $RSYNC_DRY_ARG $RSYNC_ATTR_ARGS $RSYNC_TYPE_ARGS $SYNC_OPTS -e \"$RSYNC_SSH_CMD\" $backupArgs --exclude \"$OSYNC_DIR\" $RSYNC_PATTERNS $RSYNC_PARTIAL_EXCLUDE --exclude-from=\"${INITIATOR[$__replicaDir]}${INITIATOR[$__stateDir]}/$destinationReplica${INITIATOR[$__deletedListFile]}\" --exclude-from=\"${INITIATOR[$__replicaDir]}${INITIATOR[$__stateDir]}/$sourceReplica${INITIATOR[$__deletedListFile]}\" $REMOTE_USER@$REMOTE_HOST:\"$escSourceDir\" \"$destDir\" >> $RUN_DIR/$PROGRAM.update.$destinationReplica.$SCRIPT_PID 2>&1"
+			rsyncCmd="$(type -p $RSYNC_EXECUTABLE) --rsync-path=\"$RSYNC_PATH\" $RSYNC_ARGS $RSYNC_DRY_ARG $RSYNC_ATTR_ARGS $RSYNC_TYPE_ARGS $SYNC_OPTS -e \"$RSYNC_SSH_CMD\" $backupArgs --exclude \"$OSYNC_DIR\" $RSYNC_PATTERNS $RSYNC_PARTIAL_EXCLUDE --exclude-from=\"${INITIATOR[$__replicaDir]}${INITIATOR[$__stateDir]}/$destinationReplica${INITIATOR[$__deletedListFile]}\" --exclude-from=\"${INITIATOR[$__replicaDir]}${INITIATOR[$__stateDir]}/$sourceReplica${INITIATOR[$__deletedListFile]}\" $REMOTE_USER@$REMOTE_HOST:\"$escSourceDir\" \"$destDir\" >> $RUN_DIR/$PROGRAM.update.$destinationReplica.$SCRIPT_PID.$TSTAMP 2>&1"
 		fi
 	else
-		rsyncCmd="$(type -p $RSYNC_EXECUTABLE) --rsync-path=\"$RSYNC_PATH\" $RSYNC_ARGS $RSYNC_DRY_ARG $RSYNC_ATTR_ARGS $RSYNC_TYPE_ARGS $SYNC_OPTS $backupArgs --exclude \"$OSYNC_DIR\" $RSYNC_PATTERNS $RSYNC_PARTIAL_EXCLUDE --exclude-from=\"${INITIATOR[$__replicaDir]}${INITIATOR[$__stateDir]}/$sourceReplica${INITIATOR[$__deletedListFile]}\" --exclude-from=\"${INITIATOR[$__replicaDir]}${INITIATOR[$__stateDir]}/$destinationReplica${INITIATOR[$__deletedListFile]}\" \"$sourceDir\" \"$destDir\" >> $RUN_DIR/$PROGRAM.update.$destinationReplica.$SCRIPT_PID 2>&1"
+		rsyncCmd="$(type -p $RSYNC_EXECUTABLE) --rsync-path=\"$RSYNC_PATH\" $RSYNC_ARGS $RSYNC_DRY_ARG $RSYNC_ATTR_ARGS $RSYNC_TYPE_ARGS $SYNC_OPTS $backupArgs --exclude \"$OSYNC_DIR\" $RSYNC_PATTERNS $RSYNC_PARTIAL_EXCLUDE --exclude-from=\"${INITIATOR[$__replicaDir]}${INITIATOR[$__stateDir]}/$sourceReplica${INITIATOR[$__deletedListFile]}\" --exclude-from=\"${INITIATOR[$__replicaDir]}${INITIATOR[$__stateDir]}/$destinationReplica${INITIATOR[$__deletedListFile]}\" \"$sourceDir\" \"$destDir\" >> $RUN_DIR/$PROGRAM.update.$destinationReplica.$SCRIPT_PID.$TSTAMP 2>&1"
 	fi
 	Logger "RSYNC_CMD: $rsyncCmd" "DEBUG"
 	eval "$rsyncCmd"
@@ -1013,13 +1011,13 @@ function syncUpdate {
 
 	if [ $retval -ne 0 ] && [ $retval -ne 24 ]; then
 		Logger "Updating $destinationReplica replica failed. Stopping execution." "CRITICAL" $retval
-		if [ -f "$RUN_DIR/$PROGRAM.update.$destinationReplica.$SCRIPT_PID" ]; then
-			Logger "Rsync output:\n$(cat $RUN_DIR/$PROGRAM.update.$destinationReplica.$SCRIPT_PID)" "NOTICE"
+		if [ -f "$RUN_DIR/$PROGRAM.update.$destinationReplica.$SCRIPT_PID.$TSTAMP" ]; then
+			Logger "Rsync output:\n$(cat $RUN_DIR/$PROGRAM.update.$destinationReplica.$SCRIPT_PID.$TSTAMP)" "NOTICE"
 		fi
 		exit 1
 	else
-		if [ -f "$RUN_DIR/$PROGRAM.update.$destinationReplica.$SCRIPT_PID" ]; then
-			Logger "List:\n$(cat $RUN_DIR/$PROGRAM.update.$destinationReplica.$SCRIPT_PID)" "VERBOSE"
+		if [ -f "$RUN_DIR/$PROGRAM.update.$destinationReplica.$SCRIPT_PID.$TSTAMP" ]; then
+			Logger "List:\n$(cat $RUN_DIR/$PROGRAM.update.$destinationReplica.$SCRIPT_PID.$TSTAMP)" "VERBOSE"
 		fi
 		Logger "Updating $destinationReplica replica succeded." "NOTICE"
 		return 0
@@ -1081,7 +1079,7 @@ function _deleteLocal {
 							Logger "Cannot move [$replicaDir$files] to deletion directory." "ERROR" $retval
 							echo "$files" >> "${INITIATOR[$__replicaDir]}${INITIATOR[$__stateDir]}/$replicaType${INITIATOR[$__failedDeletedListFile]}"
 						else
-							echo "$files" >> "$RUN_DIR/$PROGRAM.delete.$replicaType.$SCRIPT_PID"
+							echo "$files" >> "$RUN_DIR/$PROGRAM.delete.$replicaType.$SCRIPT_PID.$TSTAMP"
 						fi
 					fi
 				fi
@@ -1095,7 +1093,7 @@ function _deleteLocal {
 							Logger "Cannot delete [$replicaDir$files]." "ERROR" $retval
 							echo "$files" >> "${INITIATOR[$__replicaDir]}${INITIATOR[$__stateDir]}/$replicaType${INITIATOR[$__failedDeletedListFile]}"
 						else
-							echo "$files" >> "$RUN_DIR/$PROGRAM.delete.$replicaType.$SCRIPT_PID"
+							echo "$files" >> "$RUN_DIR/$PROGRAM.delete.$replicaType.$SCRIPT_PID.$TSTAMP"
 						fi
 					fi
 				fi
@@ -1137,14 +1135,14 @@ function _deleteRemote {
 
 	# Additionnaly, we need to copy the deletetion list to the remote state folder
 	escDestDir="$(EscapeSpaces "${TARGET[$__replicaDir]}${TARGET[$__stateDir]}")"
-	rsyncCmd="$(type -p $RSYNC_EXECUTABLE) --rsync-path=\"$RSYNC_PATH\" -e \"$RSYNC_SSH_CMD\" \"${INITIATOR[$__replicaDir]}${INITIATOR[$__stateDir]}/$deletionListFromReplica${INITIATOR[$__deletedListFile]}\" $REMOTE_USER@$REMOTE_HOST:\"$escDestDir/\" >> $RUN_DIR/$PROGRAM.${FUNCNAME[0]}.precopy.$SCRIPT_PID 2>&1"
+	rsyncCmd="$(type -p $RSYNC_EXECUTABLE) --rsync-path=\"$RSYNC_PATH\" -e \"$RSYNC_SSH_CMD\" \"${INITIATOR[$__replicaDir]}${INITIATOR[$__stateDir]}/$deletionListFromReplica${INITIATOR[$__deletedListFile]}\" $REMOTE_USER@$REMOTE_HOST:\"$escDestDir/\" >> $RUN_DIR/$PROGRAM.${FUNCNAME[0]}.precopy.$SCRIPT_PID.$TSTAMP 2>&1"
 	Logger "RSYNC_CMD: $rsyncCmd" "DEBUG"
 	eval "$rsyncCmd" 2>> "$LOG_FILE"
 	retval=$?
 	if [ $retval -ne 0 ]; then
 		Logger "Cannot copy the deletion list to remote replica." "ERROR" $retval
-		if [ -f "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.precopy.$SCRIPT_PID" ]; then
-			Logger "$(cat $RUN_DIR/$PROGRAM.${FUNCNAME[0]}.precopy.$SCRIPT_PID)" "ERROR"
+		if [ -f "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.precopy.$SCRIPT_PID.$TSTAMP" ]; then
+			Logger "$(cat $RUN_DIR/$PROGRAM.${FUNCNAME[0]}.precopy.$SCRIPT_PID.$TSTAMP)" "ERROR"
 		fi
 		exit 1
 	fi
@@ -1152,7 +1150,7 @@ function _deleteRemote {
 $SSH_CMD env _DEBUG="'$_DEBUG'" env _PARANOIA_DEBUG="'$_PARANOIA_DEBUG'" env _LOGGER_SILENT="'$_LOGGER_SILENT'" env _LOGGER_VERBOSE="'$_LOGGER_VERBOSE'" env _LOGGER_PREFIX="'$_LOGGER_PREFIX'" env _LOGGER_ERR_ONLY="'$_LOGGER_ERR_ONLY'" \
 env sync_on_changes=$sync_on_changes env _DRYRUN="'$_DRYRUN'" env COMMAND_SUDO="'$COMMAND_SUDO'" \
 env FILE_LIST="'$(EscapeSpaces "${TARGET[$__replicaDir]}${TARGET[$__stateDir]}/$deletionListFromReplica${INITIATOR[$__deletedListFile]}")'" env REPLICA_DIR="'$(EscapeSpaces "$replicaDir")'" env SOFT_DELETE="'$SOFT_DELETE'" \
-env DELETION_DIR="'$(EscapeSpaces "$deletionDir")'" env FAILED_DELETE_LIST="'$failedDeleteList'" env SUCCESS_DELETE_LIST="'$successDeleteList'" 'bash -s' << 'ENDSSH' >> "$RUN_DIR/$PROGRAM.remote_deletion.$SCRIPT_PID" 2>&1
+env DELETION_DIR="'$(EscapeSpaces "$deletionDir")'" env FAILED_DELETE_LIST="'$failedDeleteList'" env SUCCESS_DELETE_LIST="'$successDeleteList'" 'bash -s' << 'ENDSSH' >> "$RUN_DIR/$PROGRAM.remote_deletion.$SCRIPT_PID.$TSTAMP" 2>&1
 include #### DEBUG SUBSET ####
 include #### TrapError SUBSET ####
 include #### RemoteLogger SUBSET ####
@@ -1224,23 +1222,23 @@ include #### RemoteLogger SUBSET ####
 	done < "$FILE_LIST"
 ENDSSH
 
-	if [ -s "$RUN_DIR/$PROGRAM.remote_deletion.$SCRIPT_PID" ]; then
+	if [ -s "$RUN_DIR/$PROGRAM.remote_deletion.$SCRIPT_PID.$TSTAMP" ]; then
 		(
 		_LOGGER_PREFIX=""
-		Logger "$(cat $RUN_DIR/$PROGRAM.remote_deletion.$SCRIPT_PID)" "ERROR"
+		Logger "$(cat $RUN_DIR/$PROGRAM.remote_deletion.$SCRIPT_PID.$TSTAMP)" "ERROR"
 		)
 	fi
 
 	## Copy back the deleted failed file list
-	#rsyncCmd="$(type -p $RSYNC_EXECUTABLE) --rsync-path=\"$RSYNC_PATH\" -e \"$RSYNC_SSH_CMD\" $REMOTE_USER@$REMOTE_HOST:\"{$failedDeleteList,$successDeleteList}\" \"${INITIATOR[$__replicaDir]}${INITIATOR[$__stateDir]}\" > \"$RUN_DIR/$PROGRAM.remote_failed_deletion_list_copy.$SCRIPT_PID\""
-	rsyncCmd="$(type -p $RSYNC_EXECUTABLE) -r --rsync-path=\"$RSYNC_PATH\" -e \"$RSYNC_SSH_CMD\" --include \"$(dirname ${TARGET[$__stateDir]})\" --include \"${TARGET[$__stateDir]}\" --include \"${TARGET[$__stateDir]}/$replicaType${TARGET[$__failedDeletedListFile]}\" --include \"${TARGET[$__stateDir]}/$replicaType${TARGET[$__successDeletedListFile]}\" --exclude='*' $REMOTE_USER@$REMOTE_HOST:\"$(EscapeSpaces ${TARGET[$__replicaDir]})\" \"${INITIATOR[$__replicaDir]}\" > \"$RUN_DIR/$PROGRAM.remote_failed_deletion_list_copy.$SCRIPT_PID\""
+	#rsyncCmd="$(type -p $RSYNC_EXECUTABLE) --rsync-path=\"$RSYNC_PATH\" -e \"$RSYNC_SSH_CMD\" $REMOTE_USER@$REMOTE_HOST:\"{$failedDeleteList,$successDeleteList}\" \"${INITIATOR[$__replicaDir]}${INITIATOR[$__stateDir]}\" > \"$RUN_DIR/$PROGRAM.remote_failed_deletion_list_copy.$SCRIPT_PID.$TSTAMP\""
+	rsyncCmd="$(type -p $RSYNC_EXECUTABLE) -r --rsync-path=\"$RSYNC_PATH\" -e \"$RSYNC_SSH_CMD\" --include \"$(dirname ${TARGET[$__stateDir]})\" --include \"${TARGET[$__stateDir]}\" --include \"${TARGET[$__stateDir]}/$replicaType${TARGET[$__failedDeletedListFile]}\" --include \"${TARGET[$__stateDir]}/$replicaType${TARGET[$__successDeletedListFile]}\" --exclude='*' $REMOTE_USER@$REMOTE_HOST:\"$(EscapeSpaces ${TARGET[$__replicaDir]})\" \"${INITIATOR[$__replicaDir]}\" > \"$RUN_DIR/$PROGRAM.remote_failed_deletion_list_copy.$SCRIPT_PID.$TSTAMP\""
 	Logger "RSYNC_CMD: $rsyncCmd" "DEBUG"
 	eval "$rsyncCmd" 2>> "$LOG_FILE"
 	retval=$?
 	if [ $retval -ne 0 ]; then
 		Logger "Cannot copy back the failed deletion list to initiator replica." "CRITICAL" $retval
-		if [ -f "$RUN_DIR/$PROGRAM.remote_failed_deletion_list_copy.$SCRIPT_PID" ]; then
-			Logger "Comand output: $(cat $RUN_DIR/$PROGRAM.remote_failed_deletion_list_copy.$SCRIPT_PID)" "NOTICE"
+		if [ -f "$RUN_DIR/$PROGRAM.remote_failed_deletion_list_copy.$SCRIPT_PID.$TSTAMP" ]; then
+			Logger "Comand output: $(cat $RUN_DIR/$PROGRAM.remote_failed_deletion_list_copy.$SCRIPT_PID.$TSTAMP)" "NOTICE"
 		fi
 		exit 1
 	fi
@@ -1284,14 +1282,14 @@ function deletionPropagation {
 			fi
 			retval=$?
 			if [ $retval -eq 0 ]; then
-				if [ -f "$RUN_DIR/$PROGRAM._delete_remote.$SCRIPT_PID" ]; then
-					Logger "Remote:\n$(cat $RUN_DIR/$PROGRAM._delete_remote.$SCRIPT_PID)" "VERBOSE"
+				if [ -f "$RUN_DIR/$PROGRAM._delete_remote.$SCRIPT_PID.$TSTAMP" ]; then
+					Logger "Remote:\n$(cat $RUN_DIR/$PROGRAM._delete_remote.$SCRIPT_PID.$TSTAMP)" "VERBOSE"
 				fi
 				return $retval
 			else
 				Logger "Deletion on $replicaType failed." "CRITICAL"
-				if [ -f "$RUN_DIR/$PROGRAM.remote_deletion.$SCRIPT_PID" ]; then
-					Logger "Remote:\n$(cat $RUN_DIR/$PROGRAM.remote_deletion.$SCRIPT_PID)" "CRITICAL" $retval
+				if [ -f "$RUN_DIR/$PROGRAM.remote_deletion.$SCRIPT_PID.$TSTAMP" ]; then
+					Logger "Remote:\n$(cat $RUN_DIR/$PROGRAM.remote_deletion.$SCRIPT_PID.$TSTAMP)" "CRITICAL" $retval
 				fi
 				exit 1
 			fi
@@ -1658,23 +1656,23 @@ function _SoftDeleteLocal {
 			Logger "Removing files older than $changeTime days on $replicaType replica for $deletionType deletion." "NOTICE"
 		fi
 
-		$COMMAND_SUDO $REMOTE_FIND_CMD "$replicaDeletionPath" -type f -ctime +"$changeTime" -print0 | xargs -0 -I {} bash -c 'export file="{}"; if [ '$_LOGGER_VERBOSE' == true ]; then echo "Will delete file {}"; if [ '$DRYRUN' == false ]; then '$COMMAND_SUDO' rm -f "$file"' >> "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$SCRIPT_PID" 2>&1
+		$COMMAND_SUDO $REMOTE_FIND_CMD "$replicaDeletionPath" -type f -ctime +"$changeTime" -print0 | xargs -0 -I {} bash -c 'export file="{}"; if [ '$_LOGGER_VERBOSE' == true ]; then echo "Will delete file {}"; if [ '$DRYRUN' == false ]; then '$COMMAND_SUDO' rm -f "$file"' >> "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$SCRIPT_PID.$TSTAMP" 2>&1
 		retval=$?
 		if [ $retval -ne 0 ]; then
 			Logger "Error while executing file cleanup on $replicaType replica." "ERROR" $retval
-			Logger "Command output:\n$(cat $RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$SCRIPT_PID)" "NOTICE"
+			Logger "Command output:\n$(cat $RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$SCRIPT_PID.$TSTAMP)" "NOTICE"
 		else
 			Logger "File cleanup complete on $replicaType replica." "NOTICE"
-			Logger "Command output:\n$(cat $RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$SCRIPT_PID)" "VERBOSE"
+			Logger "Command output:\n$(cat $RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$SCRIPT_PID.$TSTAMP)" "VERBOSE"
 		fi
-		$COMMAND_SUDO $REMOTE_FIND_CMD "$replicaDeletionPath" -type d -empty -ctime +"$changeTime" -print0 | xargs -0 -I {} bash -c 'export file="{}"; if [ '$_LOGGER_VERBOSE' == true ]; then echo "Will delete directory {}"; if [ '$DRY_RUN' == false ]; then '$COMMAND_SUDO' rm -f "{}"' >> "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$SCRIPT_PID" 2>&1
+		$COMMAND_SUDO $REMOTE_FIND_CMD "$replicaDeletionPath" -type d -empty -ctime +"$changeTime" -print0 | xargs -0 -I {} bash -c 'export file="{}"; if [ '$_LOGGER_VERBOSE' == true ]; then echo "Will delete directory {}"; if [ '$DRY_RUN' == false ]; then '$COMMAND_SUDO' rm -f "{}"' >> "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$SCRIPT_PID.$TSTAMP" 2>&1
 		retval=$?
 		if [ $retval -ne 0 ]; then
 			Logger "Error while executing directory cleanup on $replicaType replica." "ERROR" $retval
-			Logger "Command output:\n$(cat $RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$SCRIPT_PID)" "NOTICE"
+			Logger "Command output:\n$(cat $RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$SCRIPT_PID.$TSTAMP)" "NOTICE"
 		else
 			Logger "Directory cleanup complete on $replicaType replica." "NOTICE"
-			Logger "Command output:\n$(cat $RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$SCRIPT_PID)" "VERBOSE"
+			Logger "Command output:\n$(cat $RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$SCRIPT_PID.$TSTAMP)" "VERBOSE"
 		fi
 
 	elif [ -d "$replicaDeletionPath" ] && ! [ -w "$replicaDeletionPath" ]; then
@@ -1710,7 +1708,7 @@ function _SoftDeleteRemote {
 
 	#TODO: fixed find directory -ctime was missing +, test it
 #TODO: missing logger vars
-$SSH_CMD env _LOGGER_VERBOSE="'$_LOGGER_VERBOSE'" env _DRYRUN="'$_DRYRUN'" env replicaDeletionPath="'$replicaDeletionPath'" env changeTime="'$changeTime'" env COMAMND_SUDO="'$COMMAND_SUDO'" env REMOTE_FIND_CMD="'$REMOTE_FIND_CMD'" 'bash -s' << 'ENDSSH' > "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$SCRIPT_PID" 2>&1
+$SSH_CMD env _LOGGER_VERBOSE="'$_LOGGER_VERBOSE'" env _DRYRUN="'$_DRYRUN'" env replicaDeletionPath="'$replicaDeletionPath'" env changeTime="'$changeTime'" env COMAMND_SUDO="'$COMMAND_SUDO'" env REMOTE_FIND_CMD="'$REMOTE_FIND_CMD'" 'bash -s' << 'ENDSSH' > "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$SCRIPT_PID.$TSTAMP" 2>&1
 
 # Cannot launch log function from xargs, ugly hack
 if [ -d "$replicaDeletionPath" ]; then
@@ -1726,7 +1724,7 @@ ENDSSH
 	retval=$?
 	if [ $retval -ne 0 ]; then
 		Logger "Error while executing cleanup on remote $replicaType replica." "ERROR" $retval
-		Logger "Command output:\n$(cat $RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$SCRIPT_PID)" "NOTICE"
+		Logger "Command output:\n$(cat $RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$SCRIPT_PID.$TSTAMP)" "NOTICE"
 	else
 		Logger "Cleanup complete on $replicaType replica." "NOTICE"
 	fi
@@ -1796,20 +1794,20 @@ function Summary {
 
 	Logger "Attrib updates: INITIATOR << >> TARGET" "ALWAYS"
 
-	_SummaryFromFile "${TARGET[$__replicaDir]}" "$RUN_DIR/$PROGRAM.attr-update.target.$SCRIPT_PID" "~ >>"
-	_SummaryFromFile "${INITIATOR[$__replicaDir]}" "$RUN_DIR/$PROGRAM.attr-update.initiator.$SCRIPT_PID" "~ <<"
+	_SummaryFromFile "${TARGET[$__replicaDir]}" "$RUN_DIR/$PROGRAM.attr-update.target.$SCRIPT_PID.$TSTAMP" "~ >>"
+	_SummaryFromFile "${INITIATOR[$__replicaDir]}" "$RUN_DIR/$PROGRAM.attr-update.initiator.$SCRIPT_PID.$TSTAMP" "~ <<"
 
 	Logger "File transfers: INITIATOR << >> TARGET" "ALWAYS"
-	_SummaryFromFile "${TARGET[$__replicaDir]}" "$RUN_DIR/$PROGRAM.update.target.$SCRIPT_PID" "+ >>"
-	_SummaryFromFile "${INITIATOR[$__replicaDir]}" "$RUN_DIR/$PROGRAM.update.initiator.$SCRIPT_PID" "+ <<"
+	_SummaryFromFile "${TARGET[$__replicaDir]}" "$RUN_DIR/$PROGRAM.update.target.$SCRIPT_PID.$TSTAMP" "+ >>"
+	_SummaryFromFile "${INITIATOR[$__replicaDir]}" "$RUN_DIR/$PROGRAM.update.initiator.$SCRIPT_PID.$TSTAMP" "+ <<"
 
 	Logger "File deletions: INITIATOR << >> TARGET" "ALWAYS"
 	if [ "$REMOTE_OPERATION" == "yes" ]; then
 		_SummaryFromFile "${TARGET[$__replicaDir]}" "${INITIATOR[$__replicaDir]}${INITIATOR[$__stateDir]}/target${TARGET[$__successDeletedListFile]}" "- >>"
 	else
-		_SummaryFromFile "${TARGET[$__replicaDir]}" "$RUN_DIR/$PROGRAM.delete.target.$SCRIPT_PID" "- >>"
+		_SummaryFromFile "${TARGET[$__replicaDir]}" "$RUN_DIR/$PROGRAM.delete.target.$SCRIPT_PID.$TSTAMP" "- >>"
 	fi
-	_SummaryFromFile "${INITIATOR[$__replicaDir]}" "$RUN_DIR/$PROGRAM.delete.initiator.$SCRIPT_PID" "- <<"
+	_SummaryFromFile "${INITIATOR[$__replicaDir]}" "$RUN_DIR/$PROGRAM.delete.initiator.$SCRIPT_PID.$TSTAMP" "- <<"
 	)
 }
 
