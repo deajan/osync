@@ -7,7 +7,7 @@
 
 ## On CYGWIN / MSYS, ACL and extended attributes aren't supported
 
-# osync test suite 2016120901
+# osync test suite 2016121201
 
 # 4 tests:
 # quicklocal
@@ -221,7 +221,7 @@ function oneTimeSetUp () {
 
 	osyncDaemonParameters[$__local]="$CONF_DIR/$LOCAL_CONF --on-changes"
 
-	if [ "$LOCAL_OS" != "msys" ] || [ "$LOCAL_OS" == "Cygwin" ]; then
+	if [ "$LOCAL_OS" != "msys" ] && [ "$LOCAL_OS" != "Cygwin" ]; then
 		osyncParameters[$__quickRemote]="--initiator=$INITIATOR_DIR --target=ssh://localhost:$SSH_PORT/$TARGET_DIR --rsakey=${HOME}/.ssh/id_rsa_local --instance-id=quickremote"
 		osyncParameters[$__confRemote]="$CONF_DIR/$REMOTE_CONF"
 
@@ -388,7 +388,7 @@ function test_Deletetion () {
 }
 
 function test_deletion_failure () {
-	if [ "$LOCAL_OS" == "WinNT10" ] || [ "$LOCAL_OS" == "msys" ]; then
+	if [ "$LOCAL_OS" == "WinNT10" ] || [ "$LOCAL_OS" == "msys" ] || [ "$LOCAL_OS" == "Cygwin" ]; then
 		echo "Skipping deletion failure test as Win10 does not have chattr  support."
 		return 0
 	fi
@@ -774,7 +774,7 @@ function test_FileAttributePropagation () {
 		return 0
 	fi
 
-	if [ "$LOCAL_OS" == "MacOSX" ] || [ "$LOCAL_OS" == "msys" ]; then
+	if [ "$LOCAL_OS" == "MacOSX" ] || [ "$LOCAL_OS" == "msys" ] || [ "$LOCAL_OS" == "Cygwin" ]; then
 		echo "Skipping FileAttributePropagation tests because [$LOCAL_OS]  does not support ACL."
 		return 0
 	fi
@@ -980,7 +980,7 @@ function test_Locking () {
 	REMOTE_HOST_PING=no ./$OSYNC_EXECUTABLE ${osyncParameters[$__confLocal]}
 	assertEquals "Should be able to resume locked target with same instance_id in confLocal mode." "0" $?
 
-	if [ "$LOCAL_OS" != "msys" ]; then
+	if [ "$LOCAL_OS" != "msys" ] && [ "$LOCAL_OS" != "Cygwin" ]; then
 		PrepareLocalDirs
 		mkdir -p "$TARGET_DIR/$OSYNC_WORKDIR"
 		echo 65536@quickremote > "$TARGET_DIR/$OSYNC_WORKDIR/lock"
@@ -1011,7 +1011,7 @@ function test_Locking () {
 	REMOTE_HOST_PING=no ./$OSYNC_EXECUTABLE ${osyncParameters[$__confLocal]}
 	assertEquals "Should be able to resume locked local target with bogus instance_id in confLocal mode." "0" $?
 
-	if [ "$LOCAL_OS" != "msys" ]; then
+	if [ "$LOCAL_OS" != "msys" ] && [ "$LOCAL_OS" != "Cygwin" ]; then
 		PrepareLocalDirs
 		mkdir -p "$TARGET_DIR/$OSYNC_WORKDIR"
 		echo 65536@bogusinstance > "$TARGET_DIR/$OSYNC_WORKDIR/lock"
