@@ -1,0 +1,4308 @@
+#LyX 2.2 created this file. For more info see http://www.lyx.org/
+\lyxformat 508
+\begin_document
+\begin_header
+\save_transient_properties true
+\origin unavailable
+\textclass article
+\use_default_options true
+\maintain_unincluded_children false
+\language english
+\language_package default
+\inputencoding utf8x
+\fontencoding global
+\font_roman "default" "default"
+\font_sans "default" "default"
+\font_typewriter "default" "default"
+\font_math "auto" "auto"
+\font_default_family default
+\use_non_tex_fonts true
+\font_sc false
+\font_osf false
+\font_sf_scale 100 100
+\font_tt_scale 100 100
+\graphics default
+\default_output_format default
+\output_sync 0
+\bibtex_command default
+\index_command default
+\paperfontsize default
+\spacing single
+\use_hyperref true
+\pdf_title "Osync Configuration guide"
+\pdf_author "Orsiris "
+\pdf_bookmarks true
+\pdf_bookmarksnumbered false
+\pdf_bookmarksopen false
+\pdf_bookmarksopenlevel 1
+\pdf_breaklinks false
+\pdf_pdfborder true
+\pdf_colorlinks false
+\pdf_backref section
+\pdf_pdfusetitle true
+\papersize a4paper
+\use_geometry true
+\use_package amsmath 1
+\use_package amssymb 1
+\use_package cancel 0
+\use_package esint 1
+\use_package mathdots 1
+\use_package mathtools 0
+\use_package mhchem 1
+\use_package stackrel 0
+\use_package stmaryrd 0
+\use_package undertilde 0
+\cite_engine basic
+\cite_engine_type default
+\biblio_style plain
+\use_bibtopic false
+\use_indices false
+\paperorientation portrait
+\suppress_date false
+\justification true
+\use_refstyle 1
+\boxbgcolor #d0d0d0
+\index Index
+\shortcut idx
+\color #008000
+\end_index
+\leftmargin 2cm
+\topmargin 2cm
+\rightmargin 2cm
+\bottommargin 2cm
+\headheight 1cm
+\headsep 1cm
+\footskip 1cm
+\secnumdepth 3
+\tocdepth 3
+\paragraph_separation indent
+\paragraph_indentation 2em
+\quotes_language swedish
+\papercolumns 1
+\papersides 1
+\paperpagestyle default
+\listings_params "backgroundcolor={\color{white}},basicstyle={\ttfamily},breaklines=true,frame=single"
+\bullet 0 0 6 -1
+\tracking_changes false
+\output_changes false
+\html_math_output 0
+\html_css_as_file 0
+\html_be_strict false
+\end_header
+
+\begin_body
+
+\begin_layout Title
+osync v1.2RC1 Documentation
+\end_layout
+
+\begin_layout Author
+(C) 2013-2016 by Orsiris de Jong
+\end_layout
+
+\begin_layout Date
+12 December 2016
+\end_layout
+
+\begin_layout Standard
+\begin_inset CommandInset href
+LatexCommand href
+name "http://www.netpower.fr/osync"
+target "http://www.netpower.fr/osync"
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Standard
+\begin_inset CommandInset line
+LatexCommand rule
+offset "0.5ex"
+width "100col%"
+height "1pt"
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Standard
+\begin_inset CommandInset toc
+LatexCommand tableofcontents
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Section
+Introduction
+\end_layout
+
+\begin_layout Subsection
+Quickstart guide
+\end_layout
+
+\begin_layout Standard
+osync is a command line two way synchronization tool for Linux / BSD / Android
+ / Busybox / MacOSX and Windows, with an emphasis on reliability and automation
+ on low bandwidth links.
+\end_layout
+
+\begin_layout Standard
+For those who think TL;DR, a quickstart guide can be found in the README.md
+ file.
+\end_layout
+
+\begin_layout Subsection
+Basic synchronization problems
+\end_layout
+
+\begin_layout Standard
+Synchronization is usually found in two flavors, bloc level sync and file
+ level sync.
+ While whole bloc level synchronization is generally a good way of doing,
+ it's also very greedy in network ressources and is not easy to setup.
+ That's where file level sync comes in handy, where only some directories
+ & files need to be synced.
+\end_layout
+
+\begin_layout Standard
+Imagine you're syncing two remote offices of a same company.
+ If you're syncing a user's home directory or it's roaming profile as a
+ night task, the next day, the user will find it's roaming profile up to
+ date at the remote office.
+\end_layout
+
+\begin_layout Standard
+But what would happen if two users work on the same file in a public folder,
+ at the same time, on both offices ? Some sync software would stop sync
+ and ask what to do.
+ Others might simply deleted the oldest version of the file, even if it
+ was modified on both sides.
+\end_layout
+
+\begin_layout Standard
+Also, what would happen if a user uploads a lot of data ? If the link between
+ both offices cannot handle enough data transfer in a given time, any other
+ sync task won't be run, and the sync would continue during the day, when
+ bandwidth is necessary elsewhere.
+\end_layout
+
+\begin_layout Standard
+What would happen if a power fault occurs while synchronization is going
+ on ?
+\end_layout
+
+\begin_layout Subsection
+What osync can do
+\end_layout
+
+\begin_layout Subsubsection
+Making synchronization reliable
+\end_layout
+
+\begin_layout Standard
+osync is designed to synchronize two folders on both local and / or remote
+ systems.
+\end_layout
+
+\begin_layout Standard
+It is time controlled, which means you can decide how much time it should
+ spend on a sync task before stopping it and launching the next one.
+\end_layout
+
+\begin_layout Standard
+It's designed to resume failed or stopped sync tasks in order to gain as
+ much time as possible, or totally restart the sync task if resuming fails.
+\end_layout
+
+\begin_layout Standard
+It can keep multiple versions of a file in case of conflicts.
+\end_layout
+
+\begin_layout Standard
+It handles soft deletion.
+ If a user deletes a file on replica A, it will move that file on replica
+ B to the 
+\begin_inset Quotes sld
+\end_inset
+
+.osync_workdir/deleted
+\begin_inset Quotes srd
+\end_inset
+
+ folder.
+\end_layout
+
+\begin_layout Standard
+It will automatically clean old files (soft deleted and conflict backups)
+ after a defined amount of days.
+\end_layout
+
+\begin_layout Standard
+It will perform various checks before launching a synchronization, like
+ checking for free disk space against a defined minimum value.
+\end_layout
+
+\begin_layout Subsubsection
+Making a sysadmin's life easier
+\end_layout
+
+\begin_layout Standard
+osync is also desgined to ease synchronization setups.
+\end_layout
+
+\begin_layout Standard
+It will trigger an email alert including the whole sync process execution
+ log if a warning / error is found.
+\end_layout
+
+\begin_layout Standard
+Pre-processing and post-processing commands can be launched on local and
+ / or remote systems, which may be useful to launch snapshot software, flush
+ or standby virtual machines, etc).
+\end_layout
+
+\begin_layout Standard
+Multiple concurrent instances of osync can be run as long as they don't
+ sync the same replicas at the same time.
+\end_layout
+
+\begin_layout Standard
+A batch processing script is included (osync-batch.sh) to launch sequential
+ sync tasks.
+ Failed sync tasks are rerun if every other task has completed and there's
+ still some time left in a given timespan.
+\end_layout
+
+\begin_layout Standard
+osync can use rsync or ssh tunnel compression to gain bandwidth.
+ Bandwidth can also be limited for slow link sharing.
+\end_layout
+
+\begin_layout Standard
+It can be run in quicksync mode for the impatient (nothing to configure
+ except the replica paths), or with a full blown config file.
+\end_layout
+
+\begin_layout Standard
+You may run osync manually, schedule it with cron, or have it monitor a
+ directory as a daemon and launch sync tasks on file modifications.
+\end_layout
+
+\begin_layout Standard
+osync has been deeply tested on RHEL / CentOS 5, 6 & 7, Debian 6, 7, & 8,
+ Linux Mint 14, 17 & 18, FreeBSD 8.3, 10.3 & 11, pfSense 2.x, Mac OS X, Android
+ using termux, Windows 10 bash, and msys2 & cygwin environments.
+\end_layout
+
+\begin_layout Subsubsection
+What osync cannot do
+\end_layout
+
+\begin_layout Standard
+Contrary to most sync tools, osync is stateful, which means that it doesn't
+ need an agent installed on computers it synchronizes to.
+ This makes it gain some degree of fault tolerance with WAN links.
+\end_layout
+
+\begin_layout Standard
+But this also has some drawbacks, there is a cornercase when a user deletes
+ a file while the synchronisation is happening, the file won't get deleted
+ on the other side because the sync is actually updating the directory states
+ at the same time they get changed.
+ Even if this happens only on very big deployments in some rare occasions
+ because of the time osync takes to sync, there is still a chance that your
+ deletion wouldn't make it.
+ Generally speaking, the easiest way is to setup osync as a crontask and
+ launch it by night in order to avoid any possible 
+\end_layout
+
+\begin_layout Standard
+The good point is, osync is built from ground up to keep your data safe,
+ and there's no chance it will delete anything you didn't want.
+\end_layout
+
+\begin_layout Standard
+osync is a simple bash script that relies on other tools like rsync.
+\end_layout
+
+\begin_layout Standard
+Hence, it has some advantages and disavantages:
+\end_layout
+
+\begin_layout Standard
+Advantages:
+\end_layout
+
+\begin_layout Standard
+- Easily customisable
+\end_layout
+
+\begin_layout Standard
+- Fast
+\end_layout
+
+\begin_layout Standard
+- Agentless
+\end_layout
+
+\begin_layout Standard
+Disavantages:
+\end_layout
+
+\begin_layout Standard
+- There's no way to detect file moves.
+ If you move a directory on replica A, osync will soft delete the directory
+ on replica B and copy the new directory from replica A.
+\end_layout
+
+\begin_layout Standard
+- There's no multi-master replication in osync V1.
+ Hence, if you want to sync replicas A, B, and C using osync, you'll have
+ to use one of the following schemas:
+\end_layout
+
+\begin_layout Paragraph
+Replicate 3-way with A as master
+\end_layout
+
+\begin_layout Standard
+Run the following tasks sequentially where A is the initiatior:
+\end_layout
+
+\begin_layout Standard
+Replicate A & B
+\end_layout
+
+\begin_layout Standard
+Replicate A & C
+\end_layout
+
+\begin_layout Standard
+Replicate A & B
+\end_layout
+
+\begin_layout Paragraph
+Replicate 3-way with A & B as masters
+\end_layout
+
+\begin_layout Standard
+Run the following tasks from each system.
+ Be sure they won't run concurrently (osync will detect that another replication
+ is still running, and abort the current one):
+\end_layout
+
+\begin_layout Standard
+Replicate A & B where A is the initiator
+\end_layout
+
+\begin_layout Standard
+Replicate B & C where B is the initiator
+\end_layout
+
+\begin_layout Standard
+Replicate C & A where C is the initiator
+\end_layout
+
+\begin_layout Subsection
+Why use osync
+\end_layout
+
+\begin_layout Standard
+There are a lot of file sync tools out there, some probably better than
+ osync depending on the use case.
+\end_layout
+
+\begin_layout Standard
+osync has been basically written to be low bandwidth friendly, with resume
+ options for unstable internet links (but it will also do great on a fiber
+ link :)).
+\end_layout
+
+\begin_layout Standard
+It has also been written to be a setup and forget tool, without any user
+ interaction like manual conflict resolution.
+\end_layout
+
+\begin_layout Standard
+osync also is one of the few tools that
+\series bold
+ support ACL synchronization
+\series default
+.
+\end_layout
+
+\begin_layout Standard
+At last, osync consumes very little RAM and CPU ressources and is suitable
+ from lower en hardware up to serveres.
+\end_layout
+
+\begin_layout Subsection
+How osync tries to resolve sync issues
+\end_layout
+
+\begin_layout Standard
+Let's get back to the example above, where osync is used to sync two remote
+ offices with users' home directories.
+\end_layout
+
+\begin_layout Standard
+Now imagine a user uploaded 100GB of data, and the WAN link between local
+ and remote systems can only handle 6GB/hour of data transfer.
+\end_layout
+
+\begin_layout Standard
+Now if osync is scheduled every night at 10:00 pm, and it's configured to
+ run for maximum 10 hours, it would stop at 6am, after having transferred
+ 60GB.
+\end_layout
+
+\begin_layout Standard
+Then, on the next day, it would transfer the remaining 40GB from 10:00 pm
+ to about 3:30am.
+\end_layout
+
+\begin_layout Standard
+Also, if you run sequential instances of osync (with osync-batch), one per
+ user directory for example, you can decide how much time osync should spend
+ per user.
+ So if a user uploads too much data, and osync cannot finish the synchronization
+ task for that user directory in a given timespan, it will stop that sync
+ task and run next user synchronization task so every user sync task gets
+ run, regardless of the amount of data.
+ If there's time left, osync-batch reprograms the user sync task that has
+ been stopped.
+\end_layout
+
+\begin_layout Subsection
+Naming in this document
+\end_layout
+
+\begin_layout Standard
+osync's goal is to synchronize two directories, that can be hosted on the
+ same computer or two different ones.
+\end_layout
+
+\begin_layout Standard
+The computer that runs osync must have at least one of these two directories
+ mounted, and will be called the 
+\emph on
+local system.
+\end_layout
+
+\begin_layout Standard
+The first directory to sync on the local system is called the 
+\emph on
+initiator replica
+\emph default
+.
+\end_layout
+
+\begin_layout Standard
+The other directory, called the 
+\emph on
+target replica
+\emph default
+ can be hosted on the 
+\emph on
+local system
+\emph default
+, or on another computer which will be called the 
+\emph on
+remote system
+\emph default
+.
+ In that case, the 
+\emph on
+local system
+\emph default
+ will connect to the 
+\emph on
+remote system
+\emph default
+ through an ssh tunnel and synchronize both 
+\emph on
+initiator
+\emph default
+ and 
+\emph on
+target replicas
+\emph default
+.
+\end_layout
+
+\begin_layout Standard
+Any osync configuration file that gets executed is called an 
+\emph on
+osync task
+\emph default
+.
+\end_layout
+
+\begin_layout Standard
+In the following examples, a special user called 
+\emph on
+syncuser
+\emph default
+ is used for osync.
+\end_layout
+
+\begin_layout Subsection
+How osync solves sync conflicts
+\end_layout
+
+\begin_layout Standard
+Conflict resolution is done automatically.
+ When a file is modified on both replicas, osync compares the timestamps
+ on both replicas and keeps the most recent file.
+\end_layout
+
+\begin_layout Standard
+In the highly uncommon case where both files have the exact same timestamp,
+ a configuration value called CONFLICT_PREVALANCE choses the which replica's
+ file will be kept.
+ By default, Initiator is chosen, unless specified otherwise in the config
+ file.
+\end_layout
+
+\begin_layout Standard
+The file that isn't kept is copied to 
+\begin_inset Quotes sld
+\end_inset
+
+.osync_wordir/backups
+\begin_inset Quotes srd
+\end_inset
+
+ directory of the replica by default, with its full path relative to the
+ replica, unless specified otherwise by the CONFLICT_BACKUP configuration
+ value.
+\end_layout
+
+\begin_layout Standard
+After an amount of days set by CONFLICT_BACKUP_DAYS, which is 30 by default,
+ the backed up file is deleted.
+\end_layout
+
+\begin_layout Standard
+If CONFLICT_BACKUP_MULTIPLE is set to YES (disabled by default), multiple
+ versions of the backed up files are kept, with a timestamp suffix like
+ 
+\begin_inset Quotes sld
+\end_inset
+
+2016.12.31-12.00.01
+\begin_inset Quotes srd
+\end_inset
+
+.
+\end_layout
+
+\begin_layout Section
+Prerequisites
+\end_layout
+
+\begin_layout Subsection
+General packages
+\end_layout
+
+\begin_layout Standard
+osync is a bash script that will work with 
+\series bold
+bash version 3.2 or better
+\series default
+, but will not run with ksh / tsh / csh or other shells.
+ Usually bash comes with most linux distributions.
+\end_layout
+
+\begin_layout Standard
+Here's a list of commands to install basic prerequisites on both local and
+ remote machines.
+ 
+\end_layout
+
+\begin_layout Standard
+Note that openssh-clients are only needed on local machine if connecting
+ remotely and sshpass is only needed if dealing with password files instead
+ of RSA keys.
+\end_layout
+
+\begin_layout Itemize
+RHEL / CentOS
+\end_layout
+
+\begin_deeper
+\begin_layout Itemize
+\begin_inset listings
+inline false
+status open
+
+\begin_layout Plain Layout
+
+yum install rsync coreutils openssh-clients sshpass
+\end_layout
+
+\end_inset
+
+
+\end_layout
+
+\end_deeper
+\begin_layout Itemize
+Debian / Ubuntu / Mint
+\end_layout
+
+\begin_deeper
+\begin_layout Itemize
+\begin_inset listings
+inline false
+status open
+
+\begin_layout Plain Layout
+
+apt-get install rsync openssh-client sshpass
+\end_layout
+
+\end_inset
+
+
+\end_layout
+
+\end_deeper
+\begin_layout Itemize
+FreeBSD
+\end_layout
+
+\begin_deeper
+\begin_layout Itemize
+\begin_inset listings
+inline false
+status open
+
+\begin_layout Plain Layout
+
+pkg install bash rsync sshpass
+\end_layout
+
+\end_inset
+
+
+\end_layout
+
+\end_deeper
+\begin_layout Itemize
+MSYS2
+\end_layout
+
+\begin_deeper
+\begin_layout Itemize
+\begin_inset listings
+inline false
+status open
+
+\begin_layout Plain Layout
+
+msys-base msys-coreutils-ext msys-rsync procps openssh-client
+\end_layout
+
+\end_inset
+
+
+\end_layout
+
+\end_deeper
+\begin_layout Itemize
+Cygwin
+\end_layout
+
+\begin_deeper
+\begin_layout Itemize
+\begin_inset listings
+inline false
+status open
+
+\begin_layout Plain Layout
+
+rsync procps openssh
+\end_layout
+
+\end_inset
+
+
+\end_layout
+
+\end_deeper
+\begin_layout Itemize
+termux (Android / Busybox)
+\end_layout
+
+\begin_deeper
+\begin_layout Itemize
+\begin_inset listings
+inline false
+status open
+
+\begin_layout Plain Layout
+
+apk --no-cache add bash rsync openssh-client
+\end_layout
+
+\end_inset
+
+
+\end_layout
+
+\end_deeper
+\begin_layout Standard
+Additionnaly, on termux, shebangs need to be modified to work with the system
+ root.
+ Example on how to get osync.sh working:
+\end_layout
+
+\begin_layout Standard
+\begin_inset listings
+inline false
+status open
+
+\begin_layout Plain Layout
+
+termux-fix-shebang osync.sh
+\end_layout
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Subsubsection
+Mail alert prerequisites
+\end_layout
+
+\begin_layout Standard
+osync can send alert emails on warnings / errors.
+\end_layout
+
+\begin_layout Itemize
+On standard linux distros, BSD, MacOSX and Windows 10 bash, osync relies
+ on your system-wide configured mail sending support in order to send alerts.
+ It will try to use mail / mutt & sendmail.
+ Please make sure that your system is configured to allow outgoing mail.
+ You may check for osync mail in your mail logs (example: /var/log/maillog
+ on RHEL / CentOS).
+\end_layout
+
+\begin_layout Itemize
+On android / busybox, you will need sendmail and openssl-tools if you plan
+ to use mail encryption (TLS/SSL)
+\end_layout
+
+\begin_deeper
+\begin_layout Itemize
+\begin_inset listings
+inline false
+status open
+
+\begin_layout Plain Layout
+
+apt --no-cache add sendmail openssl-tools
+\end_layout
+
+\end_inset
+
+
+\end_layout
+
+\end_deeper
+\begin_layout Itemize
+On Cygwin / MSYS2, mail support is done via mailsend (https://github.com/muquit/m
+ailsend) or sendmail (http://caspian.dotconf.net/menu/Software/SendEmail/)
+ which have to be executable path (%PATH% variable, or just place them in
+ system32).
+\end_layout
+
+\begin_layout Subsubsection
+Daemon mode prerequisites
+\end_layout
+
+\begin_layout Standard
+osync can run in daermon mode in order to detect file modifications.
+ This mode works on Linux / BSD and MacOSX.
+\end_layout
+
+\begin_layout Standard
+On Linux and BSD, please install the following package:
+\end_layout
+
+\begin_layout Standard
+\begin_inset listings
+inline false
+status open
+
+\begin_layout Plain Layout
+
+inotify-tools
+\end_layout
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Standard
+On FreeBSD, you might want to increase kern.maxfiles tunable if you plan
+ to use inotify-tools for applications that need to monitor activity of
+ a lot of files.
+ Modify /boot/loader.conf and add 
+\begin_inset listings
+inline false
+status open
+
+\begin_layout Plain Layout
+
+kern.maxfiles="25000"
+\end_layout
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Standard
+On MacOS X, you will need to install fswatch with brew:
+\end_layout
+
+\begin_layout Standard
+\begin_inset listings
+inline false
+status open
+
+\begin_layout Plain Layout
+
+brew install fswatch
+\end_layout
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Subsection
+File synchronization
+\end_layout
+
+\begin_layout Standard
+File sync tasks don't need any special configurations.
+ You only have to worry about your sync user having the filesystem permissions
+ to read / write on both replicas.
+\end_layout
+
+\begin_layout Standard
+A good way is to make your user member of the files' group that has full
+ permissions.
+\end_layout
+
+\begin_layout Standard
+Another way to achieve this is using ACLs if your filesystem supports them.
+ You can add the following permissions for user "syncuser" on directory
+ "/home/web".
+ Setting a default rule will add rights on new files.
+\end_layout
+
+\begin_layout Standard
+\begin_inset listings
+inline false
+status open
+
+\begin_layout Plain Layout
+
+# setfacl -dRm u:syncuser::r-x /home/web
+\end_layout
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Standard
+Be aware that ACLs are tricky and default unix permissions serve as mask
+ for ACLs.
+\end_layout
+
+\begin_layout Standard
+Make always sure you can read /write to both replicas with your sync user:
+\end_layout
+
+\begin_layout Standard
+\begin_inset listings
+inline false
+status open
+
+\begin_layout Plain Layout
+
+# su syncuser
+\end_layout
+
+\begin_layout Plain Layout
+
+$ cat /initiator/replica/test.file
+\end_layout
+
+\begin_layout Plain Layout
+
+$ touch /initiator/replica/othertest.file
+\end_layout
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Standard
+Repeat that step for the target replica.
+\end_layout
+
+\begin_layout Subsection
+Time setup
+\end_layout
+
+\begin_layout Standard
+WARNING: osync's conflict resolution relies on timestamps, so it is very
+ important for all systems osync runs / syncs to, to have a reliable and
+ common timesource.
+\end_layout
+
+\begin_layout Standard
+Please consider setting up NTPD first before you plan to run osync.
+\end_layout
+
+\begin_layout Subsection
+\begin_inset CommandInset label
+LatexCommand label
+name "subsec:Performing-superuser-backups"
+
+\end_inset
+
+Performing superuser sync
+\end_layout
+
+\begin_layout Standard
+osync can be run as superuser, which should always be avoided by granting
+ the read / write permissions to a dedicated sync user to both replicas.
+\end_layout
+
+\begin_layout Standard
+There are still some cases where osync needs to be run as superuser, especially
+ when syncing system files.
+\end_layout
+
+\begin_layout Standard
+In those cases, osync can be run as dedicated sync user and ask for sudo
+ permissions (if system permits it) for specific commands, or directly run
+ as root (which isn't recommended).
+\end_layout
+
+\begin_layout Standard
+In order to be able to use the sudo command without having to enter a password,
+ you’ll need to modify the local and / or remote system to allow the following
+ commands to be run as superuser: rsync, du, find, mkdir, rm, echo, mv,
+ tee and cat.
+\end_layout
+
+\begin_layout Standard
+Use visudo to edit the sudoers file (or carefully edit /etc/sudoers yourself)
+ and add the following
+\end_layout
+
+\begin_layout Standard
+\begin_inset listings
+inline false
+status open
+
+\begin_layout Plain Layout
+
+syncuser ALL= NOPASSWD:/usr/bin/rsync
+\end_layout
+
+\begin_layout Plain Layout
+
+syncuser ALL= NOPASSWD:/usr/bin/du
+\end_layout
+
+\begin_layout Plain Layout
+
+syncuser ALL= NOPASSWD:/bin/find
+\end_layout
+
+\begin_layout Plain Layout
+
+syncuser ALL= NOPASSWD:/bin/mkdir
+\end_layout
+
+\begin_layout Plain Layout
+
+syncuser ALL= NOPASSWD:/bin/rm
+\end_layout
+
+\begin_layout Plain Layout
+
+syncuser ALL= NOPASSWD:/bin/mv
+\end_layout
+
+\begin_layout Plain Layout
+
+syncuser ALL= NOPASSWD:/bin/echo
+\end_layout
+
+\begin_layout Plain Layout
+
+syncuser ALL= NOPASSWD:/bin/cat
+\end_layout
+
+\begin_layout Plain Layout
+
+syncuser ALL= NOPASSWD:/usr/bin/tee
+\end_layout
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Standard
+You might check the right paths to your commands (example to get path for
+ rsync executable): 
+\end_layout
+
+\begin_layout Standard
+\begin_inset listings
+inline false
+status open
+
+\begin_layout Plain Layout
+
+# type rsync
+\end_layout
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Standard
+You'll also need to disable requiretty in /etc/sudoers by adding the following
+ line:
+\end_layout
+
+\begin_layout Standard
+\begin_inset listings
+inline false
+status open
+
+\begin_layout Plain Layout
+
+Defaults:syncuser   !requiretty
+\end_layout
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Standard
+Once your standard sync user is granted to run what osync needs, you can
+ enable sudo in osync's config file:
+\end_layout
+
+\begin_layout Standard
+\begin_inset listings
+inline false
+status open
+
+\begin_layout Plain Layout
+
+SUDO_EXEC=yes
+\end_layout
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Standard
+You should be aware that there is a risk with having rsync command run as
+ superuser.
+ A user who can run rsync command as superuser can upload any file he wants
+ to the system, including a tweaked /etc/sudoers or /etc/passwd file.
+ Please read chapter 
+\begin_inset CommandInset ref
+LatexCommand ref
+reference "subsec:Enhancing-remote-backup"
+
+\end_inset
+
+ to secure your installation.
+\end_layout
+
+\begin_layout Subsection
+Remote sync
+\end_layout
+
+\begin_layout Standard
+osync can perform local or remote synchronization tasks.
+ For local sync, pelease refer to chapters 
+\begin_inset CommandInset ref
+LatexCommand ref
+reference "sec:Running-Osync-in"
+
+\end_inset
+
+, 
+\begin_inset CommandInset ref
+LatexCommand ref
+reference "sec:Running-Osync-with-config-file"
+
+\end_inset
+
+and 
+\begin_inset CommandInset ref
+LatexCommand ref
+reference "sec:Running-Osync-as-daemon"
+
+\end_inset
+
+.
+\end_layout
+
+\begin_layout Standard
+Remote synchronization is done through an SSH tunnel.
+ To be able to establish such a tunnel without having to enter a password,
+ you’ll have to generate a pair of private and public RSA keys.
+\end_layout
+
+\begin_layout Standard
+The private part is kept by the computer that initiates the connection,
+ the local system.
+ The public part is kept on the remote system.
+\end_layout
+
+\begin_layout Standard
+The following steps will be required to generate a ssh key:
+\end_layout
+
+\begin_layout Standard
+Create a dedicated sync user and log in as that user on the local system
+ to perform the following actions.
+\end_layout
+
+\begin_layout Standard
+\begin_inset listings
+inline false
+status open
+
+\begin_layout Plain Layout
+
+$ ssh-keygen -t rsa
+\end_layout
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Standard
+This should create two files named ~/.ssh/id_rsa and ~/.ssh/id_rsa.pub
+\end_layout
+
+\begin_layout Standard
+You should also create a dedicated sync user on the remote system.
+\end_layout
+
+\begin_layout Standard
+Copy the public part of the RSA pair to the remote system with scp (replace
+ 22 with your ssh port number if needed).
+\end_layout
+
+\begin_layout Standard
+\begin_inset listings
+inline false
+status open
+
+\begin_layout Plain Layout
+
+$ scp -p 22 ~/.ssh/id_rsa syncuser@remotesystem.tld:/home/syncuser/.ssh/authorized_
+keys
+\end_layout
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Standard
+Make sure the file is only readable and owned by the syncuser on the remote
+ system.
+\end_layout
+
+\begin_layout Standard
+\begin_inset listings
+inline false
+status open
+
+\begin_layout Plain Layout
+
+$ chmod 600 /home/syncuser/.ssh/authorized_keys
+\end_layout
+
+\begin_layout Plain Layout
+
+$ chown syncuser:root /home/syncuser/.ssh/authorized_keys
+\end_layout
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Standard
+Now you should be able to login as "syncuser" on the remote system without
+ any password.
+ You can try to remotely login by entering the following on the local system:
+\end_layout
+
+\begin_layout Standard
+\begin_inset listings
+inline false
+status open
+
+\begin_layout Plain Layout
+
+$ ssh -p 22 syncuser@remotesystem.tld
+\end_layout
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Standard
+Be aware that only the user that generated the ssh key can remotely log
+ in.
+\end_layout
+
+\begin_layout Standard
+You may optionnaly enhance remote login security by applying chapter 
+\begin_inset CommandInset ref
+LatexCommand ref
+reference "subsec:Enhancing-remote-backup"
+
+\end_inset
+
+ methods.
+\end_layout
+
+\begin_layout Subsection
+Mail transport agent
+\end_layout
+
+\begin_layout Standard
+You should make sure your system can send emails so osync can warn you if
+ something bad happens.
+ osync will use mutt or mail command.
+ Please make sure you can send a test mail with at least one of the following
+ commands run by your sync user:
+\end_layout
+
+\begin_layout Standard
+On Linux / BSD / MacOS / Windows 10 Bash
+\end_layout
+
+\begin_layout Standard
+\begin_inset listings
+inline false
+status open
+
+\begin_layout Plain Layout
+
+$ echo "your test message" | mutt -x -s "This is a test message" your@mail.tld
+\end_layout
+
+\begin_layout Plain Layout
+
+$ echo "your test message" | mail -s "This is a test message" your@mail.tld
+\end_layout
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Standard
+On termux (Android)
+\end_layout
+
+\begin_layout Standard
+\begin_inset listings
+inline false
+status open
+
+\begin_layout Plain Layout
+
+$ echo -e"Subject:subject
+\backslash
+r
+\backslash
+nyour test message" |sendmail -f "sender@mail.tld" -S "smtp.yourisp.tld:25"
+ -au"MySMTPUser" -ap"MySMTPPassword" "destination@mail.tld"
+\end_layout
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Standard
+Check your antispam if you don't get your message.
+ If you still don't get your message, check your distributions documentation
+ about the mail command.
+\end_layout
+
+\begin_layout Standard
+If you run on windows cygwin / msys environment, please make sure you can
+ launch mailsend.exe / sendemail.exe by adding it to the %PATH% variable (found
+ 
+\begin_inset CommandInset href
+LatexCommand href
+name "here"
+target "http://github.com/muquit/mailsend"
+
+\end_inset
+
+ and 
+\begin_inset CommandInset href
+LatexCommand href
+name "here"
+target "http://caspian.dotconf.net/menu/Software/SendEmail/"
+
+\end_inset
+
+).
+\end_layout
+
+\begin_layout Subsection
+\begin_inset CommandInset label
+LatexCommand label
+name "subsec:Enhancing-remote-backup"
+
+\end_inset
+
+Enhancing remote system security
+\end_layout
+
+\begin_layout Standard
+You may want to secure a password-less ssh access by removing non necessary
+ services offered by SSH.
+ Edit the file ~/.ssh/authorized_keys created earlier on the remote system
+ and add the following line in the beginning of the file:
+\end_layout
+
+\begin_layout Standard
+\begin_inset listings
+inline false
+status open
+
+\begin_layout Plain Layout
+
+no-port-forwarding,no-X11-forwarding,no-agent-forwarding,no-pty
+\end_layout
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Standard
+Also, we may want to prevent any host except of our initiator replica system
+ to passwordless connect.
+ Add the following line:
+\end_layout
+
+\begin_layout Standard
+\begin_inset listings
+inline false
+status open
+
+\begin_layout Plain Layout
+
+from=*.my.initiator.replica.server.domain.tld
+\end_layout
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Standard
+Your authorized_keys file should look like this:
+\end_layout
+
+\begin_layout Standard
+\begin_inset listings
+lstparams "breaklines=true"
+inline false
+status open
+
+\begin_layout Plain Layout
+
+from="*.mydomain.tld",no-port-forwarding,no-X11-forwarding,no-agent-forwarding,no-
+pty ssh-rsa yourkey== syncuser@host.tld
+\end_layout
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Subsection
+More security enhancing (not recommended unless you know what you are doing)
+\end_layout
+
+\begin_layout Standard
+We may also restrict the ssh session to only a couple of commands we'll
+ need.
+ osync comes with a script called 
+\emph on
+ssh_filter.sh
+\emph default
+ that will only allow execution of commands osync needs.
+ Once again edit your authorized_keys file and add the following.
+\end_layout
+
+\begin_layout Standard
+\begin_inset listings
+inline false
+status open
+
+\begin_layout Plain Layout
+
+command="/usr/local/bin/ssh_filter.sh"
+\end_layout
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Standard
+Your file should then look like this:
+\end_layout
+
+\begin_layout Standard
+\begin_inset listings
+lstparams "breaklines=true,showstringspaces=false"
+inline false
+status open
+
+\begin_layout Plain Layout
+
+from="*.mydomain.tld",no-port-forwarding,no-X11-forwarding,no-agent-forwarding,no-
+pty,command="/usr/local/bin/ssh_filter.sh" ssh-rsa yourkey== syncuser@remotesyste
+m.tld 
+\end_layout
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Standard
+Copy then the script ssh_filter.sh to /usr/local/bin on the remote system.
+ Don't forget to make it executable and make it owned by root
+\end_layout
+
+\begin_layout Standard
+\begin_inset listings
+inline false
+status open
+
+\begin_layout Plain Layout
+
+# chmod 755 /usr/local/bin/ssh_filter.sh
+\end_layout
+
+\begin_layout Plain Layout
+
+# chown root:root /usr/local/bin/ssh_filter.sh
+\end_layout
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Standard
+Now, only the commands 
+\begin_inset Quotes eld
+\end_inset
+
+find, du, rsync, echo, mv, mkdir and sudo
+\begin_inset Quotes erd
+\end_inset
+
+ may be executed via the ssh tunnel.
+ You may enable / disable the usage of sudo command by editing the following
+ value in the ssh_filter.sh script:
+\end_layout
+
+\begin_layout Standard
+\begin_inset listings
+inline false
+status open
+
+\begin_layout Plain Layout
+
+SUDO_EXEC=yes
+\end_layout
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Standard
+Also, adding remote pre- and postexecution commands in your configuration
+ files will not work if you use the ssh filter.
+ You'll have to add your optional commands in ssh_filter.sh.
+ Example if you want to perform remote snapshots you'll have to allow one
+ of the following:
+\end_layout
+
+\begin_layout Standard
+\begin_inset listings
+inline false
+status open
+
+\begin_layout Plain Layout
+
+CMD1=zfs
+\end_layout
+
+\begin_layout Plain Layout
+
+CMD2=xfs
+\end_layout
+
+\begin_layout Plain Layout
+
+CMD3=lvm
+\end_layout
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Subsection
+\begin_inset CommandInset label
+LatexCommand label
+name "subsec:More-security-(or"
+
+\end_inset
+
+Security for the paranoid (not recommended unless you really know what you
+ are doing)
+\end_layout
+
+\begin_layout Standard
+Executing rsync as superuser is a security risk.
+ A way to prevent rsync usage allowing only a symlink to be executed.
+ Thus, a attacker script using rsync would not work.
+ This kind of security is called 
+\begin_inset Quotes eld
+\end_inset
+
+security by obscurity
+\begin_inset Quotes erd
+\end_inset
+
+ and should generally not be the only security process, but makes any attack
+ harder.
+ First, let's create a symlink to rsync called let's say o_rsync, on both
+ local and remote systems.
+\end_layout
+
+\begin_layout Standard
+\begin_inset listings
+inline false
+status open
+
+\begin_layout Plain Layout
+
+# ln -s $(type rsync) $(dirname $(type rsync))/o_rsync
+\end_layout
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Standard
+Now edit ssh_filter.sh and change the following value:
+\end_layout
+
+\begin_layout Standard
+\begin_inset listings
+inline false
+status open
+
+\begin_layout Plain Layout
+
+RSYNC_EXECUTABLE=o_rsync
+\end_layout
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Standard
+Also, edit RSYNC_EXECUTABLE value on any of your sync configuration files
+ and you're done.
+ 
+\end_layout
+
+\begin_layout Section
+Getting and running osync
+\end_layout
+
+\begin_layout Subsection
+Downloading osync
+\end_layout
+
+\begin_layout Standard
+osync can be downloaded on the author's site (stable version) or on github
+ (stable or latest dev snapshot).
+\end_layout
+
+\begin_layout Standard
+Getting osync via author's site
+\end_layout
+
+\begin_layout Standard
+\begin_inset listings
+inline false
+status open
+
+\begin_layout Plain Layout
+
+wget http://netpower.fr/projects/osync/osync.v1.2RC1.tar.gz
+\end_layout
+
+\begin_layout Plain Layout
+
+tar xvf osync.v1.2RC1.tar.gz
+\end_layout
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Standard
+Getting osync via github (remove the -b 
+\begin_inset Quotes sld
+\end_inset
+
+v1.00a
+\begin_inset Quotes srd
+\end_inset
+
+ if you want latest dev snapshot)
+\end_layout
+
+\begin_layout Standard
+\begin_inset listings
+inline false
+status open
+
+\begin_layout Plain Layout
+
+git clone -b "v1.2RC1" https://github.com/deajan/osync
+\end_layout
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Standard
+On Linux / BSD / Windows 10 bash, Once you downloaded osync, enter into
+ the newly created folder and run the install script
+\end_layout
+
+\begin_layout Standard
+\begin_inset listings
+inline false
+status open
+
+\begin_layout Plain Layout
+
+bash ./install.sh
+\end_layout
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Standard
+This will copy osync to /usr/local/bin and create /etc/osync with a test
+ sync.conf file.
+\end_layout
+
+\begin_layout Standard
+It will also copy daemon required files to /etc/init.d or /usr/lib/systemd/system
+ and /etc/systemd/user depending on your distribution.
+\end_layout
+
+\begin_layout Standard
+On MacOS X, msys, Cygwin and termux (Android), you may directly use osync.sh
+ script.
+\end_layout
+
+\begin_layout Subsection
+Basics
+\end_layout
+
+\begin_layout Standard
+Everytime osync is run, it runs with an INSTANCE_ID.
+\end_layout
+
+\begin_layout Standard
+This INSTANCE_ID helps identifying successive runs on replicas, and helps
+ differentiate concurrent runs of the same initiator replica to different
+ targets.
+\end_layout
+
+\begin_layout Standard
+By default, the INSTANCE_ID in quicksync mode is 
+\begin_inset Quotes sld
+\end_inset
+
+quicksync_task
+\begin_inset Quotes srd
+\end_inset
+
+.
+ This might be overriden via command-line or by using a configuration file.
+\end_layout
+
+\begin_layout Standard
+Keep in mind that two osync instances should never share the same INSTANCE_ID.
+\end_layout
+
+\begin_layout Subsection
+\begin_inset CommandInset label
+LatexCommand label
+name "sec:Running-Osync-in"
+
+\end_inset
+
+Running osync in quicksync mode
+\end_layout
+
+\begin_layout Standard
+You just osync to sync two local dirs like this:
+\end_layout
+
+\begin_layout Standard
+\begin_inset listings
+inline false
+status open
+
+\begin_layout Plain Layout
+
+$ ./osync.sh --initiator=/path/to/dir1 --target=/path/to/dir2
+\end_layout
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Standard
+You also may want to sync a remote directory.
+ 
+\end_layout
+
+\begin_layout Standard
+You may specify an alternate SSH port directly in the URI.
+ When ommited, SSH port 22 is used.
+\end_layout
+
+\begin_layout Standard
+Also, if not set, the default RSA key will be read from ~/.ssh/id_rsa
+\end_layout
+
+\begin_layout Standard
+\begin_inset listings
+inline false
+status open
+
+\begin_layout Plain Layout
+
+$ ./osync.sh --initiator=/path/to/dir1 --target=ssh://remoteuser@remotehost.com//pa
+th/to/dir2
+\end_layout
+
+\begin_layout Plain Layout
+
+$ ./osync.sh --initiator=/path/to/dir2 --target=ssh://remoteuser@remotehost.com:22/
+/path/to/dir2 --rsakey=/home/user/.ssh/other_key
+\end_layout
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Standard
+The following command-line options are quicksync specific:
+\end_layout
+
+\begin_layout Standard
+Use an RSA key to connect remotely
+\end_layout
+
+\begin_layout Standard
+\begin_inset listings
+inline false
+status open
+
+\begin_layout Plain Layout
+
+--rsakey=/path/to/rsa.key
+\end_layout
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Standard
+Use a password file instead of an RSA key (needs sshpass utility installed)
+\end_layout
+
+\begin_layout Standard
+\begin_inset listings
+inline false
+status open
+
+\begin_layout Plain Layout
+
+--password-file=/path/to/passwd
+\end_layout
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Standard
+Set INSTANCE_ID
+\end_layout
+
+\begin_layout Standard
+\begin_inset listings
+inline false
+status open
+
+\begin_layout Plain Layout
+
+--instance-id="some-instance-name"
+\end_layout
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Standard
+Skip deletions on initiator, target or both (valid values are: initiator
+ or target or initiator,target)
+\end_layout
+
+\begin_layout Standard
+\begin_inset listings
+inline false
+status open
+
+\begin_layout Plain Layout
+
+--skip-deletion=initiator,target
+\end_layout
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Standard
+Send alert emails (only works with Linux / BSD / Windows 10 bash / MacOSX
+ in quicksync mode)
+\end_layout
+
+\begin_layout Standard
+\begin_inset listings
+inline false
+status open
+
+\begin_layout Plain Layout
+
+--destination-mails="my@mail.tld myother@mail.tld"
+\end_layout
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Subsection
+Setting environment variables
+\end_layout
+
+\begin_layout Subsubsection
+General environment variables
+\end_layout
+
+\begin_layout Standard
+Quicksync mode actually can make use of most options available in config
+ files.
+\end_layout
+
+\begin_layout Standard
+You may set them on the fly as environment variable like
+\end_layout
+
+\begin_layout Standard
+\begin_inset listings
+inline false
+status open
+
+\begin_layout Plain Layout
+
+$ PRESERVE_ACL=yes ./osync.sh --initiator=/path/to/dir1 --target=/path/to/dir2
+\end_layout
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Standard
+A list of config values is found in appendix.
+\end_layout
+
+\begin_layout Subsubsection
+Special environment variables
+\end_layout
+
+\begin_layout Standard
+There is a set of special environment variables used mainly for debugging
+ purposes.
+\end_layout
+
+\begin_layout Standard
+Valid ones are:
+\end_layout
+
+\begin_layout Standard
+Enable deubgging
+\end_layout
+
+\begin_layout Standard
+\begin_inset listings
+inline false
+status open
+
+\begin_layout Plain Layout
+
+_DEBUG=yes
+\end_layout
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Standard
+Enable paranoid debugging (only works on debug_osync.sh build or bootstrap.sh)
+\end_layout
+
+\begin_layout Standard
+\begin_inset listings
+inline false
+status open
+
+\begin_layout Plain Layout
+
+_PARANOIA_DEBUG=yes
+\end_layout
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Standard
+Increase / decrease sleeping time between process checks when osync waits
+ for a process.
+ Default value is 0.05.
+ (x is an integer or floating point number)
+\end_layout
+
+\begin_layout Standard
+\begin_inset listings
+inline false
+status open
+
+\begin_layout Plain Layout
+
+SLEEP_TIME=x
+\end_layout
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Standard
+Ignore unknown OS and execute regardless with default options.
+\end_layout
+
+\begin_layout Standard
+\begin_inset listings
+inline false
+status open
+
+\begin_layout Plain Layout
+
+IGNORE_OS_TYPE=yes
+\end_layout
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Subsection
+\begin_inset CommandInset label
+LatexCommand label
+name "sec:Running-Osync-with-config-file"
+
+\end_inset
+
+Running osync with a full blown configuration file
+\end_layout
+
+\begin_layout Standard
+Running osync with a configuration will do just the same as in quicksync
+ mode, except that you have much more control of what's going on.
+\end_layout
+
+\begin_layout Standard
+A sample configuration file is called sync.conf and is included with osync.
+ You may edit this file to fit your needs.
+ Basically configuration files should go to /etc/osync.
+\end_layout
+
+\begin_layout Standard
+Every option of the configuration file is explained in the appendix.
+\end_layout
+
+\begin_layout Standard
+Once you've setup a file according to your needs, you may go for a test
+ run.
+\end_layout
+
+\begin_layout Standard
+\begin_inset listings
+inline false
+status open
+
+\begin_layout Plain Layout
+
+$ ./osync.sh /etc/osync/my_sync.conf --dry --verbose
+\end_layout
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Standard
+osync should enumerate which changes will be done on both sides.
+\end_layout
+
+\begin_layout Standard
+If everything worked out right, you might process the actual sync process.
+\end_layout
+
+\begin_layout Standard
+A full configuration file specifies a maximum execution delay.
+ Initial sync tasks can take a huge amount of time depending on bandwidth
+ between replicas, in that case you might add parameter –no-maxtime to your
+ first sync run so execution time won't be enforced.
+\end_layout
+
+\begin_layout Standard
+\begin_inset listings
+inline false
+status open
+
+\begin_layout Plain Layout
+
+$ ./osync.sh /etc/osync/my_sync.conf --no-maxtime
+\end_layout
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Standard
+Creating a regular sync scenario is quite simple as long as you don't schedule
+ twice the same sync task in a shorter time span than your HARD_MAX_EXEC_TIME_TO
+TAL value.
+ Just create a crontab entry and add parameter –silent so your local mailbox
+ won't get filled up.
+ Example, having a sync scheduled every hour in /etc/crontab
+\end_layout
+
+\begin_layout Standard
+\begin_inset listings
+inline false
+status open
+
+\begin_layout Plain Layout
+
+00 * * * * syncuser /usr/local/bin/osync.sh /etc/osync/your_sync.conf --silent
+\end_layout
+
+\end_inset
+
+You may find the sync log under /var/log/osync-your_sync.log or under the
+ current directory if /var/log is not writable.
+\end_layout
+
+\begin_layout Subsection
+\begin_inset CommandInset label
+LatexCommand label
+name "sec:Running-Osync-as-daemon"
+
+\end_inset
+
+Running osync as deamon
+\end_layout
+
+\begin_layout Subsubsection
+Manually
+\end_layout
+
+\begin_layout Standard
+osync may also run in file monitor mode.
+ In this mode, osync checks the initiator replica, and runs a synchronization
+ as soon as there is file activity on initiator replica.
+ With this mode, you do not need a schedule anymore.
+ Be aware that only initiator replica is monitored, and target replica sync
+ updates only occur when initiator replica modifications happen.
+\end_layout
+
+\begin_layout Standard
+\begin_inset listings
+inline false
+status open
+
+\begin_layout Plain Layout
+
+$ ./osync.sh /etc/osync/my_sync.conf --on-changes
+\end_layout
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Subsubsection
+As a system service
+\end_layout
+
+\begin_layout Standard
+If you plan to run osync on a regular basis in file monitor mode, you might
+ consider installing it as a system service.
+\end_layout
+
+\begin_layout Standard
+From the directory you downloaded osync, run the install.sh script and enable
+ the service.
+\end_layout
+
+\begin_layout Standard
+Remark: When exiting osync daemon, the process will continue to run for
+ up to a minute to unlock replicas and termine sub processes.
+\end_layout
+
+\begin_layout Paragraph
+init.d service files
+\end_layout
+
+\begin_layout Standard
+For init.d systems, syntax is:
+\end_layout
+
+\begin_layout Standard
+\begin_inset listings
+inline false
+status open
+
+\begin_layout Plain Layout
+
+# service osync-srv start
+\end_layout
+
+\begin_layout Plain Layout
+
+# chkconfig osync-srv on
+\end_layout
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Standard
+osync then scans for *.conf files in /etc/osync and will run an instance
+ per configuration file.
+\end_layout
+
+\begin_layout Standard
+Service control just works like with standard system services.
+\end_layout
+
+\begin_layout Paragraph
+systemd service files
+\end_layout
+
+\begin_layout Standard
+For systemd systems, syntax is:
+\end_layout
+
+\begin_layout Standard
+\begin_inset listings
+inline false
+status open
+
+\begin_layout Plain Layout
+
+# systemctl start osync-srv@config_file
+\end_layout
+
+\begin_layout Plain Layout
+
+# systemctl enable osync-srv@config_file
+\end_layout
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Standard
+With systemd, every config file found in /etc/osync can be controlled as
+ a separate service.
+\end_layout
+
+\begin_layout Standard
+Note that on FreeBSD, rsync exclusion patterns won't work because if inotifywait
+'s limited –exclude implementation that can only make use of one exclude
+ parameter.
+\end_layout
+
+\begin_layout Subsection
+Modifying osync behavior
+\end_layout
+
+\begin_layout Subsubsection
+Output / log behavior
+\end_layout
+
+\begin_layout Standard
+On most runs, you may only want to output file modifications or errors.
+ You may achieve this (in quicksync / conf / daemon modes) by adding the
+ following parameters:
+\end_layout
+
+\begin_layout Standard
+\begin_inset listings
+inline false
+status open
+
+\begin_layout Plain Layout
+
+# ./osync.sh /path/to/sync.conf --errors-only --summary --no-prefix
+\end_layout
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Standard
+The following is a list of all command line switches that work with all
+ three modes:
+\end_layout
+
+\begin_layout Standard
+Will run a simulation only
+\end_layout
+
+\begin_layout Standard
+\begin_inset listings
+inline false
+status open
+
+\begin_layout Plain Layout
+
+--dry
+\end_layout
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Standard
+Silents osync totally, to be used in a cron schedule
+\end_layout
+
+\begin_layout Standard
+\begin_inset listings
+inline false
+status open
+
+\begin_layout Plain Layout
+
+--silent
+\end_layout
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Standard
+Show a summary of updated / deleted files
+\end_layout
+
+\begin_layout Standard
+\begin_inset listings
+inline false
+status open
+
+\begin_layout Plain Layout
+
+--summary
+\end_layout
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Standard
+Suppress non error state messages
+\end_layout
+
+\begin_layout Standard
+\begin_inset listings
+inline false
+status open
+
+\begin_layout Plain Layout
+
+--errors-only
+\end_layout
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Standard
+More detailled output (debug)
+\end_layout
+
+\begin_layout Standard
+\begin_inset listings
+inline false
+status open
+
+\begin_layout Plain Layout
+
+--verbose
+\end_layout
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Standard
+Suppress log time prefix
+\end_layout
+
+\begin_layout Standard
+\begin_inset listings
+inline false
+status open
+
+\begin_layout Plain Layout
+
+--no-prefix
+\end_layout
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Standard
+Add rsync stats to output
+\end_layout
+
+\begin_layout Standard
+\begin_inset listings
+inline false
+status open
+
+\begin_layout Plain Layout
+
+--stats
+\end_layout
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Subsubsection
+Execution behavior
+\end_layout
+
+\begin_layout Standard
+Disable HARD_MAX_EXEC_TIME checks, so that a synchronization can take as
+ long as it wants.
+ This is used to perfom initial sync operations on big sets of files
+\end_layout
+
+\begin_layout Standard
+\begin_inset listings
+inline false
+status open
+
+\begin_layout Plain Layout
+
+--no-maxtime
+\end_layout
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Standard
+Override any existing active or dead locks on replicas.
+ Be careful if there is another running sync on any of both replicas
+\end_layout
+
+\begin_layout Standard
+\begin_inset listings
+inline false
+status open
+
+\begin_layout Plain Layout
+
+--force-unlock
+\end_layout
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Standard
+Invoke daemon like mode.
+ Shouldn't actually be used unless for debugging.
+ Use daemon service files instead.
+\end_layout
+
+\begin_layout Standard
+\begin_inset listings
+inline false
+status open
+
+\begin_layout Plain Layout
+
+--on-changes
+\end_layout
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Standard
+Show help
+\end_layout
+
+\begin_layout Standard
+\begin_inset listings
+inline false
+status open
+
+\begin_layout Plain Layout
+
+--help
+\end_layout
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Subsection
+Running osync batch
+\end_layout
+
+\begin_layout Standard
+If you have multiple configuration files in /etc/osync that you would like
+ to run sequentially, and re-run failed sync tasks, osync comes with a tool
+ called osync-batch.
+\end_layout
+
+\begin_layout Standard
+It will execute all osync conf files in a row, in a given timespan.
+\end_layout
+
+\begin_layout Standard
+osync-batch passes all its parameters to osync itself, except for the following
+ which modifiy batch behavior itself:
+\end_layout
+
+\begin_layout Standard
+Path to directory containing osync configuration files
+\end_layout
+
+\begin_layout Standard
+\begin_inset listings
+inline false
+status open
+
+\begin_layout Plain Layout
+
+--path=/etc/osync
+\end_layout
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Standard
+Maximum number of runs for failing synchronisation tasks (x is an integer).
+ Defaults to 3.
+\end_layout
+
+\begin_layout Standard
+\begin_inset listings
+inline false
+status open
+
+\begin_layout Plain Layout
+
+--max-runs=x
+\end_layout
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Standard
+Maximum execution time for whole batch process in seconds (x is an integer).
+ Defaults to 36000.
+ Setting to 0 disables max execution time check.
+\end_layout
+
+\begin_layout Standard
+\begin_inset listings
+inline false
+status open
+
+\begin_layout Plain Layout
+
+--max-exec-time=x
+\end_layout
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Standard
+You may program a cron task for osync-batch.sh like
+\end_layout
+
+\begin_layout Standard
+\begin_inset listings
+inline false
+status open
+
+\begin_layout Plain Layout
+
+00 * * * * syncuser /usr/local/bin/osync-batch.sh --path=/etc/osync --silent
+\end_layout
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Section
+System & FS Caveats
+\end_layout
+
+\begin_layout Standard
+Depending on which configuration osync runs, not all functions may work.
+\end_layout
+
+\begin_layout Standard
+Especially, ACL and entended attributes preservation won't work on MacOSX,
+ Cygwin, MSYS, Android and BusyBox local or remote environments.
+\end_layout
+
+\begin_layout Standard
+In order to work on most systems, ACL preservation and extended system attribute
+ preservarion has been disabled in quicksync mode.
+\end_layout
+
+\begin_layout Standard
+To enable them, please run osync with the following environment variables
+\end_layout
+
+\begin_layout Standard
+\begin_inset listings
+inline false
+status open
+
+\begin_layout Plain Layout
+
+PRESERVE_ACL=yes PRESERVE_XATTR=yes ./osync.sh
+\end_layout
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Standard
+Those settings are also valid if set in config files.
+\end_layout
+
+\begin_layout Standard
+Also, setting up a sync between different file systems may prevent certain
+ functionnality to work (mainly ACL preservation, extended attribute preservatio
+n and symlink / hardlink support).
+\end_layout
+
+\begin_layout Standard
+At last, MSYS2 has symlink support disabled by default.
+ It can be enabled by uncommenting MSYS=winsymlinks:nativestrict in msys2-shell.c
+md, but doesn't behave exactly like other implementations.
+\end_layout
+
+\begin_layout Section
+Configuration file appendix
+\end_layout
+
+\begin_layout Subsection
+Full list of configuration file parameters
+\end_layout
+
+\begin_layout Standard
+Set this to whatever you want to identify your sync task.
+ Two different osync runs should never share the same INSTANCE_ID.
+ This value also determines the log filename and appears in the warning
+ / error mails.
+\end_layout
+
+\begin_layout Standard
+\begin_inset listings
+inline false
+status open
+
+\begin_layout Plain Layout
+
+INSTANCE_ID=name_of_your_sync
+\end_layout
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Standard
+Initiator directory to sync (initiator replica), must be on the system you're
+ running osync on.
+\end_layout
+
+\begin_layout Standard
+\begin_inset listings
+inline false
+status open
+
+\begin_layout Plain Layout
+
+INITIATOR_SYNC_DIR="/some/path"
+\end_layout
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Standard
+Target directory to sync (target replica), can be on the same system you're
+ running osync on or another remote system, reachable via an SSH tunnel.
+\end_layout
+
+\begin_layout Standard
+Target directory can be a SSH uri like 
+\begin_inset Quotes sld
+\end_inset
+
+ssh://user@host.com:1234//some/other/path
+\begin_inset Quotes srd
+\end_inset
+
+ where 1234 is an optional port, and the first slash is a separator, meaning
+ that the full path is /some/other/path.
+\end_layout
+
+\begin_layout Standard
+\begin_inset listings
+inline false
+status open
+
+\begin_layout Plain Layout
+
+TARGET_SYNC_DIR="/some/other/path"
+\end_layout
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Standard
+Location of the private RSA key.
+ If left empty, the default path 
+\begin_inset Quotes sld
+\end_inset
+
+~/.ssh/id_rsa
+\begin_inset Quotes srd
+\end_inset
+
+ will be used.
+\end_layout
+
+\begin_layout Standard
+\begin_inset listings
+inline false
+status open
+
+\begin_layout Plain Layout
+
+SSH_RSA_PRIVATE_KEY=~/.ssh/id_rsa
+\end_layout
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Standard
+Alternate auth method by using a password file.
+ This needs sshpass to be installed.
+\end_layout
+
+\begin_layout Standard
+\begin_inset listings
+inline false
+status open
+
+\begin_layout Plain Layout
+
+SSH_PASSWORD_FILE=/home/syncuser/path/to/passwd
+\end_layout
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Standard
+Tells osync to create initiator or target directories if they don't exist.
+ Default is no.
+\end_layout
+
+\begin_layout Standard
+\begin_inset listings
+inline false
+status open
+
+\begin_layout Plain Layout
+
+CREATE_DIRS=yes|no
+\end_layout
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Standard
+By default, leaving this empty sets the log file to /var/log/osync_INSTANCE_ID.lo
+g.
+ You might change this to specify a personalized log file.
+\end_layout
+
+\begin_layout Standard
+\begin_inset listings
+inline false
+status open
+
+\begin_layout Plain Layout
+
+LOGFILE=""
+\end_layout
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Standard
+Generate an alert if initiator or target replicas have less space than the
+ following given value in kilobytes.
+\end_layout
+
+\begin_layout Standard
+\begin_inset listings
+inline false
+status open
+
+\begin_layout Plain Layout
+
+MINIMUM_SPACE=10240
+\end_layout
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Standard
+Bandwidth limit in kilobytes / second.
+ Leave this to zero to disable limitation.
+ Note that bandwidth is enforced only when running file updates.
+ All other sync steps don't enforce that setting as they generally need
+ very little bandwidth.
+\end_layout
+
+\begin_layout Standard
+\begin_inset listings
+inline false
+status open
+
+\begin_layout Plain Layout
+
+BANDWIDTH=0
+\end_layout
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Standard
+Synchronization tasks may be executed as root if you enable the following
+ parameter.
+ See prerequisites in chapter 
+\begin_inset CommandInset ref
+LatexCommand ref
+reference "subsec:Performing-superuser-backups"
+
+\end_inset
+
+.
+\end_layout
+
+\begin_layout Standard
+\begin_inset listings
+inline false
+status open
+
+\begin_layout Plain Layout
+
+SUDO_EXEC=yes|no
+\end_layout
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Standard
+Paranoia option.
+ Don't change this unless you read chapter 
+\begin_inset CommandInset ref
+LatexCommand ref
+reference "subsec:More-security-(or"
+
+\end_inset
+
+ and understand what you are doing.
+\end_layout
+
+\begin_layout Standard
+\begin_inset listings
+inline false
+status open
+
+\begin_layout Plain Layout
+
+RSYNC_EXECUTABLE=rsync
+\end_layout
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Standard
+Remote Rsync Executable path.
+ Don't change this unless your remote rsync binary isn't in the execution
+ path.
+\end_layout
+
+\begin_layout Standard
+\begin_inset listings
+inline false
+status open
+
+\begin_layout Plain Layout
+
+REMOTE_RSYNC_PATH=""
+\end_layout
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Standard
+Rsync include / exclude order.
+ If set to include, includes will be processed before excludes, and vice-versa.
+\end_layout
+
+\begin_layout Standard
+\begin_inset listings
+inline false
+status open
+
+\begin_layout Plain Layout
+
+RSYNC_PATTERN_FIRST=include|exclude
+\end_layout
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Standard
+List of files / directories to include / exclude from both replicas (see
+ rsync patterns for more explanations, wildcards won't work).
+\end_layout
+
+\begin_layout Standard
+Poaths are relative to both replicas.
+ List is separated by PATH_SEPARATOR_CHAR defined below.
+\end_layout
+
+\begin_layout Standard
+\begin_inset listings
+inline false
+status open
+
+\begin_layout Plain Layout
+
+RSYNC_INCLUDE_PATTERN=""
+\end_layout
+
+\begin_layout Plain Layout
+
+RSYNC_EXCLUDE_PATTERN="tmp;archives;somepath"
+\end_layout
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Standard
+File that contains the list of files /directories to include / exclude from
+ both replicas (see rsync pattern files for more explanations).
+ Leave this empty if you don't want to use an exclusion file.
+ This file has to be in the same directory as the config file.
+ Paths are relative to sync dirs.
+ One element per line.
+ 
+\end_layout
+
+\begin_layout Standard
+\begin_inset listings
+inline false
+status open
+
+\begin_layout Plain Layout
+
+RSYNC_INCLUDE_FROM=""
+\end_layout
+
+\begin_layout Plain Layout
+
+RSYNC_EXCLUDE_FROM="exclude.list"
+\end_layout
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Standard
+Path separator char for RSYNC_EXCLUDE_PATTERN, you might change this in
+ the unholy case that your filenames contains semicolons.
+\end_layout
+
+\begin_layout Standard
+\begin_inset listings
+inline false
+status open
+
+\begin_layout Plain Layout
+
+PATH_SEPARATOR_CHAR=";"
+\end_layout
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Standard
+Enable / disable ssh compression.
+ Leave this enabled unless your connection to remote system is high speed
+ (LAN)
+\end_layout
+
+\begin_layout Standard
+\begin_inset listings
+inline false
+status open
+
+\begin_layout Plain Layout
+
+SSH_COMPRESSION=yes|no
+\end_layout
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Standard
+Tell ssh to not check the remote computer ssh fingerprint.
+ DANGER WILL ROBINSON ! This should generally lead to security issues.
+ Only enable this if you know exactly what you are doing.
+\end_layout
+
+\begin_layout Standard
+\begin_inset listings
+inline false
+status open
+
+\begin_layout Plain Layout
+
+SSH_IGNORE_KNOWN_HOSTS=yes|no
+\end_layout
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Standard
+Ping remote host before launching synchronization.
+ Be sure the host is responding to ping.
+ Failing to ping will skip current task.
+\end_layout
+
+\begin_layout Standard
+\begin_inset listings
+inline false
+status open
+
+\begin_layout Plain Layout
+
+REMOTE_HOST_PING=yes|no
+\end_layout
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Itemize
+Check for internet access by pinging one or more hosts before launching
+ remote sync task.
+ Leave this empty do disable the checks.
+ Failed checks won't abort current task, just trigger a warning.
+\end_layout
+
+\begin_layout Standard
+\begin_inset listings
+inline false
+status open
+
+\begin_layout Plain Layout
+
+REMOTE_3RD_PARTY_HOST="www.kernel.org www.google.fr"
+\end_layout
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Itemize
+Misc settings
+\end_layout
+
+\begin_layout Standard
+Optional arguments to pass to rsync.
+ Do not use already managed parameters by rsync.
+\end_layout
+
+\begin_layout Standard
+\begin_inset listings
+inline false
+status open
+
+\begin_layout Plain Layout
+
+RSYNC_OPTIONAL_ARGS=""
+\end_layout
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Standard
+Should osync preserve standard unix permissions
+\end_layout
+
+\begin_layout Standard
+\begin_inset listings
+inline false
+status open
+
+\begin_layout Plain Layout
+
+PRESERVE_PERMISSIONS=yes|no
+\end_layout
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Standard
+Should osync preserve file owner
+\end_layout
+
+\begin_layout Standard
+\begin_inset listings
+inline false
+status open
+
+\begin_layout Plain Layout
+
+PRESERVE_OWNER=yes|no
+\end_layout
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Standard
+Should osync preserve group owner
+\end_layout
+
+\begin_layout Standard
+\begin_inset listings
+inline false
+status open
+
+\begin_layout Plain Layout
+
+PRESERVE_GROUP=yes|no
+\end_layout
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Standard
+Should osync preserve files executability status
+\end_layout
+
+\begin_layout Standard
+\begin_inset listings
+inline false
+status open
+
+\begin_layout Plain Layout
+
+PRESERVE_EXECUTABILITY=yes|no
+\end_layout
+
+\end_inset
+
+Preserve ACLs.
+ Please check that your filesystem supports ACLs and is mounted with it's
+ support or rsync will get you loads of errors.
+\end_layout
+
+\begin_layout Standard
+\begin_inset listings
+inline false
+status open
+
+\begin_layout Plain Layout
+
+PRESERVE_ACL=yes|no
+\end_layout
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Standard
+Preserve Xattr.
+ The same applies as for ACLs
+\end_layout
+
+\begin_layout Standard
+\begin_inset listings
+inline false
+status open
+
+\begin_layout Plain Layout
+
+PRESERVE_XATTR=yes|no
+\end_layout
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Standard
+Transforms symlinks into referent files/dirs when syncing replicas.
+\end_layout
+
+\begin_layout Standard
+\begin_inset listings
+inline false
+status open
+
+\begin_layout Plain Layout
+
+COPY_SYMLINKS=yes|no
+\end_layout
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Standard
+Treat symlinked dirs as dirs.
+ CAUTION: This also follows symlinks outside of the replica root.
+\end_layout
+
+\begin_layout Standard
+\begin_inset listings
+inline false
+status open
+
+\begin_layout Plain Layout
+
+KEEP_DIRLINKS=no
+\end_layout
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Standard
+Preserve hard links.
+ Make sure source and target FS can manage hard links or you will lose them.
+\end_layout
+
+\begin_layout Standard
+\begin_inset listings
+inline false
+status open
+
+\begin_layout Plain Layout
+
+PRESERVE_HARDLINKS=yes|no
+\end_layout
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Standard
+Do a full checksum on files instead of comparing file sizes and modification
+ times.
+ Enabling this will make sync tasks longer.
+\end_layout
+
+\begin_layout Standard
+\begin_inset listings
+inline false
+status open
+
+\begin_layout Plain Layout
+
+CHECKSUM=yes|no
+\end_layout
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Standard
+Use rsync compression for file transfers.
+ Leave this disabled unless your're not using SSH compression.
+\end_layout
+
+\begin_layout Standard
+\begin_inset listings
+inline false
+status open
+
+\begin_layout Plain Layout
+
+RSYNC_COMPRESS=yes|no
+\end_layout
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Standard
+Maximum execution time (in seconds) for sync process.
+ Soft value generates a warning only.
+ Hard value generates a warning and stops sync task.
+\end_layout
+
+\begin_layout Standard
+You may set this to 0 to disable time checks.
+\end_layout
+
+\begin_layout Standard
+\begin_inset listings
+inline false
+status open
+
+\begin_layout Plain Layout
+
+SOFT_MAX_EXEC_TIME_FILE_TASK=7200
+\end_layout
+
+\begin_layout Plain Layout
+
+HARD_MAX_EXEC_TIME_FILE_TASK=10600
+\end_layout
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Standard
+Log a status message every KEEP_LOGGING seconds.
+ Set this to zero to disable status messages.
+\end_layout
+
+\begin_layout Standard
+\begin_inset listings
+inline false
+status open
+
+\begin_layout Plain Layout
+
+KEEP_LOGGING=1801
+\end_layout
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Standard
+Minimum time (in seconds) in file monitor /daemon mode between modification
+ detection and sync task in order to let copy operations finish.
+\end_layout
+
+\begin_layout Standard
+\begin_inset listings
+inline false
+status open
+
+\begin_layout Plain Layout
+
+MIN_WAIT=60
+\end_layout
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Standard
+Maximum time (in seconds) in file monitor / daemon mode.
+ After this amount of time, a sync operation is forced.
+\end_layout
+
+\begin_layout Standard
+\begin_inset listings
+inline false
+status open
+
+\begin_layout Plain Layout
+
+MAX_WAIT=7200
+\end_layout
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Itemize
+Conflict and deletion option
+\end_layout
+
+\begin_layout Standard
+Enabling this option will keep a backup of a file on the target replica
+ if it gets updated from the source replica.
+ Backups will be made to .osync_workdir/backups
+\end_layout
+
+\begin_layout Standard
+\begin_inset listings
+inline false
+status open
+
+\begin_layout Plain Layout
+
+CONFLICT_BACKUP=yes|no
+\end_layout
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Standard
+Keep multiple backup versions of the same file.
+ Warning, This can be very space consuming.
+\end_layout
+
+\begin_layout Standard
+\begin_inset listings
+inline false
+status open
+
+\begin_layout Plain Layout
+
+CONFLICT_BACKUP_MULTIPLE=yes|no
+\end_layout
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Standard
+osync will clean backup files after a given number of days.
+ Setting this to 0 will disable cleaning and keep backups forever.
+ Warning: This can be very space consuming.
+\end_layout
+
+\begin_layout Standard
+\begin_inset listings
+inline false
+status open
+
+\begin_layout Plain Layout
+
+CONFLICT_BACKUP_DAYS=30
+\end_layout
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Standard
+If the same file exists on both replicas, newer version will be synced.
+ However, if both files have the same timestamp but differ, CONFLICT_PREVALANCE
+ sets winner replica.
+\begin_inset listings
+inline false
+status open
+
+\begin_layout Plain Layout
+
+CONFLICT_PREVALANCE=initiator|target
+\end_layout
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Standard
+On deletition propagation to the target replica, a backup of the deleted
+ files can be kept.
+ Deletions will be kept in .osync_workdir/deleted
+\end_layout
+
+\begin_layout Standard
+\begin_inset listings
+inline false
+status open
+
+\begin_layout Plain Layout
+
+SOFT_DELETE=yes|no
+\end_layout
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Standard
+osync will clean deleted files after a given number of days.
+ Setting this to 0 will disable cleaning and keep deleted files forever.
+ Warning: This can be very space consuming.
+\end_layout
+
+\begin_layout Standard
+\begin_inset listings
+inline false
+status open
+
+\begin_layout Plain Layout
+
+SOFT_DELETE_DAYS=30
+\end_layout
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Standard
+Deletion propagation (not soft deletion) can be skipped on one or both replicas.
+\end_layout
+
+\begin_layout Standard
+\begin_inset listings
+inline false
+status open
+
+\begin_layout Plain Layout
+
+SKIP_DELETION=initiator|target|initiator,target
+\end_layout
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Itemize
+Resuming options
+\end_layout
+
+\begin_layout Standard
+Try to resume an aborted sync task
+\end_layout
+
+\begin_layout Standard
+\begin_inset listings
+inline false
+status open
+
+\begin_layout Plain Layout
+
+RESUME_SYNC=yes|no
+\end_layout
+
+\end_inset
+
+ Number maximum resume tries before initating a fresh sync.
+\end_layout
+
+\begin_layout Standard
+\begin_inset listings
+inline false
+status open
+
+\begin_layout Plain Layout
+
+RESUME_TRY=2
+\end_layout
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Standard
+When a pidlock exists on target replica that does not correspond to initiator's
+ instance-id, force pidlock removal.
+ Be carefull with this option if you have multiple initiators.
+\end_layout
+
+\begin_layout Standard
+\begin_inset listings
+lstparams "breaklines=true"
+inline false
+status open
+
+\begin_layout Plain Layout
+
+FORCE_STRANGER_LOCK_RESUME=no
+\end_layout
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Standard
+Keep partial uploads that can be resumed on next run.
+ This can be very useful if big files must get updated though slow links.
+\end_layout
+
+\begin_layout Standard
+\begin_inset listings
+inline false
+status open
+
+\begin_layout Plain Layout
+
+PARTIAL=no 
+\end_layout
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Standard
+Use rsync delta copy algorithm.
+ Disabling this is useful to reduce CPU usage and raise bandwidth which
+ might be valuable on local-local syncs or LAN syncs.
+\end_layout
+
+\begin_layout Standard
+\begin_inset listings
+inline false
+status open
+
+\begin_layout Plain Layout
+
+DELTA_COPIES=yes
+\end_layout
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Itemize
+Alert Options
+\end_layout
+
+\begin_layout Standard
+List of alert mails separated by spaces
+\end_layout
+
+\begin_layout Standard
+\begin_inset listings
+inline false
+status open
+
+\begin_layout Plain Layout
+
+DESTINATION_MAILS="your@alert.tld"
+\end_layout
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Standard
+MSYS / Cygwin / Android / Busybox only mail options
+\end_layout
+
+\begin_layout Standard
+\begin_inset listings
+inline false
+status open
+
+\begin_layout Plain Layout
+
+SENDER_MAIL="alert@your.system.tld"
+\end_layout
+
+\begin_layout Plain Layout
+
+SMTP_SERVER=smtp.your.isp.tld
+\end_layout
+
+\begin_layout Plain Layout
+
+SMTP_PORT=25
+\end_layout
+
+\begin_layout Plain Layout
+
+SMTP_ENCRYPTION=tls|ssl|none
+\end_layout
+
+\begin_layout Plain Layout
+
+SMTP_USER=optional_smtp_user
+\end_layout
+
+\begin_layout Plain Layout
+
+SMTP_PASSWORD=optional_smtp_password
+\end_layout
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Itemize
+Execution hooks
+\end_layout
+
+\begin_layout Standard
+Commands can will be run before and / or after sync process (remote execution
+ will only happen if REMOTE_SYNC is set).
+ Multiple commands can be semicolon separated.
+\end_layout
+
+\begin_layout Standard
+Command(s) to run locally before sync process starts.
+\end_layout
+
+\begin_layout Standard
+\begin_inset listings
+inline false
+status open
+
+\begin_layout Plain Layout
+
+LOCAL_RUN_BEFORE_CMD=""
+\end_layout
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Standard
+Command(s) to run locally if sync process finishes.
+\end_layout
+
+\begin_layout Standard
+\begin_inset listings
+inline false
+status open
+
+\begin_layout Plain Layout
+
+LOCAL_RUN_AFTER_CMD=""
+\end_layout
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Standard
+Command(s) to run on remote system before sync process starts.
+\end_layout
+
+\begin_layout Standard
+\begin_inset listings
+inline false
+status open
+
+\begin_layout Plain Layout
+
+REMOTE_RUN_BEFORE_CMD=""
+\end_layout
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Standard
+Command(s) to run on remote system if sync process finishes.
+\end_layout
+
+\begin_layout Standard
+\begin_inset listings
+inline false
+status open
+
+\begin_layout Plain Layout
+
+REMOTE_RUN_AFTER_CMD=""
+\end_layout
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Standard
+Max execution time of commands before they get force killed.
+ Leave 0 if you don't wan't this to happen.
+ Time is specified in seconds.
+\begin_inset listings
+inline false
+status open
+
+\begin_layout Plain Layout
+
+MAX_EXEC_TIME_PER_CMD_BEFORE=0 
+\end_layout
+
+\begin_layout Plain Layout
+
+MAX_EXEC_TIME_PER_CMD_AFTER=0
+\end_layout
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Standard
+Stops osync execution if one of the above commands fail
+\end_layout
+
+\begin_layout Standard
+\begin_inset listings
+inline false
+status open
+
+\begin_layout Plain Layout
+
+STOP_ON_CMD_ERROR=yes|no 
+\end_layout
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Standard
+Run local and remote commands after a sync task even if it failed.
+\end_layout
+
+\begin_layout Standard
+\begin_inset listings
+inline false
+status open
+
+\begin_layout Plain Layout
+
+RUN_AFTER_CMD_ON_ERROR=yes|no
+\end_layout
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Subsection
+Upgrades from v1.0x and v1.1x
+\end_layout
+
+\begin_layout Standard
+Upgrades from osync v1.0x require to rewrite osync config file and state
+ filenames.
+ Master & slave replica are now called initiator and target replicas.
+ SYNC-ID is now called INSTANCE-ID.
+\end_layout
+
+\begin_layout Standard
+There's an update script that does this job.
+\end_layout
+
+\begin_layout Standard
+For quicksync tasks:
+\end_layout
+
+\begin_layout Standard
+\begin_inset listings
+inline false
+status open
+
+\begin_layout Plain Layout
+
+$ upgrade-v1.0x-v1.2x.sh --master=/path/to/master/replica --slave=/path/to/slave/re
+plica --sync-id=[INSTANCE_ID]
+\end_layout
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Standard
+For config file tasks:
+\end_layout
+
+\begin_layout Standard
+\begin_inset listings
+inline false
+status open
+
+\begin_layout Plain Layout
+
+$ upgrade-v1.0x-v1.2x.sh /etc/osync/sync.conf
+\end_layout
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Standard
+Upgrades from osync v1.1x require to add osync configuration values into
+ config file.
+\end_layout
+
+\begin_layout Standard
+Just use the upgrade script the same way you would to upgrade from v1.0x.
+\end_layout
+
+\begin_layout Section
+Troubleshooting
+\end_layout
+
+\begin_layout Standard
+osync has been tested successfully on multiple systems for a wide variety
+ of sync plans.
+ Please check the following steps before requesting help.
+\end_layout
+
+\begin_layout Standard
+If no error message is shown in console, please check the log files.
+\end_layout
+
+\begin_layout Subsection
+Log files
+\end_layout
+
+\begin_layout Standard
+Default [log_path] is /var/log, /home, ./ and /tmp depending if the directories
+ are writable.
+\end_layout
+
+\begin_layout Standard
+Everything that is printed on screen via stdout or stderr is always included
+ in log file which is named osync.[INSTANCE_ID].log
+\end_layout
+
+\begin_layout Standard
+Disabling switches like –errors-only or –silent may help diagnostic the
+ problem.
+\end_layout
+
+\begin_layout Standard
+Log inludes a prefix (normally TIME) which indicates since how much seconds
+ osync runs.
+\end_layout
+
+\begin_layout Standard
+When some commands get run remotely, prefix is RTIME and indicates since
+ how much seconds osync runs a specific remote task.
+\end_layout
+
+\begin_layout Standard
+Prefix can be disabled via a command line argument.
+\end_layout
+
+\begin_layout Subsection
+Warnings, errors and alerts
+\end_layout
+
+\begin_layout Standard
+osync has two levels of alerts.
+\end_layout
+
+\begin_layout Standard
+Warnings are raised when something minor goes wrong, like checking for minimum
+ available space or checking for internet connectivity, which will not affect
+ the synchronization task directly.
+\end_layout
+
+\begin_layout Standard
+Errors are raised when something happens that could possibily stop sync
+ from happening.
+\end_layout
+
+\begin_layout Standard
+Both are logged, and if email support is set, an alert email will be sent.
+\end_layout
+
+\begin_layout Subsection
+Local-local sync
+\end_layout
+
+\begin_layout Standard
+osync logs every of it's actions to [log_path]/osync-version.instance_id.log.
+\end_layout
+
+\begin_layout Standard
+Please check the log file if something went wrong.
+\end_layout
+
+\begin_layout Standard
+You might try running osync as root to check if your problem is filesystem
+ permission related.
+\end_layout
+
+\begin_layout Standard
+You might add –verbose option to see what actually happens.
+\end_layout
+
+\begin_layout Standard
+Also, running osync with the following command will give the exact commands
+ that actually happen:
+\end_layout
+
+\begin_layout Standard
+\begin_inset listings
+inline false
+status open
+
+\begin_layout Plain Layout
+
+DEBUG=yes /usr/local/bin/osync.sh /etc/osync/my_sync.conf --verbose
+\end_layout
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Subsection
+Local-remote sync
+\end_layout
+
+\begin_layout Standard
+Remote synchronization is a bit more tricky.
+\end_layout
+
+\begin_layout Standard
+You might check that you can log in remotely with the command
+\end_layout
+
+\begin_layout Standard
+\begin_inset listings
+inline false
+status open
+
+\begin_layout Plain Layout
+
+$ ssh -p 22 remotesyncuser@remotehost.tld
+\end_layout
+
+\end_inset
+
+Also, you might check that you can use rsync command remotely
+\end_layout
+
+\begin_layout Standard
+\begin_inset listings
+inline false
+status open
+
+\begin_layout Plain Layout
+
+$ ssh -p 22 remotesyncuser@remotehost.tld rsync --help
+\end_layout
+
+\end_inset
+
+You can temporarily disable ssh security by removing lines you added in
+ chapter 
+\begin_inset CommandInset ref
+LatexCommand ref
+reference "subsec:Enhancing-remote-backup"
+
+\end_inset
+
+.
+ Additionnaly, you can check ssh_filter log in ~/.ssh/ssh_filter.log on the
+ remote system.
+ You might try running osync with SUDO_EXEC to check if your problem is
+ user permission related.
+\end_layout
+
+\begin_layout Subsection
+File monitor mode
+\end_layout
+
+\begin_layout Standard
+In file monitor mode, osync will still log it's execution to /var/log/osync.insta
+nce_id.log (or current directory if /var/log is not writable).
+\end_layout
+
+\begin_layout Standard
+Also, standard systemd log method is used if available.
+ You may check an execution with
+\end_layout
+
+\begin_layout Standard
+\begin_inset listings
+inline false
+status open
+
+\begin_layout Plain Layout
+
+systemctl status osync-srv@configfile
+\end_layout
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Standard
+You mai also see osync logs in journalctl with
+\end_layout
+
+\begin_layout Standard
+\begin_inset listings
+inline false
+status open
+
+\begin_layout Plain Layout
+
+journalctl -xn
+\end_layout
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Section
+Final words
+\end_layout
+
+\begin_layout Standard
+The idea of osync came in a discussion around a beer one evening.
+ It began as a project for a friend, whose company I was working for as
+ a consultant.
+\end_layout
+
+\begin_layout Standard
+Today, osync is still used by this company, and a lot of others around the
+ globe.
+\end_layout
+
+\begin_layout Standard
+I do provide technical help and support in my spare time, and will appreciate
+ every contribution on Github :)
+\end_layout
+
+\begin_layout Standard
+\begin_inset CommandInset line
+LatexCommand rule
+offset "0.5ex"
+width "100col%"
+height "1pt"
+
+\end_inset
+
+
+\end_layout
+
+\end_body
+\end_document
