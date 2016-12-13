@@ -4,7 +4,7 @@ PROGRAM="osync" # Rsync based two way sync engine with fault tolerance
 AUTHOR="(C) 2013-2016 by Orsiris de Jong"
 CONTACT="http://www.netpower.fr/osync - ozy@netpower.fr"
 PROGRAM_VERSION=1.2-beta3
-PROGRAM_BUILD=2016121208
+PROGRAM_BUILD=2016121301
 IS_STABLE=no
 
 #TODO(low): is debug subset relevant in remote env
@@ -410,7 +410,6 @@ function _HandleLocksLocal {
 	fi
 
 	if [ $writeLocks != true ]; then
-		Logger "This is the final merdier" "WARN"
 		return 1
 	else
 		$COMMAND_SUDO echo "$SCRIPT_PID@$INSTANCE_ID" > "$lockfile" 2> "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}-$replicaType.$SCRIPT_PID.$TSTAMP"
@@ -1229,7 +1228,7 @@ ENDSSH
 
 	if [ -s "$RUN_DIR/$PROGRAM.remote_deletion.$SCRIPT_PID.$TSTAMP" ]; then
 		(
-		_LOGGER_PREFIX=""
+		_LOGGER_PREFIX="RR"
 		Logger "$(cat $RUN_DIR/$PROGRAM.remote_deletion.$SCRIPT_PID.$TSTAMP)" "ERROR"
 		)
 	fi
@@ -1349,14 +1348,14 @@ function Sync {
 			fi
 
 			if [ "$resumeInitiator" != "synced" ]; then
-				Logger "WARNING: Trying to resume aborted execution on $($STAT_CMD "${INITIATOR[$__initiatorLastActionFile]}") at task [$resumeInitiator] for initiator. [$resumeCount] previous tries." "WARN"
+				Logger "Trying to resume aborted execution on $($STAT_CMD "${INITIATOR[$__initiatorLastActionFile]}") at task [$resumeInitiator] for initiator. [$resumeCount] previous tries." "NOTICE"
 				echo $(($resumeCount+1)) > "${INITIATOR[$__resumeCount]}"
 			else
 				resumeInitiator="none"
 			fi
 
 			if [ "$resumeTarget" != "synced" ]; then
-				Logger "WARNING: Trying to resume aborted execution on $($STAT_CMD "${INITIATOR[$__targetLastActionFile]}") as task [$resumeTarget] for target. [$resumeCount] previous tries." "WARN"
+				Logger "Trying to resume aborted execution on $($STAT_CMD "${INITIATOR[$__targetLastActionFile]}") as task [$resumeTarget] for target. [$resumeCount] previous tries." "NOTICE"
 				echo $(($resumeCount+1)) > "${INITIATOR[$__resumeCount]}"
 			else
 				resumeTarget="none"
