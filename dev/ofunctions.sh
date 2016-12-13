@@ -3,7 +3,7 @@
 #### OFUNCTIONS MINI SUBSET ####
 
 _OFUNCTIONS_VERSION=2.1-dev
-_OFUNCTIONS_BUILD=2016121303
+_OFUNCTIONS_BUILD=2016121304
 #### _OFUNCTIONS_BOOTSTRAP SUBSET ####
 _OFUNCTIONS_BOOTSTRAP=true
 #### _OFUNCTIONS_BOOTSTRAP SUBSET END ####
@@ -143,11 +143,11 @@ function RemoteLogger {
 	local retval="${3:-undef}"	# optional return value of command
 
 	if [ "$_LOGGER_PREFIX" == "time" ]; then
-		prefix="Remote TIME: $SECONDS - "
+		prefix="RTIME: $SECONDS - "
 	elif [ "$_LOGGER_PREFIX" == "date" ]; then
 		prefix="R $(date) - "
 	else
-		prefix="RTIME - $SECONDS "
+		prefix=""
 	fi
 
 	if [ "$level" == "CRITICAL" ]; then
