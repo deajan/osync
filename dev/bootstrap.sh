@@ -1,7 +1,13 @@
 #!/usr/bin/env bash
 
-## dev pre-processor bootstrap rev 2016121101
+## dev pre-processor bootstrap rev 2016121301
 ## Yeah !!! A really tech sounding name... In fact it's just include emulation in bash
+
+EXEC_PATH="$(cd "$(dirname "$1")"; pwd)/$(basename "$1")"
+if [ "$(basename $EXEC_PATH)" != "dev" ]; then
+	echo "Plrase run bootstrap.sh from osync/dev directory."
+	exit 1
+fi
 
 outputFileName="$0"
 
