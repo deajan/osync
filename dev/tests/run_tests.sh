@@ -7,7 +7,7 @@
 
 ## On CYGWIN / MSYS, ACL and extended attributes aren't supported
 
-# osync test suite 2016121202
+# osync test suite 2016121301
 
 # 4 tests:
 # quicklocal
@@ -705,7 +705,7 @@ function test_handle_symlinks () {
 		rm -f "$TARGET_DIR/$FileBL"
 
 		COPY_SYMLINKS=$copySymlinks REMOTE_HOST_PING=no ./$OSYNC_EXECUTABLE $i
-		assertEquals "Fourth symlink deletion run should resume with parameters [$i]." "2" $?
+		assertEquals "Fourth symlink deletion run should resume with parameters [$i]." "0" $?
 
 		[ ! -f "$TARGET_DIR/$FileAL" ]
 		assertEquals "File [$TARGET_DIR/$FileAL] is still present in replica dir." "0" $?
