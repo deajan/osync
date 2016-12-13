@@ -4,7 +4,7 @@ PROGRAM="osync" # Rsync based two way sync engine with fault tolerance
 AUTHOR="(C) 2013-2016 by Orsiris de Jong"
 CONTACT="http://www.netpower.fr/osync - ozy@netpower.fr"
 PROGRAM_VERSION=1.2-beta3
-PROGRAM_BUILD=2016121208
+PROGRAM_BUILD=2016121302
 IS_STABLE=no
 
 #TODO(low): is debug subset relevant in remote env
@@ -15,7 +15,7 @@ IS_STABLE=no
 #### OFUNCTIONS MINI SUBSET ####
 
 _OFUNCTIONS_VERSION=2.1-dev
-_OFUNCTIONS_BUILD=2016121301
+_OFUNCTIONS_BUILD=2016121304
 _OFUNCTIONS_BOOTSTRAP=true
 ## BEGIN Generic bash functions written in 2013-2016 by Orsiris de Jong - http://www.netpower.fr - ozy@netpower.fr
 
@@ -145,11 +145,11 @@ function RemoteLogger {
 	local retval="${3:-undef}"	# optional return value of command
 
 	if [ "$_LOGGER_PREFIX" == "time" ]; then
-		prefix="Remote TIME: $SECONDS - "
+		prefix="RTIME: $SECONDS - "
 	elif [ "$_LOGGER_PREFIX" == "date" ]; then
-		prefix="Remote $(date) - "
+		prefix="R $(date) - "
 	else
-		prefix="Remote "
+		prefix=""
 	fi
 
 	if [ "$level" == "CRITICAL" ]; then
@@ -712,8 +712,8 @@ function WaitForTaskCompletion {
 					wait $pid
 					retval=$?
 					if [ $retval -ne 0 ]; then
-						errorcount=$((errorcount+1))
 						Logger "${FUNCNAME[0]} called by [$callerName] finished monitoring [$pid] with exitcode [$retval]." "DEBUG"
+						errorcount=$((errorcount+1))
 						# Welcome to variable variable bash hell
 						if [ "$(eval echo \"\$WAIT_FOR_TASK_COMPLETION_$callerName\")" == "" ]; then
 							eval "WAIT_FOR_TASK_COMPLETION_$callerName=\"$pid:$retval\""
@@ -1203,7 +1203,7 @@ function RunLocalCommand {
 	Logger "Running command [$command] on local host." "NOTICE"
 	eval "$command" > "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$SCRIPT_PID.$TSTAMP" 2>&1 &
 
-	WaitForTaskCompletion $! 0 $hardMaxTime $SLEEP_TIME $KEEP_LOGGING true true false ${FUNCNAME[0]}
+	WaitForTaskCompletion $! 0 $hardMaxTime $SLEEP_TIME $KEEP_LOGGING true true false
 	retval=$?
 	if [ $retval -eq 0 ]; then
 		Logger "Command succeded." "NOTICE"
@@ -1237,7 +1237,7 @@ function RunRemoteCommand {
 	cmd=$SSH_CMD' "$command" > "'$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$SCRIPT_PID.$TSTAMP'" 2>&1'
 	Logger "cmd: $cmd" "DEBUG"
 	eval "$cmd" &
-	WaitForTaskCompletion $! 0 $hardMaxTime $SLEEP_TIME $KEEP_LOGGING true true false ${FUNCNAME[0]}
+	WaitForTaskCompletion $! 0 $hardMaxTime $SLEEP_TIME $KEEP_LOGGING true true false
 	retval=$?
 	if [ $retval -eq 0 ]; then
 		Logger "Command succeded." "NOTICE"
@@ -1270,7 +1270,7 @@ function RunBeforeHook {
 		pids="$pids;$!"
 	fi
 	if [ "$pids" != "" ]; then
-		WaitForTaskCompletion $pids 0 0 $SLEEP_TIME $KEEP_LOGGING true true false ${FUNCNAME[0]}
+		WaitForTaskCompletion $pids 0 0 $SLEEP_TIME $KEEP_LOGGING true true false
 	fi
 }
 
@@ -1288,7 +1288,7 @@ function RunAfterHook {
 		pids="$pids;$!"
 	fi
 	if [ "$pids" != "" ]; then
-		WaitForTaskCompletion $pids 0 0 $SLEEP_TIME $KEEP_LOGGING true true false ${FUNCNAME[0]}
+		WaitForTaskCompletion $pids 0 0 $SLEEP_TIME $KEEP_LOGGING true true false
 	fi
 }
 
@@ -1299,7 +1299,7 @@ function CheckConnectivityRemoteHost {
 
 		if [ "$REMOTE_HOST_PING" != "no" ] && [ "$REMOTE_OPERATION" != "no" ]; then
 			eval "$PING_CMD $REMOTE_HOST > /dev/null 2>&1" &
-			WaitForTaskCompletion $! 60 180 $SLEEP_TIME $KEEP_LOGGING true true false ${FUNCNAME[0]}
+			WaitForTaskCompletion $! 60 180 $SLEEP_TIME $KEEP_LOGGING true true false
 			retval=$?
 			if [ $retval != 0 ]; then
 				Logger "Cannot ping [$REMOTE_HOST]. Return code [$retval]." "WARN"
@@ -1319,7 +1319,7 @@ function CheckConnectivity3rdPartyHosts {
 			for i in $REMOTE_3RD_PARTY_HOSTS
 			do
 				eval "$PING_CMD $i > /dev/null 2>&1" &
-				WaitForTaskCompletion $! 180 360 $SLEEP_TIME $KEEP_LOGGING true true false ${FUNCNAME[0]}
+				WaitForTaskCompletion $! 180 360 $SLEEP_TIME $KEEP_LOGGING true true false
 				retval=$?
 				if [ $retval != 0 ]; then
 					Logger "Cannot ping 3rd party host [$i]. Return code [$retval]." "NOTICE"
@@ -1968,11 +1968,11 @@ function RemoteLogger {
 	local retval="${3:-undef}"	# optional return value of command
 
 	if [ "$_LOGGER_PREFIX" == "time" ]; then
-		prefix="Remote TIME: $SECONDS - "
+		prefix="RTIME: $SECONDS - "
 	elif [ "$_LOGGER_PREFIX" == "date" ]; then
-		prefix="Remote $(date) - "
+		prefix="R $(date) - "
 	else
-		prefix="Remote "
+		prefix=""
 	fi
 
 	if [ "$level" == "CRITICAL" ]; then
@@ -2158,7 +2158,6 @@ function _HandleLocksLocal {
 	fi
 
 	if [ $writeLocks != true ]; then
-		Logger "This is the final merdier" "WARN"
 		return 1
 	else
 		$COMMAND_SUDO echo "$SCRIPT_PID@$INSTANCE_ID" > "$lockfile" 2> "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}-$replicaType.$SCRIPT_PID.$TSTAMP"
@@ -2273,11 +2272,11 @@ function RemoteLogger {
 	local retval="${3:-undef}"	# optional return value of command
 
 	if [ "$_LOGGER_PREFIX" == "time" ]; then
-		prefix="Remote TIME: $SECONDS - "
+		prefix="RTIME: $SECONDS - "
 	elif [ "$_LOGGER_PREFIX" == "date" ]; then
-		prefix="Remote $(date) - "
+		prefix="R $(date) - "
 	else
-		prefix="Remote "
+		prefix=""
 	fi
 
 	if [ "$level" == "CRITICAL" ]; then
@@ -3065,11 +3064,11 @@ function RemoteLogger {
 	local retval="${3:-undef}"	# optional return value of command
 
 	if [ "$_LOGGER_PREFIX" == "time" ]; then
-		prefix="Remote TIME: $SECONDS - "
+		prefix="RTIME: $SECONDS - "
 	elif [ "$_LOGGER_PREFIX" == "date" ]; then
-		prefix="Remote $(date) - "
+		prefix="R $(date) - "
 	else
-		prefix="Remote "
+		prefix=""
 	fi
 
 	if [ "$level" == "CRITICAL" ]; then
@@ -3183,7 +3182,7 @@ ENDSSH
 
 	if [ -s "$RUN_DIR/$PROGRAM.remote_deletion.$SCRIPT_PID.$TSTAMP" ]; then
 		(
-		_LOGGER_PREFIX=""
+		_LOGGER_PREFIX="RR"
 		Logger "$(cat $RUN_DIR/$PROGRAM.remote_deletion.$SCRIPT_PID.$TSTAMP)" "ERROR"
 		)
 	fi
@@ -3301,14 +3300,14 @@ function Sync {
 			fi
 
 			if [ "$resumeInitiator" != "synced" ]; then
-				Logger "WARNING: Trying to resume aborted execution on $($STAT_CMD "${INITIATOR[$__initiatorLastActionFile]}") at task [$resumeInitiator] for initiator. [$resumeCount] previous tries." "WARN"
+				Logger "Trying to resume aborted execution on $($STAT_CMD "${INITIATOR[$__initiatorLastActionFile]}") at task [$resumeInitiator] for initiator. [$resumeCount] previous tries." "NOTICE"
 				echo $(($resumeCount+1)) > "${INITIATOR[$__resumeCount]}"
 			else
 				resumeInitiator="none"
 			fi
 
 			if [ "$resumeTarget" != "synced" ]; then
-				Logger "WARNING: Trying to resume aborted execution on $($STAT_CMD "${INITIATOR[$__targetLastActionFile]}") as task [$resumeTarget] for target. [$resumeCount] previous tries." "WARN"
+				Logger "Trying to resume aborted execution on $($STAT_CMD "${INITIATOR[$__targetLastActionFile]}") as task [$resumeTarget] for target. [$resumeCount] previous tries." "NOTICE"
 				echo $(($resumeCount+1)) > "${INITIATOR[$__resumeCount]}"
 			else
 				resumeTarget="none"
@@ -3420,7 +3419,7 @@ function Sync {
 	## Step 2
 	if [ "$resumeInitiator" == "${SYNC_ACTION[2]}" ] || [ "$resumeTarget" == "${SYNC_ACTION[2]}" ]; then
 		if [[ "$RSYNC_ATTR_ARGS" == *"-X"* ]] || [[ "$RSYNC_ATTR_ARGS" == *"-A"* ]]; then
-			syncAttrs "${INITIATOR[$__replicaDir]}" "$TARGET_SYNC_DIR"
+			syncAttrs "${INITIATOR[$__replicaDir]}" "$TARGET_SYNC_DIR" &
 			WaitForTaskCompletion $! $SOFT_MAX_EXEC_TIME $HARD_MAX_EXEC_TIME $SLEEP_TIME $KEEP_LOGGING false true false
 			if [ $? -ne 0 ]; then
 				echo "${SYNC_ACTION[2]}" > "${INITIATOR[$__initiatorLastActionFile]}"
@@ -3457,7 +3456,7 @@ function Sync {
 				fi
 			fi
 			if [ "$resumeInitiator" == "${SYNC_ACTION[3]}" ]; then
-				syncUpdate "${INITIATOR[$__type]}" "${TARGET[$__type]}"
+				syncUpdate "${INITIATOR[$__type]}" "${TARGET[$__type]}" &
 				WaitForTaskCompletion $! $SOFT_MAX_EXEC_TIME $HARD_MAX_EXEC_TIME $SLEEP_TIME $KEEP_LOGGING false true false
 				if [ $? -ne 0 ]; then
 					echo "${SYNC_ACTION[3]}" > "${INITIATOR[$__initiatorLastActionFile]}"
@@ -3470,7 +3469,7 @@ function Sync {
 			fi
 		else
 			if [ "$resumeInitiator" == "${SYNC_ACTION[3]}" ]; then
-				syncUpdate "${INITIATOR[$__type]}" "${TARGET[$__type]}"
+				syncUpdate "${INITIATOR[$__type]}" "${TARGET[$__type]}" &
 				WaitForTaskCompletion $! $SOFT_MAX_EXEC_TIME $HARD_MAX_EXEC_TIME $SLEEP_TIME $KEEP_LOGGING false true false
 				if [ $? -ne 0 ]; then
 					echo "${SYNC_ACTION[3]}" > "${INITIATOR[$__initiatorLastActionFile]}"
@@ -3482,7 +3481,7 @@ function Sync {
 				fi
 			fi
 			if [ "$resumeTarget" == "${SYNC_ACTION[3]}" ]; then
-				syncUpdate "${TARGET[$__type]}" "${INITIATOR[$__type]}"
+				syncUpdate "${TARGET[$__type]}" "${INITIATOR[$__type]}" &
 				WaitForTaskCompletion $! $SOFT_MAX_EXEC_TIME $HARD_MAX_EXEC_TIME $SLEEP_TIME $KEEP_LOGGING false true false
 				if [ $? -ne 0 ]; then
 					echo "${SYNC_ACTION[3]}" > "${INITIATOR[$__targetLastActionFile]}"
