@@ -6,7 +6,7 @@ PROGRAM=osync
 PROGRAM_VERSION=1.2-RC1
 PROGRAM_BINARY=$PROGRAM".sh"
 PROGRAM_BATCH=$PROGRAM"-batch.sh"
-SCRIPT_BUILD=2016121102
+SCRIPT_BUILD=2016121301
 
 ## osync / obackup / pmocr / zsnap install script
 ## Tested on RHEL / CentOS 6 & 7, Fedora 23, Debian 7 & 8, Mint 17 and FreeBSD 8, 10 and 11
@@ -370,7 +370,7 @@ STATS_LINK="http://instcount.netpower.fr?program=$PROGRAM&version=$PROGRAM_VERSI
 
 QuickLogger "$PROGRAM installed. Use with $BIN_DIR/$PROGRAM"
 if [ $_STATS -eq 1 ]; then
-	if [ $_LOGGER_SILENT -eq 1 ]; then
+	if [ $_LOGGER_SILENT == true ]; then
 		Statistics
 	else
 		QuickLogger "In order to make install statistics, the script would like to connect to $STATS_LINK"
