@@ -163,7 +163,7 @@ When testing your contribs, generate files via merge.sh or use bootstrap.sh whic
 Unit tests are run by travis on every PR, but you may also run them manually which adds some tests that travis can't do, via dev/tests/run_tests.sh
 SSH port can be changed on the fly via environment variable SSH_PORT, eg: SSH_PORT=2222 dev/tests/run_tests.sh
 
-Consider reading CODING_CONVENTION.TXT before submitting a patch.
+Consider reading CODING_CONVENTIONS.TXT before submitting a patch.
 
 Troubleshooting
 ---------------
