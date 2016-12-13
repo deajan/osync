@@ -8,7 +8,7 @@ KNOWN ISSUES
 RECENT CHANGES
 --------------
 
-dd Mmm YYYY: osync v1.2-RC1 release
+13 Dec 2016: osync v1.2-RC1 release
 
 - Unit tests have run on CentOS 5,6 and 7, Debian 8, Linux Mint 18, FreeBSD 10.3/pfSense, FreeBSD 11, MacOSX Sierra, Win10 1607 (14393.479) bash, Cygwin x64 and MSYS2 current
 - Added optional rsync arguments configuration value
