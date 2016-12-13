@@ -3,18 +3,15 @@
 PROGRAM="osync" # Rsync based two way sync engine with fault tolerance
 AUTHOR="(C) 2013-2016 by Orsiris de Jong"
 CONTACT="http://www.netpower.fr/osync - ozy@netpower.fr"
-PROGRAM_VERSION=1.2-beta3
+PROGRAM_VERSION=1.2-RC1
 PROGRAM_BUILD=2016121302
-IS_STABLE=no
-
-#TODO(low): is debug subset relevant in remote env
-#TODO(high): check parallel functions for $RUNDIR type output not interferring on both simultaneous runs
+IS_STABLE=yes
 
 
 
 #### OFUNCTIONS MINI SUBSET ####
 
-_OFUNCTIONS_VERSION=2.1-dev
+_OFUNCTIONS_VERSION=2.1-RC1
 _OFUNCTIONS_BUILD=2016121304
 _OFUNCTIONS_BOOTSTRAP=true
 ## BEGIN Generic bash functions written in 2013-2016 by Orsiris de Jong - http://www.netpower.fr - ozy@netpower.fr
