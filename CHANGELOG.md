@@ -3,15 +3,67 @@ KNOWN ISSUES
 
 - Cannot finish sync if one replica contains a directory and the other replica contains a file named the same way (Unix doesn't allow this)
 - Soft deletion does not honor exclusion lists
+! colors don't work in mac shell
 
 RECENT CHANGES
 --------------
 
-19 nov 2016: osync v1.2-beta3 re-release
+dd Mmm YYYY: osync v1.2-RC1 release
+
+- Unit tests have run on CentOS 5,6 and 7, Debian 8, Linux Mint 18, FreeBSD 10.3/pfSense, FreeBSD 11, MacOSX Sierra, Win10 1607 (14393.479) bash, Cygwin x64 and MSYS2 current
+- Added optional rsync arguments configuration value
+- Fixed another random error involving warns and errors triggered by earlier runs with same PID flag files
+- Adde more preflight checks
+- Fixed a random appearing issue with Sync being stopped on internet failure introduced in v1.2 rewrite
+- Resuming operation will not send warnings anymore unless resumed too many timess
+- Spinner is less prone to move logging on screen
+- Fixed daemon mode didn't enforce exclusions
+- Made a quick and dirty preprocessor
+	- ofunctions can now directly be loaded into osync via an include statement
+	- n_osync.sh can be assembled on the fly using bootstrap.sh
+- Forced remote ssh to use bash (fixes FreeBSD 11 compatibility when default shell is csh)
+- Faster execution
+	- Reduced number of needed sequential SSH connections for remote sync (4 connections less)
+	- Refactored CheckReplicaPath and CheckDiskSpace into one functon CheckReplicas
+	- Refactored CheckDiskSpace, CheckLocks and WriteLocks into one function HandleLocks
+	- Removed noclobber locking in favor of a more direct method
+- Improved remote logging
+- Fixed directory ctime softdeletion
+- Using mutt as mail program now supports multiple recipients
+- osync now properly handles symlink deletions (previous bugfix	didn't work properly)
+- Simplified osync-batch runner (internally and for user)
+	- Better filename handling
+	- Easier to read log output
+	- Always passes --silent to osync
+	- All options that do not belong to osync-batch are automatically passed to osync
+- Improved installer OS detection
+- Added daemon capability on MacOS X
+- Fixed upgrade script cannot update header on BSD / MacOS X
+- Fixed SendEmail function on MacOS X
+- Fixed MAX_HARD_EXEC_TIME not enforced in sync function introduced with v1.2 rewrite
+- Fixed MAX_SOFT_EXEC_TIME not enforced bug introduced with v1.2 rewrite
+- PRESERVE_ACL and PRESERVE_XATTR are ignored when local or remote OS is MacOS or msys or Cygwin
+- Fixed PRESERVE_EXECUTABILITY was ommited volontary on MacOS X because of rsync syntax
+- Fixed failed deletion rescheduling under BSD bug introduced with v1.2 rewrite
+- merge.sh is now BSD and Mac compatible
+- More work on unit tests:
+	- Unit tests are now BSD / MacOSX / MSYS / Cygwin and Windows 10 bash compatible
+	- Added more ACL tests
+	- Added directory soft deletion tests
+	- Added symlink and broken symlink copy / deletion tests
+	- Made unit tests more robust when aborted
+	- Simplified unit tests needed config files (merged travis and local config files)
+	- Added timed execution tests
+- More code compliance
+- Lots of minor fixes
+
+19 Nov 2016: osync v1.2-beta3 re-release
 
 - Fixed blocker bug where local tests tried GetRemoteOS Anyway
 - Fixed CentOS 5 compatibility bug for checking disk space introduced in beta3
 - More Android / Busybox compatibility
+- Made unit tests clean authorized_keys file after usage
+- Added local unit test where remote OS connection would fail
 
 18 Nov 2016: osync v1.2-beta3 released
 
