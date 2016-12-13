@@ -6,7 +6,7 @@ AUTHOR="(C) 2016 by Orsiris de Jong"
 CONTACT="http://www.netpower.fr/osync - ozy@netpower.fr"
 OLD_PROGRAM_VERSION="v1.0x-v1.1x"
 NEW_PROGRAM_VERSION="v1.2x"
-CONFIG_FILE_VERSION=2016111201
+CONFIG_FILE_VERSION=2016121301
 PROGRAM_BUILD=2016121101
 
 ## type -p does not work on platforms other than linux (bash). If if does not work, always assume output is not a zero exitcode
@@ -42,6 +42,7 @@ SSH_COMPRESSION
 SSH_IGNORE_KNOWN_HOSTS
 REMOTE_HOST_PING
 REMOTE_3RD_PARTY_HOSTS
+RSYNC_OPTIONAL_ARGS
 PRESERVE_PERMISSIONS
 PRESERVE_OWNER
 PRESERVE_GROUP
@@ -110,6 +111,7 @@ yes
 no
 no
 'www.kernel.org www.google.com'
+''
 yes
 yes
 yes
