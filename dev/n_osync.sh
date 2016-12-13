@@ -4,7 +4,7 @@ PROGRAM="osync" # Rsync based two way sync engine with fault tolerance
 AUTHOR="(C) 2013-2016 by Orsiris de Jong"
 CONTACT="http://www.netpower.fr/osync - ozy@netpower.fr"
 PROGRAM_VERSION=1.2-beta3
-PROGRAM_BUILD=2016121301
+PROGRAM_BUILD=2016121302
 IS_STABLE=no
 
 #TODO(low): is debug subset relevant in remote env
@@ -1467,7 +1467,7 @@ function Sync {
 	## Step 2
 	if [ "$resumeInitiator" == "${SYNC_ACTION[2]}" ] || [ "$resumeTarget" == "${SYNC_ACTION[2]}" ]; then
 		if [[ "$RSYNC_ATTR_ARGS" == *"-X"* ]] || [[ "$RSYNC_ATTR_ARGS" == *"-A"* ]]; then
-			syncAttrs "${INITIATOR[$__replicaDir]}" "$TARGET_SYNC_DIR"
+			syncAttrs "${INITIATOR[$__replicaDir]}" "$TARGET_SYNC_DIR" &
 			WaitForTaskCompletion $! $SOFT_MAX_EXEC_TIME $HARD_MAX_EXEC_TIME $SLEEP_TIME $KEEP_LOGGING false true false
 			if [ $? -ne 0 ]; then
 				echo "${SYNC_ACTION[2]}" > "${INITIATOR[$__initiatorLastActionFile]}"
@@ -1504,7 +1504,7 @@ function Sync {
 				fi
 			fi
 			if [ "$resumeInitiator" == "${SYNC_ACTION[3]}" ]; then
-				syncUpdate "${INITIATOR[$__type]}" "${TARGET[$__type]}"
+				syncUpdate "${INITIATOR[$__type]}" "${TARGET[$__type]}" &
 				WaitForTaskCompletion $! $SOFT_MAX_EXEC_TIME $HARD_MAX_EXEC_TIME $SLEEP_TIME $KEEP_LOGGING false true false
 				if [ $? -ne 0 ]; then
 					echo "${SYNC_ACTION[3]}" > "${INITIATOR[$__initiatorLastActionFile]}"
@@ -1517,7 +1517,7 @@ function Sync {
 			fi
 		else
 			if [ "$resumeInitiator" == "${SYNC_ACTION[3]}" ]; then
-				syncUpdate "${INITIATOR[$__type]}" "${TARGET[$__type]}"
+				syncUpdate "${INITIATOR[$__type]}" "${TARGET[$__type]}" &
 				WaitForTaskCompletion $! $SOFT_MAX_EXEC_TIME $HARD_MAX_EXEC_TIME $SLEEP_TIME $KEEP_LOGGING false true false
 				if [ $? -ne 0 ]; then
 					echo "${SYNC_ACTION[3]}" > "${INITIATOR[$__initiatorLastActionFile]}"
@@ -1529,7 +1529,7 @@ function Sync {
 				fi
 			fi
 			if [ "$resumeTarget" == "${SYNC_ACTION[3]}" ]; then
-				syncUpdate "${TARGET[$__type]}" "${INITIATOR[$__type]}"
+				syncUpdate "${TARGET[$__type]}" "${INITIATOR[$__type]}" &
 				WaitForTaskCompletion $! $SOFT_MAX_EXEC_TIME $HARD_MAX_EXEC_TIME $SLEEP_TIME $KEEP_LOGGING false true false
 				if [ $? -ne 0 ]; then
 					echo "${SYNC_ACTION[3]}" > "${INITIATOR[$__targetLastActionFile]}"
