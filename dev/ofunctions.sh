@@ -3,7 +3,7 @@
 #### OFUNCTIONS MINI SUBSET ####
 
 _OFUNCTIONS_VERSION=2.1-dev
-_OFUNCTIONS_BUILD=2016121301
+_OFUNCTIONS_BUILD=2016121302
 #### _OFUNCTIONS_BOOTSTRAP SUBSET ####
 _OFUNCTIONS_BOOTSTRAP=true
 #### _OFUNCTIONS_BOOTSTRAP SUBSET END ####
@@ -145,9 +145,9 @@ function RemoteLogger {
 	if [ "$_LOGGER_PREFIX" == "time" ]; then
 		prefix="Remote TIME: $SECONDS - "
 	elif [ "$_LOGGER_PREFIX" == "date" ]; then
-		prefix="Remote $(date) - "
+		prefix="R $(date) - "
 	else
-		prefix="Remote "
+		prefix="RTIME - $SECONDS "
 	fi
 
 	if [ "$level" == "CRITICAL" ]; then
@@ -733,8 +733,8 @@ function WaitForTaskCompletion {
 					wait $pid
 					retval=$?
 					if [ $retval -ne 0 ]; then
-						errorcount=$((errorcount+1))
 						Logger "${FUNCNAME[0]} called by [$callerName] finished monitoring [$pid] with exitcode [$retval]." "DEBUG"
+						errorcount=$((errorcount+1))
 						# Welcome to variable variable bash hell
 						if [ "$(eval echo \"\$WAIT_FOR_TASK_COMPLETION_$callerName\")" == "" ]; then
 							eval "WAIT_FOR_TASK_COMPLETION_$callerName=\"$pid:$retval\""
@@ -1349,7 +1349,7 @@ function CheckConnectivityRemoteHost {
 
 		if [ "$REMOTE_HOST_PING" != "no" ] && [ "$REMOTE_OPERATION" != "no" ]; then
 			eval "$PING_CMD $REMOTE_HOST > /dev/null 2>&1" &
-			WaitForTaskCompletion $! 60 180 $SLEEP_TIME $KEEP_LOGGING true true false ${FUNCNAME[0]}
+			WaitForTaskCompletion $! 60 180 $SLEEP_TIME $KEEP_LOGGING true true false
 			retval=$?
 			if [ $retval != 0 ]; then
 				Logger "Cannot ping [$REMOTE_HOST]. Return code [$retval]." "WARN"
@@ -1372,7 +1372,7 @@ function CheckConnectivity3rdPartyHosts {
 			for i in $REMOTE_3RD_PARTY_HOSTS
 			do
 				eval "$PING_CMD $i > /dev/null 2>&1" &
-				WaitForTaskCompletion $! 180 360 $SLEEP_TIME $KEEP_LOGGING true true false ${FUNCNAME[0]}
+				WaitForTaskCompletion $! 180 360 $SLEEP_TIME $KEEP_LOGGING true true false
 				retval=$?
 				if [ $retval != 0 ]; then
 					Logger "Cannot ping 3rd party host [$i]. Return code [$retval]." "NOTICE"
