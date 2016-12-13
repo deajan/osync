@@ -1,16 +1,16 @@
 #!/usr/bin/env bash
 
+_OFUNCTIONS_BOOTSTRAP=true
+
 PROGRAM=osync
 PROGRAM_VERSION=1.2-beta3
 PROGRAM_BINARY=$PROGRAM".sh"
 PROGRAM_BATCH=$PROGRAM"-batch.sh"
-SCRIPT_BUILD=2016112401
+SCRIPT_BUILD=2016121102
 
 ## osync / obackup / pmocr / zsnap install script
-## Tested on RHEL / CentOS 6 & 7, Fedora 23, Debian 7 & 8, Mint 17 and FreeBSD 8 & 10
+## Tested on RHEL / CentOS 6 & 7, Fedora 23, Debian 7 & 8, Mint 17 and FreeBSD 8, 10 and 11
 ## Please adapt this to fit your distro needs
-
-#TODO: silent mode and no stats mode
 
 # Get current install.sh path from http://stackoverflow.com/a/246128/2635443
 SCRIPT_PATH="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
@@ -35,80 +35,125 @@ PMOCR_SERVICE_FILE_SYSTEMD_SYSTEM="pmocr-srv@.service"
 
 ## Default log file
 if [ -w $FAKEROOT/var/log ]; then
-        LOG_FILE="$FAKEROOT/var/log/$PROGRAM-install.log"
+	LOG_FILE="$FAKEROOT/var/log/$PROGRAM-install.log"
 elif ([ "$HOME" != "" ] && [ -w "$HOME" ]); then
-        LOG_FILE="$HOME/$PROGRAM-install.log"
+	LOG_FILE="$HOME/$PROGRAM-install.log"
 else
-    	LOG_FILE="./$PROGRAM-install.log"
+	LOG_FILE="./$PROGRAM-install.log"
 fi
 
-# Generic quick logging function
+# QuickLogger subfunction, can be called directly
 function _QuickLogger {
-        local value="${1}"
-       	local destination="${2}" # Destination: stdout, log, both
+	local value="${1}"
+	local destination="${2}" # Destination: stdout, log, both
 
-        if ([ "$destination" == "log" ] || [ "$destination" == "both" ]); then
-                echo -e "$(date) - $value" >> "$LOG_FILE"
-        elif ([ "$destination" == "stdout" ] || [ "$destination" == "both" ]); then
-                echo -e "$value"
-       	fi
+	if ([ "$destination" == "log" ] || [ "$destination" == "both" ]); then
+		echo -e "$(date) - $value" >> "$LOG_FILE"
+	elif ([ "$destination" == "stdout" ] || [ "$destination" == "both" ]); then
+		echo -e "$value"
+	fi
 }
 
+# Generic quick logging function
 function QuickLogger {
 	local value="${1}"
 
-	if [ "$_SILENT" -eq 1 ]; then
+	if [ "$_LOGGER_SILENT" == true ]; then
 		_QuickLogger "$value" "log"
 	else
 		_QuickLogger "$value" "stdout"
 	fi
 }
+## from https://gist.github.com/cdown/1163649
+function UrlEncode {
+	local length="${#1}"
 
-function urlencode() {
-    # urlencode <string>
-
-    local LANG=C
-    local length="${#1}"
-    for (( i = 0; i < length; i++ )); do
-        local c="${1:i:1}"
-        case $c in
-            [a-zA-Z0-9.~_-]) printf "$c" ;;
-            *) printf '%%%02X' "'$c" ;;
-        esac
-    done
+	local LANG=C
+	for (( i = 0; i < length; i++ )); do
+		local c="${1:i:1}"
+		case $c in
+			[a-zA-Z0-9.~_-])
+			printf "$c"
+			;;
+			*)
+			printf '%%%02X' "'$c"
+			;;
+		esac
+	done
 }
-
-function SetOSSettings {
+function GetLocalOS {
 	local localOsVar
 
-	USER=root
-
-        # There's no good way to tell if currently running in BusyBox shell. Using sluggish way.
-        if ls --help 2>&1 | grep -i "BusyBox" > /dev/null; then
-                localOsVar="BusyBox"
-        else
-                # Detecting the special ubuntu userland in Windows 10 bash
-                if grep -i Microsoft /proc/sys/kernel/osrelease > /dev/null 2>&1; then
-                        localOsVar="Microsoft"
-                else
-                        localOsVar="$(uname -spio 2>&1)"
-                        if [ $? != 0 ]; then
-                                localOsVar="$(uname -v 2>&1)"
-                                if [ $? != 0 ]; then
-                                        localOsVar="$(uname)"
-                                fi
-                        fi
-                fi
-        fi
+	# There's no good way to tell if currently running in BusyBox shell. Using sluggish way.
+	if ls --help 2>&1 | grep -i "BusyBox" > /dev/null; then
+		localOsVar="BusyBox"
+	else
+		# Detecting the special ubuntu userland in Windows 10 bash
+		if grep -i Microsoft /proc/sys/kernel/osrelease > /dev/null 2>&1; then
+			localOsVar="Microsoft"
+		else
+			localOsVar="$(uname -spio 2>&1)"
+			if [ $? != 0 ]; then
+				localOsVar="$(uname -v 2>&1)"
+				if [ $? != 0 ]; then
+					localOsVar="$(uname)"
+				fi
+			fi
+		fi
+	fi
 
 	case $localOsVar in
+		# Android uname contains both linux and android, keep it before linux entry
+		*"Android"*)
+		LOCAL_OS="Android"
+		;;
+		*"Linux"*)
+		LOCAL_OS="Linux"
+		;;
+		*"BSD"*)
+		LOCAL_OS="BSD"
+		;;
+		*"MINGW32"*|*"MSYS"*)
+		LOCAL_OS="msys"
+		;;
+		*"CYGWIN"*)
+		LOCAL_OS="Cygwin"
+		;;
+		*"Microsoft"*)
+		LOCAL_OS="WinNT10"
+		;;
+		*"Darwin"*)
+		LOCAL_OS="MacOSX"
+		;;
+		*"BusyBox"*)
+		LOCAL_OS="BusyBox"
+		;;
+		*)
+		if [ "$IGNORE_OS_TYPE" == "yes" ]; then
+			Logger "Running on unknown local OS [$localOsVar]." "WARN"
+			return
+		fi
+		if [ "$_OFUNCTIONS_VERSION" != "" ]; then
+			Logger "Running on >> $localOsVar << not supported. Please report to the author." "ERROR"
+		fi
+		exit 1
+		;;
+	esac
+	if [ "$_OFUNCTIONS_VERSION" != "" ]; then
+		Logger "Local OS: [$localOsVar]." "DEBUG"
+	fi
+}
+function SetLocalOSSettings {
+	USER=root
+
+	case $LOCAL_OS in
 		*"BSD"*)
 		GROUP=wheel
 		;;
-		*"Darwin"*)
+		*"MacOSX"*)
 		GROUP=admin
 		;;
-		*"MINGW"*|*"CYGWIN"*)
+		*"msys"*|*"Cygwin"*)
 		USER=""
 		GROUP=""
 		;;
@@ -117,12 +162,17 @@ function SetOSSettings {
 		;;
 	esac
 
-	if ([ "$USER" != "" ] && [ "$(whoami)" != "$USER" ] && [ "$FAKEROOT" == "" ]); then
-	  	QuickLogger "Must be run as $USER."
+	if [ "$LOCAL_OS" == "Android" ] || [ "$LOCAL_OS" == "MacOSX" ] || [ "$LOCAL_OS" == "BusyBox" ]; then
+		QuickLogger "Cannot be installed on [$LOCAL_OS]. Please use $PROGRAM.sh directly."
 		exit 1
 	fi
 
-	OS=$(urlencode "$localOsVar")
+	if ([ "$USER" != "" ] && [ "$(whoami)" != "$USER" ] && [ "$FAKEROOT" == "" ]); then
+		QuickLogger "Must be run as $USER."
+		exit 1
+	fi
+
+	OS=$(UrlEncode "$localOsVar")
 }
 
 function GetInit {
@@ -262,22 +312,22 @@ function CopyServiceFiles {
 }
 
 function Statistics {
-        if type wget > /dev/null; then
-                wget -qO- "$STATS_LINK" > /dev/null 2>&1
-                if [ $? == 0 ]; then
-                        return 0
-                fi
+	if type wget > /dev/null; then
+		wget -qO- "$STATS_LINK" > /dev/null 2>&1
+		if [ $? == 0 ]; then
+			return 0
+		fi
 	fi
 
-        if type curl > /dev/null; then
-                curl "$STATS_LINK" -o /dev/null > /dev/null 2>&1
-                if [ $? == 0 ]; then
-                        return 0
-                fi
+	if type curl > /dev/null; then
+		curl "$STATS_LINK" -o /dev/null > /dev/null 2>&1
+		if [ $? == 0 ]; then
+			return 0
+		fi
 	fi
 
-       	QuickLogger "Neiter wget nor curl could be used for. Cannot run statistics. Use the provided link please."
-        return 1
+	QuickLogger "Neiter wget nor curl could be used for. Cannot run statistics. Use the provided link please."
+	return 1
 }
 
 function Usage {
@@ -288,13 +338,13 @@ function Usage {
 	exit 127
 }
 
-_SILENT=0
+_LOGGER_SILENT=false
 _STATS=1
 for i in "$@"
 do
 	case $i in
 		--silent)
-		_SILENT=1
+		_LOGGER_SILENT=true
 		;;
 		--no-stats)
 		_STATS=0
@@ -308,7 +358,8 @@ if [ "$FAKEROOT" != "" ]; then
 	mkdir -p "$SERVICE_DIR_SYSTEMD_SYSTEM" "$SERVICE_DIR_SYSTEMD_USER" "$BIN_DIR"
 fi
 
-SetOSSettings
+GetLocalOS
+SetLocalOSSettings
 CreateConfDir
 CopyExampleFiles
 CopyProgram
@@ -319,7 +370,7 @@ STATS_LINK="http://instcount.netpower.fr?program=$PROGRAM&version=$PROGRAM_VERSI
 
 QuickLogger "$PROGRAM installed. Use with $BIN_DIR/$PROGRAM"
 if [ $_STATS -eq 1 ]; then
-	if [ $_SILENT -eq 1 ]; then
+	if [ $_LOGGER_SILENT -eq 1 ]; then
 		Statistics
 	else
 		QuickLogger "In order to make install statistics, the script would like to connect to $STATS_LINK"
