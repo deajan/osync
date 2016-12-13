@@ -7,7 +7,7 @@
 
 ## On CYGWIN / MSYS, ACL and extended attributes aren't supported
 
-# osync test suite 2016120901
+# osync test suite 2016121202
 
 # 4 tests:
 # quicklocal
@@ -151,12 +151,19 @@ function DownloadLargeFileSet() {
 function CreateOldFile () {
 	local drive
 	local filePath="${1}"
+	local type="${2:-false}"
 
-	touch "$filePath"
+	if [ $type == true ]; then
+		mkdir -p "$filePath"
+	else
+		mkdir -p "$(dirname $filePath)"
+		touch "$filePath"
+	fi
+
 	assertEquals "touch [$filePath]" "0" $?
 
 	# Get current drive
-        drive=$(df "$OSYNC_DIR" | tail -1 | awk '{print $1}')
+	drive=$(df "$OSYNC_DIR" | tail -1 | awk '{print $1}')
 
 	# modify ctime on ext4 so osync thinks it has to delete the old files
 	debugfs -w -R 'set_inode_field "'$filePath'" ctime 201001010101' $drive
@@ -175,7 +182,7 @@ function PrepareLocalDirs () {
 	mkdir -p "$INITIATOR_DIR"
 
 	if [ -d "$TARGET_DIR" ]; then
- 		rm -rf "$TARGET_DIR"
+		rm -rf "$TARGET_DIR"
 	fi
 	mkdir -p "$TARGET_DIR"
 }
@@ -221,7 +228,7 @@ function oneTimeSetUp () {
 
 	osyncDaemonParameters[$__local]="$CONF_DIR/$LOCAL_CONF --on-changes"
 
-	if [ "$LOCAL_OS" != "msys" ] || [ "$LOCAL_OS" == "Cygwin" ]; then
+	if [ "$LOCAL_OS" != "msys" ] && [ "$LOCAL_OS" != "Cygwin" ]; then
 		osyncParameters[$__quickRemote]="--initiator=$INITIATOR_DIR --target=ssh://localhost:$SSH_PORT/$TARGET_DIR --rsakey=${HOME}/.ssh/id_rsa_local --instance-id=quickremote"
 		osyncParameters[$__confRemote]="$CONF_DIR/$REMOTE_CONF"
 
@@ -283,8 +290,8 @@ function oneTimeTearDown () {
 }
 
 function setUp () {
-        rm -rf "$INITIATOR_DIR"
-        rm -rf "$TARGET_DIR"
+	rm -rf "$INITIATOR_DIR"
+	rm -rf "$TARGET_DIR"
 }
 
 # This test has to be done everytime in order for osync executable to be fresh
@@ -388,7 +395,7 @@ function test_Deletetion () {
 }
 
 function test_deletion_failure () {
-	if [ "$LOCAL_OS" == "WinNT10" ] || [ "$LOCAL_OS" == "msys" ]; then
+	if [ "$LOCAL_OS" == "WinNT10" ] || [ "$LOCAL_OS" == "msys" ] || [ "$LOCAL_OS" == "Cygwin" ]; then
 		echo "Skipping deletion failure test as Win10 does not have chattr  support."
 		return 0
 	fi
@@ -720,13 +727,16 @@ function test_softdeletion_cleanup () {
 	files[2]="$INITIATOR_DIR/$OSYNC_BACKUP_DIR/someBackedUpFileInitiator"
 	files[3]="$TARGET_DIR/$OSYNC_BACKUP_DIR/someBackedUpFileTarget"
 
+	DirA="$INITIATOR_DIR/$OSYNC_DELETE_DIR/somedir"
+	DirB="$TARGET_DIR/$OSYNC_DELETE_DIR/someotherdir"
+
 	for i in "${osyncParameters[@]}"; do
 		cd "$OSYNC_DIR"
 		PrepareLocalDirs
 
 		# First run
-		REMOTE_HOST_PING=no ./$OSYNC_EXECUTABLE $i
-		assertEquals "First deletion run with parameters [$i]." "0" $?
+		#REMOTE_HOST_PING=no ./$OSYNC_EXECUTABLE $i
+		#assertEquals "First deletion run with parameters [$i]." "0" $?
 
 		# Get current drive
 		drive=$(df "$OSYNC_DIR" | tail -1 | awk '{print $1}')
@@ -746,6 +756,12 @@ function test_softdeletion_cleanup () {
 				CreateOldFile "$file.old"
 			fi
 		done
+		if [ "$TRAVIS_RUN" == true ] || [ "$LOCAL_OS" == "BSD" ] || [ "$LOCAL_OS" == "MacOSX" ] || [ "$LOCAL_OS" == "WinNT10" ] || [ "$LOCAL_OS" == "msys" ] || [ "$LOCAL_OS" == "Cygwin" ]; then
+			echo "Skipping changing ctime on dir too"
+		else
+			CreateOldFile "$DirA" true
+			CreateOldFile "$DirB" true
+		fi
 
 		# Second run
 		REMOTE_HOST_PING=no ./$OSYNC_EXECUTABLE $i
@@ -763,6 +779,18 @@ function test_softdeletion_cleanup () {
 				assertEquals "Old softdeleted / backed up file [$file.old] is deleted permanently." "1" $?
 			fi
 		done
+
+		if [ "$TRAVIS_RUN" == true ] || [ "$LOCAL_OS" == "BSD" ] || [ "$LOCAL_OS" == "MacOSX" ] || [ "$LOCAL_OS" == "WinNT10" ] || [ "$LOCAL_OS" == "msys" ] || [ "$LOCAL_OS" == "Cygwin" ]; then
+			[ ! -d "$DirA" ]
+			assertEquals "Old softdeleted / backed up directory [$dirA] is deleted permanently." "0" $?
+			[ ! -d "$DirB" ]
+			assertEquals "Old softdeleted / backed up directory [$dirB] is deleted permanently." "0" $?
+		else
+			[ ! -d "$DirA" ]
+			assertEquals "Old softdeleted / backed up directory [$DirA] is deleted permanently." "1" $?
+			[ ! -d "$DirB" ]
+			assertEquals "Old softdeleted / backed up directory [$DirB] is deleted permanently." "1" $?
+		fi
 	done
 
 }
@@ -774,7 +802,7 @@ function test_FileAttributePropagation () {
 		return 0
 	fi
 
-	if [ "$LOCAL_OS" == "MacOSX" ] || [ "$LOCAL_OS" == "msys" ]; then
+	if [ "$LOCAL_OS" == "MacOSX" ] || [ "$LOCAL_OS" == "msys" ] || [ "$LOCAL_OS" == "Cygwin" ]; then
 		echo "Skipping FileAttributePropagation tests because [$LOCAL_OS]  does not support ACL."
 		return 0
 	fi
@@ -895,6 +923,8 @@ function test_MultipleConflictBackups () {
 
 	for i in "${osyncParameters[@]}"; do
 
+		echo "Running with parameters [$î]."
+
 		cd "$OSYNC_DIR"
 		PrepareLocalDirs
 
@@ -980,7 +1010,7 @@ function test_Locking () {
 	REMOTE_HOST_PING=no ./$OSYNC_EXECUTABLE ${osyncParameters[$__confLocal]}
 	assertEquals "Should be able to resume locked target with same instance_id in confLocal mode." "0" $?
 
-	if [ "$LOCAL_OS" != "msys" ]; then
+	if [ "$LOCAL_OS" != "msys" ] && [ "$LOCAL_OS" != "Cygwin" ]; then
 		PrepareLocalDirs
 		mkdir -p "$TARGET_DIR/$OSYNC_WORKDIR"
 		echo 65536@quickremote > "$TARGET_DIR/$OSYNC_WORKDIR/lock"
@@ -1011,7 +1041,7 @@ function test_Locking () {
 	REMOTE_HOST_PING=no ./$OSYNC_EXECUTABLE ${osyncParameters[$__confLocal]}
 	assertEquals "Should be able to resume locked local target with bogus instance_id in confLocal mode." "0" $?
 
-	if [ "$LOCAL_OS" != "msys" ]; then
+	if [ "$LOCAL_OS" != "msys" ] && [ "$LOCAL_OS" != "Cygwin" ]; then
 		PrepareLocalDirs
 		mkdir -p "$TARGET_DIR/$OSYNC_WORKDIR"
 		echo 65536@bogusinstance > "$TARGET_DIR/$OSYNC_WORKDIR/lock"
@@ -1235,15 +1265,15 @@ function test_timedExecution () {
 			SLEEP_TIME=1 SOFT_MAX_EXEC_TIME=${softTimes[$x]} HARD_MAX_EXEC_TIME=${hardTimes[$x]} ./$OSYNC_EXECUTABLE $i
 			retval=$?
 			if [ "$OSYNC_MIN_VERSION" -gt 1 ]; then
-	        		assertEquals "Timed Execution test with timed SOFT_MAX_EXEC_TIME=${softTimes[$x]} and HARD_MAX_EXEC_TIME=${hardTimes[$x]}." $x $retval
+				assertEquals "Timed Execution test with timed SOFT_MAX_EXEC_TIME=${softTimes[$x]} and HARD_MAX_EXEC_TIME=${hardTimes[$x]}." $x $retval
 			else
 				# osync v1.1 had different exit codes, 240 was warning, anything else than 0 was error
 				if [ $x -eq 2 ]; then
-		        		assertEquals "Timed Execution test with timed SOFT_MAX_EXEC_TIME=${softTimes[$x]} and HARD_MAX_EXEC_TIME=${hardTimes[$x]}." 240 $retval
+					assertEquals "Timed Execution test with timed SOFT_MAX_EXEC_TIME=${softTimes[$x]} and HARD_MAX_EXEC_TIME=${hardTimes[$x]}." 240 $retval
 				elif [ $x -eq 1 ]; then
-		        		assertNotEquals "Timed Execution test with timed SOFT_MAX_EXEC_TIME=${softTimes[$x]} and HARD_MAX_EXEC_TIME=${hardTimes[$x]}." 0 $retval
+					assertNotEquals "Timed Execution test with timed SOFT_MAX_EXEC_TIME=${softTimes[$x]} and HARD_MAX_EXEC_TIME=${hardTimes[$x]}." 0 $retval
 				else
-		        		assertEquals "Timed Execution test with timed SOFT_MAX_EXEC_TIME=${softTimes[$x]} and HARD_MAX_EXEC_TIME=${hardTimes[$x]}." 0 $retval
+					assertEquals "Timed Execution test with timed SOFT_MAX_EXEC_TIME=${softTimes[$x]} and HARD_MAX_EXEC_TIME=${hardTimes[$x]}." 0 $retval
 				fi
 			fi
 		done
@@ -1256,20 +1286,20 @@ function test_UpgradeConfRun () {
 		return 0
 	fi
 
-        # Basic return code tests. Need to go deep into file presence testing
-        cd "$OSYNC_DIR"
+	# Basic return code tests. Need to go deep into file presence testing
+	cd "$OSYNC_DIR"
 	PrepareLocalDirs
 
-        # Make a security copy of the old config file
-        cp "$CONF_DIR/$OLD_CONF" "$CONF_DIR/$TMP_OLD_CONF"
+	# Make a security copy of the old config file
+	cp "$CONF_DIR/$OLD_CONF" "$CONF_DIR/$TMP_OLD_CONF"
 
-        ./$OSYNC_UPGRADE "$CONF_DIR/$TMP_OLD_CONF"
-        assertEquals "Conf file upgrade" "0" $?
-        ./$OSYNC_EXECUTABLE "$CONF_DIR/$TMP_OLD_CONF"
-        assertEquals "Upgraded conf file execution test" "0" $?
+	./$OSYNC_UPGRADE "$CONF_DIR/$TMP_OLD_CONF"
+	assertEquals "Conf file upgrade" "0" $?
+	./$OSYNC_EXECUTABLE "$CONF_DIR/$TMP_OLD_CONF"
+	assertEquals "Upgraded conf file execution test" "0" $?
 
-        rm -f "$CONF_DIR/$TMP_OLD_CONF"
-        rm -f "$CONF_DIR/$TMP_OLD_CONF.save"
+	rm -f "$CONF_DIR/$TMP_OLD_CONF"
+	rm -f "$CONF_DIR/$TMP_OLD_CONF.save"
 }
 
 function test_DaemonMode () {
@@ -1330,7 +1360,7 @@ function test_DaemonMode () {
 function test_NoRemoteAccessTest () {
 	RemoveSSH
 
-        cd "$OSYNC_DIR"
+	cd "$OSYNC_DIR"
 	PrepareLocalDirs
 
 	REMOTE_HOST_PING=no ./$OSYNC_EXECUTABLE ${osyncParameters[$__confLocal]}
