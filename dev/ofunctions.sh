@@ -2,8 +2,8 @@
 #### OFUNCTIONS FULL SUBSET ####
 #### OFUNCTIONS MINI SUBSET ####
 
-_OFUNCTIONS_VERSION=2.1-dev
-_OFUNCTIONS_BUILD=2016121304
+_OFUNCTIONS_VERSION=2.1-RC1+dev
+_OFUNCTIONS_BUILD=2016121501
 #### _OFUNCTIONS_BOOTSTRAP SUBSET ####
 _OFUNCTIONS_BOOTSTRAP=true
 #### _OFUNCTIONS_BOOTSTRAP SUBSET END ####
@@ -151,7 +151,7 @@ function RemoteLogger {
 	fi
 
 	if [ "$level" == "CRITICAL" ]; then
-		_Logger "" "$prefix\e[41m$value\e[0m" true
+		_Logger "" "$prefix\e[1;33;41m$value\e[0m" true
 		if [ $_DEBUG == "yes" ]; then
 			_Logger -e "" "[$retval] in [$(joinString , ${FUNCNAME[@]})] SP=$SCRIPT_PID P=$$" true
 		fi
@@ -227,7 +227,7 @@ function Logger {
 	fi
 
 	if [ "$level" == "CRITICAL" ]; then
-		_Logger "$prefix($level):$value" "$prefix\e[41m$value\e[0m" true
+		_Logger "$prefix($level):$value" "$prefix\e[1;33;41m$value\e[0m" true
 		ERROR_ALERT=true
 		# ERROR_ALERT / WARN_ALERT isn't set in main when Logger is called from a subprocess. Need to keep this flag.
 		echo -e "[$retval] in [$(joinString , ${FUNCNAME[@]})] SP=$SCRIPT_PID P=$$\n$prefix($level):$value" >> "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.error.$SCRIPT_PID.$TSTAMP"
