@@ -4,7 +4,7 @@ PROGRAM="osync" # Rsync based two way sync engine with fault tolerance
 AUTHOR="(C) 2013-2016 by Orsiris de Jong"
 CONTACT="http://www.netpower.fr/osync - ozy@netpower.fr"
 PROGRAM_VERSION=1.2-RC1+dev
-PROGRAM_BUILD=2016121501
+PROGRAM_BUILD=2016121502
 IS_STABLE=no
 
 # Execution order						#__WITH_PARANOIA_DEBUG
@@ -201,18 +201,20 @@ function CheckCurrentConfigAll {
 
 function _CheckReplicasLocal {
 	local replicaPath="${1}"
-	__CheckArguments 1 $# "$@"	#__WITH_PARANOIA_DEBUG
+	local replicaType="${2}"
+
+	__CheckArguments 2 $# "$@"	#__WITH_PARANOIA_DEBUG
 
 	local retval
 	local diskSpace
 
 	if [ ! -d "$replicaPath" ]; then
 		if [ "$CREATE_DIRS" == "yes" ]; then
-			$COMMAND_SUDO mkdir -p "$replicaPath" >> "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$SCRIPT_PID.$TSTAMP" 2>&1
+			$COMMAND_SUDO mkdir -p "$replicaPath" >> "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$replicaType.$SCRIPT_PID.$TSTAMP" 2>&1
 			retval=$?
 			if [ $retval -ne 0 ]; then
 				Logger "Cannot create local replica path [$replicaPath]." "CRITICAL" $retval
-				Logger "Command output:\n$(cat $RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$SCRIPT_PID.$TSTAMP)" "WARN"
+				Logger "Command output:\n$(cat $RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$replicaType.$SCRIPT_PID.$TSTAMP)" "WARN"
 				return 1
 			else
 				Logger "Created local replica path [$replicaPath]." "NOTICE"
@@ -247,6 +249,8 @@ function _CheckReplicasLocal {
 
 function _CheckReplicasRemote {
 	local replicaPath="${1}"
+	local replicaType="${2}"
+
 	__CheckArguments 1 $# "$@"	#__WITH_PARANOIA_DEBUG
 
 	local retval
@@ -257,7 +261,7 @@ function _CheckReplicasRemote {
 
 $SSH_CMD env _DEBUG="'$_DEBUG'" env _PARANOIA_DEBUG="'$_PARANOIA_DEBUG'" env _LOGGER_SILENT="'$_LOGGER_SILENT'" env _LOGGER_VERBOSE="'$_LOGGER_VERBOSE'" env _LOGGER_PREFIX="'$_LOGGER_PREFIX'" env _LOGGER_ERR_ONLY="'$_LOGGER_ERR_ONLY'" \
 env PROGRAM="'$PROGRAM'" env SCRIPT_PID="'$SCRIPT_PID'" TSTAMP="'$TSTAMP'" \
-env replicaPath="'$replicaPath'" env CREATE_DIRS="'$CREATE_DIRS'" env COMMAND_SUDO="'$COMMAND_SUDO'" env DF_CMD="'$DF_CMD'" env MINIMUM_SPACE="'$MINIMUM_SPACE'" 'bash -s' << 'ENDSSH' > "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$SCRIPT_PID.$TSTAMP" 2>&1
+env replicaPath="'$replicaPath'" env CREATE_DIRS="'$CREATE_DIRS'" env COMMAND_SUDO="'$COMMAND_SUDO'" env DF_CMD="'$DF_CMD'" env MINIMUM_SPACE="'$MINIMUM_SPACE'" 'bash -s' << 'ENDSSH' > "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$replicaType.$SCRIPT_PID.$TSTAMP" 2>&1
 include #### DEBUG SUBSET ####
 include #### TrapError SUBSET ####
 include #### IsInteger SUBSET ####
@@ -309,10 +313,10 @@ ENDSSH
 	if [ $retval -ne 0 ]; then
 		Logger "Failed to check remote replica." "CRITICAL" $retval
 	fi
-	if [ -s "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$SCRIPT_PID.$TSTAMP" ]; then
+	if [ -s "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$replicaType.$SCRIPT_PID.$TSTAMP" ]; then
 		(
 		_LOGGER_PREFIX=""
-		Logger "$(cat $RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$SCRIPT_PID.$TSTAMP)" "NOTICE"
+		Logger "$(cat $RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$replicaType.$SCRIPT_PID.$TSTAMP)" "NOTICE"
 		)
 	fi
 	if [ $retval -ne 0 ]; then
@@ -335,13 +339,13 @@ function CheckReplicas {
 		fi
 	fi
 
-	_CheckReplicasLocal "${INITIATOR[$__replicaDir]}" &
+	_CheckReplicasLocal "${INITIATOR[$__replicaDir]}" "${INITIATOR[$__type]}" &
 	pids="$!"
 	if [ "$REMOTE_OPERATION" != "yes" ]; then
-		_CheckReplicasLocal "${TARGET[$__replicaDir]}" &
+		_CheckReplicasLocal "${TARGET[$__replicaDir]}" "${TARGET[$__type]}" &
 		pids="$pids;$!"
 	else
-		_CheckReplicasRemote "${TARGET[$__replicaDir]}" &
+		_CheckReplicasRemote "${TARGET[$__replicaDir]}" "${TARGET[$__type]}" &
 		pids="$pids;$!"
 	fi
 	WaitForTaskCompletion $pids 720 1800 $SLEEP_TIME $KEEP_LOGGING true true false
@@ -367,11 +371,11 @@ function _HandleLocksLocal {
 	local writeLocks
 
 	if [ ! -d "$replicaStateDir" ]; then
-		$COMMAND_SUDO mkdir -p "$replicaStateDir" >> "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$SCRIPT_PID.$TSTAMP" 2>&1
+		$COMMAND_SUDO mkdir -p "$replicaStateDir" > "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$replicaType.$SCRIPT_PID.$TSTAMP" 2>&1
 		retval=$?
 		if [ $retval -ne 0 ]; then
 			Logger "Cannot create state dir [$replicaStateDir]." "CRITICAL" $retval
-			Logger "Command output:\n$(cat $RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$SCRIPT_PID.$TSTAMP)" "WARN"
+			Logger "Command output:\n$(cat $RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$replicaType.$SCRIPT_PID.$TSTAMP)" "WARN"
 			return 1
 		fi
 	fi
@@ -409,11 +413,11 @@ function _HandleLocksLocal {
 	if [ $writeLocks != true ]; then
 		return 1
 	else
-		$COMMAND_SUDO echo "$SCRIPT_PID@$INSTANCE_ID" > "$lockfile" 2> "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}-$replicaType.$SCRIPT_PID.$TSTAMP"
+		$COMMAND_SUDO echo "$SCRIPT_PID@$INSTANCE_ID" > "$lockfile" 2> "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$replicaType.$SCRIPT_PID.$TSTAMP"
 		retval=$?
 		if [ $retval -ne 0 ]; then
 			Logger "Could not create lock file on local $replicaType in [$lockfile]." "CRITICAL" $retval
-			Logger "Command output\n$($RUN_DIR/$PROGRAM.${FUNCNAME[0]}-$replicaType.$SCRIPT_PID.$TSTAMP)" "WARN"
+			Logger "Command output\n$($RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$replicaType.$SCRIPT_PID.$TSTAMP)" "WARN"
 			return 1
 		else
 			Logger "Locked local $replicaType replica in [$lockfile]." "DEBUG"
@@ -442,7 +446,7 @@ function _HandleLocksRemote {
 $SSH_CMD env _DEBUG="'$_DEBUG'" env _PARANOIA_DEBUG="'$_PARANOIA_DEBUG'" env _LOGGER_SILENT="'$_LOGGER_SILENT'" env _LOGGER_VERBOSE="'$_LOGGER_VERBOSE'" env _LOGGER_PREFIX="'$_LOGGER_PREFIX'" env _LOGGER_ERR_ONLY="'$_LOGGER_ERR_ONLY'" \
 env PROGRAM="'$PROGRAM'" env SCRIPT_PID="'$SCRIPT_PID'" TSTAMP="'$TSTAMP'" \
 env replicaStateDir="'$replicaStateDir'" env initiatorRunningPidsFlat="\"(${initiatorRunningPids[@]})\"" env lockfile="'$lockfile'" env replicaType="'$replicaType'" env overwrite="'$overwrite'" \
-env INSTANCE_ID="'$INSTANCE_ID'" env FORCE_STRANGER_LOCK_RESUME="'$FORCE_STRANGER_LOCK_RESUME'"  'bash -s' << 'ENDSSH' > "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$SCRIPT_PID.$TSTAMP" 2>&1
+env INSTANCE_ID="'$INSTANCE_ID'" env FORCE_STRANGER_LOCK_RESUME="'$FORCE_STRANGER_LOCK_RESUME'"  'bash -s' << 'ENDSSH' > "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$replicaType.$SCRIPT_PID.$TSTAMP" 2>&1
 include #### DEBUG SUBSET ####
 include #### TrapError SUBSET ####
 include #### ArrayContains SUBSET ####
@@ -521,10 +525,10 @@ ENDSSH
 	if [ $retval -ne 0 ]; then
 		Logger "Remote lock handling failed." "CRITICAL" $retval
 	fi
-	if [ -s "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$SCRIPT_PID.$TSTAMP" ]; then
+	if [ -s "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$replicaType.$SCRIPT_PID.$TSTAMP" ]; then
 		(
 		_LOGGER_PREFIX=""
-		Logger "$(cat $RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$SCRIPT_PID.$TSTAMP)" "NOTICE"
+		Logger "$(cat $RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$replicaType.$SCRIPT_PID.$TSTAMP)" "NOTICE"
 		)
 	fi
 	if [ $retval -ne 0 ]; then
@@ -579,7 +583,9 @@ function HandleLocks {
 
 function _UnlockReplicasLocal {
 	local lockfile="${1}"
-	__CheckArguments 1 $# "$@"	#__WITH_PARANOIA_DEBUG
+	local replicaType="${2}"
+
+	__CheckArguments 2 $# "$@"	#__WITH_PARANOIA_DEBUG
 
 	local retval
 
@@ -587,16 +593,18 @@ function _UnlockReplicasLocal {
 		$COMMAND_SUDO rm "$lockfile"
 		retval=$?
 		if [ $retval -ne 0 ]; then
-			Logger "Could not unlock local replica." "ERROR" $retval
+			Logger "Could not unlock local $replicaType replica." "ERROR" $retval
 		else
-			Logger "Removed local replica lock." "DEBUG"
+			Logger "Removed local $replicaType replica lock." "DEBUG"
 		fi
 	fi
 }
 
 function _UnlockReplicasRemote {
 	local lockfile="${1}"
-	__CheckArguments 1 $# "$@"	#__WITH_PARANOIA_DEBUG
+	local replicaType="${2}"
+
+	__CheckArguments 2 $# "$@"	#__WITH_PARANOIA_DEBUG
 
 	local retval
 	local cmd
@@ -606,17 +614,17 @@ function _UnlockReplicasRemote {
 
 $SSH_CMD env _DEBUG="'$_DEBUG'" env _PARANOIA_DEBUG="'$_PARANOIA_DEBUG'" env _LOGGER_SILENT="'$_LOGGER_SILENT'" env _LOGGER_VERBOSE="'$_LOGGER_VERBOSE'" env _LOGGER_PREFIX="'$_LOGGER_PREFIX'" env _LOGGER_ERR_ONLY="'$_LOGGER_ERR_ONLY'" \
 env PROGRAM="'$PROGRAM'" env SCRIPT_PID="'$SCRIPT_PID'" TSTAMP="'$TSTAMP'" \
-env lockfile="'$lockfile'" env COMMAND_SUDO="'$COMMAND_SUDO'" 'bash -s' << 'ENDSSH' > "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$SCRIPT_PID.$TSTAMP" 2>&1
+env lockfile="'$lockfile'" env COMMAND_SUDO="'$COMMAND_SUDO'" 'bash -s' << 'ENDSSH' > "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$replicaType.$SCRIPT_PID.$TSTAMP" 2>&1
 if [ -f "$lockfile" ]; then
 	$COMMAND_SUDO rm -f "$lockfile"
 fi
 ENDSSH
 	retval=$?
 	if [ $retval -ne 0 ]; then
-		Logger "Could not unlock remote replica." "ERROR" $retval
-		Logger "Command Output:\n$(cat $RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$SCRIPT_PID.$TSTAMP)" "WARN"
+		Logger "Could not unlock $replicaType remote replica." "ERROR" $retval
+		Logger "Command Output:\n$(cat $RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$replicaType.$SCRIPT_PID.$TSTAMP)" "WARN"
 	else
-		Logger "Removed remote replica lock." "DEBUG"
+		Logger "Removed remote $replicaType replica lock." "DEBUG"
 	fi
 }
 
@@ -630,16 +638,16 @@ function UnlockReplicas {
 	fi
 
 	if [ $INITIATOR_LOCK_FILE_EXISTS == true ]; then
-		_UnlockReplicasLocal "${INITIATOR[$__lockFile]}" &
+		_UnlockReplicasLocal "${INITIATOR[$__lockFile]}" "${INITIATOR[$__type]}" &
 		pids="$!"
 	fi
 
 	if [ $TARGET_LOCK_FILE_EXISTS == true ]; then
 		if [ "$REMOTE_OPERATION" != "yes" ]; then
-			_UnlockReplicasLocal "${TARGET[$__lockFile]}" &
+			_UnlockReplicasLocal "${TARGET[$__lockFile]}" "${TARGET[$__type]}" &
 			pids="$pids;$!"
 		else
-			_UnlockReplicasRemote "${TARGET[$__lockFile]}" &
+			_UnlockReplicasRemote "${TARGET[$__lockFile]}" "${TARGET[$__type]}" &
 			pids="$pids;$!"
 		fi
 	fi
@@ -711,6 +719,7 @@ function treeList {
 # deleteList(replicaType): Creates a list of files vanished from last run on replica $1 (initiator/target)
 function deleteList {
 	local replicaType="${1}" # replica type: initiator, target
+
 	__CheckArguments 1 $# "$@"	#__WITH_PARANOIA_DEBUG
 
 	local retval
@@ -768,6 +777,7 @@ function _getFileCtimeMtimeLocal {
 	local replicaPath="${1}" # Contains replica path
 	local replicaType="${2}" # Initiator / Target
 	local fileList="${3}" # Contains list of files to get time attrs
+
 	__CheckArguments 3 $# "$@"	#__WITH_PARANOIA_DEBUG
 
 	local retval
