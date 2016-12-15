@@ -4,7 +4,7 @@ PROGRAM="osync" # Rsync based two way sync engine with fault tolerance
 AUTHOR="(C) 2013-2016 by Orsiris de Jong"
 CONTACT="http://www.netpower.fr/osync - ozy@netpower.fr"
 PROGRAM_VERSION=1.2-RC1+dev
-PROGRAM_BUILD=2016121401
+PROGRAM_BUILD=2016121501
 IS_STABLE=no
 
 # Execution order						#__WITH_PARANOIA_DEBUG
@@ -703,6 +703,7 @@ function treeList {
 		return 0
 	else
 		Logger "Cannot create replica file list in [$replicaPath]." "CRITICAL" $retval
+		Logger "Command output\n$(cat $RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$replicaType.error.$SCRIPT_PID.$TSTAMP)" "WARN"
 		return $retval
 	fi
 }
@@ -1657,24 +1658,24 @@ function _SoftDeleteLocal {
 			Logger "Removing files older than $changeTime days on $replicaType replica for $deletionType deletion." "NOTICE"
 		fi
 
-		$COMMAND_SUDO $REMOTE_FIND_CMD "$replicaDeletionPath" -type f -ctime +"$changeTime" -print0 | xargs -0 -I {} bash -c 'export file="{}"; if [ '$_LOGGER_VERBOSE' == true ]; then echo "On "'$replicaType'" will delete file {}"; fi; if [ '$_DRYRUN' == false ]; then '$COMMAND_SUDO' rm -f "$file"; fi' > "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$replicaType.$SCRIPT_PID.$TSTAMP" 2>&1
+		$COMMAND_SUDO $FIND_CMD "$replicaDeletionPath" -type f -ctime +"$changeTime" -print0 | xargs -0 -I {} bash -c 'export file="{}"; if [ '$_LOGGER_VERBOSE' == true ]; then echo "On "'$replicaType'" will delete file {}"; fi; if [ '$_DRYRUN' == false ]; then '$COMMAND_SUDO' rm -f "$file"; fi' > "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$replicaType.$SCRIPT_PID.$TSTAMP" 2>&1
 		retval=$?
 		if [ $retval -ne 0 ]; then
 			Logger "Error while executing file cleanup on $replicaType replica." "ERROR" $retval
 			Logger "Command output:\n$(cat $RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$replicaType.$SCRIPT_PID.$TSTAMP)" "WARN"
 		else
+			Logger "Command output:\n$(cat $RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$replicaType.$SCRIPT_PID.$TSTAMP)" "VERBOSE"
 			Logger "File cleanup complete on $replicaType replica." "NOTICE"
 		fi
-		$COMMAND_SUDO $REMOTE_FIND_CMD "$replicaDeletionPath" -type d -empty -ctime +"$changeTime" -print0 | xargs -0 -I {} bash -c 'export file="{}"; if [ '$_LOGGER_VERBOSE' == true ]; then echo "On "'$replicaType'" will delete directory {}"; fi; if [ '$_DRYRUN' == false ]; then '$COMMAND_SUDO' rm -rf "{}"; fi' >> "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$replicaType.$SCRIPT_PID.$TSTAMP" 2>&1
+		$COMMAND_SUDO $FIND_CMD "$replicaDeletionPath" -type d -empty -ctime +"$changeTime" -print0 | xargs -0 -I {} bash -c 'export file="{}"; if [ '$_LOGGER_VERBOSE' == true ]; then echo "On "'$replicaType'" will delete directory {}"; fi; if [ '$_DRYRUN' == false ]; then '$COMMAND_SUDO' rm -rf "{}"; fi' > "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$replicaType.$SCRIPT_PID.$TSTAMP" 2>&1
 		retval=$?
 		if [ $retval -ne 0 ]; then
 			Logger "Error while executing directory cleanup on $replicaType replica." "ERROR" $retval
 			Logger "Command output:\n$(cat $RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$replicaType.$SCRIPT_PID.$TSTAMP)" "WARN"
 		else
+			Logger "Command output:\n$(cat $RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$replicaType.$SCRIPT_PID.$TSTAMP)" "VERBOSE"
 			Logger "Directory cleanup complete on $replicaType replica." "NOTICE"
 		fi
-
-		Logger "Command output:\n$(cat $RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$replicaType.$SCRIPT_PID.$TSTAMP)" "VERBOSE"
 
 
 	elif [ -d "$replicaDeletionPath" ] && ! [ -w "$replicaDeletionPath" ]; then
