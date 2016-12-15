@@ -251,7 +251,7 @@ function _CheckReplicasRemote {
 	local replicaPath="${1}"
 	local replicaType="${2}"
 
-	__CheckArguments 1 $# "$@"	#__WITH_PARANOIA_DEBUG
+	__CheckArguments 2 $# "$@"	#__WITH_PARANOIA_DEBUG
 
 	local retval
 	local cmd
@@ -268,7 +268,6 @@ include #### IsInteger SUBSET ####
 include #### HumanToNumeric SUBSET ####
 include #### RemoteLogger SUBSET ####
 function _CheckReplicasRemoteSub {
-
 	if [ ! -d "$replicaPath" ]; then
 		if [ "$CREATE_DIRS" == "yes" ]; then
 			$COMMAND_SUDO mkdir -p "$replicaPath"
