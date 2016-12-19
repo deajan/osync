@@ -6,7 +6,7 @@
 ## Adds installer
 
 function __PREPROCESSOR_Merge {
-	PROGRAM=pmocr
+	PROGRAM=osync
 	VERSION=$(grep "PROGRAM_VERSION=" n_$PROGRAM.sh)
 	VERSION=${VERSION#*=}
 
