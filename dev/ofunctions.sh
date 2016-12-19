@@ -3,7 +3,7 @@
 #### OFUNCTIONS MINI SUBSET ####
 
 _OFUNCTIONS_VERSION=2.1-RC1+dev
-_OFUNCTIONS_BUILD=2016121901
+_OFUNCTIONS_BUILD=2016121902
 #### _OFUNCTIONS_BOOTSTRAP SUBSET ####
 _OFUNCTIONS_BOOTSTRAP=true
 #### _OFUNCTIONS_BOOTSTRAP SUBSET END ####
@@ -202,7 +202,7 @@ function RemoteLogger {
 
 # Environment variables
 # _LOGGER_SILENT: Disables any output to stdout & stderr
-# _LOGGER_STD_ERR: Disables any output to stdout except for ALWAYS loglevel
+# _LOGGER_ERR_ONLY: Disables any output to stdout except for ALWAYS loglevel
 # _LOGGER_VERBOSE: Allows VERBOSE loglevel messages to be sent to stdout
 
 # Loglevels
