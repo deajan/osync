@@ -1299,6 +1299,10 @@ function test_UpgradeConfRun () {
 
 	./$OSYNC_UPGRADE "$CONF_DIR/$TMP_OLD_CONF"
 	assertEquals "Conf file upgrade" "0" $?
+
+	# Update remote conf files with SSH port
+	sed -i.tmp 's#ssh://.*@localhost:[0-9]*/${HOME}/osync-tests/target#ssh://'$REMOTE_USER'@localhost:'$SSH_PORT'/${HOME}/osync-tests/target#' "$CONF_DIR/$TMP_OLD_CONF"
+
 	./$OSYNC_EXECUTABLE "$CONF_DIR/$TMP_OLD_CONF"
 	assertEquals "Upgraded conf file execution test" "0" $?
 
