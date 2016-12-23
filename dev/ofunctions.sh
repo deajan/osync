@@ -3,7 +3,7 @@
 #### OFUNCTIONS MINI SUBSET ####
 
 _OFUNCTIONS_VERSION=2.1-RC1+dev
-_OFUNCTIONS_BUILD=2016122302
+_OFUNCTIONS_BUILD=2016122303
 #### _OFUNCTIONS_BOOTSTRAP SUBSET ####
 _OFUNCTIONS_BOOTSTRAP=true
 #### _OFUNCTIONS_BOOTSTRAP SUBSET END ####
@@ -1594,6 +1594,50 @@ function PostInit {
 	fi
 }
 
+function SetCompression {
+	## Busybox fix (Termux xz command doesn't support compression at all)
+	if [ "$LOCAL_OS" == "BusyBox" ] || [ "$REMOTE_OS" == "Busybox" ] || [ "$LOCAL_OS" == "Android" ] || [ "$REMOTE_OS" == "Android" ]; then
+		compressionString=""
+		if type gzip > /dev/null 2>&1
+		then
+			COMPRESSION_PROGRAM="| gzip -c$compressionString"
+			COMPRESSION_EXTENSION=.gz
+			# obackup specific
+		else
+			COMPRESSION_PROGRAM=
+			COMPRESSION_EXTENSION=
+		fi
+	else
+		compressionString=" -$COMPRESSION_LEVEL"
+
+		if type xz > /dev/null 2>&1
+		then
+			COMPRESSION_PROGRAM="| xz -c$compressionString"
+			COMPRESSION_EXTENSION=.xz
+		elif type lzma > /dev/null 2>&1
+		then
+			COMPRESSION_PROGRAM="| lzma -c$compressionString"
+			COMPRESSION_EXTENSION=.lzma
+		elif type pigz > /dev/null 2>&1
+		then
+			COMPRESSION_PROGRAM="| pigz -c$compressionString"
+			COMPRESSION_EXTENSION=.gz
+			# obackup specific
+			COMPRESSION_OPTIONS=--rsyncable
+		elif type gzip > /dev/null 2>&1
+		then
+			COMPRESSION_PROGRAM="| gzip -c$compressionString"
+			COMPRESSION_EXTENSION=.gz
+			# obackup specific
+			COMPRESSION_OPTIONS=--rsyncable
+		else
+			COMPRESSION_PROGRAM=
+			COMPRESSION_EXTENSION=
+		fi
+	fi
+	ALERT_LOG_FILE="$ALERT_LOG_FILE$COMPRESSION_EXTENSION"
+}
+
 function InitLocalOSDependingSettings {
 	__CheckArguments 0 $# "$@"    #__WITH_PARANOIA_DEBUG
 
@@ -1628,8 +1672,12 @@ function InitLocalOSDependingSettings {
 		STAT_CMD="stat -c %y"
 		STAT_CTIME_MTIME_CMD="stat -c %n;%Z;%Y"
 	fi
+
+	# Set compression first time when we know what local os we have
+	SetCompression
 }
 
+# Gets executed regardless of the need of remote connections. It's just that this code needs to get executed after we know if there is a remote os, and if yes, which one
 function InitRemoteOSDependingSettings {
 	__CheckArguments 0 $# "$@"    #__WITH_PARANOIA_DEBUG
 
@@ -1722,47 +1770,8 @@ function InitRemoteOSDependingSettings {
 		RSYNC_ARGS=$RSYNC_ARGS" --whole-file"
 	fi
 
-	## Busybox fix (Termux xz command doesn't support compression at all)
-	if [ "$LOCAL_OS" == "BusyBox" ] || [ "$REMOTE_OS" == "Busybox" ] || [ "$LOCAL_OS" == "Android" ] || [ "$REMOTE_OS" == "Android" ]; then
-		compressionString=""
-		if type gzip > /dev/null 2>&1
-		then
-			COMPRESSION_PROGRAM="| gzip -c$compressionString"
-			COMPRESSION_EXTENSION=.gz
-			# obackup specific
-		else
-			COMPRESSION_PROGRAM=
-			COMPRESSION_EXTENSION=
-		fi
-	else
-		compressionString=" -$COMPRESSION_LEVEL"
-
-		if type xz > /dev/null 2>&1
-		then
-			COMPRESSION_PROGRAM="| xz -c$compressionString"
-			COMPRESSION_EXTENSION=.xz
-		elif type lzma > /dev/null 2>&1
-		then
-			COMPRESSION_PROGRAM="| lzma -c$compressionString"
-			COMPRESSION_EXTENSION=.lzma
-		elif type pigz > /dev/null 2>&1
-		then
-			COMPRESSION_PROGRAM="| pigz -c$compressionString"
-			COMPRESSION_EXTENSION=.gz
-			# obackup specific
-			COMPRESSION_OPTIONS=--rsyncable
-		elif type gzip > /dev/null 2>&1
-		then
-			COMPRESSION_PROGRAM="| gzip -c$compressionString"
-			COMPRESSION_EXTENSION=.gz
-			# obackup specific
-			COMPRESSION_OPTIONS=--rsyncable
-		else
-			COMPRESSION_PROGRAM=
-			COMPRESSION_EXTENSION=
-		fi
-	fi
-	ALERT_LOG_FILE="$ALERT_LOG_FILE$COMPRESSION_EXTENSION"
+	# Set compression options again after we know what remote OS we're dealing with
+	SetCompression
 }
 
 ## IFS debug function
