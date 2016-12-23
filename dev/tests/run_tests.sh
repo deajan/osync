@@ -7,7 +7,7 @@
 
 ## On CYGWIN / MSYS, ACL and extended attributes aren't supported
 
-# osync test suite 2016122301
+# osync test suite 2016122302
 
 # 4 tests:
 # quicklocal
@@ -201,11 +201,13 @@ function oneTimeSetUp () {
 		REMOTE_USER="travis"
 		RHOST_PING="no"
 		SetConfFileValue "$CONF_DIR/$REMOTE_CONF" "REMOTE_3RD_PARTY_HOSTS" ""
+		SetConfFileValue "$CONF_DIR/$REMOTE_CONF" "REMOTE_HOST_PING" "no"
 	else
 		echo "Running with local settings"
 		REMOTE_USER="root"
 		RHOST_PING="yes"
 		SetConfFileValue "$CONF_DIR/$REMOTE_CONF" "REMOTE_3RD_PARTY_HOSTS" "\"www.kernel.org www.google.com\""
+		SetConfFileValue "$CONF_DIR/$REMOTE_CONF" "REMOTE_HOST_PING" "yes"
 	fi
 
 	# Get default ssh port from env
