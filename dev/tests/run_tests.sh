@@ -202,12 +202,18 @@ function oneTimeSetUp () {
 		RHOST_PING="no"
 		SetConfFileValue "$CONF_DIR/$REMOTE_CONF" "REMOTE_3RD_PARTY_HOSTS" ""
 		SetConfFileValue "$CONF_DIR/$REMOTE_CONF" "REMOTE_HOST_PING" "no"
+
+		SetConfFileValue "$CONF_DIR/$OLD_CONF" "REMOTE_3RD_PARTY_HOSTS" ""
+		SetConfFileValue "$CONF_DIR/$OLD_CONF" "REMOTE_HOST_PING" "no"
 	else
 		echo "Running with local settings"
 		REMOTE_USER="root"
 		RHOST_PING="yes"
 		SetConfFileValue "$CONF_DIR/$REMOTE_CONF" "REMOTE_3RD_PARTY_HOSTS" "\"www.kernel.org www.google.com\""
 		SetConfFileValue "$CONF_DIR/$REMOTE_CONF" "REMOTE_HOST_PING" "yes"
+
+		SetConfFileValue "$CONF_DIR/$OLD_CONF" "REMOTE_3RD_PARTY_HOSTS" "\"www.kernel.org www.google.com\""
+		SetConfFileValue "$CONF_DIR/$OLD_CONF" "REMOTE_HOST_PING" "yes"
 	fi
 
 	# Get default ssh port from env
