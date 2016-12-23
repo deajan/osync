@@ -3,7 +3,7 @@
 #### OFUNCTIONS MINI SUBSET ####
 
 _OFUNCTIONS_VERSION=2.1-RC1+dev
-_OFUNCTIONS_BUILD=2016121902
+_OFUNCTIONS_BUILD=2016122302
 #### _OFUNCTIONS_BOOTSTRAP SUBSET ####
 _OFUNCTIONS_BOOTSTRAP=true
 #### _OFUNCTIONS_BOOTSTRAP SUBSET END ####
@@ -113,6 +113,13 @@ function Dummy {
 
 #### Logger SUBSET ####
 #### RemoteLogger SUBSET ####
+
+# Array to string converter, see http://stackoverflow.com/questions/1527049/bash-join-elements-of-an-array
+# usage: joinString separaratorChar Array
+function joinString {
+	local IFS="$1"; shift; echo "$*";
+}
+
 # Sub function of Logger
 function _Logger {
 	local logValue="${1}"		# Log to file
@@ -192,8 +199,8 @@ function RemoteLogger {
 			return							#__WITH_PARANOIA_DEBUG
 		fi								#__WITH_PARANOIA_DEBUG
 	else
-		_Logger "\e[41mLogger function called without proper loglevel [$level].\e[0m"
-		_Logger "Value was: $prefix$value"
+		_Logger "" "\e[41mLogger function called without proper loglevel [$level].\e[0m" true
+		_Logger "" "Value was: $prefix$value" true
 	fi
 }
 #### RemoteLogger SUBSET END ####
@@ -253,7 +260,7 @@ function Logger {
 		fi
 		return
 	elif [ "$level" == "ALWAYS" ]; then
-		_Logger  "$prefix$value" "$prefix$value"
+		_Logger "$prefix$value" "$prefix$value"
 		return
 	elif [ "$level" == "DEBUG" ]; then
 		if [ "$_DEBUG" == "yes" ]; then
@@ -266,8 +273,8 @@ function Logger {
 			return							#__WITH_PARANOIA_DEBUG
 		fi								#__WITH_PARANOIA_DEBUG
 	else
-		_Logger "\e[41mLogger function called without proper loglevel [$level].\e[0m"
-		_Logger "Value was: $prefix$value"
+		_Logger "\e[41mLogger function called without proper loglevel [$level].\e[0m" "\e[41mLogger function called without proper loglevel [$level].\e[0m" true
+		_Logger "Value was: $prefix$value" "Value was: $prefix$value" true
 	fi
 }
 #### Logger SUBSET END ####
@@ -617,11 +624,6 @@ function Spinner {
 	fi
 }
 
-# Array to string converter, see http://stackoverflow.com/questions/1527049/bash-join-elements-of-an-array
-# usage: joinString separaratorChar Array
-function joinString {
-	local IFS="$1"; shift; echo "$*";
-}
 
 # Time control function for background processes, suitable for multiple synchronous processes
 # Fills a global variable called WAIT_FOR_TASK_COMPLETION_$callerName that contains list of failed pids in format pid1:result1;pid2:result2
