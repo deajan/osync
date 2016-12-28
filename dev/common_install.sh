@@ -6,7 +6,7 @@ PROGRAM=[prgname]
 PROGRAM_VERSION=[version]
 PROGRAM_BINARY=$PROGRAM".sh"
 PROGRAM_BATCH=$PROGRAM"-batch.sh"
-SCRIPT_BUILD=2016121301
+SCRIPT_BUILD=2016122701
 
 ## osync / obackup / pmocr / zsnap install script
 ## Tested on RHEL / CentOS 6 & 7, Fedora 23, Debian 7 & 8, Mint 17 and FreeBSD 8, 10 and 11
@@ -48,6 +48,8 @@ include #### GetLocalOS SUBSET ####
 function SetLocalOSSettings {
 	USER=root
 
+	# LOCAL_OS and LOCAL_OS_FULL are global variables set at GetLocalOS
+
 	case $LOCAL_OS in
 		*"BSD"*)
 		GROUP=wheel
@@ -74,7 +76,7 @@ function SetLocalOSSettings {
 		exit 1
 	fi
 
-	OS=$(UrlEncode "$localOsVar")
+	OS=$(UrlEncode "$LOCAL_OS_FULL")
 }
 
 function GetInit {
