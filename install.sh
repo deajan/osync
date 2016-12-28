@@ -3,10 +3,10 @@
 _OFUNCTIONS_BOOTSTRAP=true
 
 PROGRAM=osync
-PROGRAM_VERSION=1.2-RC1
+PROGRAM_VERSION=1.2-RC1+dev
 PROGRAM_BINARY=$PROGRAM".sh"
 PROGRAM_BATCH=$PROGRAM"-batch.sh"
-SCRIPT_BUILD=2016121301
+SCRIPT_BUILD=2016122701
 
 ## osync / obackup / pmocr / zsnap install script
 ## Tested on RHEL / CentOS 6 & 7, Fedora 23, Debian 7 & 8, Mint 17 and FreeBSD 8, 10 and 11
@@ -92,7 +92,7 @@ function GetLocalOS {
 		if grep -i Microsoft /proc/sys/kernel/osrelease > /dev/null 2>&1; then
 			localOsVar="Microsoft"
 		else
-			localOsVar="$(uname -spio 2>&1)"
+			localOsVar="$(uname -spior 2>&1)"
 			if [ $? != 0 ]; then
 				localOsVar="$(uname -v 2>&1)"
 				if [ $? != 0 ]; then
@@ -142,9 +142,14 @@ function GetLocalOS {
 	if [ "$_OFUNCTIONS_VERSION" != "" ]; then
 		Logger "Local OS: [$localOsVar]." "DEBUG"
 	fi
+
+	# Add a global variable for statistics in installer
+	LOCAL_OS_FULL="$localOsVar"
 }
 function SetLocalOSSettings {
 	USER=root
+
+	# LOCAL_OS and LOCAL_OS_FULL are global variables set at GetLocalOS
 
 	case $LOCAL_OS in
 		*"BSD"*)
@@ -172,7 +177,7 @@ function SetLocalOSSettings {
 		exit 1
 	fi
 
-	OS=$(UrlEncode "$localOsVar")
+	OS=$(UrlEncode "$LOCAL_OS_FULL")
 }
 
 function GetInit {
