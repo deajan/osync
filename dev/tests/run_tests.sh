@@ -7,7 +7,7 @@
 
 ## On CYGWIN / MSYS, ACL and extended attributes aren't supported
 
-# osync test suite 2016121301
+# osync test suite 2016122302
 
 # 4 tests:
 # quicklocal
@@ -199,11 +199,21 @@ function oneTimeSetUp () {
 	if [ "$TRAVIS_RUN" == true ]; then
 	echo "Running with travis settings"
 		REMOTE_USER="travis"
+		RHOST_PING="no"
 		SetConfFileValue "$CONF_DIR/$REMOTE_CONF" "REMOTE_3RD_PARTY_HOSTS" ""
+		SetConfFileValue "$CONF_DIR/$REMOTE_CONF" "REMOTE_HOST_PING" "no"
+
+		SetConfFileValue "$CONF_DIR/$OLD_CONF" "REMOTE_3RD_PARTY_HOSTS" ""
+		SetConfFileValue "$CONF_DIR/$OLD_CONF" "REMOTE_HOST_PING" "no"
 	else
 		echo "Running with local settings"
 		REMOTE_USER="root"
+		RHOST_PING="yes"
 		SetConfFileValue "$CONF_DIR/$REMOTE_CONF" "REMOTE_3RD_PARTY_HOSTS" "\"www.kernel.org www.google.com\""
+		SetConfFileValue "$CONF_DIR/$REMOTE_CONF" "REMOTE_HOST_PING" "yes"
+
+		SetConfFileValue "$CONF_DIR/$OLD_CONF" "REMOTE_3RD_PARTY_HOSTS" "\"www.kernel.org www.google.com\""
+		SetConfFileValue "$CONF_DIR/$OLD_CONF" "REMOTE_HOST_PING" "yes"
 	fi
 
 	# Get default ssh port from env
@@ -311,7 +321,7 @@ function test_LargeFileSet () {
 		PrepareLocalDirs
 		DownloadLargeFileSet "$INITIATOR_DIR"
 
-		REMOTE_HOST_PING=no ./$OSYNC_EXECUTABLE $i
+		REMOTE_HOST_PING=$RHOST_PING ./$OSYNC_EXECUTABLE $i
 		assertEquals "LargeFileSet test with parameters [$i]." "0" $?
 
 		[ -d "$INITIATOR_DIR/$OSYNC_STATE_DIR" ]
@@ -339,7 +349,7 @@ function test_Exclusions () {
 
 		numberOfPHPFiles=$(find "$INITIATOR_DIR" ! -wholename "$INITIATOR_DIR/$OSYNC_WORKDIR*" -name "*.php" | wc -l)
 
-		REMOTE_HOST_PING=no RSYNC_EXCLUDE_PATTERN="*.php" ./$OSYNC_EXECUTABLE $i
+		REMOTE_HOST_PING=$RHOST_PING RSYNC_EXCLUDE_PATTERN="*.php" ./$OSYNC_EXECUTABLE $i
 		assertEquals "Exclusions with parameters [$i]." "0" $?
 
 		numberOfInitiatorFiles=$(find "$INITIATOR_DIR" ! -wholename "$INITIATOR_DIR/$OSYNC_WORKDIR*" | wc -l)
@@ -366,13 +376,13 @@ function test_Deletetion () {
 		touch "$tFile1"
 		touch "$tFile2"
 
-		REMOTE_HOST_PING=no ./$OSYNC_EXECUTABLE $i
+		REMOTE_HOST_PING=$RHOST_PING ./$OSYNC_EXECUTABLE $i
 		assertEquals "First deletion run with parameters [$i]." "0" $?
 
 		rm -f "$iFile1"
 		rm -f "$tFile1"
 
-		REMOTE_HOST_PING=no ./$OSYNC_EXECUTABLE $i
+		REMOTE_HOST_PING=$RHOST_PING ./$OSYNC_EXECUTABLE $i
 		assertEquals "Second deletion run with parameters [$i]." "0" $?
 
 		[ -f "$TARGET_DIR/$OSYNC_DELETE_DIR/$(basename $iFile1)" ]
@@ -417,7 +427,7 @@ function test_deletion_failure () {
 		touch "$INITIATOR_DIR/$FileA"
 		touch "$TARGET_DIR/$FileB"
 
-		REMOTE_HOST_PING=no ./$OSYNC_EXECUTABLE $i
+		REMOTE_HOST_PING=$RHOST_PING ./$OSYNC_EXECUTABLE $i
 		assertEquals "First deletion run with parameters [$i]." "0" $?
 
 		rm -f "$INITIATOR_DIR/$FileA"
@@ -428,7 +438,7 @@ function test_deletion_failure () {
 		$SUDO_CMD $IMMUTABLE_ON_CMD "$INITIATOR_DIR/$FileB"
 
 		# This shuold fail with exitcode 1
-		REMOTE_HOST_PING=no ./$OSYNC_EXECUTABLE $i
+		REMOTE_HOST_PING=$RHOST_PING ./$OSYNC_EXECUTABLE $i
 		assertEquals "Second deletion run with parameters [$i]." "1" $?
 
 		# standard file tests
@@ -446,7 +456,7 @@ function test_deletion_failure () {
 		$SUDO_CMD $IMMUTABLE_OFF_CMD "$TARGET_DIR/$FileA"
 		$SUDO_CMD $IMMUTABLE_OFF_CMD "$INITIATOR_DIR/$FileB"
 
-		REMOTE_HOST_PING=no ./$OSYNC_EXECUTABLE $i
+		REMOTE_HOST_PING=$RHOST_PING ./$OSYNC_EXECUTABLE $i
 		assertEquals "Third deletion run with parameters [$i]." "0" $?
 
 		[ ! -f "$TARGET_DIR/$FileA" ]
@@ -498,14 +508,14 @@ function test_skip_deletion () {
 			touch "$TARGET_DIR/$FileB"
 
 			# First run
-			REMOTE_HOST_PING=no SKIP_DELETION="$mode" ./$OSYNC_EXECUTABLE $i
+			REMOTE_HOST_PING=$RHOST_PING SKIP_DELETION="$mode" ./$OSYNC_EXECUTABLE $i
 			assertEquals "First deletion run with parameters [$i]." "0" $?
 
 			rm -f "$INITIATOR_DIR/$FileA"
 			rm -f "$TARGET_DIR/$FileB"
 
 			# Second run
-			REMOTE_HOST_PING=no SKIP_DELETION="$mode" ./$OSYNC_EXECUTABLE $i
+			REMOTE_HOST_PING=$RHOST_PING SKIP_DELETION="$mode" ./$OSYNC_EXECUTABLE $i
 			assertEquals "First deletion run with parameters [$i]." "0" $?
 
 			if [ "$mode" == "initiator" ]; then
@@ -578,14 +588,14 @@ function test_handle_symlinks () {
 		ln -s "$INITIATOR_DIR/$FileA" "$INITIATOR_DIR/$FileAL"
 		ln -s "$TARGET_DIR/$FileB" "$TARGET_DIR/$FileBL"
 
-		COPY_SYMLINKS=$copySymlinks REMOTE_HOST_PING=no ./$OSYNC_EXECUTABLE $i
+		COPY_SYMLINKS=$copySymlinks REMOTE_HOST_PING=$RHOST_PING ./$OSYNC_EXECUTABLE $i
 		assertEquals "First symlink run with parameters [$i]." "0" $?
 
 		# Delete symlinks
 		rm -f "$INITIATOR_DIR/$FileAL"
 		rm -f "$TARGET_DIR/$FileBL"
 
-		COPY_SYMLINKS=$copySymlinks REMOTE_HOST_PING=no ./$OSYNC_EXECUTABLE $i
+		COPY_SYMLINKS=$copySymlinks REMOTE_HOST_PING=$RHOST_PING ./$OSYNC_EXECUTABLE $i
 		assertEquals "Second symlink deletion run with parameters [$i]." "0" $?
 
 		# symlink deletion propagation
@@ -604,7 +614,7 @@ function test_handle_symlinks () {
 		rm -f "$INITIATOR_DIR/$FileA"
 		rm -f "$TARGET_DIR/$FileB"
 
-		COPY_SYMLINKS=$copySymlinks REMOTE_HOST_PING=no ./$OSYNC_EXECUTABLE $i
+		COPY_SYMLINKS=$copySymlinks REMOTE_HOST_PING=$RHOST_PING ./$OSYNC_EXECUTABLE $i
 		assertEquals "Third broken symlink run with parameters [$i]." "0" $?
 
 		[ -L "$TARGET_DIR/$FileAL" ]
@@ -617,7 +627,7 @@ function test_handle_symlinks () {
 		rm -f "$INITIATOR_DIR/$FileAL"
 		rm -f "$TARGET_DIR/$FileBL"
 
-		COPY_SYMLINKS=$copySymlinks REMOTE_HOST_PING=no ./$OSYNC_EXECUTABLE $i
+		COPY_SYMLINKS=$copySymlinks REMOTE_HOST_PING=$RHOST_PING ./$OSYNC_EXECUTABLE $i
 		assertEquals "Fourth symlink deletion run with parameters [$i]." "0" $?
 
 		[ ! -L "$TARGET_DIR/$FileAL" ]
@@ -665,14 +675,14 @@ function test_handle_symlinks () {
 		ln -s "$INITIATOR_DIR/$FileA" "$INITIATOR_DIR/$FileAL"
 		ln -s "$TARGET_DIR/$FileB" "$TARGET_DIR/$FileBL"
 
-		COPY_SYMLINKS=$copySymlinks REMOTE_HOST_PING=no ./$OSYNC_EXECUTABLE $i
+		COPY_SYMLINKS=$copySymlinks REMOTE_HOST_PING=$RHOST_PING ./$OSYNC_EXECUTABLE $i
 		assertEquals "First symlink run with parameters [$i]." "0" $?
 
 		# Delete symlinks
 		rm -f "$INITIATOR_DIR/$FileAL"
 		rm -f "$TARGET_DIR/$FileBL"
 
-		COPY_SYMLINKS=$copySymlinks REMOTE_HOST_PING=no ./$OSYNC_EXECUTABLE $i
+		COPY_SYMLINKS=$copySymlinks REMOTE_HOST_PING=$RHOST_PING ./$OSYNC_EXECUTABLE $i
 		assertEquals "Second symlink deletion run with parameters [$i]." "0" $?
 
 		# symlink deletion propagation
@@ -691,7 +701,7 @@ function test_handle_symlinks () {
 		rm -f "$INITIATOR_DIR/$FileA"
 		rm -f "$TARGET_DIR/$FileB"
 
-		COPY_SYMLINKS=$copySymlinks REMOTE_HOST_PING=no ./$OSYNC_EXECUTABLE $i
+		COPY_SYMLINKS=$copySymlinks REMOTE_HOST_PING=$RHOST_PING ./$OSYNC_EXECUTABLE $i
 		assertEquals "Third broken symlink run with parameters should fail [$i]." "1" $?
 
 		[ ! -f "$TARGET_DIR/$FileAL" ]
@@ -704,7 +714,7 @@ function test_handle_symlinks () {
 		rm -f "$INITIATOR_DIR/$FileAL"
 		rm -f "$TARGET_DIR/$FileBL"
 
-		COPY_SYMLINKS=$copySymlinks REMOTE_HOST_PING=no ./$OSYNC_EXECUTABLE $i
+		COPY_SYMLINKS=$copySymlinks REMOTE_HOST_PING=$RHOST_PING ./$OSYNC_EXECUTABLE $i
 		assertEquals "Fourth symlink deletion run should resume with parameters [$i]." "0" $?
 
 		[ ! -f "$TARGET_DIR/$FileAL" ]
@@ -735,7 +745,7 @@ function test_softdeletion_cleanup () {
 		PrepareLocalDirs
 
 		# First run
-		#REMOTE_HOST_PING=no ./$OSYNC_EXECUTABLE $i
+		#REMOTE_HOST_PING=$RHOST_PING ./$OSYNC_EXECUTABLE $i
 		#assertEquals "First deletion run with parameters [$i]." "0" $?
 
 		# Get current drive
@@ -764,7 +774,7 @@ function test_softdeletion_cleanup () {
 		fi
 
 		# Second run
-		REMOTE_HOST_PING=no ./$OSYNC_EXECUTABLE $i
+		REMOTE_HOST_PING=$RHOST_PING ./$OSYNC_EXECUTABLE $i
 
 		# Check file presence
 		for file in "${files[@]}"; do
@@ -828,7 +838,7 @@ function test_FileAttributePropagation () {
 		touch "$TARGET_DIR/$FileB"
 
 		# First run
-		PRESERVE_ACL=yes PRESERVE_XATTR=yes REMOTE_HOST_PING=no ./$OSYNC_EXECUTABLE $i
+		PRESERVE_ACL=yes PRESERVE_XATTR=yes REMOTE_HOST_PING=$RHOST_PING ./$OSYNC_EXECUTABLE $i
 		assertEquals "First deletion run with parameters [$i]." "0" $?
 
 		sleep 1
@@ -856,7 +866,7 @@ function test_FileAttributePropagation () {
 		assertEquals "Set ACL on target directory" "0" $?
 
 		# Second run
-		PRESERVE_ACL=yes PRESERVE_XATTR=yes REMOTE_HOST_PING=no ./$OSYNC_EXECUTABLE $i
+		PRESERVE_ACL=yes PRESERVE_XATTR=yes REMOTE_HOST_PING=$RHOST_PING ./$OSYNC_EXECUTABLE $i
 		assertEquals "First deletion run with parameters [$i]." "0" $?
 
 		getfacl "$TARGET_DIR/$FileA" | grep "other::r-x" > /dev/null
@@ -891,14 +901,14 @@ function test_ConflictBackups () {
 		echo "$FileB" > "$TARGET_DIR/$FileB"
 
 		# First run
-		REMOTE_HOST_PING=no ./$OSYNC_EXECUTABLE $i
+		REMOTE_HOST_PING=$RHOST_PING ./$OSYNC_EXECUTABLE $i
 		assertEquals "First deletion run with parameters [$i]." "0" $?
 
 		echo "$FileA+" > "$TARGET_DIR/$FileA"
 		echo "$FileB+" > "$INITIATOR_DIR/$FileB"
 
 		# Second run
-		REMOTE_HOST_PING=no ./$OSYNC_EXECUTABLE $i
+		REMOTE_HOST_PING=$RHOST_PING ./$OSYNC_EXECUTABLE $i
 		assertEquals "First deletion run with parameters [$i]." "0" $?
 
 		[ -f "$INITIATOR_DIR/$OSYNC_BACKUP_DIR/$FileA" ]
@@ -935,28 +945,28 @@ function test_MultipleConflictBackups () {
 		echo "$FileB" > "$TARGET_DIR/$FileB"
 
 		# First run
-		CONFLICT_BACKUP_MULTIPLE=yes REMOTE_HOST_PING=no ./$OSYNC_EXECUTABLE $i $additionalParameters
+		CONFLICT_BACKUP_MULTIPLE=yes REMOTE_HOST_PING=$RHOST_PING ./$OSYNC_EXECUTABLE $i $additionalParameters
 		assertEquals "First deletion run with parameters [$i]." "0" $?
 
 		echo "$FileA+" > "$TARGET_DIR/$FileA"
 		echo "$FileB+" > "$INITIATOR_DIR/$FileB"
 
 		# Second run
-		CONFLICT_BACKUP_MULTIPLE=yes REMOTE_HOST_PING=no ./$OSYNC_EXECUTABLE $i $additionalParameters
+		CONFLICT_BACKUP_MULTIPLE=yes REMOTE_HOST_PING=$RHOST_PING ./$OSYNC_EXECUTABLE $i $additionalParameters
 		assertEquals "First deletion run with parameters [$i]." "0" $?
 
 		echo "$FileA-" > "$TARGET_DIR/$FileA"
 		echo "$FileB-" > "$INITIATOR_DIR/$FileB"
 
 		# Third run
-		CONFLICT_BACKUP_MULTIPLE=yes REMOTE_HOST_PING=no ./$OSYNC_EXECUTABLE $i $additionalParameters
+		CONFLICT_BACKUP_MULTIPLE=yes REMOTE_HOST_PING=$RHOST_PING ./$OSYNC_EXECUTABLE $i $additionalParameters
 		assertEquals "First deletion run with parameters [$i]." "0" $?
 
 		echo "$FileA*" > "$TARGET_DIR/$FileA"
 		echo "$FileB*" > "$INITIATOR_DIR/$FileB"
 
 		# Fouth run
-		CONFLICT_BACKUP_MULTIPLE=yes REMOTE_HOST_PING=no ./$OSYNC_EXECUTABLE $i $additionalParameters
+		CONFLICT_BACKUP_MULTIPLE=yes REMOTE_HOST_PING=$RHOST_PING ./$OSYNC_EXECUTABLE $i $additionalParameters
 		assertEquals "First deletion run with parameters [$i]." "0" $?
 
 		# This test may fail only on 31th December at 23:59 :)
@@ -986,12 +996,12 @@ function test_Locking () {
 		mkdir -p "$INITIATOR_DIR/$OSYNC_WORKDIR"
 		echo 65536 > "$INITIATOR_DIR/$OSYNC_WORKDIR/lock"
 
-		REMOTE_HOST_PING=no ./$OSYNC_EXECUTABLE $i
+		REMOTE_HOST_PING=$RHOST_PING ./$OSYNC_EXECUTABLE $i
 		assertEquals "Should be able to resume when initiator has lock without running pid." "0" $?
 
 		echo $$ > "$INITIATOR_DIR/$OSYNC_WORKDIR/lock"
 
-		REMOTE_HOST_PING=no ./$OSYNC_EXECUTABLE $i
+		REMOTE_HOST_PING=$RHOST_PING ./$OSYNC_EXECUTABLE $i
 		assertEquals "Should never be able to resume when initiator has lock with running pid." "1" $?
 	done
 
@@ -1000,14 +1010,14 @@ function test_Locking () {
 	mkdir -p "$TARGET_DIR/$OSYNC_WORKDIR"
 	echo 65536@quicklocal > "$TARGET_DIR/$OSYNC_WORKDIR/lock"
 
-	REMOTE_HOST_PING=no ./$OSYNC_EXECUTABLE ${osyncParameters[$__quickLocal]}
+	REMOTE_HOST_PING=$RHOST_PING ./$OSYNC_EXECUTABLE ${osyncParameters[$__quickLocal]}
 	assertEquals "Should be able to resume locked target with same instance_id in quickLocal mode." "0" $?
 
 	PrepareLocalDirs
 	mkdir -p "$TARGET_DIR/$OSYNC_WORKDIR"
 	echo 65536@local > "$TARGET_DIR/$OSYNC_WORKDIR/lock"
 
-	REMOTE_HOST_PING=no ./$OSYNC_EXECUTABLE ${osyncParameters[$__confLocal]}
+	REMOTE_HOST_PING=$RHOST_PING ./$OSYNC_EXECUTABLE ${osyncParameters[$__confLocal]}
 	assertEquals "Should be able to resume locked target with same instance_id in confLocal mode." "0" $?
 
 	if [ "$LOCAL_OS" != "msys" ] && [ "$LOCAL_OS" != "Cygwin" ]; then
@@ -1015,14 +1025,14 @@ function test_Locking () {
 		mkdir -p "$TARGET_DIR/$OSYNC_WORKDIR"
 		echo 65536@quickremote > "$TARGET_DIR/$OSYNC_WORKDIR/lock"
 
-		REMOTE_HOST_PING=no ./$OSYNC_EXECUTABLE ${osyncParameters[$__quickRemote]}
+		REMOTE_HOST_PING=$RHOST_PING ./$OSYNC_EXECUTABLE ${osyncParameters[$__quickRemote]}
 		assertEquals "Should be able to resume locked target with same instance_id in quickRemote mode." "0" $?
 
 		PrepareLocalDirs
 		mkdir -p "$TARGET_DIR/$OSYNC_WORKDIR"
 		echo 65536@remote > "$TARGET_DIR/$OSYNC_WORKDIR/lock"
 
-		REMOTE_HOST_PING=no ./$OSYNC_EXECUTABLE ${osyncParameters[$__confRemote]}
+		REMOTE_HOST_PING=$RHOST_PING ./$OSYNC_EXECUTABLE ${osyncParameters[$__confRemote]}
 		assertEquals "Should be able to resume locked target with same instance_id in confRemote mode." "0" $?
 	fi
 
@@ -1031,14 +1041,14 @@ function test_Locking () {
 	mkdir -p "$TARGET_DIR/$OSYNC_WORKDIR"
 	echo 65536@bogusinstance > "$TARGET_DIR/$OSYNC_WORKDIR/lock"
 
-	REMOTE_HOST_PING=no ./$OSYNC_EXECUTABLE ${osyncParameters[$__quickLocal]}
+	REMOTE_HOST_PING=$RHOST_PING ./$OSYNC_EXECUTABLE ${osyncParameters[$__quickLocal]}
 	assertEquals "Should be able to resume locked local target with bogus instance id in quickLocal mode." "0" $?
 
 	PrepareLocalDirs
 	mkdir -p "$TARGET_DIR/$OSYNC_WORKDIR"
 	echo 65536@bogusinstance > "$TARGET_DIR/$OSYNC_WORKDIR/lock"
 
-	REMOTE_HOST_PING=no ./$OSYNC_EXECUTABLE ${osyncParameters[$__confLocal]}
+	REMOTE_HOST_PING=$RHOST_PING ./$OSYNC_EXECUTABLE ${osyncParameters[$__confLocal]}
 	assertEquals "Should be able to resume locked local target with bogus instance_id in confLocal mode." "0" $?
 
 	if [ "$LOCAL_OS" != "msys" ] && [ "$LOCAL_OS" != "Cygwin" ]; then
@@ -1046,14 +1056,14 @@ function test_Locking () {
 		mkdir -p "$TARGET_DIR/$OSYNC_WORKDIR"
 		echo 65536@bogusinstance > "$TARGET_DIR/$OSYNC_WORKDIR/lock"
 
-		REMOTE_HOST_PING=no ./$OSYNC_EXECUTABLE ${osyncParameters[$__quickRemote]}
+		REMOTE_HOST_PING=$RHOST_PING ./$OSYNC_EXECUTABLE ${osyncParameters[$__quickRemote]}
 		assertEquals "Should not be able to resume remote locked target with bogus instance_id in quickRemote mode." "1" $?
 
 		PrepareLocalDirs
 		mkdir -p "$TARGET_DIR/$OSYNC_WORKDIR"
 		echo 65536@bogusinstance > "$TARGET_DIR/$OSYNC_WORKDIR/lock"
 
-		REMOTE_HOST_PING=no ./$OSYNC_EXECUTABLE ${osyncParameters[$__confRemote]}
+		REMOTE_HOST_PING=$RHOST_PING ./$OSYNC_EXECUTABLE ${osyncParameters[$__confRemote]}
 		assertEquals "Should not be able to resume remote locked target with bogus instance_id in confRemote mode." "1" $?
 	fi
 
@@ -1070,7 +1080,7 @@ function test_Locking () {
 		mkdir -p "$INITIATOR_DIR/$OSYNC_WORKDIR"
 		echo 65536@bogusinstance > "$INITIATOR_DIR/$OSYNC_WORKDIR/lock"
 
-		FORCE_STRANGER_UNLOCK=yes REMOTE_HOST_PING=no ./$OSYNC_EXECUTABLE $i
+		FORCE_STRANGER_UNLOCK=yes REMOTE_HOST_PING=$RHOST_PING ./$OSYNC_EXECUTABLE $i
 		assertEquals "Should be able to resume when target has lock with different instance id but FORCE_STRANGER_UNLOCK=yes." "0" $?
 	done
 
@@ -1295,6 +1305,10 @@ function test_UpgradeConfRun () {
 
 	./$OSYNC_UPGRADE "$CONF_DIR/$TMP_OLD_CONF"
 	assertEquals "Conf file upgrade" "0" $?
+
+	# Update remote conf files with SSH port
+	sed -i.tmp 's#ssh://.*@localhost:[0-9]*/${HOME}/osync-tests/target#ssh://'$REMOTE_USER'@localhost:'$SSH_PORT'/${HOME}/osync-tests/target#' "$CONF_DIR/$TMP_OLD_CONF"
+
 	./$OSYNC_EXECUTABLE "$CONF_DIR/$TMP_OLD_CONF"
 	assertEquals "Upgraded conf file execution test" "0" $?
 
@@ -1363,7 +1377,7 @@ function test_NoRemoteAccessTest () {
 	cd "$OSYNC_DIR"
 	PrepareLocalDirs
 
-	REMOTE_HOST_PING=no ./$OSYNC_EXECUTABLE ${osyncParameters[$__confLocal]}
+	REMOTE_HOST_PING=$RHOST_PING ./$OSYNC_EXECUTABLE ${osyncParameters[$__confLocal]}
 	assertEquals "Basic local test without remote access." "0" $?
 }
 

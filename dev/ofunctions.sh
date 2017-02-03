@@ -3,11 +3,12 @@
 #### OFUNCTIONS MINI SUBSET ####
 
 _OFUNCTIONS_VERSION=2.1-RC1+dev
-_OFUNCTIONS_BUILD=2016121501
+_OFUNCTIONS_BUILD=2017010401
 #### _OFUNCTIONS_BOOTSTRAP SUBSET ####
 _OFUNCTIONS_BOOTSTRAP=true
 #### _OFUNCTIONS_BOOTSTRAP SUBSET END ####
-## BEGIN Generic bash functions written in 2013-2016 by Orsiris de Jong - http://www.netpower.fr - ozy@netpower.fr
+
+## BEGIN Generic bash functions written in 2013-2017 by Orsiris de Jong - http://www.netpower.fr - ozy@netpower.fr
 
 ## To use in a program, define the following variables:
 ## PROGRAM=program-name
@@ -113,6 +114,13 @@ function Dummy {
 
 #### Logger SUBSET ####
 #### RemoteLogger SUBSET ####
+
+# Array to string converter, see http://stackoverflow.com/questions/1527049/bash-join-elements-of-an-array
+# usage: joinString separaratorChar Array
+function joinString {
+	local IFS="$1"; shift; echo "$*";
+}
+
 # Sub function of Logger
 function _Logger {
 	local logValue="${1}"		# Log to file
@@ -143,7 +151,7 @@ function RemoteLogger {
 	local retval="${3:-undef}"	# optional return value of command
 
 	if [ "$_LOGGER_PREFIX" == "time" ]; then
-		prefix="RTIME: $SECONDS - "
+		prefix="TIME: $SECONDS - "
 	elif [ "$_LOGGER_PREFIX" == "date" ]; then
 		prefix="R $(date) - "
 	else
@@ -192,8 +200,8 @@ function RemoteLogger {
 			return							#__WITH_PARANOIA_DEBUG
 		fi								#__WITH_PARANOIA_DEBUG
 	else
-		_Logger "\e[41mLogger function called without proper loglevel [$level].\e[0m"
-		_Logger "Value was: $prefix$value"
+		_Logger "" "\e[41mLogger function called without proper loglevel [$level].\e[0m" true
+		_Logger "" "Value was: $prefix$value" true
 	fi
 }
 #### RemoteLogger SUBSET END ####
@@ -202,7 +210,7 @@ function RemoteLogger {
 
 # Environment variables
 # _LOGGER_SILENT: Disables any output to stdout & stderr
-# _LOGGER_STD_ERR: Disables any output to stdout except for ALWAYS loglevel
+# _LOGGER_ERR_ONLY: Disables any output to stdout except for ALWAYS loglevel
 # _LOGGER_VERBOSE: Allows VERBOSE loglevel messages to be sent to stdout
 
 # Loglevels
@@ -253,7 +261,7 @@ function Logger {
 		fi
 		return
 	elif [ "$level" == "ALWAYS" ]; then
-		_Logger  "$prefix$value" "$prefix$value"
+		_Logger "$prefix$value" "$prefix$value"
 		return
 	elif [ "$level" == "DEBUG" ]; then
 		if [ "$_DEBUG" == "yes" ]; then
@@ -266,8 +274,8 @@ function Logger {
 			return							#__WITH_PARANOIA_DEBUG
 		fi								#__WITH_PARANOIA_DEBUG
 	else
-		_Logger "\e[41mLogger function called without proper loglevel [$level].\e[0m"
-		_Logger "Value was: $prefix$value"
+		_Logger "\e[41mLogger function called without proper loglevel [$level].\e[0m" "\e[41mLogger function called without proper loglevel [$level].\e[0m" true
+		_Logger "Value was: $prefix$value" "Value was: $prefix$value" true
 	fi
 }
 #### Logger SUBSET END ####
@@ -579,7 +587,7 @@ function TrapError {
 	local code="${2:-1}"
 
 	if [ $_LOGGER_SILENT == false ]; then
-		echo -e "\e[45m/!\ ERROR in ${job}: Near line ${line}, exit code ${code}\e[0m"
+		(>&2 echo -e "\e[45m/!\ ERROR in ${job}: Near line ${line}, exit code ${code}\e[0m")
 	fi
 }
 #### TrapError SUBSET END ####
@@ -617,11 +625,6 @@ function Spinner {
 	fi
 }
 
-# Array to string converter, see http://stackoverflow.com/questions/1527049/bash-join-elements-of-an-array
-# usage: joinString separaratorChar Array
-function joinString {
-	local IFS="$1"; shift; echo "$*";
-}
 
 # Time control function for background processes, suitable for multiple synchronous processes
 # Fills a global variable called WAIT_FOR_TASK_COMPLETION_$callerName that contains list of failed pids in format pid1:result1;pid2:result2
@@ -678,7 +681,7 @@ function WaitForTaskCompletion {
 			Spinner
 		fi
 		if [ $counting == true ]; then
-			exec_time=$(($SECONDS - $seconds_begin))
+			exec_time=$((SECONDS - seconds_begin))
 		else
 			exec_time=$SECONDS
 		fi
@@ -834,7 +837,7 @@ function ParallelExec {
 		fi
 
 		if [ $counting == true ]; then
-			exec_time=$(($SECONDS - $seconds_begin))
+			exec_time=$((SECONDS - seconds_begin))
 		else
 			exec_time=$SECONDS
 		fi
@@ -872,7 +875,7 @@ function ParallelExec {
 			fi
 			eval "HARD_MAX_EXEC_TIME_REACHED_$callerName=true"
 			# Return the number of commands that haven't run / finished run
-			return $(($commandCount - $counter + ${#pidsArray[@]}))
+			return $((commandCount - counter + ${#pidsArray[@]}))
 		fi
 
 		while [ $counter -lt "$commandCount" ] && [ ${#pidsArray[@]} -lt $numberOfProcesses ]; do
@@ -895,7 +898,6 @@ function ParallelExec {
 			if [ $(IsInteger $pid) -eq 1 ]; then
 				# Handle uninterruptible sleep state or zombies by ommiting them from running process array (How to kill that is already dead ? :)
 				if kill -0 $pid > /dev/null 2>&1; then
-					#pidState=$(ps -p$pid -o state= 2 > /dev/null)
 					pidState="$(eval $PROCESS_STATE_CMD)"
 					if [ "$pidState" != "D" ] && [ "$pidState" != "Z" ]; then
 						newPidsArray+=($pid)
@@ -919,7 +921,7 @@ function ParallelExec {
 		pidsArray=("${newPidsArray[@]}")
 
 		# Trivial wait time for bash to not eat up all CPU
-		sleep $SLEEP_TIME
+		sleep $sleepTime
 	done
 
 	return $errorCount
@@ -933,11 +935,6 @@ function CleanUp {
 		# Fix for sed -i requiring backup extension for BSD & Mac (see all sed -i statements)
 		rm -f "$RUN_DIR/$PROGRAM."*".$SCRIPT_PID.$TSTAMP.tmp"
 	fi
-}
-
-# obsolete, use StripQuotes
-function SedStripQuotes {
-	echo $(echo $1 | sed "s/^\([\"']\)\(.*\)\1\$/\2/g")
 }
 
 # Usage: var=$(StripSingleQuotes "$var")
@@ -1096,7 +1093,7 @@ function GetLocalOS {
 		if grep -i Microsoft /proc/sys/kernel/osrelease > /dev/null 2>&1; then
 			localOsVar="Microsoft"
 		else
-			localOsVar="$(uname -spio 2>&1)"
+			localOsVar="$(uname -spior 2>&1)"
 			if [ $? != 0 ]; then
 				localOsVar="$(uname -v 2>&1)"
 				if [ $? != 0 ]; then
@@ -1146,6 +1143,9 @@ function GetLocalOS {
 	if [ "$_OFUNCTIONS_VERSION" != "" ]; then
 		Logger "Local OS: [$localOsVar]." "DEBUG"
 	fi
+
+	# Add a global variable for statistics in installer
+	LOCAL_OS_FULL="$localOsVar"
 }
 #### GetLocalOS SUBSET END ####
 
@@ -1173,7 +1173,7 @@ function GetOs {
 		if grep -i Microsoft /proc/sys/kernel/osrelease > /dev/null 2>&1; then
 			localOsVar="Microsoft"
 		else
-			localOsVar="$(uname -spio 2>&1)"
+			localOsVar="$(uname -spior 2>&1)"
 			if [ $? != 0 ]; then
 				localOsVar="$(uname -v 2>&1)"
 				if [ $? != 0 ]; then
@@ -1418,8 +1418,8 @@ function __CheckArguments {
 			if [ "$argument" == "" ]; then
 				fetchArguments=false
 			else
-				argList="$argList[Argument $(($iterate-2)): $argument] "
-				iterate=$(($iterate+1))
+				argList="$argList[Argument $((iterate-2)): $argument] "
+				iterate=$((iterate+1))
 			fi
 		done
 
@@ -1435,7 +1435,7 @@ function __CheckArguments {
 		Logger "Entering function [$callerName]." "PARANOIA_DEBUG"
 
 		if ! ([ $countedArguments -ge $minArgs ] && [ $countedArguments -le $maxArgs ]); then
-			Logger "Function $functionName may have inconsistent number of arguments. Expected min: $minArgs, max: $maxArgs, count: $countedArguments, bash seen: $numberOfGivenArguments. see log file." "ERROR"
+			Logger "Function $callerName may have inconsistent number of arguments. Expected min: $minArgs, max: $maxArgs, count: $countedArguments, bash seen: $numberOfGivenArguments." "ERROR"
 			Logger "$callerName arguments: $argList" "ERROR"
 		else
 			if [ ! -z "$argList" ]; then
@@ -1556,7 +1556,7 @@ function PreInit {
 		else
 			RSYNC_PATH="sudo $RSYNC_EXECUTABLE"
 		fi
-		COMMAND_SUDO="sudo"
+		COMMAND_SUDO="sudo -E"
 	else
 		if [ "$RSYNC_REMOTE_PATH" != "" ]; then
 			RSYNC_PATH="$RSYNC_REMOTE_PATH/$RSYNC_EXECUTABLE"
@@ -1590,6 +1590,50 @@ function PostInit {
 		SCP_CMD=""
 		RSYNC_SSH_CMD=""
 	fi
+}
+
+function SetCompression {
+	## Busybox fix (Termux xz command doesn't support compression at all)
+	if [ "$LOCAL_OS" == "BusyBox" ] || [ "$REMOTE_OS" == "Busybox" ] || [ "$LOCAL_OS" == "Android" ] || [ "$REMOTE_OS" == "Android" ]; then
+		compressionString=""
+		if type gzip > /dev/null 2>&1
+		then
+			COMPRESSION_PROGRAM="| gzip -c$compressionString"
+			COMPRESSION_EXTENSION=.gz
+			# obackup specific
+		else
+			COMPRESSION_PROGRAM=
+			COMPRESSION_EXTENSION=
+		fi
+	else
+		compressionString=" -$COMPRESSION_LEVEL"
+
+		if type xz > /dev/null 2>&1
+		then
+			COMPRESSION_PROGRAM="| xz -c$compressionString"
+			COMPRESSION_EXTENSION=.xz
+		elif type lzma > /dev/null 2>&1
+		then
+			COMPRESSION_PROGRAM="| lzma -c$compressionString"
+			COMPRESSION_EXTENSION=.lzma
+		elif type pigz > /dev/null 2>&1
+		then
+			COMPRESSION_PROGRAM="| pigz -c$compressionString"
+			COMPRESSION_EXTENSION=.gz
+			# obackup specific
+			COMPRESSION_OPTIONS=--rsyncable
+		elif type gzip > /dev/null 2>&1
+		then
+			COMPRESSION_PROGRAM="| gzip -c$compressionString"
+			COMPRESSION_EXTENSION=.gz
+			# obackup specific
+			COMPRESSION_OPTIONS=--rsyncable
+		else
+			COMPRESSION_PROGRAM=
+			COMPRESSION_EXTENSION=
+		fi
+	fi
+	ALERT_LOG_FILE="$ALERT_LOG_FILE$COMPRESSION_EXTENSION"
 }
 
 function InitLocalOSDependingSettings {
@@ -1626,8 +1670,12 @@ function InitLocalOSDependingSettings {
 		STAT_CMD="stat -c %y"
 		STAT_CTIME_MTIME_CMD="stat -c %n;%Z;%Y"
 	fi
+
+	# Set compression first time when we know what local os we have
+	SetCompression
 }
 
+# Gets executed regardless of the need of remote connections. It's just that this code needs to get executed after we know if there is a remote os, and if yes, which one
 function InitRemoteOSDependingSettings {
 	__CheckArguments 0 $# "$@"    #__WITH_PARANOIA_DEBUG
 
@@ -1720,47 +1768,8 @@ function InitRemoteOSDependingSettings {
 		RSYNC_ARGS=$RSYNC_ARGS" --whole-file"
 	fi
 
-	## Busybox fix (Termux xz command doesn't support compression at all)
-	if [ "$LOCAL_OS" == "BusyBox" ] || [ "$REMOTE_OS" == "Busybox" ] || [ "$LOCAL_OS" == "Android" ] || [ "$REMOTE_OS" == "Android" ]; then
-		compressionString=""
-		if type gzip > /dev/null 2>&1
-		then
-			COMPRESSION_PROGRAM="| gzip -c$compressionString"
-			COMPRESSION_EXTENSION=.gz
-			# obackup specific
-		else
-			COMPRESSION_PROGRAM=
-			COMPRESSION_EXTENSION=
-		fi
-	else
-		compressionString=" -$COMPRESSION_LEVEL"
-
-		if type xz > /dev/null 2>&1
-		then
-			COMPRESSION_PROGRAM="| xz -c$compressionString"
-			COMPRESSION_EXTENSION=.xz
-		elif type lzma > /dev/null 2>&1
-		then
-			COMPRESSION_PROGRAM="| lzma -c$compressionString"
-			COMPRESSION_EXTENSION=.lzma
-		elif type pigz > /dev/null 2>&1
-		then
-			COMPRESSION_PROGRAM="| pigz -c$compressionString"
-			COMPRESSION_EXTENSION=.gz
-			# obackup specific
-			COMPRESSION_OPTIONS=--rsyncable
-		elif type gzip > /dev/null 2>&1
-		then
-			COMPRESSION_PROGRAM="| gzip -c$compressionString"
-			COMPRESSION_EXTENSION=.gz
-			# obackup specific
-			COMPRESSION_OPTIONS=--rsyncable
-		else
-			COMPRESSION_PROGRAM=
-			COMPRESSION_EXTENSION=
-		fi
-	fi
-	ALERT_LOG_FILE="$ALERT_LOG_FILE$COMPRESSION_EXTENSION"
+	# Set compression options again after we know what remote OS we're dealing with
+	SetCompression
 }
 
 ## IFS debug function
