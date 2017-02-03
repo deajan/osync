@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 
 PROGRAM="osync" # Rsync based two way sync engine with fault tolerance
-AUTHOR="(C) 2013-2016 by Orsiris de Jong"
+AUTHOR="(C) 2013-2017 by Orsiris de Jong"
 CONTACT="http://www.netpower.fr/osync - ozy@netpower.fr"
 PROGRAM_VERSION=1.2-RC1+dev
 PROGRAM_BUILD=2016121901
@@ -42,9 +42,10 @@ IS_STABLE=no
 
 
 _OFUNCTIONS_VERSION=2.1-RC1+dev
-_OFUNCTIONS_BUILD=2016122701
+_OFUNCTIONS_BUILD=2017010401
 _OFUNCTIONS_BOOTSTRAP=true
-## BEGIN Generic bash functions written in 2013-2016 by Orsiris de Jong - http://www.netpower.fr - ozy@netpower.fr
+
+## BEGIN Generic bash functions written in 2013-2017 by Orsiris de Jong - http://www.netpower.fr - ozy@netpower.fr
 
 ## To use in a program, define the following variables:
 ## PROGRAM=program-name
@@ -616,7 +617,7 @@ function TrapError {
 	local code="${2:-1}"
 
 	if [ $_LOGGER_SILENT == false ]; then
-		echo -e "\e[45m/!\ ERROR in ${job}: Near line ${line}, exit code ${code}\e[0m"
+		(>&2 echo -e "\e[45m/!\ ERROR in ${job}: Near line ${line}, exit code ${code}\e[0m")
 	fi
 }
 
@@ -709,7 +710,7 @@ function WaitForTaskCompletion {
 			Spinner
 		fi
 		if [ $counting == true ]; then
-			exec_time=$(($SECONDS - $seconds_begin))
+			exec_time=$((SECONDS - seconds_begin))
 		else
 			exec_time=$SECONDS
 		fi
@@ -865,7 +866,7 @@ function ParallelExec {
 		fi
 
 		if [ $counting == true ]; then
-			exec_time=$(($SECONDS - $seconds_begin))
+			exec_time=$((SECONDS - seconds_begin))
 		else
 			exec_time=$SECONDS
 		fi
@@ -903,7 +904,7 @@ function ParallelExec {
 			fi
 			eval "HARD_MAX_EXEC_TIME_REACHED_$callerName=true"
 			# Return the number of commands that haven't run / finished run
-			return $(($commandCount - $counter + ${#pidsArray[@]}))
+			return $((commandCount - counter + ${#pidsArray[@]}))
 		fi
 
 		while [ $counter -lt "$commandCount" ] && [ ${#pidsArray[@]} -lt $numberOfProcesses ]; do
@@ -926,7 +927,6 @@ function ParallelExec {
 			if [ $(IsInteger $pid) -eq 1 ]; then
 				# Handle uninterruptible sleep state or zombies by ommiting them from running process array (How to kill that is already dead ? :)
 				if kill -0 $pid > /dev/null 2>&1; then
-					#pidState=$(ps -p$pid -o state= 2 > /dev/null)
 					pidState="$(eval $PROCESS_STATE_CMD)"
 					if [ "$pidState" != "D" ] && [ "$pidState" != "Z" ]; then
 						newPidsArray+=($pid)
@@ -950,7 +950,7 @@ function ParallelExec {
 		pidsArray=("${newPidsArray[@]}")
 
 		# Trivial wait time for bash to not eat up all CPU
-		sleep $SLEEP_TIME
+		sleep $sleepTime
 	done
 
 	return $errorCount
@@ -964,11 +964,6 @@ function CleanUp {
 		# Fix for sed -i requiring backup extension for BSD & Mac (see all sed -i statements)
 		rm -f "$RUN_DIR/$PROGRAM."*".$SCRIPT_PID.$TSTAMP.tmp"
 	fi
-}
-
-# obsolete, use StripQuotes
-function SedStripQuotes {
-	echo $(echo $1 | sed "s/^\([\"']\)\(.*\)\1\$/\2/g")
 }
 
 # Usage: var=$(StripSingleQuotes "$var")
@@ -1441,8 +1436,8 @@ function __CheckArguments {
 			if [ "$argument" == "" ]; then
 				fetchArguments=false
 			else
-				argList="$argList[Argument $(($iterate-2)): $argument] "
-				iterate=$(($iterate+1))
+				argList="$argList[Argument $((iterate-2)): $argument] "
+				iterate=$((iterate+1))
 			fi
 		done
 
@@ -1458,7 +1453,7 @@ function __CheckArguments {
 		Logger "Entering function [$callerName]." "PARANOIA_DEBUG"
 
 		if ! ([ $countedArguments -ge $minArgs ] && [ $countedArguments -le $maxArgs ]); then
-			Logger "Function $functionName may have inconsistent number of arguments. Expected min: $minArgs, max: $maxArgs, count: $countedArguments, bash seen: $numberOfGivenArguments. see log file." "ERROR"
+			Logger "Function $callerName may have inconsistent number of arguments. Expected min: $minArgs, max: $maxArgs, count: $countedArguments, bash seen: $numberOfGivenArguments." "ERROR"
 			Logger "$callerName arguments: $argList" "ERROR"
 		else
 			if [ ! -z "$argList" ]; then
@@ -2057,7 +2052,7 @@ function TrapError {
 	local code="${2:-1}"
 
 	if [ $_LOGGER_SILENT == false ]; then
-		echo -e "\e[45m/!\ ERROR in ${job}: Near line ${line}, exit code ${code}\e[0m"
+		(>&2 echo -e "\e[45m/!\ ERROR in ${job}: Near line ${line}, exit code ${code}\e[0m")
 	fi
 }
 function IsInteger {
@@ -2392,7 +2387,7 @@ function TrapError {
 	local code="${2:-1}"
 
 	if [ $_LOGGER_SILENT == false ]; then
-		echo -e "\e[45m/!\ ERROR in ${job}: Near line ${line}, exit code ${code}\e[0m"
+		(>&2 echo -e "\e[45m/!\ ERROR in ${job}: Near line ${line}, exit code ${code}\e[0m")
 	fi
 }
 ## Modified version of http://stackoverflow.com/a/8574392
@@ -3246,7 +3241,7 @@ function TrapError {
 	local code="${2:-1}"
 
 	if [ $_LOGGER_SILENT == false ]; then
-		echo -e "\e[45m/!\ ERROR in ${job}: Near line ${line}, exit code ${code}\e[0m"
+		(>&2 echo -e "\e[45m/!\ ERROR in ${job}: Near line ${line}, exit code ${code}\e[0m")
 	fi
 }
 
