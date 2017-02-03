@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 
 PROGRAM="osync" # Rsync based two way sync engine with fault tolerance
-AUTHOR="(C) 2013-2016 by Orsiris de Jong"
+AUTHOR="(C) 2013-2017 by Orsiris de Jong"
 CONTACT="http://www.netpower.fr/osync - ozy@netpower.fr"
 PROGRAM_VERSION=1.2-RC1+dev
 PROGRAM_BUILD=2016121901
@@ -220,7 +220,7 @@ function _CheckReplicasLocal {
 				Logger "Created local replica path [$replicaPath]." "NOTICE"
 			fi
 		else
-			Logger "Local replica path [$replicaPath] does not exist." "CRITICAL"
+			Logger "Local replica path [$replicaPath] does not exist / is not writable." "CRITICAL"
 			return 1
 		fi
 	fi
@@ -280,7 +280,7 @@ function _CheckReplicasRemoteSub {
 				RemoteLogger "Created remote replica path [$replicaPath]." "NOTICE"
 			fi
 		else
-			RemoteLogger "Remote replica path [$replicaPath] does not exist." "CRITICAL"
+			RemoteLogger "Remote replica path [$replicaPath] does not exist / is not writable." "CRITICAL"
 			exit 1
 		fi
 	fi
