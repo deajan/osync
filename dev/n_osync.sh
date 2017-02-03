@@ -4,7 +4,7 @@ PROGRAM="osync" # Rsync based two way sync engine with fault tolerance
 AUTHOR="(C) 2013-2017 by Orsiris de Jong"
 CONTACT="http://www.netpower.fr/osync - ozy@netpower.fr"
 PROGRAM_VERSION=1.2-RC1+dev
-PROGRAM_BUILD=2016121901
+PROGRAM_BUILD=2017020301
 IS_STABLE=no
 
 # Execution order						#__WITH_PARANOIA_DEBUG
@@ -1725,7 +1725,7 @@ env _DRYRUN="'$_DRYRUN'" env replicaType="'$replicaType'" env replicaDeletionPat
 
 # Cannot launch log function from xargs, ugly hack
 if [ -d "$replicaDeletionPath" ]; then
-	$REMOTE_FIND_CMD "$replicaDeletionPath" -type f -ctime +"$changeTime" -print0 | xargs -0 -I {} bash -c 'export file="{}"; if [ '$_LOGGER_VERBOSE' == true ]; then echo "On "'$replicaType'" ill delete file {}"; fi; if [ '$_DRYRUN' == false ]; then rm -f "$file"; fi'
+	$REMOTE_FIND_CMD "$replicaDeletionPath" -type f -ctime +"$changeTime" -print0 | xargs -0 -I {} bash -c 'export file="{}"; if [ '$_LOGGER_VERBOSE' == true ]; then echo "On "'$replicaType'" will delete file {}"; fi; if [ '$_DRYRUN' == false ]; then rm -f "$file"; fi'
 	retval1=$?
 	$REMOTE_FIND_CMD "$replicaDeletionPath" -type d -empty -ctime +"$changeTime" -print0 | xargs -0 -I {} bash -c 'export file="{}"; if [ '$_LOGGER_VERBOSE' == true ]; then echo "On "'$replicaType'" will delete directory {}"; fi; if [ '$_DRYRUN' == false ]; then rm -rf "{}"; fi'
 	retval2=$?
