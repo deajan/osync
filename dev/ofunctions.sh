@@ -3,7 +3,7 @@
 #### OFUNCTIONS MINI SUBSET ####
 
 _OFUNCTIONS_VERSION=2.1-RC1+dev
-_OFUNCTIONS_BUILD=2017020301
+_OFUNCTIONS_BUILD=2017020302
 #### _OFUNCTIONS_BOOTSTRAP SUBSET ####
 _OFUNCTIONS_BOOTSTRAP=true
 #### _OFUNCTIONS_BOOTSTRAP SUBSET END ####
@@ -1695,7 +1695,7 @@ function InitRemoteOSDependingSettings {
 	fi
 
 	## Set rsync default arguments
-	RSYNC_ARGS="-rltD"
+	RSYNC_ARGS="-rltD -8"
 	if [ "$_DRYRUN" == true ]; then
 		RSYNC_DRY_ARG="-n"
 		DRY_WARNING="/!\ DRY RUN "
