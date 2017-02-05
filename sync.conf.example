@@ -2,7 +2,7 @@
 
 ###### osync - Rsync based two way sync engine with fault tolerance
 ###### (C) 2013-2016 by Orsiris de Jong (www.netpower.fr)
-###### osync v1.1x / v1.2x config file rev 2016121301
+###### osync v1.1x / v1.2x config file rev 2017020501
 
 ## ---------- GENERAL OPTIONS
 
@@ -162,6 +162,11 @@ DELTA_COPIES=yes
 ## Just make sure that the current user has enough privileges to use mail / mutt / sendmail and that the mail system is configured to allow outgoing mails
 ## on pfSense platform, smtp support needs to be configured in System > Advanced > Notifications
 DESTINATION_MAILS="your@alert.tld"
+
+## Optional change of mail body encoding (using iconv)
+## By default, all mails are sent in UTF-8 format without header (because of maximum compatibility of all platforms)
+## You may specify an optional encoding here (like "ISO-8859-1" or whatever iconv can handle)
+MAIL_BODY_CHARSET=""
 
 ## Additional mail parameters needed for Android / Busybox / Cygwin / MSYS
 ## Android & Busybox use sendmail (and openssl if encryption is needed)

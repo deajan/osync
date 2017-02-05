@@ -3,7 +3,7 @@
 #### OFUNCTIONS MINI SUBSET ####
 
 _OFUNCTIONS_VERSION=2.1-RC1+dev
-_OFUNCTIONS_BUILD=2017020302
+_OFUNCTIONS_BUILD=2017020501
 #### _OFUNCTIONS_BOOTSTRAP SUBSET ####
 _OFUNCTIONS_BOOTSTRAP=true
 #### _OFUNCTIONS_BOOTSTRAP SUBSET END ####
@@ -387,7 +387,11 @@ function SendAlert {
 		attachment=true
 	fi
 	if [ -e "$RUN_DIR/$PROGRAM._Logger.$SCRIPT_PID.$TSTAMP" ]; then
-		body="$MAIL_ALERT_MSG"$'\n\n'"$(cat $RUN_DIR/$PROGRAM._Logger.$SCRIPT_PID.$TSTAMP)"
+		if [ "$MAIL_BODY_CHARSET" != "" ] && type iconv > /dev/null 2>&1; then
+			body="$MAIL_ALERT_MSG"$'\n\n'"$(iconv -f UTF-8 -t $MAIL_BODY_CHARSET $RUN_DIR/$PROGRAM._Logger.$SCRIPT_PID.$TSTAMP)"
+		else
+			body="$MAIL_ALERT_MSG"$'\n\n'"$(cat $RUN_DIR/$PROGRAM._Logger.$SCRIPT_PID.$TSTAMP)"
+		fi
 	fi
 
 	if [ $ERROR_ALERT == true ]; then
