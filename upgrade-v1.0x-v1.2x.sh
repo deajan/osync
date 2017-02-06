@@ -2,11 +2,11 @@
 
 PROGRAM="osync instance upgrade script"
 SUBPROGRAM="osync"
-AUTHOR="(C) 2016 by Orsiris de Jong"
+AUTHOR="(C) 2016-2017 by Orsiris de Jong"
 CONTACT="http://www.netpower.fr/osync - ozy@netpower.fr"
 OLD_PROGRAM_VERSION="v1.0x-v1.1x"
 NEW_PROGRAM_VERSION="v1.2x"
-CONFIG_FILE_VERSION=2016121301
+CONFIG_FILE_VERSION=2017020501
 PROGRAM_BUILD=2016121101
 
 ## type -p does not work on platforms other than linux (bash). If if does not work, always assume output is not a zero exitcode
@@ -72,6 +72,7 @@ FORCE_STRANGER_LOCK_RESUME
 PARTIAL
 DELTA_COPIES
 DESTINATION_MAILS
+MAIL_BODY_CHARSET
 SENDER_MAIL
 SMTP_SERVER
 SMTP_PORT
@@ -142,6 +143,7 @@ no
 yes
 ''
 alert@your.system.tld
+''
 smtp.your.isp.tld
 25
 none
