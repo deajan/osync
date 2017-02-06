@@ -4,7 +4,7 @@ PROGRAM="osync" # Rsync based two way sync engine with fault tolerance
 AUTHOR="(C) 2013-2017 by Orsiris de Jong"
 CONTACT="http://www.netpower.fr/osync - ozy@netpower.fr"
 PROGRAM_VERSION=1.2-RC1+dev
-PROGRAM_BUILD=2017020302
+PROGRAM_BUILD=2017020601
 IS_STABLE=no
 
 # Execution order						#__WITH_PARANOIA_DEBUG
@@ -747,12 +747,13 @@ function deleteList {
 			cmd="(grep -F -x -v -f \"${INITIATOR[$__replicaDir]}${INITIATOR[$__stateDir]}/$replicaType${INITIATOR[$__treeCurrentFile]}\" \"${INITIATOR[$__replicaDir]}${INITIATOR[$__stateDir]}/$replicaType${INITIATOR[$__treeAfterFileNoSuffix]}\" || :) > \"${INITIATOR[$__replicaDir]}${INITIATOR[$__stateDir]}/$replicaType${INITIATOR[$__deletedListFile]}\""
 		fi
 
-		Logger "CMD: $cmd" "DEBUG"
+		Logger "Launching command [$cmd]." "DEBUG"
 		eval "$cmd" 2>> "$LOG_FILE"
 		retval=$?
 
 		if [ $retval -ne 0 ]; then
-			Logger "Couldl not prepare $replicaType deletion list." "CRITICAL" $retval
+			Logger "Could not prepare $replicaType deletion list." "CRITICAL" $retval
+			Logger "Command was [$cmd]." "WARN"
 			return $retval
 		fi
 
@@ -805,11 +806,12 @@ function _getFileCtimeMtimeRemote {
 	local cmd
 
 	cmd='cat "'$fileList'" | '$SSH_CMD' "cat > \".$PROGRAM.ctime_mtime.$replicaType.$SCRIPT_PID.$TSTAMP\""'
-	Logger "CMD: $cmd" "DEBUG"
+	Logger "Launching command [$cmd]." "DEBUG"
 	eval "$cmd"
 	retval=$?
 	if [ $retval -ne 0 ]; then
 		Logger "Sending ctime required file list failed with [$retval] on $replicaType. Stopping execution." "CRITICAL" $retval
+		Logger "Command was [$cmd]." "WARN"
 		if [ -f "$RUN_DIR/$PROGRAM.ctime_mtime.$replicaType.$SCRIPT_PID.$TSTAMP" ]; then
 			Logger "Command output:\n$(cat $RUN_DIR/$PROGRAM.ctime_mtime.$replicaType.$SCRIPT_PID.$TSTAMP)" "WARN"
 		fi
@@ -2089,7 +2091,7 @@ function SyncOnChanges {
 		else
 			cmd='bash '$osync_cmd' '$opts
 		fi
-		Logger "daemon cmd: $cmd" "DEBUG"
+		Logger "Daemon cmd: $cmd" "DEBUG"
 		eval "$cmd"
 		retval=$?
 		if [ $retval -ne 0 ] && [ $retval != 2 ]; then
