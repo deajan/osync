@@ -142,8 +142,8 @@ no
 no
 yes
 ''
-alert@your.system.tld
 ''
+alert@your.system.tld
 smtp.your.isp.tld
 25
 none
