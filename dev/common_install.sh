@@ -8,7 +8,7 @@ PROGRAM_BINARY=$PROGRAM".sh"
 PROGRAM_BATCH=$PROGRAM"-batch.sh"
 SSH_FILTER="ssh_filter.sh"
 
-SCRIPT_BUILD=2017020703
+SCRIPT_BUILD=2017020704
 
 ## osync / obackup / pmocr / zsnap install script
 ## Tested on RHEL / CentOS 6 & 7, Fedora 23, Debian 7 & 8, Mint 17 and FreeBSD 8, 10 and 11
@@ -97,17 +97,17 @@ function GetInit {
 	fi
 }
 
-function CreateConfDir {
-	if [ ! -d "$CONF_DIR" ]; then
-		mkdir "$CONF_DIR"
+function CreateDir {
+	local dir="${1}"
+
+	if [ ! -d "$dir" ]; then
+		mkdir "$dir"
 		if [ $? == 0 ]; then
-			QuickLogger "Created directory [$CONF_DIR]."
+			QuickLogger "Created directory [$dir]."
 		else
-			QuickLogger "Cannot create directory [$CONF_DIR]."
+			QuickLogger "Cannot create directory [$dir]."
 			exit 1
 		fi
-	else
-		QuickLogger "Config directory [$CONF_DIR] exists."
 	fi
 }
 
@@ -309,7 +309,8 @@ if [ "$ACTION" == "uninstall" ]; then
 	RemoveAll
 	QuickLogger "$PROGRAM uninstalled."
 else
-	CreateConfDir
+	CreateDir "$CONF_DIR"
+	CreateDir "$BIN_DIR"
 	CopyExampleFiles
 	CopyProgram
 	CopyServiceFiles
