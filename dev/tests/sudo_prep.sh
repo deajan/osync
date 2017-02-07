@@ -68,9 +68,9 @@ function RemoveUser {
 	local remoteUser="${1}"
 
 	if type rmuser > /dev/null 2>&1; then
-		rmuser $remoteUser
+		rmuser -y $remoteUser
 	elif type userdel > /dev/null 2>&1; then
-		userdel $remoteUser
+		userdel -fr $remoteUser
 	else
 		echo "Please remove $remoteUser manually"
 	fi
@@ -101,7 +101,8 @@ if [ "$1" == "set" ]; then
 	SetupSSH "$testUser" "$testUserHome"
 	PrepareSudoers "$testUser"
 	echo ""
-	echo "Now feel free to run osync sudo test"
+	echo "Now feel free to run osync sudo test with"
+	echo "su osyncsudo"
 	echo "SUDO_EXEC=yes osync.sh --initiator=/home/osyncsudo --target=ssh://osyncsudo@localhost:22//root/osync-tests --rsakey=/home/osyncsudo/.ssh/id_rsa_local"
 	echo "Don't forget to run $0 unset later"
 
