@@ -6,7 +6,9 @@ PROGRAM=[prgname]
 PROGRAM_VERSION=[version]
 PROGRAM_BINARY=$PROGRAM".sh"
 PROGRAM_BATCH=$PROGRAM"-batch.sh"
-SCRIPT_BUILD=2016122701
+SSH_FILTER="ssh_filter.sh"
+
+SCRIPT_BUILD=2017020701
 
 ## osync / obackup / pmocr / zsnap install script
 ## Tested on RHEL / CentOS 6 & 7, Fedora 23, Debian 7 & 8, Mint 17 and FreeBSD 8, 10 and 11
@@ -22,19 +24,20 @@ SERVICE_DIR_INIT=$FAKEROOT/etc/init.d
 SERVICE_DIR_SYSTEMD_SYSTEM=$FAKEROOT/lib/systemd/system
 SERVICE_DIR_SYSTEMD_USER=$FAKEROOT/etc/systemd/user
 
-## osync specific code
-OSYNC_SERVICE_FILE_INIT="osync-srv"
-OSYNC_SERVICE_FILE_SYSTEMD_SYSTEM="osync-srv@.service"
-OSYNC_SERVICE_FILE_SYSTEMD_USER="osync-srv@.service.user"
+if [ "$PROGRAM" == "osync" ]; then
+	SERVICE_NAME="osync-srv"
+elif [ "$PROGRAM" == "pmocr" ]; then
+	SERVICE_NAME="pmocr-srv"
+fi
 
-## pmocr specfic code
-PMOCR_SERVICE_FILE_INIT="pmocr-srv"
-PMOCR_SERVICE_FILE_SYSTEMD_SYSTEM="pmocr-srv@.service"
+SERVICE_FILE_INIT="$SERVICE_NAME"
+SERVICE_FILE_SYSTEMD_SYSTEM="$SERVICE_NAME@.service"
+SERVICE_FILE_SYSTEMD_USER="$SERVICE_NAME@.service.user"
 
 ## Generic code
 
 ## Default log file
-if [ -w $FAKEROOT/var/log ]; then
+if [ -w "$FAKEROOT/var/log" ]; then
 	LOG_FILE="$FAKEROOT/var/log/$PROGRAM-install.log"
 elif ([ "$HOME" != "" ] && [ -w "$HOME" ]); then
 	LOG_FILE="$HOME/$PROGRAM-install.log"
@@ -106,112 +109,110 @@ function CreateConfDir {
 	fi
 }
 
-function CopyExampleFiles {
-	if [ -f "$SCRIPT_PATH/sync.conf.example" ]; then
-		cp "$SCRIPT_PATH/sync.conf.example" "$CONF_DIR/sync.conf.example"
+function CopyFile {
+	local sourcePath="${1}"
+	local destPath="${2}"
+	local fileName="${3}"
+	local fileMod="${4}"
+	local fileUser="${5}"
+	local fileGroup="${6}"
+
+	local userGroup=""
+	local oldFileName
+
+	if [ -f "$destPath/$fileName" ]; then
+		oldFileName="$fileName"
+		fileName="$oldFileName.new"
+		cp "$sourcePath/$oldFileName" "$destPath/$fileName"
+	else
+		cp "$sourcePath/$fileName" "$destPath"
 	fi
 
-	if [ -f "$SCRIPT_PATH/host_backup.conf.example" ]; then
-		cp "$SCRIPT_PATH/host_backup.conf.example" "$CONF_DIR/host_backup.conf.example"
-	fi
-
-	if [ -f "$SCRIPT_PATH/exlude.list.example" ]; then
-		cp "$SCRIPT_PATH/exclude.list.example" "$CONF_DIR/exclude.list.example"
-	fi
-
-	if [ -f "$SCRIPT_PATH/snapshot.conf.example" ]; then
-		cp "$SCRIPT_PATH/snapshot.conf.example" "$CONF_DIR/snapshot.conf.example"
-	fi
-
-	if [ -f "$SCRIPT_PATH/default.conf" ]; then
-		if [ -f "$CONF_DIR/default.conf" ]; then
-			cp "$SCRIPT_PATH/default.conf" "$CONF_DIR/default.conf.new"
-			QuickLogger "Copied default.conf to [$CONF_DIR/default.conf.new]."
-		else
-			cp "$SCRIPT_PATH/default.conf" "$CONF_DIR/default.conf"
-		fi
-	fi
-}
-
-function CopyProgram {
-	cp "$SCRIPT_PATH/$PROGRAM_BINARY" "$BIN_DIR"
 	if [ $? != 0 ]; then
-		QuickLogger "Cannot copy $PROGRAM_BINARY to [$BIN_DIR]. Make sure to run install script in the directory containing all other files."
+		QuickLogger "Cannot copy [$fileName] to [$destPath]. Make sure to run install script in the directory containing all other files."
 		QuickLogger "Also make sure you have permissions to write to [$BIN_DIR]."
 		exit 1
 	else
-		chmod 755 "$BIN_DIR/$PROGRAM_BINARY"
-		QuickLogger "Copied $PROGRAM_BINARY to [$BIN_DIR]."
-	fi
-
-	if [ -f "$SCRIPT_PATH/$PROGRAM_BATCH" ]; then
-		cp "$SCRIPT_PATH/$PROGRAM_BATCH" "$BIN_DIR"
-		if [ $? != 0 ]; then
-			QuickLogger "Cannot copy $PROGRAM_BATCH to [$BIN_DIR]."
-		else
-			chmod 755 "$BIN_DIR/$PROGRAM_BATCH"
-			QuickLogger "Copied $PROGRAM_BATCH to [$BIN_DIR]."
-		fi
-	fi
-
-	if [  -f "$SCRIPT_PATH/ssh_filter.sh" ]; then
-		cp "$SCRIPT_PATH/ssh_filter.sh" "$BIN_DIR"
-		if [ $? != 0 ]; then
-			QuickLogger "Cannot copy ssh_filter.sh to [$BIN_DIR]."
-		else
-			chmod 755 "$BIN_DIR/ssh_filter.sh"
-			if ([ "$USER" != "" ] && [ "$GROUP" != "" ] && [ "$FAKEROOT" == "" ]); then
-				chown $USER:$GROUP "$BIN_DIR/ssh_filter.sh"
+		QuickLogger "Copied [$fileName] to [$destPath]."
+		if [ "$fileMod" != "" ]; then
+			chmod "$fileMod" "$destPath/$fileName"
+			if [ $? != 0 ]; then
+				QuickLogger "Cannot set file permissions of [$destPath/$fileName] to [$fileMod]."
+				exit 1
+			else
+				QuickLogger "Set file permissions to [$fileMod] on [$destPath/$fileName]."
 			fi
-			QuickLogger "Copied ssh_filter.sh to [$BIN_DIR]."
+		fi
+
+		if [ "$fileUser" != "" ]; then
+			userGroup="$fileUser"
+
+			if [ "$fileGroup" != "" ]; then
+				userGroup="$userGroup"":$fileGroup"
+			fi
+
+			chown "$userGroup" "$destPath/$fileName"
+			if [ $? != 0 ]; then
+				QuickLogger "Could not set file ownership on [$destPath/$fileName] to [$userGroup]."
+				exit 1
+			else
+				QuickLogger "Set file ownership on [$destPath/$fileName] to [$userGroup]."
+			fi
 		fi
 	fi
 }
 
-function CopyServiceFiles {
-	# OSYNC SPECIFIC
-	if ([ "$init" == "systemd" ] && [ -f "$SCRIPT_PATH/$OSYNC_SERVICE_FILE_SYSTEMD_SYSTEM" ]); then
-		cp "$SCRIPT_PATH/$OSYNC_SERVICE_FILE_SYSTEMD_SYSTEM" "$SERVICE_DIR_SYSTEMD_SYSTEM" && cp "$SCRIPT_PATH/$OSYNC_SERVICE_FILE_SYSTEMD_USER" "$SERVICE_DIR_SYSTEMD_USER/$SERVICE_FILE_SYSTEMD_SYSTEM"
-		if [ $? != 0 ]; then
-			QuickLogger "Cannot copy the systemd file to [$SERVICE_DIR_SYSTEMD_SYSTEM] or [$SERVICE_DIR_SYSTEMD_USER]."
-		else
-			QuickLogger "Created osync-srv service in [$SERVICE_DIR_SYSTEMD_SYSTEM] and [$SERVICE_DIR_SYSTEMD_USER]."
-			QuickLogger "Can be activated with [systemctl start osync-srv@instance.conf] where instance.conf is the name of the config file in $CONF_DIR."
-			QuickLogger "Can be enabled on boot with [systemctl enable osync-srv@instance.conf]."
-			QuickLogger "In userland, active with [systemctl --user start osync-srv@instance.conf]."
+function CopyExampleFiles {
+	exampleFiles=()
+	exampleFiles[0]="sync.conf.example"		# osync
+	exampleFiles[1]="host_backup.conf.example"	# obackup
+	exampleFiles[2]="exclude.list.example"		# osync & obackup
+	exampleFiles[3]="snapshot.conf.example"		# zsnap
+	exampleFiles[4]="default.conf"			# pmocr
+
+	for file in "${exampleFiles[@]}"; do
+		if [ -f "$SCRIPT_PATH/$file" ]; then
+			CopyFile "$SCRIPT_PATH" "$CONF_DIR" "$file"
 		fi
-	elif ([ "$init" == "initV" ] && [ -f "$SCRIPT_PATH/$OSYNC_SERVICE_FILE_INIT" ]); then
-		cp "$SCRIPT_PATH/$OSYNC_SERVICE_FILE_INIT" "$SERVICE_DIR_INIT"
-		if [ $? != 0 ]; then
-			QuickLogger "Cannot copy osync-srv to [$SERVICE_DIR_INIT]."
-		else
-			chmod 755 "$SERVICE_DIR_INIT/$OSYNC_SERVICE_FILE_INIT"
-			QuickLogger "Created osync-srv service in [$SERVICE_DIR_INIT]."
-			QuickLogger "Can be activated with [service $OSYNC_SERVICE_FILE_INIT start]."
-			QuickLogger "Can be enabled on boot with [chkconfig $OSYNC_SERVICE_FILE_INIT on]."
-		fi
+	done
+}
+
+function CopyProgram {
+	binFiles=()
+	binFiles[0]="$PROGRAM_BINARY"
+	binFiles[1]="$PROGRAM_BATCH"
+	binFiles[2]="$SSH_FILTER"
+
+	local user=""
+	local group=""
+
+	if ([ "$USER" != "" ] && [ "$FAKEROOT" == "" ]); then
+		user="$USER"
+	fi
+	if ([ "$GROUP" != "" ] && [ "$FAKEROOT" == "" ]); then
+		group="$GROUP"
 	fi
 
-	# PMOCR SPECIFIC
-	if ([ "$init" == "systemd" ] && [ -f "$SCRIPT_PATH/$PMOCR_SERVICE_FILE_SYSTEMD_SYSTEM" ]); then
-		cp "$SCRIPT_PATH/$PMOCR_SERVICE_FILE_SYSTEMD_SYSTEM" "$SERVICE_DIR_SYSTEMD_SYSTEM"
-		if [ $? != 0 ]; then
-			QuickLogger "Cannot copy the systemd file to [$SERVICE_DIR_SYSTEMD_SYSTEM] or [$SERVICE_DIR_SYSTEMD_USER]."
-		else
-			QuickLogger "Created pmocr-srv service in [$SERVICE_DIR_SYSTEMD_SYSTEM] and [$SERVICE_DIR_SYSTEMD_USER]."
-			QuickLogger "Can be activated with [systemctl start pmocr-srv@default.conf] where default.conf is the name of the config file in $CONF_DIR."
-			QuickLogger "Can be enabled on boot with [systemctl enable pmocr-srv@default.conf]."
-		fi
-	elif ([ "$init" == "initV" ] && [ -f "$SCRIPT_PATH/$PMOCR_SERVICE_FILE_INIT" ]); then
-		cp "$SCRIPT_PATH/$PMOCR_SERVICE_FILE_INIT" "$SERVICE_DIR_INIT"
-		if [ $? != 0 ]; then
-			QuickLogger "Cannot copy pmoct-srv to [$SERVICE_DIR_INIT]."
-		else
-			chmod 755 "$SERVICE_DIR_INIT/$PMOCR_SERVICE_FILE_INIT"
-			QuickLogger "Created osync-srv service in [$SERVICE_DIR_INIT]."
-			QuickLogger "Can be activated with [service $PMOCR_SERVICE_FILE_INIT start]."
-			QuickLogger "Can be enabled on boot with [chkconfig $PMOCR_SERVICE_FILE_INIT on]."
-		fi
+	for file in "${binFiles[@]}"; do
+		CopyFile "$SCRIPT_PATH" "$BIN_DIR" "$file" 755 "$user" "$group"
+	done
+}
+
+function CopyServiceFiles {
+	if ([ "$init" == "systemd" ] && [ -f "$SCRIPT_PATH/$SERVICE_FILE_SYSTEMD_SYSTEM" ]); then
+		CopyFile "$SCRIPT_PATH" "$SERVICE_DIR_SYSTEMD_SYSTEM" "$SERVICE_FILE_SYSTEMD_SYSTEM"
+		CopyFile "$SCRIPT_PATH" "$SERVICE_DIR_SYSTEMD_USER" "$SERVICE_FILE_SYSTEMD_USER"
+
+		QuickLogger "Created [$SERVICE_NAME] service in [$SERVICE_DIR_SYSTEMD_SYSTEM] and [$SERVICE_DIR_SYSTEMD_USER]."
+		QuickLogger "Can be activated with [systemctl start SERVICE_NAME@instance.conf] where instance.conf is the name of the config file in $CONF_DIR."
+		QuickLogger "Can be enabled on boot with [systemctl enable $SERVICE_NAME@instance.conf]."
+		QuickLogger "In userland, active with [systemctl --user start $SERVICE_NAME@instance.conf]."
+	elif ([ "$init" == "initV" ] && [ -f "$SCRIPT_PATH/$SERVICE_FILE_INIT" ]); then
+		CopyFile "$SCRIPT_PATH" "$SERVICE_DIR_INIT" "$SERVICE_FILE_INIT" "755"
+
+		QuickLogger "Created osync-srv service in [$SERVICE_DIR_INIT]."
+		QuickLogger "Can be activated with [service $OSYNC_SERVICE_FILE_INIT start]."
+		QuickLogger "Can be enabled on boot with [chkconfig $OSYNC_SERVICE_FILE_INIT on]."
 	fi
 }
 
@@ -234,6 +235,32 @@ function Statistics {
 	return 1
 }
 
+function RemoveFile {
+	local file="${1}"
+
+	if [ -f "$file" ]; then
+		rm -f "$file"
+		if [ $? != 0 ]; then
+			QuickLogger "Could not remove file [$file]."
+		else
+			QuickLogger "Removed file [$file]."
+		fi
+	else
+		QuickLogger "File [$file] not found. Skipping."
+	fi
+}
+
+function RemoveAll {
+	RemoveFile "$BIN_DIR/$PROGRAM_BINARY"
+	RemoveFile "$BIN_DIR/$PROGRAM_BATCH"
+	RemoveFile "$BIN_DIR/$SSH_FILTER"
+	RemoveFile "$SERVICE_DIR_SYSTEMD_SYSTEM/$SERVICE_FILE_SYSTEMD_SYSTEM"
+	RemoveFile "$SERVICE_DIR_SYSTEMD_USER/$SERVICE_FILE_SYSTEMD_SYSTEM"
+	RemoveFile "$SERVICE_DIR_INIT/$SERVICE_FILE_INIT"
+
+	QuickLogger "Skipping configuration files in [$CONF_DIR]. You may remove this directory manually."
+}
+
 function Usage {
 	echo "Installs $PROGRAM into $BIN_DIR"
 	echo "options:"
@@ -244,6 +271,8 @@ function Usage {
 
 _LOGGER_SILENT=false
 _STATS=1
+ACTION="install"
+
 for i in "$@"
 do
 	case $i in
@@ -252,6 +281,9 @@ do
 		;;
 		--no-stats)
 		_STATS=0
+		;;
+		--remove)
+		ACTION="uninstall"
 		;;
 		--help|-h|-?)
 		Usage
@@ -264,21 +296,27 @@ fi
 
 GetLocalOS
 SetLocalOSSettings
-CreateConfDir
-CopyExampleFiles
-CopyProgram
 GetInit
-CopyServiceFiles
 
-STATS_LINK="http://instcount.netpower.fr?program=$PROGRAM&version=$PROGRAM_VERSION&os=$OS"
+STATS_LINK="http://instcount.netpower.fr?program=$PROGRAM&version=$PROGRAM_VERSION&os=$OS&action=$ACTION"
 
-QuickLogger "$PROGRAM installed. Use with $BIN_DIR/$PROGRAM"
+if [ "$ACTION" == "uninstall" ]; then
+	RemoveAll
+	QuickLogger "$PROGRAM uninstalled."
+else
+	CreateConfDir
+	CopyExampleFiles
+	CopyProgram
+	CopyServiceFiles
+	QuickLogger "$PROGRAM installed. Use with $BIN_DIR/$PROGRAM"
+fi
+
 if [ $_STATS -eq 1 ]; then
 	if [ $_LOGGER_SILENT == true ]; then
 		Statistics
 	else
-		QuickLogger "In order to make install statistics, the script would like to connect to $STATS_LINK"
-		read -r -p "No data except those in the url will be send. Allow [Y/n]" response
+		QuickLogger "In order to make usage statistics, the script would like to connect to $STATS_LINK"
+		read -r -p "No data except those in the url will be send. Allow [Y/n] " response
 		case $response in
 			[nN])
 			exit
