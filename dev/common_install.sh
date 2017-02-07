@@ -48,6 +48,8 @@ fi
 include #### QuickLogger SUBSET ####
 include #### UrlEncode SUBSET ####
 include #### GetLocalOS SUBSET ####
+include #### GetConfFileValue SUBSET ####
+
 function SetLocalOSSettings {
 	USER=root
 
