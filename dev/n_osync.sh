@@ -4,7 +4,7 @@ PROGRAM="osync" # Rsync based two way sync engine with fault tolerance
 AUTHOR="(C) 2013-2017 by Orsiris de Jong"
 CONTACT="http://www.netpower.fr/osync - ozy@netpower.fr"
 PROGRAM_VERSION=1.2-RC1+dev
-PROGRAM_BUILD=2017020601
+PROGRAM_BUILD=2017020701
 IS_STABLE=no
 
 # Execution order						#__WITH_PARANOIA_DEBUG
@@ -193,6 +193,13 @@ function CheckCurrentConfigAll {
 		if [ $(ArrayContains "${INITIATOR[$__type]}" "${SKIP_DELETION[@]}") -eq 0 ] && [ $(ArrayContains "${TARGET[$__type]}" "${SKIP_DELETION[@]}") -eq 0 ]; then
 			Logger "Bogus skip deletion parameter [$SKIP_DELETION]." "CRITICAL"
 			exit 1
+		fi
+	fi
+
+	if [ "$SUDO_EXEC" == "yes" ]; then
+		if ! type sudo > /dev/null 2>&1; then
+			Logger "sudo is not available. Disabling sudo mode." "WARN"
+			SUDO_EXEC=no
 		fi
 	fi
 }
