@@ -7,7 +7,7 @@
 
 ## On CYGWIN / MSYS, ACL and extended attributes aren't supported
 
-# osync test suite 2016122302
+# osync test suite 2017020701
 
 # 4 tests:
 # quicklocal
@@ -933,7 +933,7 @@ function test_MultipleConflictBackups () {
 
 	for i in "${osyncParameters[@]}"; do
 
-		echo "Running with parameters [$î]."
+		echo "Running with parameters [$i]."
 
 		cd "$OSYNC_DIR"
 		PrepareLocalDirs
