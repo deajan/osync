@@ -50,16 +50,35 @@ function SetupSSH {
 function PrepareSudoers {
 	local remoteUser="${1}"
 
+	local bashPath
+	local rsyncPath
+
+	if ! type bash > /dev/null 2>&1; then
+		echo "No bash available"
+		exit 1
+	else
+		bashPath=$(type -p bash)
+	fi
+
+	if ! type rsync > /dev/null 2>&1; then
+		echo "No rsync available"
+		exit 1
+	else
+		rsyncPath=$(type -p rsync)
+	fi
+
+	RemoveSudoers $remoteUser
+
 	if [ -f "/etc/sudoers" ]; then
-		echo "$remoteUser ALL=NOPASSWD:SETENV:/usr/bin/rsync,/usr/bin/bash" >> "/etc/sudoers"
+		echo "$remoteUser ALL=NOPASSWD:SETENV:$rsyncPath,$bashPath" >> "/etc/sudoers"
 		echo "Defaults:$remoteUser !requiretty" >> "/etc/sudoers"
 	elif [ -f "/usr/local/etc/sudoers" ]; then
-		echo "$remoteUser ALL=NOPASSWD:SETENV:/usr/local/bin/rsync,/usr/local/bin/bash" >> "/usr/local/etc/sudoers"
+		echo "$remoteUser ALL=NOPASSWD:SETENV:$rsyncPath,$bashPath" >> "/usr/local/etc/sudoers"
 		echo "Defaults:$remoteUser !requiretty" >> "usr/local/etc/sudoers"
 	else
 		echo "No sudoers file found."
 		echo "copy the following lines to /etc/sudoers (or /usr/local/etc/sudoers) and adjust /usr/bin path to the target system"
-		echo "$remoteUser ALL=NOPASSWD:SETENV:/usr/bin/rsync,/usr/bin/bash"
+		echo "$remoteUser ALL=NOPASSWD:SETENV:$rsyncPath,$bashPath"
 		echo "Defaults:$remoteUser !requiretty"
 	fi
 }
