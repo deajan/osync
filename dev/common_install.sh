@@ -8,7 +8,7 @@ PROGRAM_BINARY=$PROGRAM".sh"
 PROGRAM_BATCH=$PROGRAM"-batch.sh"
 SSH_FILTER="ssh_filter.sh"
 
-SCRIPT_BUILD=2017020701
+SCRIPT_BUILD=2017020702
 
 ## osync / obackup / pmocr / zsnap install script
 ## Tested on RHEL / CentOS 6 & 7, Fedora 23, Debian 7 & 8, Mint 17 and FreeBSD 8, 10 and 11
@@ -116,11 +116,12 @@ function CopyFile {
 	local fileMod="${4}"
 	local fileUser="${5}"
 	local fileGroup="${6}"
+	local overwrite="${7:-false}"
 
 	local userGroup=""
 	local oldFileName
 
-	if [ -f "$destPath/$fileName" ]; then
+	if [ -f "$destPath/$fileName" ] && [ $overwrite == false ]; then
 		oldFileName="$fileName"
 		fileName="$oldFileName.new"
 		cp "$sourcePath/$oldFileName" "$destPath/$fileName"
@@ -172,7 +173,7 @@ function CopyExampleFiles {
 
 	for file in "${exampleFiles[@]}"; do
 		if [ -f "$SCRIPT_PATH/$file" ]; then
-			CopyFile "$SCRIPT_PATH" "$CONF_DIR" "$file"
+			CopyFile "$SCRIPT_PATH" "$CONF_DIR" "$file" "" "" "" false
 		fi
 	done
 }
@@ -194,21 +195,21 @@ function CopyProgram {
 	fi
 
 	for file in "${binFiles[@]}"; do
-		CopyFile "$SCRIPT_PATH" "$BIN_DIR" "$file" 755 "$user" "$group"
+		CopyFile "$SCRIPT_PATH" "$BIN_DIR" "$file" 755 "$user" "$group" true
 	done
 }
 
 function CopyServiceFiles {
 	if ([ "$init" == "systemd" ] && [ -f "$SCRIPT_PATH/$SERVICE_FILE_SYSTEMD_SYSTEM" ]); then
-		CopyFile "$SCRIPT_PATH" "$SERVICE_DIR_SYSTEMD_SYSTEM" "$SERVICE_FILE_SYSTEMD_SYSTEM"
-		CopyFile "$SCRIPT_PATH" "$SERVICE_DIR_SYSTEMD_USER" "$SERVICE_FILE_SYSTEMD_USER"
+		CopyFile "$SCRIPT_PATH" "$SERVICE_DIR_SYSTEMD_SYSTEM" "$SERVICE_FILE_SYSTEMD_SYSTEM" "" "" "" true
+		CopyFile "$SCRIPT_PATH" "$SERVICE_DIR_SYSTEMD_USER" "$SERVICE_FILE_SYSTEMD_USER" "" "" "" true
 
 		QuickLogger "Created [$SERVICE_NAME] service in [$SERVICE_DIR_SYSTEMD_SYSTEM] and [$SERVICE_DIR_SYSTEMD_USER]."
 		QuickLogger "Can be activated with [systemctl start SERVICE_NAME@instance.conf] where instance.conf is the name of the config file in $CONF_DIR."
 		QuickLogger "Can be enabled on boot with [systemctl enable $SERVICE_NAME@instance.conf]."
 		QuickLogger "In userland, active with [systemctl --user start $SERVICE_NAME@instance.conf]."
 	elif ([ "$init" == "initV" ] && [ -f "$SCRIPT_PATH/$SERVICE_FILE_INIT" ]); then
-		CopyFile "$SCRIPT_PATH" "$SERVICE_DIR_INIT" "$SERVICE_FILE_INIT" "755"
+		CopyFile "$SCRIPT_PATH" "$SERVICE_DIR_INIT" "$SERVICE_FILE_INIT" "755" "" "" true
 
 		QuickLogger "Created osync-srv service in [$SERVICE_DIR_INIT]."
 		QuickLogger "Can be activated with [service $OSYNC_SERVICE_FILE_INIT start]."
