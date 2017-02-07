@@ -3,7 +3,7 @@
 #### OFUNCTIONS MINI SUBSET ####
 
 _OFUNCTIONS_VERSION=2.1-RC1+dev
-_OFUNCTIONS_BUILD=2017020502
+_OFUNCTIONS_BUILD=2017020701
 #### _OFUNCTIONS_BOOTSTRAP SUBSET ####
 _OFUNCTIONS_BOOTSTRAP=true
 #### _OFUNCTIONS_BOOTSTRAP SUBSET END ####
@@ -1089,6 +1089,8 @@ function ArrayContains () {
 #### GetLocalOS SUBSET ####
 function GetLocalOS {
 	local localOsVar
+	local localOsName
+	local localOsVer
 
 	# There's no good way to tell if currently running in BusyBox shell. Using sluggish way.
 	if ls --help 2>&1 | grep -i "BusyBox" > /dev/null; then
@@ -1149,8 +1151,14 @@ function GetLocalOS {
 		Logger "Local OS: [$localOsVar]." "DEBUG"
 	fi
 
+	# Get linux versions
+	if [ -f "/etc/os-release" ]; then
+		localOsName=$(GetConfFileValue "/etc/os-release" "NAME")
+		localOsVer=$(GetConfFileValue "/etc/os-release" "VERSION")
+	fi
+
 	# Add a global variable for statistics in installer
-	LOCAL_OS_FULL="$localOsVar"
+	LOCAL_OS_FULL="$localOsVar ($localOsName $localOsVer)"
 }
 #### GetLocalOS SUBSET END ####
 
@@ -1169,6 +1177,8 @@ $SSH_CMD bash -s << 'ENDSSH' >> "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$SCRIPT_PID.$T
 
 function GetOs {
 	local localOsVar
+	local localOsName
+	local localOsVer
 
 	# There's no good way to tell if currently running in BusyBox shell. Using sluggish way.
 	if ls --help 2>&1 | grep -i "BusyBox" > /dev/null; then
@@ -1187,7 +1197,13 @@ function GetOs {
 			fi
 		fi
 	fi
-	echo "$localOsVar"
+	# Get linux versions
+	if [ -f "/etc/os-release" ]; then
+		localOsName=$(GetConfFileValue "/etc/os-release" "NAME")
+		localOsVer=$(GetConfFileValue "/etc/os-release" "VERSION")
+	fi
+
+	echo "$localOsVar ($localOsName $localOsVer)"
 }
 
 GetOs
@@ -1827,5 +1843,38 @@ vercomp () {
     done
     return 0
 }
+
+#### GetConfFileValue SUBSET ####
+function GetConfFileValue () {
+        local file="${1}"
+        local name="${2}"
+        local value
+
+        value=$(grep "^$name=" "$file")
+        if [ $? == 0 ]; then
+                value="${value##*=}"
+                echo "$value"
+        else
+		Logger "Cannot get value for [$name] in config file [$file]." "ERROR"
+        fi
+}
+#### GetConfFileValue SUBSET END ####
+
+#### SetConfFileValue SUBSET ####
+function SetConfFileValue () {
+        local file="${1}"
+        local name="${2}"
+        local value="${3}"
+
+        if grep "^$name=" "$file" > /dev/null; then
+                # Using -i.tmp for BSD compat
+                sed -i.tmp "s/^$name=.*/$name=$value/" "$file"
+                rm -f "$file.tmp"
+		Logger "Set [$name] to [$value] in config file [$file]." "DEBUG"
+        else
+		Logger "Cannot set value [$name] to [$value] in config file [$file]." "ERROR"
+        fi
+}
+#### SetConfFileValue SUBSET END ####
 
 #### OFUNCTIONS FULL SUBSET END ####
