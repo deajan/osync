@@ -170,6 +170,12 @@ Troubleshooting
 You may find osync's logs in /var/log/osync.[INSTANCE_ID].log (or current directory if /var/log is not writable).
 Additionnaly, you can use the --verbose flag see to what actions are going on.
 
+Uninstalling
+------------
+The installer script also has an uninstall mode that will keep configuration files. Use it with
+
+	$ ./install.sh --remove
+
 Author
 ------
 Feel free to mail me for limited support in my free time :)
