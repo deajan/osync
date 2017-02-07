@@ -91,7 +91,7 @@ function RemoveSudoers {
 }
 
 if [ "$1" == "set" ]; then
-	if getent passwd | grep -v "$testUser" > /dev/null 2>&1; then
+	if ! getent passwd | grep "$testUser" > /dev/null; then
 		echo "Manual creation of $testUser with homedir $testUserHome"
 		adduser "$testUser"
 	else
