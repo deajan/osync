@@ -53,7 +53,7 @@ function PrepareSudoers {
 	if [ -f "/etc/sudoers" ]; then
 		echo "$remoteUser ALL=NOPASSWD:SETENV:/usr/bin/rsync,/usr/bin/bash" >> "/etc/sudoers"
 		echo "Defaults:$remoteUser !requiretty" >> "/etc/sudoers"
-	elif [ -f "/usr/local/bin/sudoers" ]; then
+	elif [ -f "/usr/local/etc/sudoers" ]; then
 		echo "$remoteUser ALL=NOPASSWD:SETENV:/usr/local/bin/rsync,/usr/local/bin/bash" >> "/usr/local/etc/sudoers"
 		echo "Defaults:$remoteUser !requiretty" >> "usr/local/etc/sudoers"
 	else
@@ -91,9 +91,12 @@ function RemoveSudoers {
 }
 
 if [ "$1" == "set" ]; then
-	echo "Manual creation of $testUser with homedir $testUserHome"
-
-	adduser "$testUser"
+	if getent passwd | grep -v "$testUser" > /dev/null 2>&1; then
+		echo "Manual creation of $testUser with homedir $testUserHome"
+		adduser "$testUser"
+	else
+		echo "It seems that $testUser already exists"
+	fi
 
 	SetupSSH "$testUser" "$testUserHome"
 	PrepareSudoers "$testUser"
