@@ -3,6 +3,32 @@
 testUser=osyncsudo
 testUserHome=/home/osyncsudo
 
+function CreateUser {
+	local remoteUser"${1}"
+
+	if type getent > /dev/null 2>&1; then
+		if ! getent passwd | grep "$remoteUser" > /dev/null; then
+			echo "Manual creation of $remoteUser with homedir $remoteUserHome"
+			if type adduser >/dev/null 2>&1; then
+				adduser "$remoteUser"
+			else
+				echo "Cannot create user $remoteUser. Don't know what tool to use !"
+			fi
+		else
+			echo "It seems that $remoteUser already exists"
+		fi
+	elif type dscl > /dev/null 2>&1; then
+		if ! dscl . -search /Users name $remoteUser | grep "$remoteUser" > /dev/null; then
+			echo "Manual creation of $remoteUser with homedir $remoteUserHome"
+			dscl . -create /Users/$remoteUser
+		else
+			echo "It seems that $remoteUser already exists"
+		fi
+	else
+		echo "Well, I don't know what tool to use to create that user for you"
+	fi
+}
+
 function SetupSSH {
         local remoteUser="${1}"
         local homedir="${2}"
@@ -21,7 +47,7 @@ function SetupSSH {
 		exit 1
 	fi
 
-	chown $testUser "$homedir/.ssh"
+	chown $remoteUser "$homedir/.ssh"
 	if  [ $? != 0 ]; then
 		echo "Cannot chown [$homedir/.ssh]."
 		exit 1
@@ -90,6 +116,8 @@ function RemoveUser {
 		rmuser -y $remoteUser
 	elif type userdel > /dev/null 2>&1; then
 		userdel -fr $remoteUser
+	elif type dscl > /dev/null 2>&1; then
+		dscl . -delete "Users/$remoteUser"
 	else
 		echo "Please remove $remoteUser manually"
 	fi
@@ -110,13 +138,7 @@ function RemoveSudoers {
 }
 
 if [ "$1" == "set" ]; then
-	if ! getent passwd | grep "$testUser" > /dev/null; then
-		echo "Manual creation of $testUser with homedir $testUserHome"
-		adduser "$testUser"
-	else
-		echo "It seems that $testUser already exists"
-	fi
-
+	CreateUser "$testUser"
 	SetupSSH "$testUser" "$testUserHome"
 	PrepareSudoers "$testUser"
 	echo ""
