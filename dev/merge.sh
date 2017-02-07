@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-## MERGE 2016121901
+## MERGE 2017020701
 
 ## Merges ofunctions.sh and n_program.sh into program.sh
 ## Adds installer
@@ -51,6 +51,8 @@ function __PREPROCESSOR_Constants {
 	'#### UrlEncode SUBSET ####'
 	'#### HumanToNumeric SUBSET ####'
 	'#### ArrayContains SUBSET ####'
+	'#### GetConfFileValue SUBSET ####'
+	'#### SetConfFileValue SUBSET ####'
 	)
 }
 
