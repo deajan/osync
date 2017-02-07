@@ -3,7 +3,7 @@
 #### OFUNCTIONS MINI SUBSET ####
 
 _OFUNCTIONS_VERSION=2.1-RC1+dev
-_OFUNCTIONS_BUILD=2017020701
+_OFUNCTIONS_BUILD=2017020702
 #### _OFUNCTIONS_BOOTSTRAP SUBSET ####
 _OFUNCTIONS_BOOTSTRAP=true
 #### _OFUNCTIONS_BOOTSTRAP SUBSET END ####
@@ -1667,6 +1667,11 @@ function InitLocalOSDependingSettings {
 	if [ "$LOCAL_OS" == "msys" ] || [ "$LOCAL_OS" == "Cygwin" ]; then
 		FIND_CMD=$(dirname $BASH)/find
 		PING_CMD='$SYSTEMROOT\system32\ping -n 2'
+
+	# On BSD, when not root, min ping interval is 1s
+	elif [ "$LOCAL_OS" == "BSD" ] && [ "$SUDO_EXEC" == "yes" ]; then
+		FIND_CMD=find
+		PING_CMD="ping -c 2 -i 1"
 	else
 		FIND_CMD=find
 		PING_CMD="ping -c 2 -i .2"
