@@ -7,15 +7,15 @@
 
 ## On CYGWIN / MSYS, ACL and extended attributes aren't supported
 
-# osync test suite 2017020804
+# osync test suite 2017020805
 
 # 4 tests:
 # quicklocal
-# quickremote
+# quickremote (with ssh_filter.sh)
 # conflocal
-# confremote
+# confremote (with ssh_filter.sh)
 
-# for each test:
+# for each test
 # 	files with spaces, subdirs
 # 	largefileset (...large ?)
 # 	exclusions
@@ -27,7 +27,6 @@
 #	file attribute tests
 # 	local / remote locking resume tests
 #	timed execution tests
-#	ssh_filter test
 
 # function test
 # WaitForTaskCompletion
@@ -267,7 +266,7 @@ function oneTimeTearDown () {
 	rm -f "$TMP_FILE"
 
 	cd "$OSYNC_DIR"
-	$SUDO_CMD ./install.sh --remove --silent --no-stats
+	$SUDO_CMD ./install.sh --remove --no-stats
 	assertEquals "Uninstall failed" "0" $?
 
 	ELAPSED_TIME=$(($SECONDS - $START_TIME))
@@ -286,7 +285,7 @@ function test_Merge () {
 	assertEquals "Merging code" "0" $?
 
 	cd "$OSYNC_DIR"
-	$SUDO_CMD ./install.sh --silent --no-stats
+	$SUDO_CMD ./install.sh --no-stats
 	assertEquals "Install failed" "0" $?
 
 	# Set osync version to stable while testing to avoid warning message
