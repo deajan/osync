@@ -8,6 +8,15 @@ KNOWN ISSUES
 RECENT CHANGES
 --------------
 
+dd mmm YYYY: osync v1.2-RC2 release
+
+- Improved privilege elevation compatibility on SUDO_EXEC=yes runs
+- Refactored installer logic and added --remove option
+- Added optional mail body characterset encoding
+- Fixed log output has escaped UTF-8 characters because of LC_ALL=C
+- Fixed installer statistics don't report OS
+- Minor tweaks and fixes in ofunctions
+
 13 Dec 2016: osync v1.2-RC1 release
 
 - Unit tests have run on CentOS 5,6 and 7, Debian 8, Linux Mint 18, FreeBSD 10.3/pfSense, FreeBSD 11, MacOSX Sierra, Win10 1607 (14393.479) bash, Cygwin x64 and MSYS2 current
