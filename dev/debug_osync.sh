@@ -3,8 +3,8 @@
 PROGRAM="osync" # Rsync based two way sync engine with fault tolerance
 AUTHOR="(C) 2013-2017 by Orsiris de Jong"
 CONTACT="http://www.netpower.fr/osync - ozy@netpower.fr"
-PROGRAM_VERSION=1.2-RC1+dev
-PROGRAM_BUILD=2016121901
+PROGRAM_VERSION=1.2-RC2
+PROGRAM_BUILD=2017020702
 IS_STABLE=no
 
 # Execution order						#__WITH_PARANOIA_DEBUG
@@ -41,8 +41,8 @@ IS_STABLE=no
 #	CleanUp					no		#__WITH_PARANOIA_DEBUG
 
 
-_OFUNCTIONS_VERSION=2.1-RC1+dev
-_OFUNCTIONS_BUILD=2017010401
+_OFUNCTIONS_VERSION=2.1-RC2
+_OFUNCTIONS_BUILD=2017020703
 _OFUNCTIONS_BOOTSTRAP=true
 
 ## BEGIN Generic bash functions written in 2013-2017 by Orsiris de Jong - http://www.netpower.fr - ozy@netpower.fr
@@ -159,7 +159,7 @@ function joinString {
 function _Logger {
 	local logValue="${1}"		# Log to file
 	local stdValue="${2}"		# Log to screeen
-	local toStderr="${3:-false}"	# Log to stderr instead of stdout
+	local toStdErr="${3:-false}"	# Log to stderr instead of stdout
 
 	if [ "$logValue" != "" ]; then
 		echo -e "$logValue" >> "$LOG_FILE"
@@ -168,7 +168,7 @@ function _Logger {
 	fi
 
 	if [ "$stdValue" != "" ] && [ "$_LOGGER_SILENT" != true ]; then
-		if [ $toStderr == true ]; then
+		if [ $toStdErr == true ]; then
 			# Force stderr color in subshell
 			(>&2 echo -e "$stdValue")
 
@@ -418,7 +418,12 @@ function SendAlert {
 		attachment=true
 	fi
 	if [ -e "$RUN_DIR/$PROGRAM._Logger.$SCRIPT_PID.$TSTAMP" ]; then
-		body="$MAIL_ALERT_MSG"$'\n\n'"$(cat $RUN_DIR/$PROGRAM._Logger.$SCRIPT_PID.$TSTAMP)"
+		if [ "$MAIL_BODY_CHARSET" != "" ] && type iconv > /dev/null 2>&1; then
+			iconv -f UTF-8 -t $MAIL_BODY_CHARSET "$RUN_DIR/$PROGRAM._Logger.$SCRIPT_PID.$TSTAMP" > "$RUN_DIR/$PROGRAM._Logger.iconv.$SCRIPT_PID.$TSTAMP"
+			body="$MAIL_ALERT_MSG"$'\n\n'"$(cat $RUN_DIR/$PROGRAM._Logger.iconv.$SCRIPT_PID.$TSTAMP)"
+		else
+			body="$MAIL_ALERT_MSG"$'\n\n'"$(cat $RUN_DIR/$PROGRAM._Logger.$SCRIPT_PID.$TSTAMP)"
+		fi
 	fi
 
 	if [ $ERROR_ALERT == true ]; then
@@ -1104,6 +1109,8 @@ function ArrayContains () {
 
 function GetLocalOS {
 	local localOsVar
+	local localOsName
+	local localOsVer
 
 	# There's no good way to tell if currently running in BusyBox shell. Using sluggish way.
 	if ls --help 2>&1 | grep -i "BusyBox" > /dev/null; then
@@ -1164,8 +1171,14 @@ function GetLocalOS {
 		Logger "Local OS: [$localOsVar]." "DEBUG"
 	fi
 
+	# Get linux versions
+	if [ -f "/etc/os-release" ]; then
+		localOsName=$(GetConfFileValue "/etc/os-release" "NAME")
+		localOsVer=$(GetConfFileValue "/etc/os-release" "VERSION")
+	fi
+
 	# Add a global variable for statistics in installer
-	LOCAL_OS_FULL="$localOsVar"
+	LOCAL_OS_FULL="$localOsVar ($localOsName $localOsVer)"
 }
 
 
@@ -1182,6 +1195,8 @@ $SSH_CMD bash -s << 'ENDSSH' >> "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$SCRIPT_PID.$T
 
 function GetOs {
 	local localOsVar
+	local localOsName
+	local localOsVer
 
 	# There's no good way to tell if currently running in BusyBox shell. Using sluggish way.
 	if ls --help 2>&1 | grep -i "BusyBox" > /dev/null; then
@@ -1200,7 +1215,13 @@ function GetOs {
 			fi
 		fi
 	fi
-	echo "$localOsVar"
+	# Get linux versions
+	if [ -f "/etc/os-release" ]; then
+		localOsName=$(GetConfFileValue "/etc/os-release" "NAME")
+		localOsVer=$(GetConfFileValue "/etc/os-release" "VERSION")
+	fi
+
+	echo "$localOsVar ($localOsName $localOsVer)"
 }
 
 GetOs
@@ -1664,6 +1685,11 @@ function InitLocalOSDependingSettings {
 	if [ "$LOCAL_OS" == "msys" ] || [ "$LOCAL_OS" == "Cygwin" ]; then
 		FIND_CMD=$(dirname $BASH)/find
 		PING_CMD='$SYSTEMROOT\system32\ping -n 2'
+
+	# On BSD, when not root, min ping interval is 1s
+	elif [ "$LOCAL_OS" == "BSD" ] && [ "$LOCAL_USER" != "root" ]; then
+		FIND_CMD=find
+		PING_CMD="ping -c 2 -i 1"
 	else
 		FIND_CMD=find
 		PING_CMD="ping -c 2 -i .2"
@@ -1713,7 +1739,7 @@ function InitRemoteOSDependingSettings {
 	fi
 
 	## Set rsync default arguments
-	RSYNC_ARGS="-rltD"
+	RSYNC_ARGS="-rltD -8"
 	if [ "$_DRYRUN" == true ]; then
 		RSYNC_DRY_ARG="-n"
 		DRY_WARNING="/!\ DRY RUN "
@@ -1806,6 +1832,68 @@ function ParentPid {
 	if [ $parent -gt 0 ]; then
 		ParentPid $parent
 	fi
+}
+
+# Neat version compare function found at http://stackoverflow.com/a/4025065/2635443
+# Returns 0 if equal, 1 if $1 > $2 and 2 if $1 < $2
+vercomp () {
+    if [[ $1 == $2 ]]
+    then
+        return 0
+    fi
+    local IFS=.
+    local i ver1=($1) ver2=($2)
+    # fill empty fields in ver1 with zeros
+    for ((i=${#ver1[@]}; i<${#ver2[@]}; i++))
+    do
+        ver1[i]=0
+    done
+    for ((i=0; i<${#ver1[@]}; i++))
+    do
+        if [[ -z ${ver2[i]} ]]
+        then
+            # fill empty fields in ver2 with zeros
+            ver2[i]=0
+        fi
+        if ((10#${ver1[i]} > 10#${ver2[i]}))
+        then
+            return 1
+        fi
+        if ((10#${ver1[i]} < 10#${ver2[i]}))
+        then
+            return 2
+        fi
+    done
+    return 0
+}
+
+function GetConfFileValue () {
+        local file="${1}"
+        local name="${2}"
+        local value
+
+        value=$(grep "^$name=" "$file")
+        if [ $? == 0 ]; then
+                value="${value##*=}"
+                echo "$value"
+        else
+		Logger "Cannot get value for [$name] in config file [$file]." "ERROR"
+        fi
+}
+
+function SetConfFileValue () {
+        local file="${1}"
+        local name="${2}"
+        local value="${3}"
+
+        if grep "^$name=" "$file" > /dev/null; then
+                # Using -i.tmp for BSD compat
+                sed -i.tmp "s/^$name=.*/$name=$value/" "$file"
+                rm -f "$file.tmp"
+		Logger "Set [$name] to [$value] in config file [$file]." "DEBUG"
+        else
+		Logger "Cannot set value [$name] to [$value] in config file [$file]." "ERROR"
+        fi
 }
 
 
@@ -1906,6 +1994,13 @@ function CheckEnvironment {
 	if ! type pgrep > /dev/null 2>&1 ; then
 		Logger "pgrep not present. Sync cannot start." "CRITICAL"
 		exit 1
+	fi
+
+	if [ "$SUDO_EXEC" == "yes" ]; then
+		if ! type sudo > /dev/null 2>&1 ; then
+			Logger "sudo not present. Sync cannot start." "CRITICAL"
+			exit 1
+		fi
 	fi
 }
 
@@ -2105,7 +2200,7 @@ function joinString {
 function _Logger {
 	local logValue="${1}"		# Log to file
 	local stdValue="${2}"		# Log to screeen
-	local toStderr="${3:-false}"	# Log to stderr instead of stdout
+	local toStdErr="${3:-false}"	# Log to stderr instead of stdout
 
 	if [ "$logValue" != "" ]; then
 		echo -e "$logValue" >> "$LOG_FILE"
@@ -2114,7 +2209,7 @@ function _Logger {
 	fi
 
 	if [ "$stdValue" != "" ] && [ "$_LOGGER_SILENT" != true ]; then
-		if [ $toStderr == true ]; then
+		if [ $toStdErr == true ]; then
 			# Force stderr color in subshell
 			(>&2 echo -e "$stdValue")
 
@@ -2428,7 +2523,7 @@ function joinString {
 function _Logger {
 	local logValue="${1}"		# Log to file
 	local stdValue="${2}"		# Log to screeen
-	local toStderr="${3:-false}"	# Log to stderr instead of stdout
+	local toStdErr="${3:-false}"	# Log to stderr instead of stdout
 
 	if [ "$logValue" != "" ]; then
 		echo -e "$logValue" >> "$LOG_FILE"
@@ -2437,7 +2532,7 @@ function _Logger {
 	fi
 
 	if [ "$stdValue" != "" ] && [ "$_LOGGER_SILENT" != true ]; then
-		if [ $toStderr == true ]; then
+		if [ $toStdErr == true ]; then
 			# Force stderr color in subshell
 			(>&2 echo -e "$stdValue")
 
@@ -2745,9 +2840,9 @@ function treeList {
 	if [ "$REMOTE_OPERATION" == "yes" ] && [ "$replicaType" == "${TARGET[$__type]}" ]; then
 		CheckConnectivity3rdPartyHosts
 		CheckConnectivityRemoteHost
-		rsyncCmd="$(type -p $RSYNC_EXECUTABLE) --rsync-path=\"$RSYNC_PATH\" $RSYNC_ARGS $RSYNC_ATTR_ARGS $RSYNC_TYPE_ARGS -8 --exclude \"$OSYNC_DIR\" $RSYNC_PATTERNS $RSYNC_PARTIAL_EXCLUDE -e \"$RSYNC_SSH_CMD\" --list-only $REMOTE_USER@$REMOTE_HOST:\"$escapedReplicaPath\" 2> \"$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$replicaType.error.$SCRIPT_PID.$TSTAMP\" | (grep -E \"^-|^d|^l\" || :) | (awk '{\$1=\$2=\$3=\$4=\"\" ;print substr(\$0,5)}' || :) | (awk 'BEGIN { FS=\" -> \" } ; { print \$1 }' || :) | (grep -v \"^\.$\" || :) | sort > \"$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$replicaType.$SCRIPT_PID.$TSTAMP\""
+		rsyncCmd="$(type -p $RSYNC_EXECUTABLE) --rsync-path=\"$RSYNC_PATH\" $RSYNC_ARGS $RSYNC_ATTR_ARGS $RSYNC_TYPE_ARGS --exclude \"$OSYNC_DIR\" $RSYNC_PATTERNS $RSYNC_PARTIAL_EXCLUDE -e \"$RSYNC_SSH_CMD\" --list-only $REMOTE_USER@$REMOTE_HOST:\"$escapedReplicaPath\" 2> \"$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$replicaType.error.$SCRIPT_PID.$TSTAMP\" | (grep -E \"^-|^d|^l\" || :) | (awk '{\$1=\$2=\$3=\$4=\"\" ;print substr(\$0,5)}' || :) | (awk 'BEGIN { FS=\" -> \" } ; { print \$1 }' || :) | (grep -v \"^\.$\" || :) | sort > \"$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$replicaType.$SCRIPT_PID.$TSTAMP\""
 	else
-		rsyncCmd="$(type -p $RSYNC_EXECUTABLE) --rsync-path=\"$RSYNC_PATH\" $RSYNC_ARGS $RSYNC_ATTR_ARGS $RSYNC_TYPE_ARGS -8 --exclude \"$OSYNC_DIR\" $RSYNC_PATTERNS $RSYNC_PARTIAL_EXCLUDE --list-only \"$replicaPath\" 2> \"$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$replicaType.error.$SCRIPT_PID.$TSTAMP\" | (grep -E \"^-|^d|^l\" || :) | (awk '{\$1=\$2=\$3=\$4=\"\" ;print substr(\$0,5)}' || :) | (awk 'BEGIN { FS=\" -> \" } ; { print \$1 }' || :) | (grep -v \"^\.$\" || :) | sort > \"$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$replicaType.$SCRIPT_PID.$TSTAMP\""
+		rsyncCmd="$(type -p $RSYNC_EXECUTABLE) --rsync-path=\"$RSYNC_PATH\" $RSYNC_ARGS $RSYNC_ATTR_ARGS $RSYNC_TYPE_ARGS --exclude \"$OSYNC_DIR\" $RSYNC_PATTERNS $RSYNC_PARTIAL_EXCLUDE --list-only \"$replicaPath\" 2> \"$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$replicaType.error.$SCRIPT_PID.$TSTAMP\" | (grep -E \"^-|^d|^l\" || :) | (awk '{\$1=\$2=\$3=\$4=\"\" ;print substr(\$0,5)}' || :) | (awk 'BEGIN { FS=\" -> \" } ; { print \$1 }' || :) | (grep -v \"^\.$\" || :) | sort > \"$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$replicaType.$SCRIPT_PID.$TSTAMP\""
 	fi
 	Logger "RSYNC_CMD: $rsyncCmd" "DEBUG"
 	eval "$rsyncCmd"
@@ -2766,6 +2861,7 @@ function treeList {
 		return 0
 	else
 		Logger "Cannot create replica file list in [$replicaPath]." "CRITICAL" $retval
+		Logger "Command was [$rsyncCmd]." "WARN"
 		Logger "Command output\n$(cat $RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$replicaType.error.$SCRIPT_PID.$TSTAMP)" "WARN"
 		return $retval
 	fi
@@ -2802,12 +2898,13 @@ function deleteList {
 			cmd="(grep -F -x -v -f \"${INITIATOR[$__replicaDir]}${INITIATOR[$__stateDir]}/$replicaType${INITIATOR[$__treeCurrentFile]}\" \"${INITIATOR[$__replicaDir]}${INITIATOR[$__stateDir]}/$replicaType${INITIATOR[$__treeAfterFileNoSuffix]}\" || :) > \"${INITIATOR[$__replicaDir]}${INITIATOR[$__stateDir]}/$replicaType${INITIATOR[$__deletedListFile]}\""
 		fi
 
-		Logger "CMD: $cmd" "DEBUG"
+		Logger "Launching command [$cmd]." "DEBUG"
 		eval "$cmd" 2>> "$LOG_FILE"
 		retval=$?
 
 		if [ $retval -ne 0 ]; then
-			Logger "Couldl not prepare $replicaType deletion list." "CRITICAL" $retval
+			Logger "Could not prepare $replicaType deletion list." "CRITICAL" $retval
+			Logger "Command was [$cmd]." "WARN"
 			return $retval
 		fi
 
@@ -2860,11 +2957,12 @@ function _getFileCtimeMtimeRemote {
 	local cmd
 
 	cmd='cat "'$fileList'" | '$SSH_CMD' "cat > \".$PROGRAM.ctime_mtime.$replicaType.$SCRIPT_PID.$TSTAMP\""'
-	Logger "CMD: $cmd" "DEBUG"
+	Logger "Launching command [$cmd]." "DEBUG"
 	eval "$cmd"
 	retval=$?
 	if [ $retval -ne 0 ]; then
 		Logger "Sending ctime required file list failed with [$retval] on $replicaType. Stopping execution." "CRITICAL" $retval
+		Logger "Command was [$cmd]." "WARN"
 		if [ -f "$RUN_DIR/$PROGRAM.ctime_mtime.$replicaType.$SCRIPT_PID.$TSTAMP" ]; then
 			Logger "Command output:\n$(cat $RUN_DIR/$PROGRAM.ctime_mtime.$replicaType.$SCRIPT_PID.$TSTAMP)" "WARN"
 		fi
@@ -2918,9 +3016,9 @@ function syncAttrs {
 	if [ "$REMOTE_OPERATION" == "yes" ]; then
 		CheckConnectivity3rdPartyHosts
 		CheckConnectivityRemoteHost
-		rsyncCmd="$(type -p $RSYNC_EXECUTABLE) --rsync-path=\"$RSYNC_PATH\" -i -n -8 $RSYNC_ARGS $RSYNC_ATTR_ARGS $RSYNC_PARTIAL_EXCLUDE -e \"$RSYNC_SSH_CMD\" --exclude \"$OSYNC_DIR\" $RSYNC_PATTERNS $RSYNC_PARTIAL_EXCLUDE \"$initiatorReplica\" $REMOTE_USER@$REMOTE_HOST:\"$targetReplica\" >> $RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$SCRIPT_PID.$TSTAMP 2>&1 &"
+		rsyncCmd="$(type -p $RSYNC_EXECUTABLE) --rsync-path=\"$RSYNC_PATH\" -i -n $RSYNC_ARGS $RSYNC_ATTR_ARGS $RSYNC_PARTIAL_EXCLUDE -e \"$RSYNC_SSH_CMD\" --exclude \"$OSYNC_DIR\" $RSYNC_PATTERNS $RSYNC_PARTIAL_EXCLUDE \"$initiatorReplica\" $REMOTE_USER@$REMOTE_HOST:\"$targetReplica\" >> $RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$SCRIPT_PID.$TSTAMP 2>&1 &"
 	else
-		rsyncCmd="$(type -p $RSYNC_EXECUTABLE) --rsync-path=\"$RSYNC_PATH\" -i -n -8 $RSYNC_ARGS $RSYNC_ATTR_ARGS $RSYNC_PARTIAL_EXCLUDE --exclude \"$OSYNC_DIR\" $RSYNC_PATTERNS $RSYNC_PARTIAL_EXCLUDE \"$initiatorReplica\" \"$targetReplica\" >> $RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$SCRIPT_PID.$TSTAMP 2>&1 &"
+		rsyncCmd="$(type -p $RSYNC_EXECUTABLE) --rsync-path=\"$RSYNC_PATH\" -i -n $RSYNC_ARGS $RSYNC_ATTR_ARGS $RSYNC_PARTIAL_EXCLUDE --exclude \"$OSYNC_DIR\" $RSYNC_PATTERNS $RSYNC_PARTIAL_EXCLUDE \"$initiatorReplica\" \"$targetReplica\" >> $RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$SCRIPT_PID.$TSTAMP 2>&1 &"
 	fi
 	Logger "RSYNC_CMD: $rsyncCmd" "DEBUG"
 	eval "$rsyncCmd"
@@ -2929,6 +3027,7 @@ function syncAttrs {
 
 	if [ $retval -ne 0 ] && [ $retval -ne 24 ]; then
 		Logger "Getting list of files that need updates failed [$retval]. Stopping execution." "CRITICAL" $retval
+		Logger "Command was [$rsyncCmd]." "WARN"
 		if [ -f "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$SCRIPT_PID.$TSTAMP" ]; then
 			Logger "Rsync output:\n$(cat $RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$SCRIPT_PID.$TSTAMP)" "NOTICE"
 		fi
@@ -3015,6 +3114,7 @@ function syncAttrs {
 
 	if [ $retval -ne 0 ] && [ $retval -ne 24 ]; then
 		Logger "Updating file attributes on $destReplica [$retval]. Stopping execution." "CRITICAL" $retval
+		Logger "Command was [$rsyncCmd]." "WARN"
 		if [ -f "$RUN_DIR/$PROGRAM.attr-update.$destReplica.$SCRIPT_PID.$TSTAMP" ]; then
 			Logger "Rsync output:\n$(cat $RUN_DIR/$PROGRAM.attr-update.$destReplica.$SCRIPT_PID.$TSTAMP)" "NOTICE"
 		fi
@@ -3077,6 +3177,7 @@ function syncUpdate {
 
 	if [ $retval -ne 0 ] && [ $retval -ne 24 ]; then
 		Logger "Updating $destinationReplica replica failed. Stopping execution." "CRITICAL" $retval
+		Logger "Command was [$rsyncCmd]." "WARN"
 		if [ -f "$RUN_DIR/$PROGRAM.update.$destinationReplica.$SCRIPT_PID.$TSTAMP" ]; then
 			Logger "Rsync output:\n$(cat $RUN_DIR/$PROGRAM.update.$destinationReplica.$SCRIPT_PID.$TSTAMP)" "NOTICE"
 		fi
@@ -3207,6 +3308,7 @@ function _deleteRemote {
 	retval=$?
 	if [ $retval -ne 0 ]; then
 		Logger "Cannot copy the deletion list to remote replica." "ERROR" $retval
+		Logger "Command was [$rsyncCmd]." "WARN"
 		if [ -f "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.precopy.$SCRIPT_PID.$TSTAMP" ]; then
 			Logger "$(cat $RUN_DIR/$PROGRAM.${FUNCNAME[0]}.precopy.$SCRIPT_PID.$TSTAMP)" "ERROR"
 		fi
@@ -3255,7 +3357,7 @@ function joinString {
 function _Logger {
 	local logValue="${1}"		# Log to file
 	local stdValue="${2}"		# Log to screeen
-	local toStderr="${3:-false}"	# Log to stderr instead of stdout
+	local toStdErr="${3:-false}"	# Log to stderr instead of stdout
 
 	if [ "$logValue" != "" ]; then
 		echo -e "$logValue" >> "$LOG_FILE"
@@ -3264,7 +3366,7 @@ function _Logger {
 	fi
 
 	if [ "$stdValue" != "" ] && [ "$_LOGGER_SILENT" != true ]; then
-		if [ $toStderr == true ]; then
+		if [ $toStdErr == true ]; then
 			# Force stderr color in subshell
 			(>&2 echo -e "$stdValue")
 
@@ -3410,13 +3512,13 @@ ENDSSH
 	fi
 
 	## Copy back the deleted failed file list
-	#rsyncCmd="$(type -p $RSYNC_EXECUTABLE) --rsync-path=\"$RSYNC_PATH\" -e \"$RSYNC_SSH_CMD\" $REMOTE_USER@$REMOTE_HOST:\"{$failedDeleteList,$successDeleteList}\" \"${INITIATOR[$__replicaDir]}${INITIATOR[$__stateDir]}\" > \"$RUN_DIR/$PROGRAM.remote_failed_deletion_list_copy.$SCRIPT_PID.$TSTAMP\""
 	rsyncCmd="$(type -p $RSYNC_EXECUTABLE) -r --rsync-path=\"$RSYNC_PATH\" -e \"$RSYNC_SSH_CMD\" --include \"$(dirname ${TARGET[$__stateDir]})\" --include \"${TARGET[$__stateDir]}\" --include \"${TARGET[$__stateDir]}/$replicaType${TARGET[$__failedDeletedListFile]}\" --include \"${TARGET[$__stateDir]}/$replicaType${TARGET[$__successDeletedListFile]}\" --exclude='*' $REMOTE_USER@$REMOTE_HOST:\"$(EscapeSpaces ${TARGET[$__replicaDir]})\" \"${INITIATOR[$__replicaDir]}\" > \"$RUN_DIR/$PROGRAM.remote_failed_deletion_list_copy.$SCRIPT_PID.$TSTAMP\""
 	Logger "RSYNC_CMD: $rsyncCmd" "DEBUG"
 	eval "$rsyncCmd" 2>> "$LOG_FILE"
 	retval=$?
 	if [ $retval -ne 0 ]; then
 		Logger "Cannot copy back the failed deletion list to initiator replica." "CRITICAL" $retval
+		Logger "Command was [$rsyncCmd]." "WARN"
 		if [ -f "$RUN_DIR/$PROGRAM.remote_failed_deletion_list_copy.$SCRIPT_PID.$TSTAMP" ]; then
 			Logger "Comand output: $(cat $RUN_DIR/$PROGRAM.remote_failed_deletion_list_copy.$SCRIPT_PID.$TSTAMP)" "NOTICE"
 		fi
@@ -3893,7 +3995,7 @@ env _DRYRUN="'$_DRYRUN'" env replicaType="'$replicaType'" env replicaDeletionPat
 
 # Cannot launch log function from xargs, ugly hack
 if [ -d "$replicaDeletionPath" ]; then
-	$REMOTE_FIND_CMD "$replicaDeletionPath" -type f -ctime +"$changeTime" -print0 | xargs -0 -I {} bash -c 'export file="{}"; if [ '$_LOGGER_VERBOSE' == true ]; then echo "On "'$replicaType'" ill delete file {}"; fi; if [ '$_DRYRUN' == false ]; then rm -f "$file"; fi'
+	$REMOTE_FIND_CMD "$replicaDeletionPath" -type f -ctime +"$changeTime" -print0 | xargs -0 -I {} bash -c 'export file="{}"; if [ '$_LOGGER_VERBOSE' == true ]; then echo "On "'$replicaType'" will delete file {}"; fi; if [ '$_DRYRUN' == false ]; then rm -f "$file"; fi'
 	retval1=$?
 	$REMOTE_FIND_CMD "$replicaDeletionPath" -type d -empty -ctime +"$changeTime" -print0 | xargs -0 -I {} bash -c 'export file="{}"; if [ '$_LOGGER_VERBOSE' == true ]; then echo "On "'$replicaType'" will delete directory {}"; fi; if [ '$_DRYRUN' == false ]; then rm -rf "{}"; fi'
 	retval2=$?
@@ -4257,7 +4359,7 @@ function SyncOnChanges {
 		else
 			cmd='bash '$osync_cmd' '$opts
 		fi
-		Logger "daemon cmd: $cmd" "DEBUG"
+		Logger "Daemon cmd: $cmd" "DEBUG"
 		eval "$cmd"
 		retval=$?
 		if [ $retval -ne 0 ] && [ $retval != 2 ]; then

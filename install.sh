@@ -3,12 +3,12 @@
 _OFUNCTIONS_BOOTSTRAP=true
 
 PROGRAM=osync
-PROGRAM_VERSION=1.2-RC1+dev
+PROGRAM_VERSION=1.2-RC2
 PROGRAM_BINARY=$PROGRAM".sh"
 PROGRAM_BATCH=$PROGRAM"-batch.sh"
 SSH_FILTER="ssh_filter.sh"
 
-SCRIPT_BUILD=2017020701
+SCRIPT_BUILD=2017020704
 
 ## osync / obackup / pmocr / zsnap install script
 ## Tested on RHEL / CentOS 6 & 7, Fedora 23, Debian 7 & 8, Mint 17 and FreeBSD 8, 10 and 11
@@ -86,6 +86,8 @@ function UrlEncode {
 }
 function GetLocalOS {
 	local localOsVar
+	local localOsName
+	local localOsVer
 
 	# There's no good way to tell if currently running in BusyBox shell. Using sluggish way.
 	if ls --help 2>&1 | grep -i "BusyBox" > /dev/null; then
@@ -146,9 +148,29 @@ function GetLocalOS {
 		Logger "Local OS: [$localOsVar]." "DEBUG"
 	fi
 
+	# Get linux versions
+	if [ -f "/etc/os-release" ]; then
+		localOsName=$(GetConfFileValue "/etc/os-release" "NAME")
+		localOsVer=$(GetConfFileValue "/etc/os-release" "VERSION")
+	fi
+
 	# Add a global variable for statistics in installer
-	LOCAL_OS_FULL="$localOsVar"
+	LOCAL_OS_FULL="$localOsVar ($localOsName $localOsVer)"
 }
+function GetConfFileValue () {
+        local file="${1}"
+        local name="${2}"
+        local value
+
+        value=$(grep "^$name=" "$file")
+        if [ $? == 0 ]; then
+                value="${value##*=}"
+                echo "$value"
+        else
+		Logger "Cannot get value for [$name] in config file [$file]." "ERROR"
+        fi
+}
+
 function SetLocalOSSettings {
 	USER=root
 
@@ -196,17 +218,17 @@ function GetInit {
 	fi
 }
 
-function CreateConfDir {
-	if [ ! -d "$CONF_DIR" ]; then
-		mkdir "$CONF_DIR"
+function CreateDir {
+	local dir="${1}"
+
+	if [ ! -d "$dir" ]; then
+		mkdir "$dir"
 		if [ $? == 0 ]; then
-			QuickLogger "Created directory [$CONF_DIR]."
+			QuickLogger "Created directory [$dir]."
 		else
-			QuickLogger "Cannot create directory [$CONF_DIR]."
+			QuickLogger "Cannot create directory [$dir]."
 			exit 1
 		fi
-	else
-		QuickLogger "Config directory [$CONF_DIR] exists."
 	fi
 }
 
@@ -217,11 +239,12 @@ function CopyFile {
 	local fileMod="${4}"
 	local fileUser="${5}"
 	local fileGroup="${6}"
+	local overwrite="${7:-false}"
 
 	local userGroup=""
 	local oldFileName
 
-	if [ -f "$destPath/$fileName" ]; then
+	if [ -f "$destPath/$fileName" ] && [ $overwrite == false ]; then
 		oldFileName="$fileName"
 		fileName="$oldFileName.new"
 		cp "$sourcePath/$oldFileName" "$destPath/$fileName"
@@ -273,7 +296,7 @@ function CopyExampleFiles {
 
 	for file in "${exampleFiles[@]}"; do
 		if [ -f "$SCRIPT_PATH/$file" ]; then
-			CopyFile "$SCRIPT_PATH" "$CONF_DIR" "$file"
+			CopyFile "$SCRIPT_PATH" "$CONF_DIR" "$file" "" "" "" false
 		fi
 	done
 }
@@ -295,25 +318,27 @@ function CopyProgram {
 	fi
 
 	for file in "${binFiles[@]}"; do
-		CopyFile "$SCRIPT_PATH" "$BIN_DIR" "$file" 755 "$user" "$group"
+		CopyFile "$SCRIPT_PATH" "$BIN_DIR" "$file" 755 "$user" "$group" true
 	done
 }
 
 function CopyServiceFiles {
 	if ([ "$init" == "systemd" ] && [ -f "$SCRIPT_PATH/$SERVICE_FILE_SYSTEMD_SYSTEM" ]); then
-		CopyFile "$SCRIPT_PATH" "$SERVICE_DIR_SYSTEMD_SYSTEM" "$SERVICE_FILE_SYSTEMD_SYSTEM"
-		CopyFile "$SCRIPT_PATH" "$SERVICE_DIR_SYSTEMD_USER" "$SERVICE_FILE_SYSTEMD_USER"
+		CopyFile "$SCRIPT_PATH" "$SERVICE_DIR_SYSTEMD_SYSTEM" "$SERVICE_FILE_SYSTEMD_SYSTEM" "" "" "" true
+		CopyFile "$SCRIPT_PATH" "$SERVICE_DIR_SYSTEMD_USER" "$SERVICE_FILE_SYSTEMD_USER" "" "" "" true
 
 		QuickLogger "Created [$SERVICE_NAME] service in [$SERVICE_DIR_SYSTEMD_SYSTEM] and [$SERVICE_DIR_SYSTEMD_USER]."
 		QuickLogger "Can be activated with [systemctl start SERVICE_NAME@instance.conf] where instance.conf is the name of the config file in $CONF_DIR."
 		QuickLogger "Can be enabled on boot with [systemctl enable $SERVICE_NAME@instance.conf]."
 		QuickLogger "In userland, active with [systemctl --user start $SERVICE_NAME@instance.conf]."
-	elif ([ "$init" == "initV" ] && [ -f "$SCRIPT_PATH/$SERVICE_FILE_INIT" ]); then
-		CopyFile "$SCRIPT_PATH" "$SERVICE_DIR_INIT" "$SERVICE_FILE_INIT" "755"
+	elif ([ "$init" == "initV" ] && [ -f "$SCRIPT_PATH/$SERVICE_FILE_INIT" ] && [ -d "$SERVICE_DIR_INIT" ]); then
+		CopyFile "$SCRIPT_PATH" "$SERVICE_DIR_INIT" "$SERVICE_FILE_INIT" "755" "" "" true
 
 		QuickLogger "Created osync-srv service in [$SERVICE_DIR_INIT]."
 		QuickLogger "Can be activated with [service $OSYNC_SERVICE_FILE_INIT start]."
 		QuickLogger "Can be enabled on boot with [chkconfig $OSYNC_SERVICE_FILE_INIT on]."
+	else
+		QuickLogger "Cannot define what init style is in use on this system. Skipping service file installation."
 	fi
 }
 
@@ -405,7 +430,8 @@ if [ "$ACTION" == "uninstall" ]; then
 	RemoveAll
 	QuickLogger "$PROGRAM uninstalled."
 else
-	CreateConfDir
+	CreateDir "$CONF_DIR"
+	CreateDir "$BIN_DIR"
 	CopyExampleFiles
 	CopyProgram
 	CopyServiceFiles
