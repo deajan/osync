@@ -7,7 +7,7 @@
 
 ## On CYGWIN / MSYS, ACL and extended attributes aren't supported
 
-# osync test suite 2017020801
+# osync test suite 2017020802
 
 # 4 tests:
 # quicklocal
@@ -264,6 +264,10 @@ function oneTimeTearDown () {
 	#rm -rf "$OSYNC_TESTS_DIR"
 	rm -f "$TMP_FILE"
 
+	cd "$OSYNC_DIR"
+	./install.sh --remove --silent --no-stats
+	assertEquals "Uninstall failed" "0" $?
+
 	ELAPSED_TIME=$(($SECONDS - $START_TIME))
 	echo "It took $ELAPSED_TIME seconds to run these tests."
 }
@@ -278,6 +282,10 @@ function test_Merge () {
 	cd "$DEV_DIR"
 	./merge.sh
 	assertEquals "Merging code" "0" $?
+
+	cd "$OSYNC_DIR"
+	./install.sh --silent --no-stats
+	assertEquals "Install failed" "0" $?
 
 	# Set osync version to stable while testing to avoid warning message
 	SetConfFileValue "$OSYNC_DIR/$OSYNC_EXECUTABLE" "IS_STABLE" "yes"
