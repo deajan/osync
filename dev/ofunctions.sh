@@ -2,7 +2,7 @@
 #### OFUNCTIONS FULL SUBSET ####
 #### OFUNCTIONS MINI SUBSET ####
 
-_OFUNCTIONS_VERSION=2.1-RC1+dev
+_OFUNCTIONS_VERSION=2.1-RC2
 _OFUNCTIONS_BUILD=2017020703
 #### _OFUNCTIONS_BOOTSTRAP SUBSET ####
 _OFUNCTIONS_BOOTSTRAP=true
@@ -125,7 +125,7 @@ function joinString {
 function _Logger {
 	local logValue="${1}"		# Log to file
 	local stdValue="${2}"		# Log to screeen
-	local toStderr="${3:-false}"	# Log to stderr instead of stdout
+	local toStdErr="${3:-false}"	# Log to stderr instead of stdout
 
 	if [ "$logValue" != "" ]; then
 		echo -e "$logValue" >> "$LOG_FILE"
@@ -134,7 +134,7 @@ function _Logger {
 	fi
 
 	if [ "$stdValue" != "" ] && [ "$_LOGGER_SILENT" != true ]; then
-		if [ $toStderr == true ]; then
+		if [ $toStdErr == true ]; then
 			# Force stderr color in subshell
 			(>&2 echo -e "$stdValue")
 
