@@ -94,7 +94,7 @@ function RemoveSSH {
 	if [ -f "${HOME}/.ssh/id_rsa_local" ]; then
 
 		pubkey=$(cat "${HOME}/.ssh/id_rsa_local.pub")
-		sed -i.bak "#$pubkey#d" "${HOME}/.ssh/authorized_keys"
+		sed -i.bak "s|.*$pubkey.*||g" "${HOME}/.ssh/authorized_keys"
 		rm -f "${HOME}/.ssh/{id_rsa_local.pub,id_rsa_local}"
 	fi
 }
