@@ -8,7 +8,7 @@ PROGRAM_BINARY=$PROGRAM".sh"
 PROGRAM_BATCH=$PROGRAM"-batch.sh"
 SSH_FILTER="ssh_filter.sh"
 
-SCRIPT_BUILD=2017020704
+SCRIPT_BUILD=2017020801
 
 ## osync / obackup / pmocr / zsnap install script
 ## Tested on RHEL / CentOS 6 & 7, Fedora 23, Debian 7 & 8, Mint 17 and FreeBSD 8, 10 and 11
@@ -315,6 +315,11 @@ else
 	CopyProgram
 	CopyServiceFiles
 	QuickLogger "$PROGRAM installed. Use with $BIN_DIR/$PROGRAM"
+	if [ "$PROGRAM" == "osync" ] || [ "$PROGRAM" == "obackup" ]; then
+		QuickLogger ""
+		QuickLogger "If connecting remotely, consider setup ssh filter to enhance security."
+		QuickLogger ""
+	fi
 fi
 
 if [ $_STATS -eq 1 ]; then
