@@ -8,8 +8,9 @@ KNOWN ISSUES
 RECENT CHANGES
 --------------
 
-dd mmm YYYY: osync v1.2-RC2 release
+08 Feb 2017: osync v1.2-RC2 release
 
+- Tests have run on CentOS 5,7 and 7, Debian 8, Linux Mint 18, Fedora 24, FreeBSD 10.3/pfSense, FreeBSD 11, MacOSX Sierra, Win10 1607 (14393.479) bash, Cygwin x64 and MSYS2 current
 - Hugely improved ssh_filter
 - Improved privilege elevation compatibility on SUDO_EXEC=yes runs
 - Refactored installer logic and added --remove option
