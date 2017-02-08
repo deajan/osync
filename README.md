@@ -57,10 +57,11 @@ On MSYS, On top of your basic install, you need msys-rsync and msys-coreutils-ex
 
 Archlinux packages are available at https://aur.archlinux.org/packages/osync/ (thanks to Shadowigor, https://github.com/shadowigor)
 
-## Upgrade from v1.0x and v1.1x
+## Upgrade from previous configuration files
 
 Since osync v1.1 the config file format has changed in semantics and adds new config options.
 Also, master is now called initiator and slave is now called target.
+osync v1.2 also added multiple new configuration options.
 
 You can upgrade all v1.0x-v1.2-dev config files by running the upgrade script
 
