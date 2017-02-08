@@ -10,6 +10,7 @@ RECENT CHANGES
 
 dd mmm YYYY: osync v1.2-RC2 release
 
+- Hugely improved ssh_filter
 - Improved privilege elevation compatibility on SUDO_EXEC=yes runs
 - Refactored installer logic and added --remove option
 - Added optional mail body characterset encoding
