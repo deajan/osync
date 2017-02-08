@@ -5,10 +5,11 @@ testUserHome=/home/osyncsudo
 
 function CreateUser {
 	local remoteUser"${1}"
+	local homedir="${2}"
 
 	if type getent > /dev/null 2>&1; then
 		if ! getent passwd | grep "$remoteUser" > /dev/null; then
-			echo "Manual creation of $remoteUser with homedir $remoteUserHome"
+			echo "Manual creation of $remoteUser with homedir $homedir"
 			if type adduser >/dev/null 2>&1; then
 				adduser "$remoteUser"
 			else
@@ -19,7 +20,7 @@ function CreateUser {
 		fi
 	elif type dscl > /dev/null 2>&1; then
 		if ! dscl . -search /Users name $remoteUser | grep "$remoteUser" > /dev/null; then
-			echo "Manual creation of $remoteUser with homedir $remoteUserHome"
+			echo "Manual creation of $remoteUser with homedir $homedir"
 			dscl . -create /Users/$remoteUser
 		else
 			echo "It seems that $remoteUser already exists"
@@ -138,7 +139,7 @@ function RemoveSudoers {
 }
 
 if [ "$1" == "set" ]; then
-	CreateUser "$testUser"
+	CreateUser "$testUser" "$testUserHome"
 	SetupSSH "$testUser" "$testUserHome"
 	PrepareSudoers "$testUser"
 	echo ""
