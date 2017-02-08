@@ -217,7 +217,7 @@ function oneTimeSetUp () {
 	fi
 
 	#TODO: Assuming that macos has the same syntax than bsd here
-	if [ "$LOCAL_OS" == "msys" ] || [ "$LOCAL_OS" == "Cygwin" ] then
+	if [ "$LOCAL_OS" == "msys" ] || [ "$LOCAL_OS" == "Cygwin" ]; then
 		SUDO_CMD=""
 	elif [ "$LOCAL_OS" == "BSD" ] || [ "$LOCAL_OS" == "MacOSX" ]; then
 		SUDO_CMD=""
