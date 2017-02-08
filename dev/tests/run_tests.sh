@@ -7,7 +7,7 @@
 
 ## On CYGWIN / MSYS, ACL and extended attributes aren't supported
 
-# osync test suite 2017020702
+# osync test suite 2017020801
 
 # 4 tests:
 # quicklocal
@@ -27,6 +27,7 @@
 #	file attribute tests
 # 	local / remote locking resume tests
 #	timed execution tests
+#	ssh_filter test
 
 # function test
 # WaitForTaskCompletion
@@ -74,7 +75,7 @@ OSYNC_IS_STABLE=maybe
 function SetupSSH {
 	echo -e  'y\n'| ssh-keygen -t rsa -b 2048 -N "" -f "${HOME}/.ssh/id_rsa_local"
 	if ! grep "$(cat ${HOME}/.ssh/id_rsa_local.pub)" "${HOME}/.ssh/authorized_keys"; then
-		cat "${HOME}/.ssh/id_rsa_local.pub" >> "${HOME}/.ssh/authorized_keys"
+		echo "from=\"*\",no-port-forwarding,no-X11-forwarding,no-agent-forwarding,no-pty,command=\"/usr/local/bin/ssh_filter.sh SomeAlphaNumericToken9\" $(cat ${HOME}/.ssh/id_rsa_local.pub)" >> "${HOME}/.ssh/authorized_keys"
 	fi
 	chmod 600 "${HOME}/.ssh/authorized_keys"
 
@@ -207,7 +208,7 @@ function oneTimeSetUp () {
 	osyncDaemonParameters[$__local]="$CONF_DIR/$LOCAL_CONF --on-changes"
 
 	if [ "$LOCAL_OS" != "msys" ] && [ "$LOCAL_OS" != "Cygwin" ]; then
-		osyncParameters[$__quickRemote]="--initiator=$INITIATOR_DIR --target=ssh://localhost:$SSH_PORT/$TARGET_DIR --rsakey=${HOME}/.ssh/id_rsa_local --instance-id=quickremote"
+		osyncParameters[$__quickRemote]="--initiator=$INITIATOR_DIR --target=ssh://localhost:$SSH_PORT/$TARGET_DIR --rsakey=${HOME}/.ssh/id_rsa_local --instance-id=quickremote --remote-token=SomeAlphaNumericToken9"
 		osyncParameters[$__confRemote]="$CONF_DIR/$REMOTE_CONF"
 
 		osyncDaemonParameters[$__remote]="$CONF_DIR/$REMOTE_CONF --on-changes"
