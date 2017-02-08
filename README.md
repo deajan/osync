@@ -153,6 +153,11 @@ Systemd specific (one service per config file)
 	$ systemctl start osync-srv@configfile.conf
 	$ systemctl enable osync-srv@configfile.conf
 
+Security enhancements
+---------------------
+Remote SSH connection security can be improved by limiting what hostnames may connect, disabling some SSH options and using ssh filter.
+Please read full documentation in order to configure ssh filter.
+
 Contributions
 -------------
 All kind of contribs are welcome.
