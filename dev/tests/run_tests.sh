@@ -7,7 +7,7 @@
 
 ## On CYGWIN / MSYS, ACL and extended attributes aren't supported
 
-# osync test suite 2017020803
+# osync test suite 2017020804
 
 # 4 tests:
 # quicklocal
@@ -217,7 +217,9 @@ function oneTimeSetUp () {
 	fi
 
 	#TODO: Assuming that macos has the same syntax than bsd here
-	if [ "$LOCAL_OS" == "BSD" ] || [ "$LOCAL_OS" == "MacOSX" ]; then
+	if [ "$LOCAL_OS" == "msys" ] || [ "$LOCAL_OS" == "Cygwin" ] then
+		SUDO_CMD=""
+	elif [ "$LOCAL_OS" == "BSD" ] || [ "$LOCAL_OS" == "MacOSX" ]; then
 		SUDO_CMD=""
 		IMMUTABLE_ON_CMD="chflags schg"
 		IMMUTABLE_OFF_CMD="chflags noschg"
