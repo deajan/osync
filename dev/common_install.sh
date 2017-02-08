@@ -8,7 +8,7 @@ PROGRAM_BINARY=$PROGRAM".sh"
 PROGRAM_BATCH=$PROGRAM"-batch.sh"
 SSH_FILTER="ssh_filter.sh"
 
-SCRIPT_BUILD=2017020801
+SCRIPT_BUILD=2017020802
 
 ## osync / obackup / pmocr / zsnap install script
 ## Tested on RHEL / CentOS 6 & 7, Fedora 23, Debian 7 & 8, Mint 17 and FreeBSD 8, 10 and 11
@@ -71,7 +71,7 @@ function SetLocalOSSettings {
 		;;
 	esac
 
-	if [ "$LOCAL_OS" == "Android" ] || [ "$LOCAL_OS" == "MacOSX" ] || [ "$LOCAL_OS" == "BusyBox" ]; then
+	if [ "$LOCAL_OS" == "Android" ] || [ "$LOCAL_OS" == "BusyBox" ]; then
 		QuickLogger "Cannot be installed on [$LOCAL_OS]. Please use $PROGRAM.sh directly."
 		exit 1
 	fi
