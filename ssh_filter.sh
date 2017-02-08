@@ -6,17 +6,16 @@
 ##### Please chmod 755 and chown root:root this file
 
 ##### Any command that has env _REMOTE_TOKEN= with the corresponding token in it will be run
-##### Also, commands that begin with rsync --server --sender are allowed
-##### Any other command will return "syntax error"
+##### Any other command will return a "syntax error"
 ##### For details, see ssh_filter.log
 
-SCRIPT_BUILD=2017020801
+SCRIPT_BUILD=2017020802
 
 ## Allow sudo
 SUDO_EXEC=yes
 
-## Paranoia option. Don't change this unless you read the documentation and still feel concerned about security issues.
-RSYNC_EXECUTABLE=rsync
+## Log all valid commands too
+_DEBUG=no
 
 ## Set remote token in authorized_keys
 if [ "$1" != "" ]; then
@@ -31,21 +30,13 @@ function Log {
 }
 
 function Go {
+	if [ "$_DEBUG" == "yes" ]; then
+		Log "Executing [$SSH_ORIGINAL_COMMAND]."
+	fi
 	eval "$SSH_ORIGINAL_COMMAND"
 }
 
 case "${SSH_ORIGINAL_COMMAND}" in
-	"$RSYNC_EXECUTABLE --server"*)
-	Go
-	;;
-	"sudo $RSYNC_EXECUTABLE --server"*)
-		if [ "$SUDO_EXEC" != "yes" ]; then
-			Log "Command [$SSH_ORIGINAL_COMMAND] contains sudo which is not allowed."
-			echo "Syntax error unexpected end of file"
-			exit 1
-		fi
-		Go
-	;;
 	*"env _REMOTE_TOKEN=$_REMOTE_TOKEN"*)
 		if [ "$SUDO_EXEC" != "yes" ] && [[ $SSH_ORIGINAL_COMMAND == *"sudo "* ]]; then
 			Log "Command [$SSH_ORIGINAL_COMMAND] contains sudo which is not allowed."
