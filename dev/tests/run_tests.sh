@@ -71,40 +71,6 @@ OSYNC_VERSION=1.x.y
 OSYNC_MIN_VERSION=x
 OSYNC_IS_STABLE=maybe
 
-# Setup an array with all function modes
-#declare -Ag osyncParameters
-
-
-## Moved to ofunctions.sh
-#function GetConfFileValue () {
-#	local file="${1}"
-#	local name="${2}"
-#	local value
-#
-#	value=$(grep "^$name=" "$file")
-#	if [ $? == 0 ]; then
-#		value="${value##*=}"
-#		echo "$value"
-#	else
-#		assertEquals "$name does not exist in [$file]." "1" "0"
-#	fi
-#}
-
-#function SetConfFileValue () {
-#	local file="${1}"
-#	local name="${2}"
-#	local value="${3}"
-#
-#	if grep "^$name=" "$file" > /dev/null; then
-#		# Using -i.tmp for BSD compat
-#		sed -i.tmp "s/^$name=.*/$name=$value/" "$file"
-#		rm -f "$file.tmp"
-#		assertEquals "Set $name to [$value]." "0" $?
-#	else
-#		assertEquals "$name does not exist in [$file]." "1" "0"
-#	fi
-#}
-
 function SetupSSH {
 	echo -e  'y\n'| ssh-keygen -t rsa -b 2048 -N "" -f "${HOME}/.ssh/id_rsa_local"
 	if ! grep "$(cat ${HOME}/.ssh/id_rsa_local.pub)" "${HOME}/.ssh/authorized_keys"; then
