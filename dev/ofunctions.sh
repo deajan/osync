@@ -2,8 +2,8 @@
 #### OFUNCTIONS FULL SUBSET ####
 #### OFUNCTIONS MINI SUBSET ####
 
-_OFUNCTIONS_VERSION=2.1-RC2
-_OFUNCTIONS_BUILD=2017020801
+_OFUNCTIONS_VERSION=2.1-RC2+dev
+_OFUNCTIONS_BUILD=2017020901
 #### _OFUNCTIONS_BOOTSTRAP SUBSET ####
 _OFUNCTIONS_BOOTSTRAP=true
 #### _OFUNCTIONS_BOOTSTRAP SUBSET END ####
@@ -1870,10 +1870,11 @@ function SetConfFileValue () {
         local file="${1}"
         local name="${2}"
         local value="${3}"
+	local separator="${4:-#}"
 
         if grep "^$name=" "$file" > /dev/null; then
                 # Using -i.tmp for BSD compat
-                sed -i.tmp "s/^$name=.*/$name=$value/" "$file"
+                sed -i.tmp "s$separator^$name=.*$separator$name=$value$separator" "$file"
                 rm -f "$file.tmp"
 		Logger "Set [$name] to [$value] in config file [$file]." "DEBUG"
         else
