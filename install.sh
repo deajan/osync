@@ -3,12 +3,12 @@
 _OFUNCTIONS_BOOTSTRAP=true
 
 PROGRAM=osync
-PROGRAM_VERSION=1.2-RC2
+PROGRAM_VERSION=1.2-RC3
 PROGRAM_BINARY=$PROGRAM".sh"
 PROGRAM_BATCH=$PROGRAM"-batch.sh"
 SSH_FILTER="ssh_filter.sh"
 
-SCRIPT_BUILD=2017020802
+SCRIPT_BUILD=2017021002
 
 ## osync / obackup / pmocr / zsnap install script
 ## Tested on RHEL / CentOS 6 & 7, Fedora 23, Debian 7 & 8, Mint 17 and FreeBSD 8, 10 and 11
@@ -379,7 +379,11 @@ function RemoveFile {
 function RemoveAll {
 	RemoveFile "$BIN_DIR/$PROGRAM_BINARY"
 	RemoveFile "$BIN_DIR/$PROGRAM_BATCH"
-	RemoveFile "$BIN_DIR/$SSH_FILTER"
+	if [ ! -f "$BIN_DIR/osync.sh" ] && [ ! -f "$BIN_DIR/obackup.sh" ]; then		# Check if any other program requiring ssh filter is present before removal
+		RemoveFile "$BIN_DIR/$SSH_FILTER"
+	else
+		QuickLogger "Skipping removal of [$BIN_DIR/$SSH_FILTER] because other programs present that need it."
+	fi
 	RemoveFile "$SERVICE_DIR_SYSTEMD_SYSTEM/$SERVICE_FILE_SYSTEMD_SYSTEM"
 	RemoveFile "$SERVICE_DIR_SYSTEMD_USER/$SERVICE_FILE_SYSTEMD_SYSTEM"
 	RemoveFile "$SERVICE_DIR_INIT/$SERVICE_FILE_INIT"

@@ -3,13 +3,12 @@
 PROGRAM="osync" # Rsync based two way sync engine with fault tolerance
 AUTHOR="(C) 2013-2017 by Orsiris de Jong"
 CONTACT="http://www.netpower.fr/osync - ozy@netpower.fr"
-PROGRAM_VERSION=1.2-RC2
-PROGRAM_BUILD=2017020802
-IS_STABLE=yes
+PROGRAM_VERSION=1.2-RC3
+PROGRAM_BUILD=2017021001
+IS_STABLE=no
 
-# Execution order						#__WITH_PARANOIA_DEBUG
-#	Function Name				Is parallel	#__WITH_PARANOIA_DEBUG
-
+##### Execution order						#__WITH_PARANOIA_DEBUG
+#####	Function Name				Is parallel	#__WITH_PARANOIA_DEBUG
 #	GetLocalOS				no		#__WITH_PARANOIA_DEBUG
 #	InitLocalOSDependingSettings		no		#__WITH_PARANOIA_DEBUG
 #	CheckEnvironment			no		#__WITH_PARANOIA_DEBUG
@@ -41,8 +40,8 @@ IS_STABLE=yes
 #	CleanUp					no		#__WITH_PARANOIA_DEBUG
 
 
-_OFUNCTIONS_VERSION=2.1-RC2
-_OFUNCTIONS_BUILD=2017020801
+_OFUNCTIONS_VERSION=2.1-RC3
+_OFUNCTIONS_BUILD=2017021003
 _OFUNCTIONS_BOOTSTRAP=true
 
 ## BEGIN Generic bash functions written in 2013-2017 by Orsiris de Jong - http://www.netpower.fr - ozy@netpower.fr
@@ -266,6 +265,10 @@ function Logger {
 	else
 		prefix=""
 	fi
+
+	## Obfuscate _REMOTE_TOKEN in logs (for ssh_filter usage only in osync and obackup)
+	value="${value/env _REMOTE_TOKEN=$_REMOTE_TOKEN/__(o_O)__}"
+	value="${value/env _REMOTE_TOKEN=\$_REMOTE_TOKEN/__(o_O)__}"
 
 	if [ "$level" == "CRITICAL" ]; then
 		_Logger "$prefix($level):$value" "$prefix\e[1;33;41m$value\e[0m" true
@@ -1885,17 +1888,17 @@ function SetConfFileValue () {
         local file="${1}"
         local name="${2}"
         local value="${3}"
+	local separator="${4:-#}"
 
         if grep "^$name=" "$file" > /dev/null; then
                 # Using -i.tmp for BSD compat
-                sed -i.tmp "s/^$name=.*/$name=$value/" "$file"
+                sed -i.tmp "s$separator^$name=.*$separator$name=$value$separator" "$file"
                 rm -f "$file.tmp"
 		Logger "Set [$name] to [$value] in config file [$file]." "DEBUG"
         else
 		Logger "Cannot set value [$name] to [$value] in config file [$file]." "ERROR"
         fi
 }
-
 
 # If using "include" statements, make sure the script does not get executed unless it's loaded by bootstrap
 _OFUNCTIONS_BOOTSTRAP=true
@@ -2864,7 +2867,7 @@ function treeList {
 		return 0
 	else
 		Logger "Cannot create replica file list in [$replicaPath]." "CRITICAL" $retval
-		Logger "Command was [$rsyncCmd]." "WARN"
+		_LOGGER_SILENT=true Logger "Command was [$rsyncCmd]." "WARN"
 		Logger "Command output\n$(cat $RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$replicaType.error.$SCRIPT_PID.$TSTAMP)" "WARN"
 		return $retval
 	fi
@@ -2907,7 +2910,7 @@ function deleteList {
 
 		if [ $retval -ne 0 ]; then
 			Logger "Could not prepare $replicaType deletion list." "CRITICAL" $retval
-			Logger "Command was [$cmd]." "WARN"
+			_LOGGER_SILENT=true Logger "Command was [$cmd]." "WARN"
 			return $retval
 		fi
 
@@ -2966,7 +2969,7 @@ function _getFileCtimeMtimeRemote {
 	retval=$?
 	if [ $retval -ne 0 ]; then
 		Logger "Sending ctime required file list failed with [$retval] on $replicaType. Stopping execution." "CRITICAL" $retval
-		Logger "Command was [$cmd]." "WARN"
+		_LOGGER_SILENT=true Logger "Command was [$cmd]." "WARN"
 		if [ -f "$RUN_DIR/$PROGRAM.ctime_mtime.$replicaType.$SCRIPT_PID.$TSTAMP" ]; then
 			Logger "Command output:\n$(cat $RUN_DIR/$PROGRAM.ctime_mtime.$replicaType.$SCRIPT_PID.$TSTAMP)" "WARN"
 		fi
@@ -3032,7 +3035,7 @@ function syncAttrs {
 
 	if [ $retval -ne 0 ] && [ $retval -ne 24 ]; then
 		Logger "Getting list of files that need updates failed [$retval]. Stopping execution." "CRITICAL" $retval
-		Logger "Command was [$rsyncCmd]." "WARN"
+		_LOGGER_SILENT=true Logger "Command was [$rsyncCmd]." "WARN"
 		if [ -f "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$SCRIPT_PID.$TSTAMP" ]; then
 			Logger "Rsync output:\n$(cat $RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$SCRIPT_PID.$TSTAMP)" "NOTICE"
 		fi
@@ -3119,7 +3122,7 @@ function syncAttrs {
 
 	if [ $retval -ne 0 ] && [ $retval -ne 24 ]; then
 		Logger "Updating file attributes on $destReplica [$retval]. Stopping execution." "CRITICAL" $retval
-		Logger "Command was [$rsyncCmd]." "WARN"
+		_LOGGER_SILENT=true Logger "Command was [$rsyncCmd]." "WARN"
 		if [ -f "$RUN_DIR/$PROGRAM.attr-update.$destReplica.$SCRIPT_PID.$TSTAMP" ]; then
 			Logger "Rsync output:\n$(cat $RUN_DIR/$PROGRAM.attr-update.$destReplica.$SCRIPT_PID.$TSTAMP)" "NOTICE"
 		fi
@@ -3182,7 +3185,7 @@ function syncUpdate {
 
 	if [ $retval -ne 0 ] && [ $retval -ne 24 ]; then
 		Logger "Updating $destinationReplica replica failed. Stopping execution." "CRITICAL" $retval
-		Logger "Command was [$rsyncCmd]." "WARN"
+		_LOGGER_SILENT=true Logger "Command was [$rsyncCmd]." "WARN"
 		if [ -f "$RUN_DIR/$PROGRAM.update.$destinationReplica.$SCRIPT_PID.$TSTAMP" ]; then
 			Logger "Rsync output:\n$(cat $RUN_DIR/$PROGRAM.update.$destinationReplica.$SCRIPT_PID.$TSTAMP)" "NOTICE"
 		fi
@@ -3313,7 +3316,7 @@ function _deleteRemote {
 	retval=$?
 	if [ $retval -ne 0 ]; then
 		Logger "Cannot copy the deletion list to remote replica." "ERROR" $retval
-		Logger "Command was [$rsyncCmd]." "WARN"
+		_LOGGER_SILENT=true Logger "Command was [$rsyncCmd]." "WARN"
 		if [ -f "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.precopy.$SCRIPT_PID.$TSTAMP" ]; then
 			Logger "$(cat $RUN_DIR/$PROGRAM.${FUNCNAME[0]}.precopy.$SCRIPT_PID.$TSTAMP)" "ERROR"
 		fi
@@ -3524,7 +3527,7 @@ ENDSSH
 	retval=$?
 	if [ $retval -ne 0 ]; then
 		Logger "Cannot copy back the failed deletion list to initiator replica." "CRITICAL" $retval
-		Logger "Command was [$rsyncCmd]." "WARN"
+		_LOGGER_SILENT=true Logger "Command was [$rsyncCmd]." "WARN"
 		if [ -f "$RUN_DIR/$PROGRAM.remote_failed_deletion_list_copy.$SCRIPT_PID.$TSTAMP" ]; then
 			Logger "Comand output: $(cat $RUN_DIR/$PROGRAM.remote_failed_deletion_list_copy.$SCRIPT_PID.$TSTAMP)" "NOTICE"
 		fi
