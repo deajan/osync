@@ -8,6 +8,8 @@ KNOWN ISSUES
 RECENT CHANGES
 --------------
 
+10 Feb 2017: osync v1.2-RC3 release
+
 - Uninstaller skips ssh_filter if needed by other program (osync/obackup)
 - Logger now automatically obfuscates _REMOTE_TOKEN
 - Logger doesn't show failed commands in stdout, only logs them
