@@ -7,9 +7,8 @@ PROGRAM_VERSION=1.2-RC2
 PROGRAM_BUILD=2017020802
 IS_STABLE=yes
 
-# Execution order						#__WITH_PARANOIA_DEBUG
-#	Function Name				Is parallel	#__WITH_PARANOIA_DEBUG
-
+##### Execution order						#__WITH_PARANOIA_DEBUG
+#####	Function Name				Is parallel	#__WITH_PARANOIA_DEBUG
 #	GetLocalOS				no		#__WITH_PARANOIA_DEBUG
 #	InitLocalOSDependingSettings		no		#__WITH_PARANOIA_DEBUG
 #	CheckEnvironment			no		#__WITH_PARANOIA_DEBUG
@@ -41,7 +40,6 @@ IS_STABLE=yes
 #	CleanUp					no		#__WITH_PARANOIA_DEBUG
 
 include #### OFUNCTIONS FULL SUBSET ####
-
 # If using "include" statements, make sure the script does not get executed unless it's loaded by bootstrap
 include #### _OFUNCTIONS_BOOTSTRAP SUBSET ####
 [ "$_OFUNCTIONS_BOOTSTRAP" != true ] && echo "Please use bootstrap.sh to load this dev version of $(basename $0)" && exit 1
