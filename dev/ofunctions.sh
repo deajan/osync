@@ -2,8 +2,8 @@
 #### OFUNCTIONS FULL SUBSET ####
 #### OFUNCTIONS MINI SUBSET ####
 
-_OFUNCTIONS_VERSION=2.1-RC3
-_OFUNCTIONS_BUILD=2017021003
+_OFUNCTIONS_VERSION=2.1-RC3+dev
+_OFUNCTIONS_BUILD=2017021301
 #### _OFUNCTIONS_BOOTSTRAP SUBSET ####
 _OFUNCTIONS_BOOTSTRAP=true
 #### _OFUNCTIONS_BOOTSTRAP SUBSET END ####
@@ -1296,6 +1296,12 @@ function RunRemoteCommand {
 	local command="${1}" # Command to run
 	local hardMaxTime="${2}" # Max time to wait for command to compleet
 	__CheckArguments 2 $# "$@"	#__WITH_PARANOIA_DEBUG
+
+
+	if [ "$REMOTE_OPERATION" != "yes" ]; then
+		Logger "Ignoring remote command [$command] because remote host is not configured." "WARN"
+		return 0
+	fi
 
 	CheckConnectivity3rdPartyHosts
 	CheckConnectivityRemoteHost
