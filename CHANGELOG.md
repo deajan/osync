@@ -8,6 +8,12 @@ KNOWN ISSUES
 RECENT CHANGES
 --------------
 
+dd Mmm YYYY: osync v1.2 release
+
+- Updated RPM spec file (Thanks to https://github.com/liger1978)
+- Fixed remote commands can be run on local runs and obviously fail
+- Minor fixes in installer logic
+
 10 Feb 2017: osync v1.2-RC3 release
 
 - Uninstaller skips ssh_filter if needed by other program (osync/obackup)
