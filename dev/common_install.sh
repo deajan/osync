@@ -1,14 +1,18 @@
 #!/usr/bin/env bash
 
+## Installer script suitable for osync / obackup / pmocr
+
 include #### _OFUNCTIONS_BOOTSTRAP SUBSET ####
 
-PROGRAM=[prgname]
-PROGRAM_VERSION=[version]
+PROGRAM=osync
+
+PROGRAM_VERSION=$(grep "PROGRAM_VERSION=" $PROGRAM.sh)
+PROGRAM_VERSION=${PROGRAM_VERSION#*=}
 PROGRAM_BINARY=$PROGRAM".sh"
 PROGRAM_BATCH=$PROGRAM"-batch.sh"
 SSH_FILTER="ssh_filter.sh"
 
-SCRIPT_BUILD=2017031301
+SCRIPT_BUILD=2017031401
 
 ## osync / obackup / pmocr / zsnap install script
 ## Tested on RHEL / CentOS 6 & 7, Fedora 23, Debian 7 & 8, Mint 17 and FreeBSD 8, 10 and 11

@@ -1,15 +1,15 @@
 #!/usr/bin/env bash
 
-## MERGE 2017020701
+## MERGE 2017031301
 
 ## Merges ofunctions.sh and n_program.sh into program.sh
 ## Adds installer
 
 function __PREPROCESSOR_Merge {
 	PROGRAM=osync
+
 	VERSION=$(grep "PROGRAM_VERSION=" n_$PROGRAM.sh)
 	VERSION=${VERSION#*=}
-
 	__PREPROCESSOR_Constants
 
 	source "ofunctions.sh"
@@ -126,21 +126,21 @@ function __PREPROCESSOR_CleanDebug {
 }
 
 function __PREPROCESSOR_CopyCommons {
-	sed "s/\[prgname\]/$PROGRAM/g" common_install.sh > ../tmp_install.sh
+	sed "s/\[prgname\]/$PROGRAM/g" common_install.sh > ../install.sh
 	if [ $? != 0 ]; then
 		QuickLogger "Cannot assemble install."
 		exit 1
 	fi
 
 	for subset in "${__PREPROCESSOR_SUBSETS[@]}"; do
-		__PREPROCESSOR_MergeSubset "$subset" "${subset//SUBSET/SUBSET END}" "ofunctions.sh" "../tmp_install.sh"
+		__PREPROCESSOR_MergeSubset "$subset" "${subset//SUBSET/SUBSET END}" "ofunctions.sh" "../install.sh"
 	done
 
-	sed "s/\[version\]/$VERSION/g" ../tmp_install.sh > ../install.sh
-	if [ $? != 0 ]; then
-		QuickLogger "Cannot change install version."
-		exit 1
-	fi
+	#sed "s/\[version\]/$VERSION/g" ../tmp_install.sh > ../install.sh
+	#if [ $? != 0 ]; then
+	#	QuickLogger "Cannot change install version."
+	#	exit 1
+	#fi
 	if [ -f "common_batch.sh" ]; then
 		sed "s/\[prgname\]/$PROGRAM/g" common_batch.sh > ../$PROGRAM-batch.sh
 		if [ $? != 0 ]; then
