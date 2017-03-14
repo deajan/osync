@@ -1,14 +1,18 @@
 #!/usr/bin/env bash
 
+## Installer script suitable for osync / obackup / pmocr
+
 _OFUNCTIONS_BOOTSTRAP=true
 
 PROGRAM=osync
-PROGRAM_VERSION=1.2-RC3
+
+PROGRAM_VERSION=$(grep "PROGRAM_VERSION=" $PROGRAM.sh)
+PROGRAM_VERSION=${PROGRAM_VERSION#*=}
 PROGRAM_BINARY=$PROGRAM".sh"
 PROGRAM_BATCH=$PROGRAM"-batch.sh"
 SSH_FILTER="ssh_filter.sh"
 
-SCRIPT_BUILD=2017021002
+SCRIPT_BUILD=2017031402
 
 ## osync / obackup / pmocr / zsnap install script
 ## Tested on RHEL / CentOS 6 & 7, Fedora 23, Debian 7 & 8, Mint 17 and FreeBSD 8, 10 and 11
@@ -304,8 +308,10 @@ function CopyExampleFiles {
 function CopyProgram {
 	binFiles=()
 	binFiles[0]="$PROGRAM_BINARY"
-	binFiles[1]="$PROGRAM_BATCH"
-	binFiles[2]="$SSH_FILTER"
+	if [ "$PROGRAM" == "osync" ] || [ "$PROGRAM" == "obackup" ]; then
+		binFiles[1]="$PROGRAM_BATCH"
+		binFiles[2]="$SSH_FILTER"
+	fi
 
 	local user=""
 	local group=""

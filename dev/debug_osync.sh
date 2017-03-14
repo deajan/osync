@@ -40,8 +40,8 @@ IS_STABLE=no
 #	CleanUp					no		#__WITH_PARANOIA_DEBUG
 
 
-_OFUNCTIONS_VERSION=2.1-RC3
-_OFUNCTIONS_BUILD=2017021003
+_OFUNCTIONS_VERSION=2.1-RC3+dev
+_OFUNCTIONS_BUILD=2017031301
 _OFUNCTIONS_BOOTSTRAP=true
 
 ## BEGIN Generic bash functions written in 2013-2017 by Orsiris de Jong - http://www.netpower.fr - ozy@netpower.fr
@@ -102,7 +102,7 @@ if [ "$SLEEP_TIME" == "" ]; then # Leave the possibity to set SLEEP_TIME as envi
 fi
 
 SCRIPT_PID=$$
-TSTAMP=$(date '+%Y%m%d%H%M%S%N')
+TSTAMP=$(date '+%Y%m%dT%H%M%S.%N')
 
 LOCAL_USER=$(whoami)
 LOCAL_HOST=$(hostname)
@@ -1313,6 +1313,12 @@ function RunRemoteCommand {
 	local command="${1}" # Command to run
 	local hardMaxTime="${2}" # Max time to wait for command to compleet
 	__CheckArguments 2 $# "$@"	#__WITH_PARANOIA_DEBUG
+
+
+	if [ "$REMOTE_OPERATION" != "yes" ]; then
+		Logger "Ignoring remote command [$command] because remote host is not configured." "WARN"
+		return 0
+	fi
 
 	CheckConnectivity3rdPartyHosts
 	CheckConnectivityRemoteHost
