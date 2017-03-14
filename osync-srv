@@ -21,7 +21,7 @@
 
 prog=osync
 progexec=osync.sh
-progpath=/usr/local/bin
+progpath=$(which osync.sh)
 confdir=/etc/osync
 pidfile=/var/run/$prog
 SCRIPT_BUILD=2015092701
