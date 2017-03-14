@@ -37,7 +37,7 @@ Installation
 osync has been designed to not delete any data, but rather make backups of conflictual files or soft deletes.
 Nevertheless, you should always have a neat backup of your data before trying a new sync tool.
 
-### 14 March 2017 Notice: osync v1.2 is right behind the corner. The master development version (RC3+) is what should basically become the final version. Please consider using the the master development version to help final testing. This version has also grown more stable and tested than actual stable version as of today. 
+### 14 March 2017 Notice: osync v1.2 is right behind the corner. The master development version is what should basically become the final version after three release candidates. Please consider using the master development version to help final testing. This version has also grown more stable and is deeper tested than actual stable version as of today. 
 
 
 You can download the latest stable release of osync at https://github.com/deajan/osync/archive/stable.tar.gz
