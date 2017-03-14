@@ -30,7 +30,7 @@ A robust two way (bidirectional) file sync script based on rsync with fault tole
 
 %install
 wget --no-check-certificate --timeout=5 -O %{_sourcedir}/%{name}-%{version}.zip %{gitsource}
-( cd %{_sourcedir} && unzip %{_sourcedir}/%{name}-%{version}.zip )
+( cd %{_sourcedir} && unzip -o %{_sourcedir}/%{name}-%{version}.zip )
 rm -rf ${RPM_BUILD_ROOT}
 mkdir -p ${RPM_BUILD_ROOT}%{_bindir}
 mkdir -p ${RPM_BUILD_ROOT}%{_unitdir}
@@ -39,8 +39,10 @@ install -m 755 %{_sourcedir}/%{name}-%{version}/osync-batch.sh ${RPM_BUILD_ROOT}
 install -m 0755 -d ${RPM_BUILD_ROOT}/etc/osync
 install -m 0644 %{_sourcedir}/%{name}-%{version}/sync.conf.example ${RPM_BUILD_ROOT}/etc/osync
 %if %use_systemd
+sed -i 's#/usr/local/bin#%{_bindir}#' %{_sourcedir}/%{name}-%{version}/osync-srv@.service 
 install -m 0755 %{_sourcedir}/%{name}-%{version}/osync-srv@.service ${RPM_BUILD_ROOT}%{_unitdir}
 %else
+sed -i 's#/usr/local/bin#%{_bindir}#' %{_sourcedir}/%{name}-%{version}/osync-srv 
 install -m 0755 %{_sourcedir}/%{name}-%{version}/osync-srv ${RPM_BUILD_ROOT}/etc/init.d
 %endif
 
@@ -58,6 +60,10 @@ install -m 0755 %{_sourcedir}/%{name}-%{version}/osync-srv ${RPM_BUILD_ROOT}/etc
 %doc
 
 %changelog
+* Tue Mar 14 2017 Orsiris de Jong <ozy@netpower.fr>
+- On the fly update binary path from /usr/local/bin to %{_bindir} in source service files for RPM usage
+- Allow unzip to overwrite existing source files
+
 * Wed Feb 15 2017 Richard Grainger <grainger@gmail.com>
 - Update version
 - Download source archive based on version
