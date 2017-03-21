@@ -4,7 +4,7 @@ PROGRAM="osync" # Rsync based two way sync engine with fault tolerance
 AUTHOR="(C) 2013-2017 by Orsiris de Jong"
 CONTACT="http://www.netpower.fr/osync - ozy@netpower.fr"
 PROGRAM_VERSION=1.2-RC3
-PROGRAM_BUILD=2017021001
+PROGRAM_BUILD=2017032101
 IS_STABLE=no
 
 ##### Execution order						#__WITH_PARANOIA_DEBUG
@@ -2099,6 +2099,11 @@ function SyncOnChanges {
 			Logger "No inotifywait command found. Cannot monitor changes." "CRITICAL"
 			exit 1
 		fi
+	fi
+
+	if [ ! -d "$INITIATOR_SYNC_DIR" ]; then
+		Logger "Initiator directory [$INITIATOR_SYNC_DIR] does not exist. Cannot monitor." "CRITICAL"
+		exit 1
 	fi
 
 	Logger "#### Running osync in file monitor mode." "NOTICE"
