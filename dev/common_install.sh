@@ -12,7 +12,7 @@ PROGRAM_BINARY=$PROGRAM".sh"
 PROGRAM_BATCH=$PROGRAM"-batch.sh"
 SSH_FILTER="ssh_filter.sh"
 
-SCRIPT_BUILD=2017031403
+SCRIPT_BUILD=2017032101
 
 ## osync / obackup / pmocr / zsnap install script
 ## Tested on RHEL / CentOS 6 & 7, Fedora 23, Debian 7 & 8, Mint 17 and FreeBSD 8, 10 and 11
@@ -283,6 +283,7 @@ function Usage {
 	echo "options:"
 	echo "--silent		Will log and bypass user interaction."
 	echo "--no-stats	Used with --silent in order to refuse sending anonymous install stats."
+	echo "--remove          Remove the program."
 	exit 127
 }
 
