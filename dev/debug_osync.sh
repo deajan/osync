@@ -3,9 +3,9 @@
 PROGRAM="osync" # Rsync based two way sync engine with fault tolerance
 AUTHOR="(C) 2013-2017 by Orsiris de Jong"
 CONTACT="http://www.netpower.fr/osync - ozy@netpower.fr"
-PROGRAM_VERSION=1.2-RC3
-PROGRAM_BUILD=2017021001
-IS_STABLE=no
+PROGRAM_VERSION=1.2
+PROGRAM_BUILD=2017032101
+IS_STABLE=yes
 
 ##### Execution order						#__WITH_PARANOIA_DEBUG
 #####	Function Name				Is parallel	#__WITH_PARANOIA_DEBUG
@@ -40,8 +40,8 @@ IS_STABLE=no
 #	CleanUp					no		#__WITH_PARANOIA_DEBUG
 
 
-_OFUNCTIONS_VERSION=2.1-RC3+dev
-_OFUNCTIONS_BUILD=2017031301
+_OFUNCTIONS_VERSION=2.1
+_OFUNCTIONS_BUILD=2017032301
 _OFUNCTIONS_BOOTSTRAP=true
 
 ## BEGIN Generic bash functions written in 2013-2017 by Orsiris de Jong - http://www.netpower.fr - ozy@netpower.fr
@@ -1144,7 +1144,7 @@ function GetLocalOS {
 		*"BSD"*)
 		LOCAL_OS="BSD"
 		;;
-		*"MINGW32"*|*"MSYS"*)
+		*"MINGW32"*|*"MINGW64"*|*"MSYS"*)
 		LOCAL_OS="msys"
 		;;
 		*"CYGWIN"*)
@@ -1243,7 +1243,7 @@ ENDSSH
 			*"BSD"*)
 			REMOTE_OS="BSD"
 			;;
-			*"MINGW32"*|*"MSYS"*)
+			*"MINGW32"*|*"MINGW64"*|*"MSYS"*)
 			REMOTE_OS="msys"
 			;;
 			*"CYGWIN"*)
@@ -4366,6 +4366,11 @@ function SyncOnChanges {
 			Logger "No inotifywait command found. Cannot monitor changes." "CRITICAL"
 			exit 1
 		fi
+	fi
+
+	if [ ! -d "$INITIATOR_SYNC_DIR" ]; then
+		Logger "Initiator directory [$INITIATOR_SYNC_DIR] does not exist. Cannot monitor." "CRITICAL"
+		exit 1
 	fi
 
 	Logger "#### Running osync in file monitor mode." "NOTICE"
