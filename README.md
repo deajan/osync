@@ -37,15 +37,19 @@ Installation
 osync has been designed to not delete any data, but rather make backups of conflictual files or soft deletes.
 Nevertheless, you should always have a neat backup of your data before trying a new sync tool.
 
-### 14 March 2017 Notice: osync v1.2 is right behind the corner. The master development version is what should basically become the final version after three release candidates. Please consider using the master development version to help final testing. This version has also grown more stable and is deeper tested than actual stable version as of today. 
+You may get osync on the author's site (stable version) or on github (stable or latest dev snapshot)
+Getting osync via author's site on **http://www.netpower.fr/osync**
 
-You may also get the last development version at https://github.com/deajan/osync with the following command
+	$ wget http://www.netpower.fr/projects/osync/osync.v1.2.tar.gz
+	$ tar xvf osync.v1.2.tar.gz
 
-	$ git clone https://github.com/deajan/osync
+Getting osync via github (remove the -b "stable" if you want latest dev snapshot)
+
+	$ git clone -b "stable" https://github.com/deajan/osync
 	$ cd osync
 	$ bash install.sh
 
-You can download the latest stable release of osync at https://github.com/deajan/osync/archive/stable.tar.gz
+There are also some RPM files round the corner I'll try to build quicky. Please note that RPM files will install osync to /usr/bin instead of /usr/bin in order to enforce good practices.
 
 osync will install itself to /usr/local/bin and an example configuration file will be installed to /etc/osync
 
@@ -188,5 +192,5 @@ The installer script also has an uninstall mode that will keep configuration fil
 
 Author
 ------
-Feel free to mail me for limited support in my free time :)
+Feel free to open an issue on github or mail me for support in my spare time :)
 Orsiris de Jong | ozy@netpower.fr
