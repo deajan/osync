@@ -4,6 +4,8 @@ A two way filesync script running on bash Llinux, BSD, Android, MacOSX, Cygwin, 
 File synchronization is bidirectional, and can be run manually, as scheduled task, or triggered on file changes in deamon mode.
 It is a command line tool rsync wrapper with a lot of additional features baked in.
 
+This is a quickstart guide, you can find the full documentation on the author's site.
+
 About
 -----
 osync provides the following capabilities
