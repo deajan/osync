@@ -93,15 +93,15 @@
 \begin_body
 
 \begin_layout Title
-osync v1.2RC1 Documentation
+osync v1.2 Documentation
 \end_layout
 
 \begin_layout Author
-(C) 2013-2016 by Orsiris de Jong
+(C) 2013-2017 by Orsiris de Jong
 \end_layout
 
 \begin_layout Date
-12 December 2016
+25 March 2017
 \end_layout
 
 \begin_layout Standard
@@ -293,9 +293,10 @@ You may run osync manually, schedule it with cron, or have it monitor a
 \end_layout
 
 \begin_layout Standard
-osync has been deeply tested on RHEL / CentOS 5, 6 & 7, Debian 6, 7, & 8,
- Linux Mint 14, 17 & 18, FreeBSD 8.3, 10.3 & 11, pfSense 2.x, Mac OS X, Android
- using termux, Windows 10 bash, and msys2 & cygwin environments.
+osync has been deeply tested on RHEL / CentOS 5, 6 & 7, Fedora 23, 24 &
+ 25, Debian 6, 7, & 8, Linux Mint 14, 17 & 18, FreeBSD 8.3, 10.3 & 11, pfSense
+ 2.x, Mac OS X, Android using termux, Windows 10 bash, and msys / msys2 &
+ cygwin environments.
 \end_layout
 
 \begin_layout Subsubsection
@@ -630,6 +631,16 @@ Note that openssh-clients are only needed on local machine if connecting
  of RSA keys.
 \end_layout
 
+\begin_layout Standard
+The sudo package is only needed if you plan to run osync remotely with a
+ standard user that gets sudo privileges.
+\end_layout
+
+\begin_layout Standard
+Also, inotify-tools / fswatch  is only needed if you plan to run osync in
+ daemon mode (wherever inotify-tools is available).
+\end_layout
+
 \begin_layout Itemize
 RHEL / CentOS
 \end_layout
@@ -642,7 +653,7 @@ status open
 
 \begin_layout Plain Layout
 
-yum install rsync coreutils openssh-clients sshpass
+yum install rsync coreutils openssh-clients sshpass inotify-tools
 \end_layout
 
 \end_inset
@@ -663,7 +674,7 @@ status open
 
 \begin_layout Plain Layout
 
-apt-get install rsync openssh-client sshpass
+apt-get install rsync openssh-client sshpass inotify-tools
 \end_layout
 
 \end_inset
@@ -684,7 +695,7 @@ status open
 
 \begin_layout Plain Layout
 
-pkg install bash rsync sshpass
+pkg install bash rsync sshpass inotify-tools sudo
 \end_layout
 
 \end_inset
@@ -694,7 +705,28 @@ pkg install bash rsync sshpass
 
 \end_deeper
 \begin_layout Itemize
-MSYS2
+MacOS X
+\end_layout
+
+\begin_deeper
+\begin_layout Itemize
+\begin_inset listings
+inline false
+status open
+
+\begin_layout Plain Layout
+
+brew install rsync fswatch	
+\end_layout
+
+\end_inset
+
+
+\end_layout
+
+\end_deeper
+\begin_layout Itemize
+MSYS (use management interface to install tools)
 \end_layout
 
 \begin_deeper
@@ -715,7 +747,7 @@ msys-base msys-coreutils-ext msys-rsync procps openssh-client
 
 \end_deeper
 \begin_layout Itemize
-Cygwin
+MSYS2
 \end_layout
 
 \begin_deeper
@@ -726,7 +758,28 @@ status open
 
 \begin_layout Plain Layout
 
-rsync procps openssh
+pacman -S rsync procps openssh-client
+\end_layout
+
+\end_inset
+
+
+\end_layout
+
+\end_deeper
+\begin_layout Itemize
+Cygwin (use management interface to install tools)
+\end_layout
+
+\begin_deeper
+\begin_layout Itemize
+\begin_inset listings
+inline false
+status open
+
+\begin_layout Plain Layout
+
+rsync procps-ng openssh wget
 \end_layout
 
 \end_inset
@@ -890,6 +943,131 @@ brew install fswatch
 \end_layout
 
 \begin_layout Subsection
+Downloading osync
+\end_layout
+
+\begin_layout Standard
+osync can be downloaded on the author's site (stable version) or on github
+ (stable or latest dev snapshot).
+\end_layout
+
+\begin_layout Standard
+Getting osync via author's site
+\end_layout
+
+\begin_layout Standard
+\begin_inset listings
+inline false
+status open
+
+\begin_layout Plain Layout
+
+wget http://netpower.fr/projects/osync/osync.v1.2.tar.gz
+\end_layout
+
+\begin_layout Plain Layout
+
+tar xvf osync.v1.2.tar.gz
+\end_layout
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Standard
+Getting osync via github (remove the -b 
+\begin_inset Quotes sld
+\end_inset
+
+stable
+\begin_inset Quotes srd
+\end_inset
+
+ if you want latest dev snapshot)
+\end_layout
+
+\begin_layout Standard
+\begin_inset listings
+inline false
+status open
+
+\begin_layout Plain Layout
+
+git clone -b "stable" https://github.com/deajan/osync
+\end_layout
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Standard
+On Linux / BSD / Windows 10 bash, Once you downloaded osync, enter into
+ the newly created folder and run the install script
+\end_layout
+
+\begin_layout Standard
+\begin_inset listings
+inline false
+status open
+
+\begin_layout Plain Layout
+
+bash ./install.sh
+\end_layout
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Standard
+This will copy osync to /usr/local/bin and create /etc/osync with a test
+ sync.conf file.
+\end_layout
+
+\begin_layout Standard
+It will also copy daemon required files to /etc/init.d or /usr/lib/systemd/system
+ and /etc/systemd/user depending on your distribution.
+\end_layout
+
+\begin_layout Standard
+On MacOS X, msys, Cygwin and termux (Android), you may directly use osync.sh
+ script.
+\end_layout
+
+\begin_layout Standard
+Uninsalling is done by using
+\end_layout
+
+\begin_layout Standard
+\begin_inset listings
+inline false
+status open
+
+\begin_layout Plain Layout
+
+bash ./install.sh --remove
+\end_layout
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Standard
+There is also an RPM package available for Fedora & CentOS, which will install
+ all binaries to /usr/bin instead of /usr/local/bin in order to enforce
+ good practices.
+\end_layout
+
+\begin_layout Subparagraph
+Please note that when using the RPM packages, the binaries paths in this
+ document shall be read as /usr/bin instead of /usr/local/bin.
+\end_layout
+
+\begin_layout Subsection
 File synchronization
 \end_layout
 
@@ -989,8 +1167,9 @@ Performing superuser sync
 \end_layout
 
 \begin_layout Standard
-osync can be run as superuser, which should always be avoided by granting
- the read / write permissions to a dedicated sync user to both replicas.
+osync can be run as superuser on the remote side, which should always be
+ avoided by granting the read / write permissions to a dedicated sync user
+ to both replicas.
 \end_layout
 
 \begin_layout Standard
@@ -1006,9 +1185,8 @@ In those cases, osync can be run as dedicated sync user and ask for sudo
 
 \begin_layout Standard
 In order to be able to use the sudo command without having to enter a password,
- you’ll need to modify the local and / or remote system to allow the following
- commands to be run as superuser: rsync, du, find, mkdir, rm, echo, mv,
- tee and cat.
+ you’ll need to modify remote system to allow the following commands to
+ be run as superuser.
 \end_layout
 
 \begin_layout Standard
@@ -1023,47 +1201,7 @@ status open
 
 \begin_layout Plain Layout
 
-syncuser ALL= NOPASSWD:/usr/bin/rsync
-\end_layout
-
-\begin_layout Plain Layout
-
-syncuser ALL= NOPASSWD:/usr/bin/du
-\end_layout
-
-\begin_layout Plain Layout
-
-syncuser ALL= NOPASSWD:/bin/find
-\end_layout
-
-\begin_layout Plain Layout
-
-syncuser ALL= NOPASSWD:/bin/mkdir
-\end_layout
-
-\begin_layout Plain Layout
-
-syncuser ALL= NOPASSWD:/bin/rm
-\end_layout
-
-\begin_layout Plain Layout
-
-syncuser ALL= NOPASSWD:/bin/mv
-\end_layout
-
-\begin_layout Plain Layout
-
-syncuser ALL= NOPASSWD:/bin/echo
-\end_layout
-
-\begin_layout Plain Layout
-
-syncuser ALL= NOPASSWD:/bin/cat
-\end_layout
-
-\begin_layout Plain Layout
-
-syncuser ALL= NOPASSWD:/usr/bin/tee
+syncuser ALL= NOPASSWD:SETENV:/usr/bin/rsync,/usr/bin/bash
 \end_layout
 
 \end_inset
@@ -1072,8 +1210,14 @@ syncuser ALL= NOPASSWD:/usr/bin/tee
 \end_layout
 
 \begin_layout Standard
-You might check the right paths to your commands (example to get path for
- rsync executable): 
+Please note that the SETENV parameter is required so osync can send it's
+ local variables as remote environment variables (equals sudo -E).
+\end_layout
+
+\begin_layout Standard
+You might check the right paths to your commands, especially on some FreeBSD
+ environments where rsync might be in /usr/local/bin instead of /usr/bin
+ (example to get path for rsync executable): 
 \end_layout
 
 \begin_layout Standard
@@ -1487,7 +1631,7 @@ status open
 
 \begin_layout Plain Layout
 
-command="/usr/local/bin/ssh_filter.sh"
+command="/usr/local/bin/ssh_filter.sh SomeAlphaNumericToken9"
 \end_layout
 
 \end_inset
@@ -1508,8 +1652,8 @@ status open
 \begin_layout Plain Layout
 
 from="*.mydomain.tld",no-port-forwarding,no-X11-forwarding,no-agent-forwarding,no-
-pty,command="/usr/local/bin/ssh_filter.sh" ssh-rsa yourkey== syncuser@remotesyste
-m.tld 
+pty,command="/usr/local/bin/ssh_filter.sh SomeAlphaNumericToken9" ssh-rsa
+ yourkey== syncuser@remotesystem.tld 
 \end_layout
 
 \end_inset
@@ -1543,17 +1687,10 @@ status open
 \end_layout
 
 \begin_layout Standard
-Now, only the commands 
-\begin_inset Quotes eld
-\end_inset
-
-find, du, rsync, echo, mv, mkdir and sudo
-\begin_inset Quotes erd
-\end_inset
-
- may be executed via the ssh tunnel.
+Now, only the commands send by osync including a specific remote token may
+ be executed via the ssh tunnel.
  You may enable / disable the usage of sudo command by editing the following
- value in the ssh_filter.sh script:
+ value in the ssh_filter.sh script as well as in the osync config file:
 \end_layout
 
 \begin_layout Standard
@@ -1571,12 +1708,9 @@ SUDO_EXEC=yes
 
 \end_layout
 
-\begin_layout Standard
-Also, adding remote pre- and postexecution commands in your configuration
- files will not work if you use the ssh filter.
- You'll have to add your optional commands in ssh_filter.sh.
- Example if you want to perform remote snapshots you'll have to allow one
- of the following:
+\begin_layout Subparagraph
+The remote token can be set in the config file and must match the one setup
+ in authorized_keys file.
 \end_layout
 
 \begin_layout Standard
@@ -1586,17 +1720,26 @@ status open
 
 \begin_layout Plain Layout
 
-CMD1=zfs
+_REMOTE_TOKEN=SomeAlphaNumericToken9
 \end_layout
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Standard
+You may also set it on the fly in quicksync mode with the parameter
+\end_layout
+
+\begin_layout Standard
+\begin_inset listings
+inline false
+status open
 
 \begin_layout Plain Layout
 
-CMD2=xfs
-\end_layout
-
-\begin_layout Plain Layout
-
-CMD3=lvm
+osync.sh --remote-token=SomeAlphaNumericToken9
 \end_layout
 
 \end_inset
@@ -1649,7 +1792,7 @@ status open
 \end_layout
 
 \begin_layout Standard
-Now edit ssh_filter.sh and change the following value:
+Now edit the osync config file and change the following value:
 \end_layout
 
 \begin_layout Standard
@@ -1667,109 +1810,8 @@ RSYNC_EXECUTABLE=o_rsync
 
 \end_layout
 
-\begin_layout Standard
-Also, edit RSYNC_EXECUTABLE value on any of your sync configuration files
- and you're done.
- 
-\end_layout
-
 \begin_layout Section
-Getting and running osync
-\end_layout
-
-\begin_layout Subsection
-Downloading osync
-\end_layout
-
-\begin_layout Standard
-osync can be downloaded on the author's site (stable version) or on github
- (stable or latest dev snapshot).
-\end_layout
-
-\begin_layout Standard
-Getting osync via author's site
-\end_layout
-
-\begin_layout Standard
-\begin_inset listings
-inline false
-status open
-
-\begin_layout Plain Layout
-
-wget http://netpower.fr/projects/osync/osync.v1.2RC1.tar.gz
-\end_layout
-
-\begin_layout Plain Layout
-
-tar xvf osync.v1.2RC1.tar.gz
-\end_layout
-
-\end_inset
-
-
-\end_layout
-
-\begin_layout Standard
-Getting osync via github (remove the -b 
-\begin_inset Quotes sld
-\end_inset
-
-v1.00a
-\begin_inset Quotes srd
-\end_inset
-
- if you want latest dev snapshot)
-\end_layout
-
-\begin_layout Standard
-\begin_inset listings
-inline false
-status open
-
-\begin_layout Plain Layout
-
-git clone -b "v1.2RC1" https://github.com/deajan/osync
-\end_layout
-
-\end_inset
-
-
-\end_layout
-
-\begin_layout Standard
-On Linux / BSD / Windows 10 bash, Once you downloaded osync, enter into
- the newly created folder and run the install script
-\end_layout
-
-\begin_layout Standard
-\begin_inset listings
-inline false
-status open
-
-\begin_layout Plain Layout
-
-bash ./install.sh
-\end_layout
-
-\end_inset
-
-
-\end_layout
-
-\begin_layout Standard
-This will copy osync to /usr/local/bin and create /etc/osync with a test
- sync.conf file.
-\end_layout
-
-\begin_layout Standard
-It will also copy daemon required files to /etc/init.d or /usr/lib/systemd/system
- and /etc/systemd/user depending on your distribution.
-\end_layout
-
-\begin_layout Standard
-On MacOS X, msys, Cygwin and termux (Android), you may directly use osync.sh
- script.
+Running osync
 \end_layout
 
 \begin_layout Subsection
@@ -2193,6 +2235,23 @@ status open
 
 \end_inset
 
+
+\end_layout
+
+\begin_layout Subparagraph
+Please note that this syntax works on RedHat / CentOS.
+ On Debian you might need to remove the usename 
+\begin_inset Quotes sld
+\end_inset
+
+ie syncuser
+\begin_inset Quotes srd
+\end_inset
+
+ in order to make the crontab line work.
+\end_layout
+
+\begin_layout Standard
 You may find the sync log under /var/log/osync-your_sync.log or under the
  current directory if /var/log is not writable.
 \end_layout
@@ -2865,6 +2924,26 @@ SSH_PASSWORD_FILE=/home/syncuser/path/to/passwd
 \end_layout
 
 \begin_layout Standard
+When using ssh_filter security, you need to specify a remote token matching
+ the one setup in remote authorized_keys file
+\end_layout
+
+\begin_layout Standard
+\begin_inset listings
+inline false
+status open
+
+\begin_layout Plain Layout
+
+_REMOTE_TOKEN=SomeAlphaNumericToken9
+\end_layout
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Standard
 Tells osync to create initiator or target directories if they don't exist.
  Default is no.
 \end_layout
@@ -2886,7 +2965,7 @@ CREATE_DIRS=yes|no
 
 \begin_layout Standard
 By default, leaving this empty sets the log file to /var/log/osync_INSTANCE_ID.lo
-g.
+g or ./osync_INSTANCE_ID.log if /var/log is not writable.
  You might change this to specify a personalized log file.
 \end_layout
 
@@ -3016,7 +3095,7 @@ status open
 
 \begin_layout Plain Layout
 
-REMOTE_RSYNC_PATH=""
+RSYNC_REMOTE_PATH=""
 \end_layout
 
 \end_inset
@@ -3215,7 +3294,10 @@ Misc settings
 
 \begin_layout Standard
 Optional arguments to pass to rsync.
- Do not use already managed parameters by rsync.
+ Do not use already managed parameters by rsync (-r -l -p -t -g -o -D -E
+ - u- i- n --executability -A -X -L -K -H -8 -zz –skip-compress –checksum
+ –bwlimit –partial –partial-dir –no-whole-file –whole-file –backup –backup-dir
+ –suffix --exclude --exclude-from --include --include-from --list-only --stats)
 \end_layout
 
 \begin_layout Standard
@@ -3787,6 +3869,32 @@ Alert Options
 \end_layout
 
 \begin_layout Standard
+Optional mail body encoding (using iconv).
+\end_layout
+
+\begin_layout Standard
+By default, all mails are sent in UTF-8 format without header (because of
+ maximum compatibility of all platforms).
+ You may specify an optional encoding here (like "ISO-8859-1" or whatever
+ iconv can handle)
+\end_layout
+
+\begin_layout Standard
+\begin_inset listings
+inline false
+status open
+
+\begin_layout Plain Layout
+
+MAIL_BODY_CHARSET=""
+\end_layout
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Standard
 List of alert mails separated by spaces
 \end_layout
 
@@ -4098,8 +4206,8 @@ Log inludes a prefix (normally TIME) which indicates since how much seconds
 \end_layout
 
 \begin_layout Standard
-When some commands get run remotely, prefix is RTIME and indicates since
- how much seconds osync runs a specific remote task.
+When some commands get run remotely it will indicate how much seconds osync
+ runs a specific remote task, beginning from 0 at every remote task.
 \end_layout
 
 \begin_layout Standard
