@@ -962,12 +962,12 @@ status open
 
 \begin_layout Plain Layout
 
-wget http://netpower.fr/projects/osync/osync.v1.2.tar.gz
+$ wget http://netpower.fr/projects/osync/osync.v1.2.tar.gz
 \end_layout
 
 \begin_layout Plain Layout
 
-tar xvf osync.v1.2.tar.gz
+$ tar xvf osync.v1.2.tar.gz
 \end_layout
 
 \end_inset
@@ -994,7 +994,7 @@ status open
 
 \begin_layout Plain Layout
 
-git clone -b "stable" https://github.com/deajan/osync
+$ git clone -b "stable" https://github.com/deajan/osync
 \end_layout
 
 \end_inset
@@ -1014,7 +1014,7 @@ status open
 
 \begin_layout Plain Layout
 
-bash ./install.sh
+$ bash ./install.sh
 \end_layout
 
 \end_inset
@@ -1048,7 +1048,7 @@ status open
 
 \begin_layout Plain Layout
 
-bash ./install.sh --remove
+$ bash ./install.sh --remove
 \end_layout
 
 \end_inset
@@ -1227,7 +1227,7 @@ status open
 
 \begin_layout Plain Layout
 
-# type rsync
+$ type rsync
 \end_layout
 
 \end_inset
@@ -1739,7 +1739,7 @@ status open
 
 \begin_layout Plain Layout
 
-osync.sh --remote-token=SomeAlphaNumericToken9
+$ osync.sh --remote-token=SomeAlphaNumericToken9
 \end_layout
 
 \end_inset
@@ -2410,7 +2410,7 @@ status open
 
 \begin_layout Plain Layout
 
-# ./osync.sh /path/to/sync.conf --errors-only --summary --no-prefix
+$ ./osync.sh /path/to/sync.conf --errors-only --summary --no-prefix
 \end_layout
 
 \end_inset
@@ -2768,7 +2768,7 @@ status open
 
 \begin_layout Plain Layout
 
-PRESERVE_ACL=yes PRESERVE_XATTR=yes ./osync.sh
+$ PRESERVE_ACL=yes PRESERVE_XATTR=yes ./osync.sh
 \end_layout
 
 \end_inset
@@ -4270,7 +4270,7 @@ status open
 
 \begin_layout Plain Layout
 
-DEBUG=yes /usr/local/bin/osync.sh /etc/osync/my_sync.conf --verbose
+$ DEBUG=yes /usr/local/bin/osync.sh /etc/osync/my_sync.conf --verbose
 \end_layout
 
 \end_inset
@@ -4353,7 +4353,7 @@ status open
 
 \begin_layout Plain Layout
 
-systemctl status osync-srv@configfile
+# systemctl status osync-srv@configfile
 \end_layout
 
 \end_inset
@@ -4372,7 +4372,7 @@ status open
 
 \begin_layout Plain Layout
 
-journalctl -xn
+# journalctl -xn
 \end_layout
 
 \end_inset
