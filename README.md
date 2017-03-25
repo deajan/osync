@@ -122,6 +122,8 @@ Once you're confident about your fist runs, you may add osync as cron task like 
 
 	*/30 * * * * root /usr/local/bin/osync.sh /etc/osync/my_sync.conf --silent
 
+Please note that this syntax works for RedHat / CentOS. On Debian you might want to remove the username (ie root) in order to make the crontab entry work.
+
 Batch mode
 ----------
 You may want to sequentially run multiple sync sets between the same servers. In that case, osync-batch.sh is a nice tool that will run every osync conf file, and, if a task fails,
