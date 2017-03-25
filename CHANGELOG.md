@@ -1,15 +1,9 @@
-KNOWN ISSUES
-------------
-
-- Cannot finish sync if one replica contains a directory and the other replica contains a file named the same way (Unix doesn't allow this)
-- Soft deletion does not honor exclusion lists
-! colors don't work in mac shell
-
 RECENT CHANGES
 --------------
 
-dd Mmm YYYY: osync v1.2 release
+25 March 2017: osync v1.2 release (for full changelog of v1.2 branch see all v1.2-beta/RC entries)
 
+- Check for initiator directory before launching monitor mode
 - Updated RPM spec file (Thanks to https://github.com/liger1978)
 - Fixed remote commands can be run on local runs and obviously fail
 - Minor fixes in installer logic
