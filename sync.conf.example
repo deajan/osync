@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 
 ###### osync - Rsync based two way sync engine with fault tolerance
-###### (C) 2013-2016 by Orsiris de Jong (www.netpower.fr)
+###### (C) 2013-2017 by Orsiris de Jong (www.netpower.fr)
 ###### osync v1.1x / v1.2x config file rev 2017020801
 
 ## ---------- GENERAL OPTIONS
@@ -83,7 +83,8 @@ REMOTE_3RD_PARTY_HOSTS="www.kernel.org www.google.com"
 ## ---------- MISC OPTIONS
 
 ## Optional arguments passed to rsync executable. The following are already managed by the program and shoul never be passed here
-## -rltD -n -P -o -g --executability -A -X -zz -L -K -H -8 -u -i --stats --checksum --bwlimit --partial --partial-dir --exclude --exclude-from --include--from --no-whole-file --whole-file --list-only
+## -r -l -p -t -g -o -D -E - u- i- n --executability -A -X -L -K -H -8 -zz –skip-compress –checksum –bwlimit –partial –partial-dir –no-whole-file –whole-file –backup –backup-dir –suffix
+## --exclude --exclude-from --include --include-from --list-only --stats
 RSYNC_OPTIONAL_ARGS=""
 
 ## Preserve basic linux permissions
