@@ -61,7 +61,8 @@ If bash is not your default shell, you may invoke it using
 	$ bash osync.sh [options]
 
 On *BSD and BusyBox, be sure to have bash installed.
-On MSYS, On top of your basic install, you need msys-rsync and msys-coreutils-ext packages.
+
+If you can't install osync, you may just copy osync.sh where you needed and run it from there.
 
 Archlinux packages are available at https://aur.archlinux.org/packages/osync/ (thanks to Shadowigor, https://github.com/shadowigor)
 
