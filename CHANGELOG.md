@@ -1,7 +1,11 @@
 RECENT CHANGES
 --------------
 
-25 March 2017: osync v1.2 release (for full changelog of v1.2 branch see all v1.2-beta/RC entries)
+dd Mmm YYYY:
+
+- Fixed low severity security issue where log and run files could be read by other users
+
+25 Mar 2017: osync v1.2 release (for full changelog of v1.2 branch see all v1.2-beta/RC entries)
 
 - Check for initiator directory before launching monitor mode
 - Updated RPM spec file (Thanks to https://github.com/liger1978)
