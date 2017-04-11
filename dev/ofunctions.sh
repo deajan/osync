@@ -3,7 +3,7 @@
 #### OFUNCTIONS MINI SUBSET ####
 
 _OFUNCTIONS_VERSION=2.1.1
-_OFUNCTIONS_BUILD=2017040801
+_OFUNCTIONS_BUILD=2017041001
 #### _OFUNCTIONS_BOOTSTRAP SUBSET ####
 _OFUNCTIONS_BOOTSTRAP=true
 #### _OFUNCTIONS_BOOTSTRAP SUBSET END ####
@@ -264,7 +264,7 @@ function Logger {
 		return
 	elif [ "$level" == "VERBOSE" ]; then
 		if [ $_LOGGER_VERBOSE == true ]; then
-			_Logger "$prefix:$value" "$prefix$value"
+			_Logger "$prefix($level):$value" "$prefix$value"
 		fi
 		return
 	elif [ "$level" == "ALWAYS" ]; then
@@ -1169,6 +1169,62 @@ function GetLocalOS {
 }
 #### GetLocalOS SUBSET END ####
 
+#__BEGIN_WITH_PARANOIA_DEBUG
+function __CheckArguments {
+	# Checks the number of arguments of a function and raises an error if some are missing
+
+	if [ "$_DEBUG" == "yes" ]; then
+		local numberOfArguments="${1}" # Number of arguments the tested function should have, can be a number of a range, eg 0-2 for zero to two arguments
+		local numberOfGivenArguments="${2}" # Number of arguments that have been passed
+
+		local minArgs
+		local maxArgs
+
+		# All arguments of the function to check are passed as array in ${3} (the function call waits for $@)
+		# If any of the arguments contains spaces, bash things there are two aguments
+		# In order to avoid this, we need to iterate over ${3} and count
+
+		callerName="${FUNCNAME[1]}"
+
+		local iterate=3
+		local fetchArguments=true
+		local argList=""
+		local countedArguments
+		while [ $fetchArguments == true ]; do
+			cmd='argument=${'$iterate'}'
+			eval $cmd
+			if [ "$argument" == "" ]; then
+				fetchArguments=false
+			else
+				argList="$argList[Argument $((iterate-2)): $argument] "
+				iterate=$((iterate+1))
+			fi
+		done
+
+		countedArguments=$((iterate-3))
+
+		if [ $(IsInteger "$numberOfArguments") -eq 1 ]; then
+			minArgs=$numberOfArguments
+			maxArgs=$numberOfArguments
+		else
+			IFS='-' read minArgs maxArgs <<< "$numberOfArguments"
+		fi
+
+		Logger "Entering function [$callerName]." "PARANOIA_DEBUG"
+
+		if ! ([ $countedArguments -ge $minArgs ] && [ $countedArguments -le $maxArgs ]); then
+			Logger "Function $callerName may have inconsistent number of arguments. Expected min: $minArgs, max: $maxArgs, count: $countedArguments, bash seen: $numberOfGivenArguments." "ERROR"
+			Logger "$callerName arguments: $argList" "ERROR"
+		else
+			if [ ! -z "$argList" ]; then
+				Logger "$callerName arguments: $argList" "PARANOIA_DEBUG"
+			fi
+		fi
+	fi
+}
+
+#__END_WITH_PARANOIA_DEBUG
+
 #### OFUNCTIONS MINI SUBSET END ####
 
 function GetRemoteOS {
@@ -1424,62 +1480,6 @@ function CheckConnectivity3rdPartyHosts {
 		fi
 	fi											#__WITH_PARANOIA_DEBUG
 }
-
-#__BEGIN_WITH_PARANOIA_DEBUG
-function __CheckArguments {
-	# Checks the number of arguments of a function and raises an error if some are missing
-
-	if [ "$_DEBUG" == "yes" ]; then
-		local numberOfArguments="${1}" # Number of arguments the tested function should have, can be a number of a range, eg 0-2 for zero to two arguments
-		local numberOfGivenArguments="${2}" # Number of arguments that have been passed
-
-		local minArgs
-		local maxArgs
-
-		# All arguments of the function to check are passed as array in ${3} (the function call waits for $@)
-		# If any of the arguments contains spaces, bash things there are two aguments
-		# In order to avoid this, we need to iterate over ${3} and count
-
-		callerName="${FUNCNAME[1]}"
-
-		local iterate=3
-		local fetchArguments=true
-		local argList=""
-		local countedArguments
-		while [ $fetchArguments == true ]; do
-			cmd='argument=${'$iterate'}'
-			eval $cmd
-			if [ "$argument" == "" ]; then
-				fetchArguments=false
-			else
-				argList="$argList[Argument $((iterate-2)): $argument] "
-				iterate=$((iterate+1))
-			fi
-		done
-
-		countedArguments=$((iterate-3))
-
-		if [ $(IsInteger "$numberOfArguments") -eq 1 ]; then
-			minArgs=$numberOfArguments
-			maxArgs=$numberOfArguments
-		else
-			IFS='-' read minArgs maxArgs <<< "$numberOfArguments"
-		fi
-
-		Logger "Entering function [$callerName]." "PARANOIA_DEBUG"
-
-		if ! ([ $countedArguments -ge $minArgs ] && [ $countedArguments -le $maxArgs ]); then
-			Logger "Function $callerName may have inconsistent number of arguments. Expected min: $minArgs, max: $maxArgs, count: $countedArguments, bash seen: $numberOfGivenArguments." "ERROR"
-			Logger "$callerName arguments: $argList" "ERROR"
-		else
-			if [ ! -z "$argList" ]; then
-				Logger "$callerName arguments: $argList" "PARANOIA_DEBUG"
-			fi
-		fi
-	fi
-}
-
-#__END_WITH_PARANOIA_DEBUG
 
 function RsyncPatternsAdd {
 	local patternType="${1}"	# exclude or include
@@ -1829,12 +1829,16 @@ function ParentPid {
 	fi
 }
 
+#### VerComp SUBSET ####
 # Neat version compare function found at http://stackoverflow.com/a/4025065/2635443
 # Returns 0 if equal, 1 if $1 > $2 and 2 if $1 < $2
-vercomp () {
+function VerComp () {
+	local result
+
     if [[ $1 == $2 ]]
     then
-        return 0
+	echo 0
+        return
     fi
     local IFS=.
     local i ver1=($1) ver2=($2)
@@ -1852,15 +1856,20 @@ vercomp () {
         fi
         if ((10#${ver1[i]} > 10#${ver2[i]}))
         then
-            return 1
+		echo 1
+		return
         fi
         if ((10#${ver1[i]} < 10#${ver2[i]}))
         then
-            return 2
+		echo 2
+            	return
         fi
     done
-    return 0
+
+    	echo 0
+	return
 }
+#### VerComp SUBSET END ####
 
 #### GetConfFileValue SUBSET ####
 function GetConfFileValue () {
@@ -1895,5 +1904,28 @@ function SetConfFileValue () {
         fi
 }
 #### SetConfFileValue SUBSET END ####
+
+# Function can replace [ -f /some/file* ] tests
+# Modified version of http://stackoverflow.com/a/6364244/2635443
+function WildcardFileExists () {
+        local file="${1}"
+        local exists=0
+
+        for f in $file; do
+                ## Check if the glob gets expanded to existing files.
+                ## If not, f here will be exactly the pattern above
+                ## and the exists test will evaluate to false.
+                if [ -e "$f" ]; then
+                        exists=1
+                        break
+                fi
+        done
+
+        if [ $exists -eq 1 ]; then
+                echo 1
+        else
+                echo 0
+        fi
+}
 
 #### OFUNCTIONS FULL SUBSET END ####
