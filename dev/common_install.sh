@@ -12,7 +12,7 @@ PROGRAM_BINARY=$PROGRAM".sh"
 PROGRAM_BATCH=$PROGRAM"-batch.sh"
 SSH_FILTER="ssh_filter.sh"
 
-SCRIPT_BUILD=2017040902
+SCRIPT_BUILD=2017041701
 
 ## osync / obackup / pmocr / zsnap install script
 ## Tested on RHEL / CentOS 6 & 7, Fedora 23, Debian 7 & 8, Mint 17 and FreeBSD 8, 10 and 11
@@ -330,7 +330,9 @@ else
 	CreateDir "$BIN_DIR"
 	CopyExampleFiles
 	CopyProgram
-	CopyServiceFiles
+	if [ "$PROGRAM" == "osync" ] || [ "$PROGRAM" == "pmocr" ]; then
+		CopyServiceFiles
+	fi
 	QuickLogger "$PROGRAM installed. Use with $BIN_DIR/$PROGRAM"
 	if [ "$PROGRAM" == "osync" ] || [ "$PROGRAM" == "obackup" ]; then
 		QuickLogger ""
