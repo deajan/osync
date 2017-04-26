@@ -41,7 +41,7 @@ IS_STABLE=yes
 
 
 _OFUNCTIONS_VERSION=2.1.2
-_OFUNCTIONS_BUILD=2017052602
+_OFUNCTIONS_BUILD=2017052603
 _OFUNCTIONS_BOOTSTRAP=true
 
 ## BEGIN Generic bash functions written in 2013-2017 by Orsiris de Jong - http://www.netpower.fr - ozy@netpower.fr
@@ -665,21 +665,21 @@ function Spinner {
 	fi
 }
 
-function _PerfProfiler {									#__WITH_PARANOIA_DEBUG
-	local perfString									#__WITH_PARANOIA_DEBUG
-												#__WITH_PARANOIA_DEBUG
-	perfString=$(ps -p $$ -o %cpu,%mem,cmd,time)						#__WITH_PARANOIA_DEBUG
-												#__WITH_PARANOIA_DEBUG
-	for i in $(pgrep -P $$); do								#__WITH_PARANOIA_DEBUG
-		perfString="$perfString\n"$(ps -p $i -o %cpu,%mem,cmd,time | tail -1)		#__WITH_PARANOIA_DEBUG
-	done											#__WITH_PARANOIA_DEBUG
-												#__WITH_PARANOIA_DEBUG
-	if type iostat > /dev/null 2>&1; then							#__WITH_PARANOIA_DEBUG
-		perfString="$perfString\n"$(iostat)						#__WITH_PARANOIA_DEBUG
-	fi											#__WITH_PARANOIA_DEBUG
-												#__WITH_PARANOIA_DEBUG
-	Logger "PerfProfiler: $perfString" "PARANOIA_DEBUG"					#__WITH_PARANOIA_DEBUG
-}												#__WITH_PARANOIA_DEBUG
+function _PerfProfiler {												#__WITH_PARANOIA_DEBUG
+	local perfString												#__WITH_PARANOIA_DEBUG
+															#__WITH_PARANOIA_DEBUG
+	perfString=$(ps -p $$ -o command,args,pid,ppid,%cpu,%mem,time,etime,state)					#__WITH_PARANOIA_DEBUG
+															#__WITH_PARANOIA_DEBUG
+	for i in $(pgrep -P $$); do											#__WITH_PARANOIA_DEBUG
+		perfString="$perfString\n"$(ps -p $i -o command,args,pid,ppid,%cpu,%mem,time,etime,state | tail -1)	#__WITH_PARANOIA_DEBUG
+	done														#__WITH_PARANOIA_DEBUG
+															#__WITH_PARANOIA_DEBUG
+	if type iostat > /dev/null 2>&1; then										#__WITH_PARANOIA_DEBUG
+		perfString="$perfString\n"$(iostat)									#__WITH_PARANOIA_DEBUG
+	fi														#__WITH_PARANOIA_DEBUG
+															#__WITH_PARANOIA_DEBUG
+	Logger "PerfProfiler: $perfString" "PARANOIA_DEBUG"								#__WITH_PARANOIA_DEBUG
+}															#__WITH_PARANOIA_DEBUG
 
 
 # Time control function for background processes, suitable for multiple synchronous processes
