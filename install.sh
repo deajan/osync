@@ -12,7 +12,7 @@ PROGRAM_BINARY=$PROGRAM".sh"
 PROGRAM_BATCH=$PROGRAM"-batch.sh"
 SSH_FILTER="ssh_filter.sh"
 
-SCRIPT_BUILD=2017032101
+SCRIPT_BUILD=2017041701
 
 ## osync / obackup / pmocr / zsnap install script
 ## Tested on RHEL / CentOS 6 & 7, Fedora 23, Debian 7 & 8, Mint 17 and FreeBSD 8, 10 and 11
@@ -342,9 +342,9 @@ function CopyServiceFiles {
 	elif ([ "$init" == "initV" ] && [ -f "$SCRIPT_PATH/$SERVICE_FILE_INIT" ] && [ -d "$SERVICE_DIR_INIT" ]); then
 		CopyFile "$SCRIPT_PATH" "$SERVICE_DIR_INIT" "$SERVICE_FILE_INIT" "755" "" "" true
 
-		QuickLogger "Created osync-srv service in [$SERVICE_DIR_INIT]."
-		QuickLogger "Can be activated with [service $OSYNC_SERVICE_FILE_INIT start]."
-		QuickLogger "Can be enabled on boot with [chkconfig $OSYNC_SERVICE_FILE_INIT on]."
+		QuickLogger "Created [$SERVICE_NAME] service in [$SERVICE_DIR_INIT]."
+		QuickLogger "Can be activated with [service $SERVICE_FILE_INIT start]."
+		QuickLogger "Can be enabled on boot with [chkconfig $SERVICE_FILE_INIT on]."
 	else
 		QuickLogger "Cannot define what init style is in use on this system. Skipping service file installation."
 	fi
@@ -386,7 +386,11 @@ function RemoveFile {
 
 function RemoveAll {
 	RemoveFile "$BIN_DIR/$PROGRAM_BINARY"
-	RemoveFile "$BIN_DIR/$PROGRAM_BATCH"
+
+	if [ "$PROGRAM" == "osync" ] || [ "$PROGRAM" == "obackup" ]; then
+		RemoveFile "$BIN_DIR/$PROGRAM_BATCH"
+	fi
+
 	if [ ! -f "$BIN_DIR/osync.sh" ] && [ ! -f "$BIN_DIR/obackup.sh" ]; then		# Check if any other program requiring ssh filter is present before removal
 		RemoveFile "$BIN_DIR/$SSH_FILTER"
 	else
@@ -447,7 +451,9 @@ else
 	CreateDir "$BIN_DIR"
 	CopyExampleFiles
 	CopyProgram
-	CopyServiceFiles
+	if [ "$PROGRAM" == "osync" ] || [ "$PROGRAM" == "pmocr" ]; then
+		CopyServiceFiles
+	fi
 	QuickLogger "$PROGRAM installed. Use with $BIN_DIR/$PROGRAM"
 	if [ "$PROGRAM" == "osync" ] || [ "$PROGRAM" == "obackup" ]; then
 		QuickLogger ""

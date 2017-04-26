@@ -9,8 +9,8 @@ IS_STABLE=yes
 
 
 
-_OFUNCTIONS_VERSION=2.1
-_OFUNCTIONS_BUILD=2017032301
+_OFUNCTIONS_VERSION=2.1.2
+_OFUNCTIONS_BUILD=2017052601
 _OFUNCTIONS_BOOTSTRAP=true
 
 ## BEGIN Generic bash functions written in 2013-2017 by Orsiris de Jong - http://www.netpower.fr - ozy@netpower.fr
@@ -34,6 +34,9 @@ fi
 
 ## Correct output of sort command (language agnostic sorting)
 export LC_ALL=C
+
+## Default umask for file creation
+umask 0077
 
 # Standard alert mail body
 MAIL_ALERT_MSG="Execution of $PROGRAM instance $INSTANCE_ID on $(date) has warnings/errors."
@@ -252,7 +255,7 @@ function Logger {
 		return
 	elif [ "$level" == "VERBOSE" ]; then
 		if [ $_LOGGER_VERBOSE == true ]; then
-			_Logger "$prefix:$value" "$prefix$value"
+			_Logger "$prefix($level):$value" "$prefix$value"
 		fi
 		return
 	elif [ "$level" == "ALWAYS" ]; then
@@ -612,6 +615,7 @@ function Spinner {
 }
 
 
+
 # Time control function for background processes, suitable for multiple synchronous processes
 # Fills a global variable called WAIT_FOR_TASK_COMPLETION_$callerName that contains list of failed pids in format pid1:result1;pid2:result2
 # Also sets a global variable called HARD_MAX_EXEC_TIME_REACHED_$callerName to true if hardMaxTime is reached
@@ -736,6 +740,8 @@ function WaitForTaskCompletion {
 		pidsArray=("${newPidsArray[@]}")
 		# Trivial wait time for bash to not eat up all CPU
 		sleep $sleepTime
+
+
 	done
 
 
@@ -894,6 +900,7 @@ function ParallelExec {
 
 		# Trivial wait time for bash to not eat up all CPU
 		sleep $sleepTime
+
 	done
 
 	return $errorCount
@@ -1117,6 +1124,7 @@ function GetLocalOS {
 	# Add a global variable for statistics in installer
 	LOCAL_OS_FULL="$localOsVar ($localOsName $localOsVer)"
 }
+
 
 
 function GetRemoteOS {
@@ -1361,7 +1369,6 @@ function CheckConnectivity3rdPartyHosts {
 			fi
 		fi
 }
-
 
 function RsyncPatternsAdd {
 	local patternType="${1}"	# exclude or include
@@ -1706,35 +1713,46 @@ function ParentPid {
 
 # Neat version compare function found at http://stackoverflow.com/a/4025065/2635443
 # Returns 0 if equal, 1 if $1 > $2 and 2 if $1 < $2
-vercomp () {
-    if [[ $1 == $2 ]]
-    then
-        return 0
-    fi
-    local IFS=.
-    local i ver1=($1) ver2=($2)
-    # fill empty fields in ver1 with zeros
-    for ((i=${#ver1[@]}; i<${#ver2[@]}; i++))
-    do
-        ver1[i]=0
-    done
-    for ((i=0; i<${#ver1[@]}; i++))
-    do
-        if [[ -z ${ver2[i]} ]]
-        then
-            # fill empty fields in ver2 with zeros
-            ver2[i]=0
-        fi
-        if ((10#${ver1[i]} > 10#${ver2[i]}))
-        then
-            return 1
-        fi
-        if ((10#${ver1[i]} < 10#${ver2[i]}))
-        then
-            return 2
-        fi
-    done
-    return 0
+function VerComp () {
+	if [ "$1" == "" ] || [ "$2" == "" ]; then
+		Logger "Bogus Vercomp values [$1] and [$2]." "WARN"
+		return 1
+	fi
+
+	if [[ $1 == $2 ]]
+		then
+			echo 0
+		return
+	fi
+
+	local IFS=.
+	local i ver1=($1) ver2=($2)
+	# fill empty fields in ver1 with zeros
+	for ((i=${#ver1[@]}; i<${#ver2[@]}; i++))
+	do
+        	ver1[i]=0
+	done
+	for ((i=0; i<${#ver1[@]}; i++))
+	do
+		if [[ -z ${ver2[i]} ]]
+		then
+			# fill empty fields in ver2 with zeros
+			ver2[i]=0
+		fi
+		if ((10#${ver1[i]} > 10#${ver2[i]}))
+		then
+			echo 1
+			return
+        	fi
+        	if ((10#${ver1[i]} < 10#${ver2[i]}))
+        	then
+			echo 2
+            		return
+        	fi
+    	done
+
+    	echo 0
+	return
 }
 
 function GetConfFileValue () {
@@ -1764,6 +1782,29 @@ function SetConfFileValue () {
 		Logger "Set [$name] to [$value] in config file [$file]." "DEBUG"
         else
 		Logger "Cannot set value [$name] to [$value] in config file [$file]." "ERROR"
+        fi
+}
+
+# Function can replace [ -f /some/file* ] tests
+# Modified version of http://stackoverflow.com/a/6364244/2635443
+function WildcardFileExists () {
+        local file="${1}"
+        local exists=0
+
+        for f in $file; do
+                ## Check if the glob gets expanded to existing files.
+                ## If not, f here will be exactly the pattern above
+                ## and the exists test will evaluate to false.
+                if [ -e "$f" ]; then
+                        exists=1
+                        break
+                fi
+        done
+
+        if [ $exists -eq 1 ]; then
+                echo 1
+        else
+                echo 0
         fi
 }
 

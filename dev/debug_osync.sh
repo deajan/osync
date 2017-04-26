@@ -40,8 +40,8 @@ IS_STABLE=yes
 #	CleanUp					no		#__WITH_PARANOIA_DEBUG
 
 
-_OFUNCTIONS_VERSION=2.1
-_OFUNCTIONS_BUILD=2017032301
+_OFUNCTIONS_VERSION=2.1.2
+_OFUNCTIONS_BUILD=2017052601
 _OFUNCTIONS_BOOTSTRAP=true
 
 ## BEGIN Generic bash functions written in 2013-2017 by Orsiris de Jong - http://www.netpower.fr - ozy@netpower.fr
@@ -65,6 +65,9 @@ fi
 
 ## Correct output of sort command (language agnostic sorting)
 export LC_ALL=C
+
+## Default umask for file creation
+umask 0077
 
 # Standard alert mail body
 MAIL_ALERT_MSG="Execution of $PROGRAM instance $INSTANCE_ID on $(date) has warnings/errors."
@@ -293,7 +296,7 @@ function Logger {
 		return
 	elif [ "$level" == "VERBOSE" ]; then
 		if [ $_LOGGER_VERBOSE == true ]; then
-			_Logger "$prefix:$value" "$prefix$value"
+			_Logger "$prefix($level):$value" "$prefix$value"
 		fi
 		return
 	elif [ "$level" == "ALWAYS" ]; then
@@ -662,6 +665,18 @@ function Spinner {
 	fi
 }
 
+function _PerfProfiler {									#__WITH_PARANOIA_DEBUG
+	local perfString									#__WITH_PARANOIA_DEBUG
+												#__WITH_PARANOIA_DEBUG
+	perfString=$(ps -p $$ -o %cpu,%mem,cmd,time)						#__WITH_PARANOIA_DEBUG
+												#__WITH_PARANOIA_DEBUG
+	for i in $(pgrep -P $$); do								#__WITH_PARANOIA_DEBUG
+		perfString="$perfString\n"$(ps -p $i -o %cpu,%mem,cmd,time | tail -1)		#__WITH_PARANOIA_DEBUG
+	done											#__WITH_PARANOIA_DEBUG
+												#__WITH_PARANOIA_DEBUG
+	Logger "PerfProfiler: $perfString" "PARANOIA_DEBUG"					#__WITH_PARANOIA_DEBUG
+}												#__WITH_PARANOIA_DEBUG
+
 
 # Time control function for background processes, suitable for multiple synchronous processes
 # Fills a global variable called WAIT_FOR_TASK_COMPLETION_$callerName that contains list of failed pids in format pid1:result1;pid2:result2
@@ -794,6 +809,11 @@ function WaitForTaskCompletion {
 		pidsArray=("${newPidsArray[@]}")
 		# Trivial wait time for bash to not eat up all CPU
 		sleep $sleepTime
+
+		if [ "$_PERF_PROFILER" == "yes" ]; then				##__WITH_PARANOIA_DEBUG
+			_PerfProfiler						##__WITH_PARANOIA_DEBUG
+		fi								##__WITH_PARANOIA_DEBUG
+
 	done
 
 	Logger "${FUNCNAME[0]} ended for [$callerName] using [$pidCount] subprocesses with [$errorcount] errors." "PARANOIA_DEBUG"	#__WITH_PARANOIA_DEBUG
@@ -959,6 +979,10 @@ function ParallelExec {
 
 		# Trivial wait time for bash to not eat up all CPU
 		sleep $sleepTime
+
+		if [ "$_PERF_PROFILER" == "yes" ]; then				##__WITH_PARANOIA_DEBUG
+			_PerfProfiler						##__WITH_PARANOIA_DEBUG
+		fi								##__WITH_PARANOIA_DEBUG
 	done
 
 	return $errorCount
@@ -1183,6 +1207,62 @@ function GetLocalOS {
 	# Add a global variable for statistics in installer
 	LOCAL_OS_FULL="$localOsVar ($localOsName $localOsVer)"
 }
+
+#__BEGIN_WITH_PARANOIA_DEBUG
+function __CheckArguments {
+	# Checks the number of arguments of a function and raises an error if some are missing
+
+	if [ "$_DEBUG" == "yes" ]; then
+		local numberOfArguments="${1}" # Number of arguments the tested function should have, can be a number of a range, eg 0-2 for zero to two arguments
+		local numberOfGivenArguments="${2}" # Number of arguments that have been passed
+
+		local minArgs
+		local maxArgs
+
+		# All arguments of the function to check are passed as array in ${3} (the function call waits for $@)
+		# If any of the arguments contains spaces, bash things there are two aguments
+		# In order to avoid this, we need to iterate over ${3} and count
+
+		callerName="${FUNCNAME[1]}"
+
+		local iterate=3
+		local fetchArguments=true
+		local argList=""
+		local countedArguments
+		while [ $fetchArguments == true ]; do
+			cmd='argument=${'$iterate'}'
+			eval $cmd
+			if [ "$argument" == "" ]; then
+				fetchArguments=false
+			else
+				argList="$argList[Argument $((iterate-2)): $argument] "
+				iterate=$((iterate+1))
+			fi
+		done
+
+		countedArguments=$((iterate-3))
+
+		if [ $(IsInteger "$numberOfArguments") -eq 1 ]; then
+			minArgs=$numberOfArguments
+			maxArgs=$numberOfArguments
+		else
+			IFS='-' read minArgs maxArgs <<< "$numberOfArguments"
+		fi
+
+		Logger "Entering function [$callerName]." "PARANOIA_DEBUG"
+
+		if ! ([ $countedArguments -ge $minArgs ] && [ $countedArguments -le $maxArgs ]); then
+			Logger "Function $callerName may have inconsistent number of arguments. Expected min: $minArgs, max: $maxArgs, count: $countedArguments, bash seen: $numberOfGivenArguments." "ERROR"
+			Logger "$callerName arguments: $argList" "ERROR"
+		else
+			if [ ! -z "$argList" ]; then
+				Logger "$callerName arguments: $argList" "PARANOIA_DEBUG"
+			fi
+		fi
+	fi
+}
+
+#__END_WITH_PARANOIA_DEBUG
 
 
 function GetRemoteOS {
@@ -1438,62 +1518,6 @@ function CheckConnectivity3rdPartyHosts {
 		fi
 	fi											#__WITH_PARANOIA_DEBUG
 }
-
-#__BEGIN_WITH_PARANOIA_DEBUG
-function __CheckArguments {
-	# Checks the number of arguments of a function and raises an error if some are missing
-
-	if [ "$_DEBUG" == "yes" ]; then
-		local numberOfArguments="${1}" # Number of arguments the tested function should have, can be a number of a range, eg 0-2 for zero to two arguments
-		local numberOfGivenArguments="${2}" # Number of arguments that have been passed
-
-		local minArgs
-		local maxArgs
-
-		# All arguments of the function to check are passed as array in ${3} (the function call waits for $@)
-		# If any of the arguments contains spaces, bash things there are two aguments
-		# In order to avoid this, we need to iterate over ${3} and count
-
-		callerName="${FUNCNAME[1]}"
-
-		local iterate=3
-		local fetchArguments=true
-		local argList=""
-		local countedArguments
-		while [ $fetchArguments == true ]; do
-			cmd='argument=${'$iterate'}'
-			eval $cmd
-			if [ "$argument" == "" ]; then
-				fetchArguments=false
-			else
-				argList="$argList[Argument $((iterate-2)): $argument] "
-				iterate=$((iterate+1))
-			fi
-		done
-
-		countedArguments=$((iterate-3))
-
-		if [ $(IsInteger "$numberOfArguments") -eq 1 ]; then
-			minArgs=$numberOfArguments
-			maxArgs=$numberOfArguments
-		else
-			IFS='-' read minArgs maxArgs <<< "$numberOfArguments"
-		fi
-
-		Logger "Entering function [$callerName]." "PARANOIA_DEBUG"
-
-		if ! ([ $countedArguments -ge $minArgs ] && [ $countedArguments -le $maxArgs ]); then
-			Logger "Function $callerName may have inconsistent number of arguments. Expected min: $minArgs, max: $maxArgs, count: $countedArguments, bash seen: $numberOfGivenArguments." "ERROR"
-			Logger "$callerName arguments: $argList" "ERROR"
-		else
-			if [ ! -z "$argList" ]; then
-				Logger "$callerName arguments: $argList" "PARANOIA_DEBUG"
-			fi
-		fi
-	fi
-}
-
-#__END_WITH_PARANOIA_DEBUG
 
 function RsyncPatternsAdd {
 	local patternType="${1}"	# exclude or include
@@ -1845,35 +1869,46 @@ function ParentPid {
 
 # Neat version compare function found at http://stackoverflow.com/a/4025065/2635443
 # Returns 0 if equal, 1 if $1 > $2 and 2 if $1 < $2
-vercomp () {
-    if [[ $1 == $2 ]]
-    then
-        return 0
-    fi
-    local IFS=.
-    local i ver1=($1) ver2=($2)
-    # fill empty fields in ver1 with zeros
-    for ((i=${#ver1[@]}; i<${#ver2[@]}; i++))
-    do
-        ver1[i]=0
-    done
-    for ((i=0; i<${#ver1[@]}; i++))
-    do
-        if [[ -z ${ver2[i]} ]]
-        then
-            # fill empty fields in ver2 with zeros
-            ver2[i]=0
-        fi
-        if ((10#${ver1[i]} > 10#${ver2[i]}))
-        then
-            return 1
-        fi
-        if ((10#${ver1[i]} < 10#${ver2[i]}))
-        then
-            return 2
-        fi
-    done
-    return 0
+function VerComp () {
+	if [ "$1" == "" ] || [ "$2" == "" ]; then
+		Logger "Bogus Vercomp values [$1] and [$2]." "WARN"
+		return 1
+	fi
+
+	if [[ $1 == $2 ]]
+		then
+			echo 0
+		return
+	fi
+
+	local IFS=.
+	local i ver1=($1) ver2=($2)
+	# fill empty fields in ver1 with zeros
+	for ((i=${#ver1[@]}; i<${#ver2[@]}; i++))
+	do
+        	ver1[i]=0
+	done
+	for ((i=0; i<${#ver1[@]}; i++))
+	do
+		if [[ -z ${ver2[i]} ]]
+		then
+			# fill empty fields in ver2 with zeros
+			ver2[i]=0
+		fi
+		if ((10#${ver1[i]} > 10#${ver2[i]}))
+		then
+			echo 1
+			return
+        	fi
+        	if ((10#${ver1[i]} < 10#${ver2[i]}))
+        	then
+			echo 2
+            		return
+        	fi
+    	done
+
+    	echo 0
+	return
 }
 
 function GetConfFileValue () {
@@ -1903,6 +1938,29 @@ function SetConfFileValue () {
 		Logger "Set [$name] to [$value] in config file [$file]." "DEBUG"
         else
 		Logger "Cannot set value [$name] to [$value] in config file [$file]." "ERROR"
+        fi
+}
+
+# Function can replace [ -f /some/file* ] tests
+# Modified version of http://stackoverflow.com/a/6364244/2635443
+function WildcardFileExists () {
+        local file="${1}"
+        local exists=0
+
+        for f in $file; do
+                ## Check if the glob gets expanded to existing files.
+                ## If not, f here will be exactly the pattern above
+                ## and the exists test will evaluate to false.
+                if [ -e "$f" ]; then
+                        exists=1
+                        break
+                fi
+        done
+
+        if [ $exists -eq 1 ]; then
+                echo 1
+        else
+                echo 0
         fi
 }
 
