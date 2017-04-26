@@ -1,5 +1,5 @@
 %define name osync
-%define version 1.2RC3
+%define version 1.2
 %define gitsource https://github.com/deajan/%{name}/archive/v%{version}.zip
 
 %define use_systemd 1
