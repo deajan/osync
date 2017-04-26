@@ -3,7 +3,7 @@
 #### OFUNCTIONS MINI SUBSET ####
 
 _OFUNCTIONS_VERSION=2.1.2
-_OFUNCTIONS_BUILD=2017052603
+_OFUNCTIONS_BUILD=2017052604
 #### _OFUNCTIONS_BOOTSTRAP SUBSET ####
 _OFUNCTIONS_BOOTSTRAP=true
 #### _OFUNCTIONS_BOOTSTRAP SUBSET END ####
@@ -640,10 +640,10 @@ function Spinner {
 function _PerfProfiler {												#__WITH_PARANOIA_DEBUG
 	local perfString												#__WITH_PARANOIA_DEBUG
 															#__WITH_PARANOIA_DEBUG
-	perfString=$(ps -p $$ -o command,args,pid,ppid,%cpu,%mem,time,etime,state)					#__WITH_PARANOIA_DEBUG
+	perfString=$(ps -p $$ -o args,pid,ppid,%cpu,%mem,time,etime,state,wchan)					#__WITH_PARANOIA_DEBUG
 															#__WITH_PARANOIA_DEBUG
 	for i in $(pgrep -P $$); do											#__WITH_PARANOIA_DEBUG
-		perfString="$perfString\n"$(ps -p $i -o command,args,pid,ppid,%cpu,%mem,time,etime,state | tail -1)	#__WITH_PARANOIA_DEBUG
+		perfString="$perfString\n"$(ps -p $i -o args,pid,ppid,%cpu,%mem,time,etime,state,wchan | tail -1)	#__WITH_PARANOIA_DEBUG
 	done														#__WITH_PARANOIA_DEBUG
 															#__WITH_PARANOIA_DEBUG
 	if type iostat > /dev/null 2>&1; then										#__WITH_PARANOIA_DEBUG
