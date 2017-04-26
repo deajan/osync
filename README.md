@@ -51,7 +51,8 @@ Getting osync via github (remove the -b "stable" if you want latest dev snapshot
 	$ cd osync
 	$ bash install.sh
 
-There are also some RPM files round the corner I'll try to build quicky. Please note that RPM files will install osync to /usr/bin instead of /usr/bin in order to enforce good practices.
+There is also a RPM file that should fit RHEL/CentOS/Fedora and basically any RPM based distro, see the github release.
+Please note that RPM files will install osync to /usr/bin instead of /usr/bin in order to enforce good practices.
 
 osync will install itself to /usr/local/bin and an example configuration file will be installed to /etc/osync
 
