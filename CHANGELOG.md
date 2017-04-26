@@ -3,7 +3,9 @@ RECENT CHANGES
 
 dd Mmm YYYY:
 
+- Added basic performance profiler to debug version
 - Fixed low severity security issue where log and run files could be read by other users
+- Minor enhancements in installer / ofunctions
 
 25 Mar 2017: osync v1.2 release (for full changelog of v1.2 branch see all v1.2-beta/RC entries)
 
