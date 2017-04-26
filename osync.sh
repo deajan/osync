@@ -10,7 +10,7 @@ IS_STABLE=yes
 
 
 _OFUNCTIONS_VERSION=2.1.2
-_OFUNCTIONS_BUILD=2017052601
+_OFUNCTIONS_BUILD=2017052602
 _OFUNCTIONS_BOOTSTRAP=true
 
 ## BEGIN Generic bash functions written in 2013-2017 by Orsiris de Jong - http://www.netpower.fr - ozy@netpower.fr
