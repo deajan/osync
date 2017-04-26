@@ -9,8 +9,8 @@ IS_STABLE=yes
 
 
 
-_OFUNCTIONS_VERSION=2.1.2
-_OFUNCTIONS_BUILD=2017052604
+_OFUNCTIONS_VERSION=2.1.3
+_OFUNCTIONS_BUILD=2017052605
 _OFUNCTIONS_BOOTSTRAP=true
 
 ## BEGIN Generic bash functions written in 2013-2017 by Orsiris de Jong - http://www.netpower.fr - ozy@netpower.fr
@@ -1111,9 +1111,6 @@ function GetLocalOS {
 		exit 1
 		;;
 	esac
-	if [ "$_OFUNCTIONS_VERSION" != "" ]; then
-		Logger "Local OS: [$localOsVar]." "DEBUG"
-	fi
 
 	# Get linux versions
 	if [ -f "/etc/os-release" ]; then
@@ -1123,6 +1120,10 @@ function GetLocalOS {
 
 	# Add a global variable for statistics in installer
 	LOCAL_OS_FULL="$localOsVar ($localOsName $localOsVer)"
+
+	if [ "$_OFUNCTIONS_VERSION" != "" ]; then
+		Logger "Local OS: [$LOCAL_OS_FULL]." "DEBUG"
+	fi
 }
 
 
@@ -1137,10 +1138,13 @@ function GetRemoteOS {
 
 $SSH_CMD env _REMOTE_TOKEN="$_REMOTE_TOKEN" bash -s << 'ENDSSH' >> "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$SCRIPT_PID.$TSTAMP" 2>&1
 
+
 function GetOs {
 	local localOsVar
 	local localOsName
 	local localOsVer
+
+	local osInfo="/etc/os-release"
 
 	# There's no good way to tell if currently running in BusyBox shell. Using sluggish way.
 	if ls --help 2>&1 | grep -i "BusyBox" > /dev/null; then
@@ -1160,9 +1164,11 @@ function GetOs {
 		fi
 	fi
 	# Get linux versions
-	if [ -f "/etc/os-release" ]; then
-		localOsName=$(GetConfFileValue "/etc/os-release" "NAME")
-		localOsVer=$(GetConfFileValue "/etc/os-release" "VERSION")
+	if [ -f "$osInfo" ]; then
+		localOsName=$(grep "^NAME=" "$osInfo")
+                localOsName="${localOsName##*=}"
+		localOsVer=$(grep "^VERSION=" "$osInfo")
+		localOsVer="${localOsVer##*=}"
 	fi
 
 	echo "$localOsVar ($localOsName $localOsVer)"

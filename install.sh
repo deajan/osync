@@ -148,9 +148,6 @@ function GetLocalOS {
 		exit 1
 		;;
 	esac
-	if [ "$_OFUNCTIONS_VERSION" != "" ]; then
-		Logger "Local OS: [$localOsVar]." "DEBUG"
-	fi
 
 	# Get linux versions
 	if [ -f "/etc/os-release" ]; then
@@ -160,6 +157,10 @@ function GetLocalOS {
 
 	# Add a global variable for statistics in installer
 	LOCAL_OS_FULL="$localOsVar ($localOsName $localOsVer)"
+
+	if [ "$_OFUNCTIONS_VERSION" != "" ]; then
+		Logger "Local OS: [$LOCAL_OS_FULL]." "DEBUG"
+	fi
 }
 function GetConfFileValue () {
         local file="${1}"
