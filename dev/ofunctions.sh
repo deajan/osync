@@ -2,8 +2,8 @@
 #### OFUNCTIONS FULL SUBSET ####
 #### OFUNCTIONS MINI SUBSET ####
 
-_OFUNCTIONS_VERSION=2.1.1
-_OFUNCTIONS_BUILD=2017041101
+_OFUNCTIONS_VERSION=2.1.2
+_OFUNCTIONS_BUILD=2017052601
 #### _OFUNCTIONS_BOOTSTRAP SUBSET ####
 _OFUNCTIONS_BOOTSTRAP=true
 #### _OFUNCTIONS_BOOTSTRAP SUBSET END ####
@@ -637,6 +637,18 @@ function Spinner {
 	fi
 }
 
+function _PerfProfiler {									#__WITH_PARANOIA_DEBUG
+	local perfString									#__WITH_PARANOIA_DEBUG
+												#__WITH_PARANOIA_DEBUG
+	perfString=$(ps -p $$ -o %cpu,%mem,cmd,time)						#__WITH_PARANOIA_DEBUG
+												#__WITH_PARANOIA_DEBUG
+	for i in $(pgrep -P $$); do								#__WITH_PARANOIA_DEBUG
+		perfString="$perfString\n"$(ps -p $i -o %cpu,%mem,cmd,time | tail -1)		#__WITH_PARANOIA_DEBUG
+	done											#__WITH_PARANOIA_DEBUG
+												#__WITH_PARANOIA_DEBUG
+	Logger "PerfProfiler: $perfString" "PARANOIA_DEBUG"					#__WITH_PARANOIA_DEBUG
+}												#__WITH_PARANOIA_DEBUG
+
 
 # Time control function for background processes, suitable for multiple synchronous processes
 # Fills a global variable called WAIT_FOR_TASK_COMPLETION_$callerName that contains list of failed pids in format pid1:result1;pid2:result2
@@ -769,6 +781,11 @@ function WaitForTaskCompletion {
 		pidsArray=("${newPidsArray[@]}")
 		# Trivial wait time for bash to not eat up all CPU
 		sleep $sleepTime
+
+		if [ "$_PERF_PROFILER" == "yes" ]; then				##__WITH_PARANOIA_DEBUG
+			_PerfProfiler						##__WITH_PARANOIA_DEBUG
+		fi								##__WITH_PARANOIA_DEBUG
+
 	done
 
 	Logger "${FUNCNAME[0]} ended for [$callerName] using [$pidCount] subprocesses with [$errorcount] errors." "PARANOIA_DEBUG"	#__WITH_PARANOIA_DEBUG
@@ -934,6 +951,10 @@ function ParallelExec {
 
 		# Trivial wait time for bash to not eat up all CPU
 		sleep $sleepTime
+
+		if [ "$_PERF_PROFILER" == "yes" ]; then				##__WITH_PARANOIA_DEBUG
+			_PerfProfiler						##__WITH_PARANOIA_DEBUG
+		fi								##__WITH_PARANOIA_DEBUG
 	done
 
 	return $errorCount
