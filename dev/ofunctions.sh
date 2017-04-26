@@ -3,7 +3,7 @@
 #### OFUNCTIONS MINI SUBSET ####
 
 _OFUNCTIONS_VERSION=2.1.2
-_OFUNCTIONS_BUILD=2017052601
+_OFUNCTIONS_BUILD=2017052602
 #### _OFUNCTIONS_BOOTSTRAP SUBSET ####
 _OFUNCTIONS_BOOTSTRAP=true
 #### _OFUNCTIONS_BOOTSTRAP SUBSET END ####
@@ -645,6 +645,10 @@ function _PerfProfiler {									#__WITH_PARANOIA_DEBUG
 	for i in $(pgrep -P $$); do								#__WITH_PARANOIA_DEBUG
 		perfString="$perfString\n"$(ps -p $i -o %cpu,%mem,cmd,time | tail -1)		#__WITH_PARANOIA_DEBUG
 	done											#__WITH_PARANOIA_DEBUG
+												#__WITH_PARANOIA_DEBUG
+	if type iostat > /dev/null 2>&1; then							#__WITH_PARANOIA_DEBUG
+		perfString="$perfString\n"$(iostat)						#__WITH_PARANOIA_DEBUG
+	fi											#__WITH_PARANOIA_DEBUG
 												#__WITH_PARANOIA_DEBUG
 	Logger "PerfProfiler: $perfString" "PARANOIA_DEBUG"					#__WITH_PARANOIA_DEBUG
 }												#__WITH_PARANOIA_DEBUG
