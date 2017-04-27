@@ -96,7 +96,7 @@ PRESERVE_EXECUTABILITY=yes
 
 ## Preserve ACLS. Make sure source and target FS can handle ACL. Disabled on Mac OSX.
 PRESERVE_ACL=no
-## Preserve Xattr. Make sure source and target FS can manage identical XATTRS. Disabled on Mac OSX.
+## Preserve Xattr. Make sure source and target FS can manage identical XATTRS. Disabled on Mac OSX. Depending on the FS, this may tamper performance alot (happens with ZFS On Linux 0.6.5-6).
 PRESERVE_XATTR=no
 ## Transforms symlinks into referent files/dirs. Be careful as symlinks without referrent will break sync as if standard files could not be copied.
 COPY_SYMLINKS=no
