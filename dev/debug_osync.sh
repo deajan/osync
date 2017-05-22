@@ -3,7 +3,7 @@
 PROGRAM="osync" # Rsync based two way sync engine with fault tolerance
 AUTHOR="(C) 2013-2017 by Orsiris de Jong"
 CONTACT="http://www.netpower.fr/osync - ozy@netpower.fr"
-PROGRAM_VERSION=1.2
+PROGRAM_VERSION=1.2.1-dev
 PROGRAM_BUILD=2017032101
 IS_STABLE=yes
 
@@ -40,8 +40,8 @@ IS_STABLE=yes
 #	CleanUp					no		#__WITH_PARANOIA_DEBUG
 
 
-_OFUNCTIONS_VERSION=2.1.3
-_OFUNCTIONS_BUILD=2017052605
+_OFUNCTIONS_VERSION=2.1.4-dev
+_OFUNCTIONS_BUILD=2017052201
 _OFUNCTIONS_BOOTSTRAP=true
 
 ## BEGIN Generic bash functions written in 2013-2017 by Orsiris de Jong - http://www.netpower.fr - ozy@netpower.fr
@@ -678,7 +678,7 @@ function _PerfProfiler {												#__WITH_PARANOIA_DEBUG
 		perfString="$perfString\n"$(iostat)									#__WITH_PARANOIA_DEBUG
 	fi														#__WITH_PARANOIA_DEBUG
 															#__WITH_PARANOIA_DEBUG
-	Logger "PerfProfiler: $perfString" "PARANOIA_DEBUG"								#__WITH_PARANOIA_DEBUG
+	Logger "PerfProfiler:\n$perfString" "PARANOIA_DEBUG"								#__WITH_PARANOIA_DEBUG
 }															#__WITH_PARANOIA_DEBUG
 
 
@@ -1659,13 +1659,13 @@ function PostInit {
 
 	# Define remote commands
 	if [ -f "$SSH_RSA_PRIVATE_KEY" ]; then
-		SSH_CMD="$(type -p ssh) $SSH_COMP -i $SSH_RSA_PRIVATE_KEY $SSH_OPTS $REMOTE_USER@$REMOTE_HOST -p $REMOTE_PORT"
-		SCP_CMD="$(type -p scp) $SSH_COMP -i $SSH_RSA_PRIVATE_KEY -P $REMOTE_PORT"
-		RSYNC_SSH_CMD="$(type -p ssh) $SSH_COMP -i $SSH_RSA_PRIVATE_KEY $SSH_OPTS -p $REMOTE_PORT"
+		SSH_CMD="$(type -p ssh) $SSH_COMP -q -i $SSH_RSA_PRIVATE_KEY $SSH_OPTS $REMOTE_USER@$REMOTE_HOST -p $REMOTE_PORT"
+		SCP_CMD="$(type -p scp) $SSH_COMP -q -i $SSH_RSA_PRIVATE_KEY -P $REMOTE_PORT"
+		RSYNC_SSH_CMD="$(type -p ssh) $SSH_COMP -q -i $SSH_RSA_PRIVATE_KEY $SSH_OPTS -p $REMOTE_PORT"
 	elif [ -f "$SSH_PASSWORD_FILE" ]; then
-		SSH_CMD="$(type -p sshpass) -f $SSH_PASSWORD_FILE $(type -p ssh) $SSH_COMP $SSH_OPTS $REMOTE_USER@$REMOTE_HOST -p $REMOTE_PORT"
-		SCP_CMD="$(type -p sshpass) -f $SSH_PASSWORD_FILE $(type -p scp) $SSH_COMP -P $REMOTE_PORT"
-		RSYNC_SSH_CMD="$(type -p sshpass) -f $SSH_PASSWORD_FILE $(type -p ssh) $SSH_COMP $SSH_OPTS -p $REMOTE_PORT"
+		SSH_CMD="$(type -p sshpass) -f $SSH_PASSWORD_FILE $(type -p ssh) $SSH_COMP -q $SSH_OPTS $REMOTE_USER@$REMOTE_HOST -p $REMOTE_PORT"
+		SCP_CMD="$(type -p sshpass) -f $SSH_PASSWORD_FILE $(type -p scp) $SSH_COMP -q -P $REMOTE_PORT"
+		RSYNC_SSH_CMD="$(type -p sshpass) -f $SSH_PASSWORD_FILE $(type -p ssh) $SSH_COMP -q $SSH_OPTS -p $REMOTE_PORT"
 	else
 		SSH_PASSWORD=""
 		SSH_CMD=""
@@ -2904,6 +2904,8 @@ function treeList {
 	local retval
 	local escapedReplicaPath
 	local rsyncCmd
+
+	sleep 10
 
 	escapedReplicaPath=$(EscapeSpaces "$replicaPath")
 
