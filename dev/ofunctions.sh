@@ -2,8 +2,8 @@
 #### OFUNCTIONS FULL SUBSET ####
 #### OFUNCTIONS MINI SUBSET ####
 
-_OFUNCTIONS_VERSION=2.1.3
-_OFUNCTIONS_BUILD=2017052605
+_OFUNCTIONS_VERSION=2.1.4-dev
+_OFUNCTIONS_BUILD=2017052201
 #### _OFUNCTIONS_BOOTSTRAP SUBSET ####
 _OFUNCTIONS_BOOTSTRAP=true
 #### _OFUNCTIONS_BOOTSTRAP SUBSET END ####
@@ -650,7 +650,7 @@ function _PerfProfiler {												#__WITH_PARANOIA_DEBUG
 		perfString="$perfString\n"$(iostat)									#__WITH_PARANOIA_DEBUG
 	fi														#__WITH_PARANOIA_DEBUG
 															#__WITH_PARANOIA_DEBUG
-	Logger "PerfProfiler: $perfString" "PARANOIA_DEBUG"								#__WITH_PARANOIA_DEBUG
+	Logger "PerfProfiler:\n$perfString" "PARANOIA_DEBUG"								#__WITH_PARANOIA_DEBUG
 }															#__WITH_PARANOIA_DEBUG
 
 
@@ -1642,13 +1642,13 @@ function PostInit {
 
 	# Define remote commands
 	if [ -f "$SSH_RSA_PRIVATE_KEY" ]; then
-		SSH_CMD="$(type -p ssh) $SSH_COMP -i $SSH_RSA_PRIVATE_KEY $SSH_OPTS $REMOTE_USER@$REMOTE_HOST -p $REMOTE_PORT"
-		SCP_CMD="$(type -p scp) $SSH_COMP -i $SSH_RSA_PRIVATE_KEY -P $REMOTE_PORT"
-		RSYNC_SSH_CMD="$(type -p ssh) $SSH_COMP -i $SSH_RSA_PRIVATE_KEY $SSH_OPTS -p $REMOTE_PORT"
+		SSH_CMD="$(type -p ssh) $SSH_COMP -q -i $SSH_RSA_PRIVATE_KEY $SSH_OPTS $REMOTE_USER@$REMOTE_HOST -p $REMOTE_PORT"
+		SCP_CMD="$(type -p scp) $SSH_COMP -q -i $SSH_RSA_PRIVATE_KEY -P $REMOTE_PORT"
+		RSYNC_SSH_CMD="$(type -p ssh) $SSH_COMP -q -i $SSH_RSA_PRIVATE_KEY $SSH_OPTS -p $REMOTE_PORT"
 	elif [ -f "$SSH_PASSWORD_FILE" ]; then
-		SSH_CMD="$(type -p sshpass) -f $SSH_PASSWORD_FILE $(type -p ssh) $SSH_COMP $SSH_OPTS $REMOTE_USER@$REMOTE_HOST -p $REMOTE_PORT"
-		SCP_CMD="$(type -p sshpass) -f $SSH_PASSWORD_FILE $(type -p scp) $SSH_COMP -P $REMOTE_PORT"
-		RSYNC_SSH_CMD="$(type -p sshpass) -f $SSH_PASSWORD_FILE $(type -p ssh) $SSH_COMP $SSH_OPTS -p $REMOTE_PORT"
+		SSH_CMD="$(type -p sshpass) -f $SSH_PASSWORD_FILE $(type -p ssh) $SSH_COMP -q $SSH_OPTS $REMOTE_USER@$REMOTE_HOST -p $REMOTE_PORT"
+		SCP_CMD="$(type -p sshpass) -f $SSH_PASSWORD_FILE $(type -p scp) $SSH_COMP -q -P $REMOTE_PORT"
+		RSYNC_SSH_CMD="$(type -p sshpass) -f $SSH_PASSWORD_FILE $(type -p ssh) $SSH_COMP -q $SSH_OPTS -p $REMOTE_PORT"
 	else
 		SSH_PASSWORD=""
 		SSH_CMD=""
