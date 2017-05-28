@@ -3,7 +3,7 @@
 #### OFUNCTIONS MINI SUBSET ####
 
 _OFUNCTIONS_VERSION=2.1.4-dev
-_OFUNCTIONS_BUILD=2017052201
+_OFUNCTIONS_BUILD=2017052801
 #### _OFUNCTIONS_BOOTSTRAP SUBSET ####
 _OFUNCTIONS_BOOTSTRAP=true
 #### _OFUNCTIONS_BOOTSTRAP SUBSET END ####
@@ -319,12 +319,17 @@ function KillChilds {
 
 	# Warning: pgrep does not exist in cygwin, have this checked in CheckEnvironment
 	if children="$(pgrep -P "$pid")"; then
+		if [[ "$pid" == *"$children"* ]]; then
+			Logger "Bogus pgrep implementation." "CRITICAL"
+			children="${children/$pid/}"
+		fi
 		for child in $children; do
 			Logger "Launching KillChilds \"$child\" true" "DEBUG"	#__WITH_PARANOIA_DEBUG
 			KillChilds "$child" true
 		done
 	fi
-		# Try to kill nicely, if not, wait 15 seconds to let Trap actions happen before killing
+
+	# Try to kill nicely, if not, wait 15 seconds to let Trap actions happen before killing
 	if [ "$self" == true ]; then
 		if kill -0 "$pid" > /dev/null 2>&1; then
 			kill -s TERM "$pid"
