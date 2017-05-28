@@ -41,7 +41,7 @@ IS_STABLE=yes
 
 
 _OFUNCTIONS_VERSION=2.1.4-dev
-_OFUNCTIONS_BUILD=2017052802
+_OFUNCTIONS_BUILD=2017052803
 _OFUNCTIONS_BOOTSTRAP=true
 
 ## BEGIN Generic bash functions written in 2013-2017 by Orsiris de Jong - http://www.netpower.fr - ozy@netpower.fr
@@ -352,21 +352,21 @@ function KillChilds {
 		return 1
 	fi
 
-	# Warning: pgrep does not exist in cygwin, have this checked in CheckEnvironment
-	if children="$(pgrep -P "$pid")"; then
-		if [[ "$pid" == *"$children"* ]]; then
-			Logger "Bogus pgrep implementation." "CRITICAL"
-			children="${children/$pid/}"
+	if kill -0 "$pid" > /dev/null 2>&1; then
+		# Warning: pgrep does not exist in cygwin, have this checked in CheckEnvironment
+		if children="$(pgrep -P "$pid")"; then
+			if [[ "$pid" == *"$children"* ]]; then
+				Logger "Bogus pgrep implementation." "CRITICAL"
+				children="${children/$pid/}"
+			fi
+			for child in $children; do
+				Logger "Launching KillChilds \"$child\" true" "DEBUG"	#__WITH_PARANOIA_DEBUG
+				KillChilds "$child" true
+			done
 		fi
-		for child in $children; do
-			Logger "Launching KillChilds \"$child\" true" "DEBUG"	#__WITH_PARANOIA_DEBUG
-			KillChilds "$child" true
-		done
-	fi
 
-	# Try to kill nicely, if not, wait 15 seconds to let Trap actions happen before killing
-	if [ "$self" == true ]; then
-		if kill -0 "$pid" > /dev/null 2>&1; then
+		# Try to kill nicely, if not, wait 15 seconds to let Trap actions happen before killing
+		if [ "$self" == true ]; then
 			kill -s TERM "$pid"
 			Logger "Sent SIGTERM to process [$pid]." "DEBUG"
 			if [ $? != 0 ]; then
