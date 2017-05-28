@@ -3,7 +3,7 @@
 #### OFUNCTIONS MINI SUBSET ####
 
 _OFUNCTIONS_VERSION=2.1.4-dev
-_OFUNCTIONS_BUILD=2017052803
+_OFUNCTIONS_BUILD=2017052804
 #### _OFUNCTIONS_BOOTSTRAP SUBSET ####
 _OFUNCTIONS_BOOTSTRAP=true
 #### _OFUNCTIONS_BOOTSTRAP SUBSET END ####
@@ -334,9 +334,12 @@ function KillChilds {
 				KillChilds "$child" true
 			done
 		fi
+	fi
 
-		# Try to kill nicely, if not, wait 15 seconds to let Trap actions happen before killing
-		if [ "$self" == true ]; then
+	# Try to kill nicely, if not, wait 15 seconds to let Trap actions happen before killing
+	if [ "$self" == true ]; then
+		# We need to check for pid again because it may have disappeared after recursive function call
+		if kill -0 "$pid" > /dev/null 2>&1; then
 			kill -s TERM "$pid"
 			Logger "Sent SIGTERM to process [$pid]." "DEBUG"
 			if [ $? != 0 ]; then
