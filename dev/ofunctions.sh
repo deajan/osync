@@ -3,7 +3,7 @@
 #### OFUNCTIONS MINI SUBSET ####
 
 _OFUNCTIONS_VERSION=2.1.4-dev
-_OFUNCTIONS_BUILD=2017052901
+_OFUNCTIONS_BUILD=2017052902
 #### _OFUNCTIONS_BOOTSTRAP SUBSET ####
 _OFUNCTIONS_BOOTSTRAP=true
 #### _OFUNCTIONS_BOOTSTRAP SUBSET END ####
@@ -71,6 +71,8 @@ fi
 #### DEBUG SUBSET END ####
 
 SCRIPT_PID=$$
+
+# TODO: Check if %N works on MacOS
 TSTAMP=$(date '+%Y%m%dT%H%M%S.%N')
 
 LOCAL_USER=$(whoami)
@@ -317,13 +319,14 @@ function KillChilds {
 	local pid="${1}" # Parent pid to kill childs
 	local self="${2:-false}" # Should parent be killed too ?
 
-	if [ $(IsNumeric "$pid") -eq 0 ] || [ "$pid" == "" ] || [ "$pid" == "0" ]; then
+	# Paranoid checks, we can safely assume that $pid shouldn't be 0 nor 1
+	if [ $(IsNumeric "$pid") -eq 0 ] || [ "$pid" == "" ] || [ "$pid" == "0" ] || [ "$pid" == "1" ]; then
 		Logger "Bogus pid given [$pid]." "CRITICAL"
 		return 1
 	fi
 
 	if kill -0 "$pid" > /dev/null 2>&1; then
-		# Warning: pgrep does not exist in cygwin, have this checked in CheckEnvironment
+		# Warning: pgrep is not native on cygwin, have this checked in CheckEnvironment
 		if children="$(pgrep -P "$pid")"; then
 			if [[ "$pid" == *"$children"* ]]; then
 				Logger "Bogus pgrep implementation." "CRITICAL"
