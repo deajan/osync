@@ -41,7 +41,7 @@ IS_STABLE=yes
 
 
 _OFUNCTIONS_VERSION=2.1.4-dev
-_OFUNCTIONS_BUILD=2017052804
+_OFUNCTIONS_BUILD=2017052901
 _OFUNCTIONS_BOOTSTRAP=true
 
 ## BEGIN Generic bash functions written in 2013-2017 by Orsiris de Jong - http://www.netpower.fr - ozy@netpower.fr
@@ -347,7 +347,7 @@ function KillChilds {
 	local pid="${1}" # Parent pid to kill childs
 	local self="${2:-false}" # Should parent be killed too ?
 
-	if [ $(IsNumeric "$pid") -eq 0 ] || [ "$pid" == "" ]; then
+	if [ $(IsNumeric "$pid") -eq 0 ] || [ "$pid" == "" ] || [ "$pid" == "0" ]; then
 		Logger "Bogus pid given [$pid]." "CRITICAL"
 		return 1
 	fi
