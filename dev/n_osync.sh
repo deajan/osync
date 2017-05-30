@@ -4,7 +4,7 @@ PROGRAM="osync" # Rsync based two way sync engine with fault tolerance
 AUTHOR="(C) 2013-2017 by Orsiris de Jong"
 CONTACT="http://www.netpower.fr/osync - ozy@netpower.fr"
 PROGRAM_VERSION=1.2.1-rc1
-PROGRAM_BUILD=2017053002
+PROGRAM_BUILD=2017053003
 IS_STABLE=yes
 
 ##### Execution order						#__WITH_PARANOIA_DEBUG
@@ -1387,7 +1387,9 @@ function Sync {
 				resumeTarget="none"
 			fi
 		else
-			Logger "Will not resume aborted execution. Too many resume tries [$resumeCount]." "WARN"
+			if [ $RESUME_TRY -ne 0 ]; then
+				Logger "Will not resume aborted execution. Too many resume tries [$resumeCount]." "WARN"
+			fi
 			echo "0" > "${INITIATOR[$__resumeCount]}"
 			resumeInitiator="none"
 			resumeTarget="none"
