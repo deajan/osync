@@ -1,9 +1,12 @@
 RECENT CHANGES
 --------------
 
-dd Mmm YYYY:
+dd Mmm YYYY: osync v1.2.1 release
 
+- Fixed bogus pgrep can lead to segfault 11 because of recursive KillChilds
+- Fixed osync deletion not working on systems with ssh banner enabled
 - Added basic performance profiler to debug version
+- Fixed GetRemoteOS missing GetConfFileValue preventing to get OS details from /etc/os-release
 - Fixed low severity security issue where log and run files could be read by other users
 - Minor enhancements in installer / ofunctions
 
