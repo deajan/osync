@@ -4,7 +4,7 @@ PROGRAM="osync" # Rsync based two way sync engine with fault tolerance
 AUTHOR="(C) 2013-2017 by Orsiris de Jong"
 CONTACT="http://www.netpower.fr/osync - ozy@netpower.fr"
 PROGRAM_VERSION=1.2.1-dev
-PROGRAM_BUILD=2017052201
+PROGRAM_BUILD=2017053010
 IS_STABLE=yes
 
 ##### Execution order						#__WITH_PARANOIA_DEBUG
@@ -109,7 +109,7 @@ function TrapQuit {
 		exitcode=0
 	fi
 	CleanUp
-	KillChilds $$ > /dev/null 2>&1
+	KillChilds $SCRIPT_PID > /dev/null 2>&1
 
 	exit $exitcode
 }
