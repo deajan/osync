@@ -4,7 +4,7 @@ PROGRAM="osync" # Rsync based two way sync engine with fault tolerance
 AUTHOR="(C) 2013-2017 by Orsiris de Jong"
 CONTACT="http://www.netpower.fr/osync - ozy@netpower.fr"
 PROGRAM_VERSION=1.2.2-dev
-PROGRAM_BUILD=2017053002
+PROGRAM_BUILD=2017053003
 IS_STABLE=no
 
 
@@ -852,6 +852,22 @@ ENDSSH
 	fi
 }
 
+#WIP function that takes treeList files and gets ctime and mtime for each file, then compares those files to create the conflict file list
+function conflictFileList {
+	local replicaPath="${1}" # path to the replica for which a tree needs to be constructed
+	local replicaType="${2}" # replica type: initiator, target
+	local treeFilename="${3}" # filename to output tree (will be prefixed with $replicaType)
+	local conflictFileName="{4}"
+
+	__CheckArguments 4 $# "$@"	#__WITH_PARANOIA_DEBUG
+
+	local retval
+	local escapedReplicaPath
+	local rsyncCmd
+	#_getCtimeMtime
+	#compare
+}
+
 # rsync does sync with mtime, but file attribute modifications only change ctime.
 # Hence, detect newer ctime on the replica that gets updated first with CONFLICT_PREVALANCE and update all newer file attributes on this replica before real update
 function syncAttrs {
@@ -1335,10 +1351,11 @@ function deletionPropagation {
 ######
 ###### Step 0a & 0b: Create current file list of replicas
 ###### Step 1a & 1b: Create deleted file list of replicas
+###### Step 2a & 2b: Create conflict file list of replicas
 ###### Step 3: Update file attributes
-###### Step 3a & 3b: Update replicas
-###### Step 4a & 4b: Propagate deletions on replicas
-###### Step 5a & 5b: Create after run file list of replicas
+###### Step 4a & 4b: Update replicas
+###### Step 5a & 5b: Propagate deletions on replicas
+###### Step 6a & 6b: Create after run file list of replicas
 
 function Sync {
 	__CheckArguments 0 $# "$@"	#__WITH_PARANOIA_DEBUG
@@ -2022,9 +2039,13 @@ function Init {
 		TARGET_BACKUP=""
 	fi
 
+	#WIP: change resume numbers when new conflict function will be done
+	#WIP: conflict list is not mandatory, but is still needed for acl resolution
+	#WIP: syncAttrs must move the file list to sub function, which checks which kind of file list to use
 	SYNC_ACTION=(
 	'replica-tree'
 	'deleted-list'
+	'conflict-list'
 	'sync_attrs'
 	'update-replica'
 	'delete-propagation'
