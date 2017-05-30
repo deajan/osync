@@ -2066,6 +2066,7 @@ function Usage {
 	echo "--no-maxtime      Disables any soft and hard execution time checks"
 	echo "--force-unlock    Will override any existing active or dead locks on initiator and target replica"
 	echo "--on-changes      Will launch a sync task after a short wait period if there is some file activity on initiator replica. You should try daemon mode instead"
+	echo "--no-resume       Do not try to resume a failed run. By default, execution is resumed once"
 	echo ""
 	echo "[QUICKSYNC OPTIONS]"
 	echo "--initiator=\"\"		Master replica path. Will contain state and backup directory (is mandatory)"
@@ -2242,6 +2243,10 @@ for i in "$@"; do
 		sync_on_changes=true
 		_NOLOCKS=true
 		_LOGGER_PREFIX="date"
+		;;
+		--no-resume)
+		opts=$opts" --no-resume"
+		RESUME_TRY=0
 		;;
 		--no-locks)
 		_NOLOCKS=true
