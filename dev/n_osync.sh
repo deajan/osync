@@ -4,7 +4,7 @@ PROGRAM="osync" # Rsync based two way sync engine with fault tolerance
 AUTHOR="(C) 2013-2017 by Orsiris de Jong"
 CONTACT="http://www.netpower.fr/osync - ozy@netpower.fr"
 PROGRAM_VERSION=1.2.1-rc1
-PROGRAM_BUILD=2017053010
+PROGRAM_BUILD=2017053002
 IS_STABLE=yes
 
 ##### Execution order						#__WITH_PARANOIA_DEBUG
@@ -2247,12 +2247,15 @@ for i in "$@"; do
 		_NOLOCKS=true
 		;;
 		--errors-only)
+		opts=$opts" --errors-only"
 		_LOGGER_ERR_ONLY=true
 		;;
 		--summary)
+		opts=$opts" --summary"
 		_SUMMARY=true
 		;;
 		--no-prefix)
+		opts=$opts" --no-prefix"
 		_LOGGER_PREFIX=""
 		;;
 		--destination-mails=*)
