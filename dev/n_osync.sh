@@ -24,10 +24,11 @@ IS_STABLE=no
 #	 	Sync				no		#__WITH_PARANOIA_DEBUG
 #			treeList		yes		#__WITH_PARANOIA_DEBUG
 #			treeList		yes		#__WITH_PARANOIA_DEBUG
+#			_getFileCtimeMtime	yes		#__WITH_PARANOIA_DEBUG
+#			_getFileCtimeMtime	yes		#__WITH_PARANOIA_DEBUG
 #			deleteList		yes		#__WITH_PARANOIA_DEBUG
 #			deleteList		yes		#__WITH_PARANOIA_DEBUG
 #			syncAttrs		no		#__WITH_PARANOIA_DEBUG
-#			_getFileCtimeMtime	yes		#__WITH_PARANOIA_DEBUG
 #			syncUpdate		no		#__WITH_PARANOIA_DEBUG
 #			syncUpdate		no		#__WITH_PARANOIA_DEBUG
 #			deletionPropagation	yes		#__WITH_PARANOIA_DEBUG
