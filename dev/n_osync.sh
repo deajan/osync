@@ -4,7 +4,7 @@ PROGRAM="osync" # Rsync based two way sync engine with fault tolerance
 AUTHOR="(C) 2013-2017 by Orsiris de Jong"
 CONTACT="http://www.netpower.fr/osync - ozy@netpower.fr"
 PROGRAM_VERSION=1.2.2-dev
-PROGRAM_BUILD=2017053010
+PROGRAM_BUILD=2017053001
 IS_STABLE=no
 
 ##### Execution order						#__WITH_PARANOIA_DEBUG
@@ -2056,17 +2056,18 @@ function Usage {
 	echo "or     osync.sh --initiator=/path/to/initiator/replica --target=ssh://[backupuser]@remotehost.com[:portnumber]//path/to/target/replica [OPTIONS] [QUICKSYNC OPTIONS]"
 	echo ""
 	echo "[OPTIONS]"
-	echo "--dry             Will run osync without actually doing anything; just testing"
-	echo "--no-prefix       Will suppress time / date suffix from output"
-	echo "--silent          Will run osync without any output to stdout, used for cron jobs"
-	echo "--errors-only     Output only errors (can be combined with silent or verbose)"
-	echo "--summary         Outputs a list of transferred / deleted files at the end of the run"
-	echo "--verbose         Increases output"
-	echo "--stats           Adds rsync transfer statistics to verbose output"
-	echo "--partial         Allows rsync to keep partial downloads that can be resumed later (experimental)"
-	echo "--no-maxtime      Disables any soft and hard execution time checks"
-	echo "--force-unlock    Will override any existing active or dead locks on initiator and target replica"
-	echo "--on-changes      Will launch a sync task after a short wait period if there is some file activity on initiator replica. You should try daemon mode instead"
+	echo "--dry                  Will run osync without actually doing anything; just testing"
+	echo "--no-prefix            Will suppress time / date suffix from output"
+	echo "--silent               Will run osync without any output to stdout, used for cron jobs"
+	echo "--errors-only          Output only errors (can be combined with silent or verbose)"
+	echo "--summary              Outputs a list of transferred / deleted files at the end of the run"
+	echo "--log-conflicts        Outputs a list of conflicted files"
+	echo "--verbose              Increases output"
+	echo "--stats                Adds rsync transfer statistics to verbose output"
+	echo "--partial              Allows rsync to keep partial downloads that can be resumed later (experimental)"
+	echo "--no-maxtime           Disables any soft and hard execution time checks"
+	echo "--force-unlock         Will override any existing active or dead locks on initiator and target replica"
+	echo "--on-changes           Will launch a sync task after a short wait period if there is some file activity on initiator replica. You should try daemon mode instead"
 	echo ""
 	echo "[QUICKSYNC OPTIONS]"
 	echo "--initiator=\"\"		Master replica path. Will contain state and backup directory (is mandatory)"
@@ -2248,10 +2249,14 @@ for i in "$@"; do
 		_NOLOCKS=true
 		;;
 		--errors-only)
-		_LOGGER_ERR_ONLY=true
+		LOGGER_ERR_ONLY="yes"
 		;;
 		--summary)
 		_SUMMARY=true
+		;;
+		--log-conflicts)
+		_LOG_CONFLICTS=true
+		opts=$opts" --log-conflicts"
 		;;
 		--no-prefix)
 		_LOGGER_PREFIX=""
