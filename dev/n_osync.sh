@@ -4,7 +4,7 @@ PROGRAM="osync" # Rsync based two way sync engine with fault tolerance
 AUTHOR="(C) 2013-2017 by Orsiris de Jong"
 CONTACT="http://www.netpower.fr/osync - ozy@netpower.fr"
 PROGRAM_VERSION=1.2.2-dev
-PROGRAM_BUILD=2017053005
+PROGRAM_BUILD=2017053006
 IS_STABLE=no
 
 
@@ -2139,9 +2139,9 @@ function Init {
 	readonly __deletedListFile=13
 	readonly __failedDeletedListFile=14
 	readonly __successDeletedListFile=15
-	readonly __timestampCurrentFile=15
-	readonly __timestampPreviousFile=16
-	readonly __conflictListFile=17
+	readonly __timestampCurrentFile=16
+	readonly __timestampPreviousFile=17
+	readonly __conflictListFile=18
 
 	INITIATOR=()
 	INITIATOR[$__type]='initiator'
