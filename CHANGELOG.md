@@ -9,6 +9,7 @@ dd Mmm YYYY: osync v1.2.2. release
 
 dd Mmm YYYY: osync v1.2.1 release
 
+- Added --no-resume option in order to disable resuming execution on failure
 - Fixed missing options passed to subprocess in daemon mode
 - Fixed bogus pgrep can lead to segfault 11 because of recursive KillChilds
 - Fixed osync deletion not working on systems with ssh banner enabled
