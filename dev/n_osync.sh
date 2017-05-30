@@ -856,8 +856,8 @@ ENDSSH
 function timestampList {
 	local replicaPath="${1}" # path to the replica for which a tree needs to be constructed
 	local replicaType="${2}" # replica type: initiator, target
-	local treeFilename="${3}" # filename to output tree (will be prefixed with $replicaType)
-	local conflictFileName="{4}"
+	local fileList="${3}" # List of files to get timestamps for
+	local timestampFilename="${4}" # filename to output timestamp list (will be prefixed with $replicaType)
 
 	__CheckArguments 4 $# "$@"	#__WITH_PARANOIA_DEBUG
 
@@ -867,16 +867,33 @@ function timestampList {
 
 	Logger "Getting file stats for $replicaType replica." "NOTICE"
 
-	#_getCtimeMtime
-	#compare
+	if [ "$replicaType" == "${INITIATOR[$__type]}" ]; then
+		timestampFilename="${TARGET[$__type]}"
+	elif [ "$replicaType" == "${TARGET[$__type]}" ]; then
+		timestampFilename="${INITIATOR[$__type]}"
+	else
+		Logger "Bogus replicaType in [${FUNCNAME[0]}]." "CRITICAL"
+		exit 1
+	fi
+	Logger "Creating $replicaType replica file list [$replicaPath]." "NOTICE"
+	if [ "$REMOTE_OPERATION" == "yes" ] && [ "$replicaType" == "${TARGET[$__type]}" ]; then
+		CheckConnectivity3rdPartyHosts
+		CheckConnectivityRemoteHost
+		_getFileCtimeMtimeRemote "$replicaPath" "$replicaType" "$fileList" "$timestampFilename"
+	else
+		_getFileCtimeMtimeLocal "$replicaPath" "$replicaType" "$fileList" "$timestampFilename"
+	fi
 }
 
 #WIP
 function conflictList {
+	return 0
+
 	local replicaPath="${1}" # path to the replica for which a tree needs to be constructed
 	local replicaType="${2}" # replica type: initiator, target
-	local treeFilename="${3}" # filename to output tree (will be prefixed with $replicaType)
-	local conflictFileName="{4}"
+	local timestampCurrentFilename="${3}" # filename of current timestamp list (will be prefixed with $replicaType)
+	local timestampPreviousFilename="${3}" # filename of previous timestamp list (will be prefixed with $replicaType)
+	local conflictFilename="{4}" # filename of conflicts
 
 	__CheckArguments 4 $# "$@"	#__WITH_PARANOIA_DEBUG
 
@@ -886,8 +903,19 @@ function conflictList {
 
 	Logger "Creating conflict list for $replicaType replica." "NOTICE"
 
-	#_getCtimeMtime
-	#compare
+	# Compare if previous exists
+}
+
+#WIP
+function renameConflictList {
+	return 0
+
+	local timestampCurrentFilename="${3}" # filename of current timestamp list (will be prefixed with $replicaType)
+	local timestampPreviousFilename="${3}" # filename of previous timestamp list (will be prefixed with $replicaType)
+
+	__CheckArguments 4 $# "$@"	#__WITH_PARANOIA_DEBUG
+
+	# Rename files
 }
 
 # rsync does sync with mtime, but file attribute modifications only change ctime.
@@ -1369,7 +1397,7 @@ function deletionPropagation {
 	fi
 }
 
-###### Sync function in 6 steps
+###### Sync function in 9 steps
 ######
 ###### Step 0a & 0b: Create current file list of replicas
 ###### Step 1a & 1b: Create deleted file list of replicas
@@ -1379,6 +1407,7 @@ function deletionPropagation {
 ###### Step 5a & 5b: Update replicas
 ###### Step 6a & 6b: Propagate deletions on replicas
 ###### Step 7a & 8b: Create after run file list of replicas
+###### Step 8: Rename timestamp files from current to previous
 
 function Sync {
 	__CheckArguments 0 $# "$@"	#__WITH_PARANOIA_DEBUG
@@ -1535,12 +1564,12 @@ function Sync {
 	## Step 2a & 2b
 	if [ "$resumeInitiator" == "${SYNC_ACTION[2]}" ] || [ "$resumeTarget" == "${SYNC_ACTION[2]}" ]; then
 		if [ "$resumeInitiator" == "${SYNC_ACTION[2]}" ]; then
-			timestampList "${INITIATOR[$__type]}" &
+			timestampList "${INITIATOR[$__replicaDir]}" "${INITIATOR[$__type]}" "${INITIATOR[$__type]}${INITIATOR[$__timestampsCurrentFile]}" &
 			initiatorPid="$!"
 		fi
 
 		if [ "$resumeTarget" == "${SYNC_ACTION[2]}" ]; then
-			timestampList "${TARGET[$__type]}" &
+			timestampList "${TARGET[$__replicaDir]}" "${TARGET[$__type]}" "${TARGET[$__type]}${TARGET[$__timestampsCurrentFile]}" &
 			targetPid="$!"
 		fi
 
@@ -1789,6 +1818,30 @@ function Sync {
 			echo "${SYNC_ACTION[8]}" > "${INITIATOR[$__targetLastActionFile]}"
 			resumeInitiator="${SYNC_ACTION[8]}"
 			resumeTarget="${SYNC_ACTION[8]}"
+		fi
+	fi
+
+	# Step 8 #WIP adapt to last function
+	if [ "$resumeInitiator" == "${SYNC_ACTION[8]}" ] || [ "$resumeTarget" == "${SYNC_ACTION[8]}" ]; then
+		if [[ "$RSYNC_ATTR_ARGS" == *"-X"* ]] || [[ "$RSYNC_ATTR_ARGS" == *"-A"* ]]; then
+			renameTimestampFiles "${INITIATOR[$__replicaDir]}" "$TARGET_SYNC_DIR" &
+			WaitForTaskCompletion $! $SOFT_MAX_EXEC_TIME $HARD_MAX_EXEC_TIME $SLEEP_TIME $KEEP_LOGGING false true false
+			if [ $? -ne 0 ]; then
+				echo "${SYNC_ACTION[8]}" > "${INITIATOR[$__initiatorLastActionFile]}"
+				echo "${SYNC_ACTION[8]}" > "${INITIATOR[$__targetLastActionFile]}"
+				exit 1
+			else
+				echo "${SYNC_ACTION[9]}" > "${INITIATOR[$__initiatorLastActionFile]}"
+				echo "${SYNC_ACTION[9]}" > "${INITIATOR[$__targetLastActionFile]}"
+				resumeInitiator="${SYNC_ACTION[5]}"
+				resumeTarget="${SYNC_ACTION[5]}"
+
+			fi
+		else
+			echo "${SYNC_ACTION[9]}" > "${INITIATOR[$__initiatorLastActionFile]}"
+			echo "${SYNC_ACTION[9]}" > "${INITIATOR[$__targetLastActionFile]}"
+			resumeInitiator="${SYNC_ACTION[9]}"
+			resumeTarget="${SYNC_ACTION[9]}"
 		fi
 	fi
 
@@ -2086,6 +2139,9 @@ function Init {
 	readonly __deletedListFile=13
 	readonly __failedDeletedListFile=14
 	readonly __successDeletedListFile=15
+	readonly __timestampCurrentFile=15
+	readonly __timestampPreviousFile=16
+	readonly __conflictListFile=17
 
 	INITIATOR=()
 	INITIATOR[$__type]='initiator'
@@ -2104,6 +2160,9 @@ function Init {
 	INITIATOR[$__deletedListFile]="-deleted-list-$INSTANCE_ID$drySuffix"
 	INITIATOR[$__failedDeletedListFile]="-failed-delete-$INSTANCE_ID$drySuffix"
 	INITIATOR[$__successDeletedListFile]="-success-delete-$INSTANCE_ID$drySuffix"
+	INITIATOR[$__timestampCurrentFile]="-timestamps-current-$INSTANCE_ID$drySuffix"
+	INITIATOR[$__timestampPreviousFile]="-timestamps-previous-$INSTANCE_ID$drySuffix"
+	INITIATOR[$__conflictListfile]="conflicts-$INSTANCE_ID$drySuffix"
 
 	TARGET=()
 	TARGET[$__type]='target'
@@ -2122,6 +2181,9 @@ function Init {
 	TARGET[$__deletedListFile]="-deleted-list-$INSTANCE_ID$drySuffix"								# unused
 	TARGET[$__failedDeletedListFile]="-failed-delete-$INSTANCE_ID$drySuffix"
 	TARGET[$__successDeletedListFile]="-success-delete-$INSTANCE_ID$drySuffix"
+	TARGET[$__timestampCurrentFile]="-timestamps-current-$INSTANCE_ID$drySuffix"
+	TARGET[$__timestampPreviousFile]="-timestamps-previous-$INSTANCE_ID$drySuffix"
+	TARGET[$__conflictListfile]="conflicts-$INSTANCE_ID$drySuffix"
 
 	PARTIAL_DIR="${INITIATOR[$__partialDir]}"
 
@@ -2164,6 +2226,7 @@ function Init {
 	'update-replica'
 	'delete-propagation'
 	'replica-tree-after'
+	'rename-timestamp-files'
 	'synced'
 	)
 }
