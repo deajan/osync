@@ -1,10 +1,13 @@
 #!/usr/bin/env bash
 
+# treeList, deleteList, _getFileCtimeMtime, conflictList should be called without having statedir informed. Just give the full path ?
+
+
 PROGRAM="osync" # Rsync based two way sync engine with fault tolerance
 AUTHOR="(C) 2013-2017 by Orsiris de Jong"
 CONTACT="http://www.netpower.fr/osync - ozy@netpower.fr"
 PROGRAM_VERSION=1.2.2-dev
-PROGRAM_BUILD=2017053101
+PROGRAM_BUILD=2017053102
 IS_STABLE=no
 
 
@@ -25,10 +28,11 @@ IS_STABLE=no
 #	 	Sync				no		#__WITH_PARANOIA_DEBUG
 #			treeList		yes		#__WITH_PARANOIA_DEBUG
 #			treeList		yes		#__WITH_PARANOIA_DEBUG
-#			_getFileCtimeMtime	yes		#__WITH_PARANOIA_DEBUG
-#			_getFileCtimeMtime	yes		#__WITH_PARANOIA_DEBUG
 #			deleteList		yes		#__WITH_PARANOIA_DEBUG
 #			deleteList		yes		#__WITH_PARANOIA_DEBUG
+#			_getFileCtimeMtime	yes		#__WITH_PARANOIA_DEBUG
+#			_getFileCtimeMtime	yes		#__WITH_PARANOIA_DEBUG
+#			conflictList		no		#__WITH_PARANOIA_FDEBUG
 #			syncAttrs		no		#__WITH_PARANOIA_DEBUG
 #			syncUpdate		no		#__WITH_PARANOIA_DEBUG
 #			syncUpdate		no		#__WITH_PARANOIA_DEBUG
@@ -36,6 +40,7 @@ IS_STABLE=no
 #			deletionPropagation	yes		#__WITH_PARANOIA_DEBUG
 #			treeList		yes		#__WITH_PARANOIA_DEBUG
 #			treeList		yes		#__WITH_PARANOIA_DEBUG
+#			renameTimestampFiles	no		#__WITH_PARANOIA_DEBUG
 #		SoftDelete			yes		#__WITH_PARANOIA_DEBUG
 #	RunAfterHook				yes		#__WITH_PARANOIA_DEBUG
 #	UnlockReplicas				yes		#__WITH_PARANOIA_DEBUG
@@ -709,7 +714,7 @@ function treeList {
 	retval=$?
 
 	if [ -f "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$replicaType.$SCRIPT_PID.$TSTAMP" ]; then
-		mv -f "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$replicaType.$SCRIPT_PID.$TSTAMP" "${INITIATOR[$__replicaDir]}${INITIATOR[$__stateDir]}/$replicaType$treeFilename"
+		mv -f "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$replicaType.$SCRIPT_PID.$TSTAMP" "$treeFilename"
 	fi
 
 	## Retval 24 = some files vanished while creating list
@@ -798,7 +803,7 @@ function _getFileCtimeMtimeLocal {
 	local retval
 
 	echo -n "" > "$RUN_DIR/$PROGRAM.ctime_mtime.$replicaType.$SCRIPT_PID.$TSTAMP"
-	while read -r file; do $STAT_CTIME_MTIME_CMD "$replicaPath$file" | sort >> "$RUN_DIR/$PROGRAM.ctime_mtime.$replicaType.$SCRIPT_PID.$TSTAMP"; done < "${INITIATOR[$__replicaDir]}${INITIATOR[$__stateDir]}/$fileList"
+	while read -r file; do $STAT_CTIME_MTIME_CMD "$replicaPath$file" | sort >> "$RUN_DIR/$PROGRAM.ctime_mtime.$replicaType.$SCRIPT_PID.$TSTAMP"; done < "$fileList"
 	retval=$?
 	if [ $retval -ne 0 ]; then
 		Logger "Getting file attributes failed [$retval] on $replicaType. Stopping execution." "CRITICAL" $retval
@@ -806,6 +811,8 @@ function _getFileCtimeMtimeLocal {
 			Logger "Command output:\n$(cat $RUN_DIR/$PROGRAM.ctime_mtime.$replicaType.$SCRIPT_PID.$TSTAMP)" "WARN"
 		fi
 		return 1
+	else
+		mv -f "$RUN_DIR/$PROGRAM.ctime_mtime.$replicaType.$SCRIPT_PID.$TSTAMP" "$timestampFile"
 	fi
 
 }
@@ -824,7 +831,7 @@ function _getFileCtimeMtimeRemote {
 	local cmd
 
 	#WIP check if the following works with env remote token on top of cat
-	cmd='cat "'${INITIATOR[$__replicaDir]}${INITIATOR[$__stateDir]}/$fileList'" | '$SSH_CMD' "env _REMOTE_TOKEN=$_REMOTE_TOKEN cat > \".$PROGRAM.ctime_mtime.$replicaType.$SCRIPT_PID.$TSTAMP\""'
+	cmd='cat "'$fileList'" | '$SSH_CMD' "env _REMOTE_TOKEN=$_REMOTE_TOKEN cat > \".$PROGRAM.ctime_mtime.$replicaType.$SCRIPT_PID.$TSTAMP\""'
 	Logger "Launching command [$cmd]." "DEBUG"
 	eval "$cmd"
 	retval=$?
@@ -856,6 +863,7 @@ ENDSSH
 	else
 		# Ugly fix for csh in FreeBSD 11 that adds leading and trailing '\"'
 		sed -i.tmp -e 's/^\\"//' -e 's/\\"$//' "$RUN_DIR/$PROGRAM.ctime_mtime.$replicaType.$SCRIPT_PID.$TSTAMP"
+		 mv -f "$RUN_DIR/$PROGRAM.ctime_mtime.$replicaType.$SCRIPT_PID.$TSTAMP" "$timestampFile"
 	fi
 }
 
@@ -901,7 +909,13 @@ function conflictList {
 
 	Logger "Creating conflict list for $replicaType replica." "NOTICE"
 
+	#WIP missing replica type for those files, also check for presence of current filename
+	if [ -f "${INITIATOR[$__replicaDir]}${INITIATOR[$__stateDir]}/$timestampPreviousFilename" ] && [ -f "${INITIATOR[$__replicaDir]}${INITIATOR[$__stateDir]}/$timestampPreviousFilename" ]; then
 	# Compare if previous exists
+		Dummy
+		comm -23 "${INITIATOR[$__replicaDir]}${INITIATOR[$__stateDir]}/$timestampCurrentFilename" "${INITIATOR[$__replicaDir]}${INITIATOR[$__stateDir]}/$timestampPreviousFilename" > "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$SCRIPT_PID.$STAMP"
+		comm -23 "${INITIATOR[$__replicaDir]}${INITIATOR[$__stateDir]}/$timestampCurrentFilename" "${INITIATOR[$__replicaDir]}${INITIATOR[$__stateDir]}/$timestampPreviousFilename" > "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$SCRIPT_PID.$STAMP"
+	fi
 }
 
 #WIP
@@ -913,7 +927,7 @@ function renameTimestampFiles {
 
 	__CheckArguments 4 $# "$@"	#__WITH_PARANOIA_DEBUG
 
-	# Rename files
+	mv -f "${INITIATOR[$__replicaDir]}${INITIATOR[$__stateDir]}/$timestampCurrentFilename" "${INITIATOR[$__replicaDir]}${INITIATOR[$__stateDir]}/$timestampPreviousFileName"
 }
 
 # rsync does sync with mtime, but file attribute modifications only change ctime.
@@ -970,16 +984,17 @@ function syncAttrs {
 		fi
 	fi
 
+	#WIP: replace 4th argument with some state file
 	Logger "Getting ctimes for pending files on initiator." "NOTICE"
-	_getFileCtimeMtimeLocal "${INITIATOR[$__replicaDir]}" "${INITIATOR[$__type]}" "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}-cleaned.$SCRIPT_PID.$TSTAMP" &
+	_getFileCtimeMtimeLocal "${INITIATOR[$__replicaDir]}" "${INITIATOR[$__type]}" "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}-cleaned.$SCRIPT_PID.$TSTAMP" "$RUN_DIR/$PROGRAM.ctime_mtime___.${INITIATOR[$__type]}.$SCRIPT_PID.$TSTAMP" &
 	pids="$!"
 
 	Logger "Getting ctimes for pending files on target." "NOTICE"
 	if [ "$REMOTE_OPERATION" != "yes" ]; then
-		_getFileCtimeMtimeLocal "${TARGET[$__replicaDir]}" "${TARGET[$__type]}" "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}-cleaned.$SCRIPT_PID.$TSTAMP" &
+		_getFileCtimeMtimeLocal "${TARGET[$__replicaDir]}" "${TARGET[$__type]}" "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}-cleaned.$SCRIPT_PID.$TSTAMP" "$RUN_DIR/$PROGRAM.ctime_mtime___.${TARGET[$__type]}.$SCRIPT_PID.$TSTAMP" &
 		pids="$pids;$!"
 	else
-		_getFileCtimeMtimeRemote "${TARGET[$__replicaDir]}" "${TARGET[$__type]}" "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}-cleaned.$SCRIPT_PID.$TSTAMP" &
+		_getFileCtimeMtimeRemote "${TARGET[$__replicaDir]}" "${TARGET[$__type]}" "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}-cleaned.$SCRIPT_PID.$TSTAMP" "$RUN_DIR/$PROGRAM.ctime_mtime___.${TARGET[$__type]}.$SCRIPT_PID.$TSTAMP" &
 		pids="$pids;$!"
 	fi
 	WaitForTaskCompletion $pids $SOFT_MAX_EXEC_TIME $HARD_MAX_EXEC_TIME $SLEEP_TIME $KEEP_LOGGING false true false
@@ -992,8 +1007,8 @@ function syncAttrs {
 	# If target gets updated first, then sync_attr must update initiators attrs first
 	# For join, remove leading replica paths
 
-	sed -i'.tmp' "s;^${INITIATOR[$__replicaDir]};;g" "$RUN_DIR/$PROGRAM.ctime_mtime.${INITIATOR[$__type]}.$SCRIPT_PID.$TSTAMP"
-	sed -i'.tmp' "s;^${TARGET[$__replicaDir]};;g" "$RUN_DIR/$PROGRAM.ctime_mtime.${TARGET[$__type]}.$SCRIPT_PID.$TSTAMP"
+	sed -i'.tmp' "s;^${INITIATOR[$__replicaDir]};;g" "$RUN_DIR/$PROGRAM.ctime_mtime___.${INITIATOR[$__type]}.$SCRIPT_PID.$TSTAMP"
+	sed -i'.tmp' "s;^${TARGET[$__replicaDir]};;g" "$RUN_DIR/$PROGRAM.ctime_mtime___.${TARGET[$__type]}.$SCRIPT_PID.$TSTAMP"
 
 	if [ "$CONFLICT_PREVALANCE" == "${TARGET[$__type]}" ]; then
 		sourceDir="${INITIATOR[$__replicaDir]}"
@@ -1001,14 +1016,14 @@ function syncAttrs {
 		destDir="${TARGET[$__replicaDir]}"
 		escDestDir=$(EscapeSpaces "${TARGET[$__replicaDir]}")
 		destReplica="${TARGET[$__type]}"
-		join -j 1 -t ';' -o 1.1,1.2,2.2 "$RUN_DIR/$PROGRAM.ctime_mtime.${INITIATOR[$__type]}.$SCRIPT_PID.$TSTAMP" "$RUN_DIR/$PROGRAM.ctime_mtime.${TARGET[$__type]}.$SCRIPT_PID.$TSTAMP" | awk -F';' '{if ($2 > $3) print $1}' > "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}-ctime_files.$SCRIPT_PID.$TSTAMP"
+		join -j 1 -t ';' -o 1.1,1.2,2.2 "$RUN_DIR/$PROGRAM.ctime_mtime___.${INITIATOR[$__type]}.$SCRIPT_PID.$TSTAMP" "$RUN_DIR/$PROGRAM.ctime_mtime___.${TARGET[$__type]}.$SCRIPT_PID.$TSTAMP" | awk -F';' '{if ($2 > $3) print $1}' > "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}-ctime_files.$SCRIPT_PID.$TSTAMP"
 	else
 		sourceDir="${TARGET[$__replicaDir]}"
 		escSourceDir=$(EscapeSpaces "${TARGET[$__replicaDir]}")
 		destDir="${INITIATOR[$__replicaDir]}"
 		escDestDir=$(EscapeSpaces "${INITIATOR[$__replicaDir]}")
 		destReplica="${INITIATOR[$__type]}"
-		join -j 1 -t ';' -o 1.1,1.2,2.2 "$RUN_DIR/$PROGRAM.ctime_mtime.${TARGET[$__type]}.$SCRIPT_PID.$TSTAMP" "$RUN_DIR/$PROGRAM.ctime_mtime.${INITIATOR[$__type]}.$SCRIPT_PID.$TSTAMP" | awk -F';' '{if ($2 > $3) print $1}' > "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}-ctime_files.$SCRIPT_PID.$TSTAMP"
+		join -j 1 -t ';' -o 1.1,1.2,2.2 "$RUN_DIR/$PROGRAM.ctime_mtime___.${TARGET[$__type]}.$SCRIPT_PID.$TSTAMP" "$RUN_DIR/$PROGRAM.ctime_mtime___.${INITIATOR[$__type]}.$SCRIPT_PID.$TSTAMP" | awk -F';' '{if ($2 > $3) print $1}' > "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}-ctime_files.$SCRIPT_PID.$TSTAMP"
 	fi
 
 	if [ $(wc -l < "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}-ctime_files.$SCRIPT_PID.$TSTAMP") -eq 0 ]; then
@@ -1474,12 +1489,12 @@ function Sync {
 	## Step 0a & 0b
 	if [ "$resumeInitiator" == "none" ] || [ "$resumeTarget" == "none" ] || [ "$resumeInitiator" == "${SYNC_ACTION[0]}" ] || [ "$resumeTarget" == "${SYNC_ACTION[0]}" ]; then
 		if [ "$resumeInitiator" == "none" ] || [ "$resumeInitiator" == "${SYNC_ACTION[0]}" ]; then
-			treeList "${INITIATOR[$__replicaDir]}" "${INITIATOR[$__type]}" "${INITIATOR[$__treeCurrentFile]}" &
+			treeList "${INITIATOR[$__replicaDir]}" "${INITIATOR[$__type]}" "${INITIATOR[$__replicaDir]}${INITIATOR[$__stateDir]}/${INITIATOR[$__type]}${INITIATOR[$__treeCurrentFile]}" &
 			initiatorPid="$!"
 		fi
 
 		if [ "$resumeTarget" == "none" ] || [ "$resumeTarget" == "${SYNC_ACTION[0]}" ]; then
-			treeList "${TARGET[$__replicaDir]}" "${TARGET[$__type]}" "${INITIATOR[$__treeCurrentFile]}" &
+			treeList "${TARGET[$__replicaDir]}" "${TARGET[$__type]}" "${INITIATOR[$__replicaDir]}${INITIATOR[$__stateDir]}/${TARGET[$__type]}${INITIATOR[$__treeCurrentFile]}" &
 			targetPid="$!"
 		fi
 
@@ -1566,12 +1581,12 @@ function Sync {
 		if [[ "$RSYNC_ATTR_ARGS" == *"-X"* ]] || [[ "$RSYNC_ATTR_ARGS" == *"-A"* ]] || [ "$LOG_CONFLICTS" == "yes" ]; then
 
 			if [ "$resumeInitiator" == "${SYNC_ACTION[2]}" ]; then
-				timestampList "${INITIATOR[$__replicaDir]}" "${INITIATOR[$__type]}" "${INITIATOR[$__type]}${INITIATOR[$__treeCurrentFile]}" "${INITIATOR[$__type]}${INITIATOR[$__timestampCurrentFile]}" &
+				timestampList "${INITIATOR[$__replicaDir]}" "${INITIATOR[$__type]}" "${INITIATOR[$__replicaDir]}${INITIATOR[$__stateDir]}/${INITIATOR[$__type]}${INITIATOR[$__treeCurrentFile]}" "${INITIATOR[$__replicaDir]}${INITIATOR[$__stateDir]}/${INITIATOR[$__type]}${INITIATOR[$__timestampCurrentFile]}" &
 				initiatorPid="$!"
 			fi
 
 			if [ "$resumeTarget" == "${SYNC_ACTION[2]}" ]; then
-				timestampList "${TARGET[$__replicaDir]}" "${TARGET[$__type]}" "${TARGET[$__type]}${TARGET[$__treeCurrentFile]}" "${TARGET[$__type]}${TARGET[$__timestampCurrentFile]}" &
+				timestampList "${TARGET[$__replicaDir]}" "${TARGET[$__type]}" "${INITIATOR[$__replicaDir]}${INITIATOR[$__stateDir]}/${TARGET[$__type]}${TARGET[$__treeCurrentFile]}" "${INITIATOR[$__replicaDir]}${INITIATOR[$__stateDir]}/${TARGET[$__type]}${TARGET[$__timestampCurrentFile]}" &
 				targetPid="$!"
 			fi
 
@@ -1666,28 +1681,29 @@ function Sync {
 		fi
 	fi
 
+#WIP reenable syncAttrs. Also check attr tests since they should trigger an error
 	## Step 4
 	if [ "$resumeInitiator" == "${SYNC_ACTION[4]}" ] || [ "$resumeTarget" == "${SYNC_ACTION[4]}" ]; then
-#		if [[ "$RSYNC_ATTR_ARGS" == *"-X"* ]] || [[ "$RSYNC_ATTR_ARGS" == *"-A"* ]]; then
-#			syncAttrs "${INITIATOR[$__replicaDir]}" "$TARGET_SYNC_DIR" &
-#			WaitForTaskCompletion $! $SOFT_MAX_EXEC_TIME $HARD_MAX_EXEC_TIME $SLEEP_TIME $KEEP_LOGGING false true false
-#			if [ $? -ne 0 ]; then
-#				echo "${SYNC_ACTION[4]}" > "${INITIATOR[$__initiatorLastActionFile]}"
-#				echo "${SYNC_ACTION[4]}" > "${INITIATOR[$__targetLastActionFile]}"
-#				exit 1
-#			else
-#				echo "${SYNC_ACTION[5]}" > "${INITIATOR[$__initiatorLastActionFile]}"
-#				echo "${SYNC_ACTION[5]}" > "${INITIATOR[$__targetLastActionFile]}"
-#				resumeInitiator="${SYNC_ACTION[5]}"
-#				resumeTarget="${SYNC_ACTION[5]}"
-#
-#			fi
-#		else
+		if [[ "$RSYNC_ATTR_ARGS" == *"-X"* ]] || [[ "$RSYNC_ATTR_ARGS" == *"-A"* ]]; then
+			syncAttrs "${INITIATOR[$__replicaDir]}" "$TARGET_SYNC_DIR" &
+			WaitForTaskCompletion $! $SOFT_MAX_EXEC_TIME $HARD_MAX_EXEC_TIME $SLEEP_TIME $KEEP_LOGGING false true false
+			if [ $? -ne 0 ]; then
+				echo "${SYNC_ACTION[4]}" > "${INITIATOR[$__initiatorLastActionFile]}"
+				echo "${SYNC_ACTION[4]}" > "${INITIATOR[$__targetLastActionFile]}"
+				exit 1
+			else
+				echo "${SYNC_ACTION[5]}" > "${INITIATOR[$__initiatorLastActionFile]}"
+				echo "${SYNC_ACTION[5]}" > "${INITIATOR[$__targetLastActionFile]}"
+				resumeInitiator="${SYNC_ACTION[5]}"
+				resumeTarget="${SYNC_ACTION[5]}"
+
+			fi
+		else
 			echo "${SYNC_ACTION[5]}" > "${INITIATOR[$__initiatorLastActionFile]}"
 			echo "${SYNC_ACTION[5]}" > "${INITIATOR[$__targetLastActionFile]}"
 			resumeInitiator="${SYNC_ACTION[5]}"
 			resumeTarget="${SYNC_ACTION[5]}"
-#		fi
+		fi
 	fi
 
 	## Step 5a & 5b
@@ -1794,12 +1810,12 @@ function Sync {
 	## Step 7a & 7b
 	if [ "$resumeInitiator" == "${SYNC_ACTION[7]}" ] || [ "$resumeTarget" == "${SYNC_ACTION[7]}" ]; then
 		if [ "$resumeInitiator" == "${SYNC_ACTION[7]}" ]; then
-			treeList "${INITIATOR[$__replicaDir]}" "${INITIATOR[$__type]}" "${INITIATOR[$__treeAfterFile]}" &
+			treeList "${INITIATOR[$__replicaDir]}" "${INITIATOR[$__type]}" "${INITIATOR[$__replicaDir]}${INITIATOR[$__stateDir]}/${INITIATOR[$__type]}${INITIATOR[$__treeAfterFile]}" &
 			initiatorPid="$!"
 		fi
 
 		if [ "$resumeTarget" == "${SYNC_ACTION[7]}" ]; then
-			treeList "${TARGET[$__replicaDir]}" "${TARGET[$__type]}" "${INITIATOR[$__treeAfterFile]}" &
+			treeList "${TARGET[$__replicaDir]}" "${TARGET[$__type]}" "${INITIATOR[$__replicaDir]}${INITIATOR[$__stateDir]}/${TARGET[$__type]}${INITIATOR[$__treeAfterFile]}" &
 			targetPid="$!"
 		fi
 
