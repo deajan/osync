@@ -905,7 +905,7 @@ function conflictList {
 }
 
 #WIP
-function renameTimeStampFiles {
+function renameTimestampFiles {
 	return 0
 
 	local timestampCurrentFilename="${3}" # filename of current timestamp list (will be prefixed with $replicaType)
