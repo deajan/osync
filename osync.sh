@@ -3,11 +3,11 @@
 PROGRAM="osync" # Rsync based two way sync engine with fault tolerance
 AUTHOR="(C) 2013-2016 by Orsiris de Jong"
 CONTACT="http://www.netpower.fr/osync - ozy@netpower.fr"
-PROGRAM_VERSION=1.1.5
-PROGRAM_BUILD=2016111701
+PROGRAM_VERSION=1.1.6-beta
+PROGRAM_BUILD=2016113001
 IS_STABLE=yes
 
-## FUNC_BUILD=2016071902-g
+## FUNC_BUILD=2016071902-i
 ## BEGIN Generic functions for osync & obackup written in 2013-2016 by Orsiris de Jong - http://www.netpower.fr - ozy@netpower.fr
 
 ## type -p does not work on platforms other than linux (bash). If if does not work, always assume output is not a zero exitcode
@@ -23,6 +23,9 @@ KEEP_LOGGING=1801
 
 ## Correct output of sort command (language agnostic sorting)
 export LC_ALL=C
+
+## Default umask for file creation
+umask 0077
 
 # Standard alert mail body
 MAIL_ALERT_MSG="Execution of $PROGRAM instance $INSTANCE_ID on $(date) has warnings/errors."
@@ -43,12 +46,14 @@ WARN_ALERT=0
 ## allow debugging from command line with _DEBUG=yes
 if [ ! "$_DEBUG" == "yes" ]; then
 	_DEBUG=no
-	SLEEP_TIME=.1
 	_VERBOSE=0
 else
-	SLEEP_TIME=1
 	trap 'TrapError ${LINENO} $?' ERR
 	_VERBOSE=1
+fi
+
+if [ "$SLEEP_TIME" == "" ]; then
+	SLEEP_TIME=.1
 fi
 
 SCRIPT_PID=$$
@@ -172,32 +177,51 @@ function QuickLogger {
 
 # Portable child (and grandchild) kill function tester under Linux, BSD and MacOS X
 function KillChilds {
-	local pid="${1}"
-	local self="${2:-false}"
+        local pid="${1}" # Parent pid to kill childs
+        local self="${2:-false}" # Should parent be killed too ?
 
-	if children="$(pgrep -P "$pid")"; then
-		for child in $children; do
-			KillChilds "$child" true
-		done
-	fi
+        # Paranoid checks, we can safely assume that $pid shouldn't be 0 nor 1
+        if [ $(IsNumeric "$pid") -eq 0 ] || [ "$pid" == "" ] || [ "$pid" == "0" ] || [ "$pid" == "1" ]; then
+                Logger "Bogus pid given [$pid]." "CRITICAL"
+                return 1
+        fi
 
-	# Try to kill nicely, if not, wait 15 seconds to let Trap actions happen before killing
-	if ( [ "$self" == true ] && eval $PROCESS_TEST_CMD > /dev/null 2>&1); then
-		Logger "Sending SIGTERM to process [$pid]." "DEBUG"
-		kill -s SIGTERM "$pid"
-		if [ $? != 0 ]; then
-			sleep 15
-			Logger "Sending SIGTERM to process [$pid] failed." "DEBUG"
-			kill -9 "$pid"
-			if [ $? != 0 ]; then
-				Logger "Sending SIGKILL to process [$pid] failed." "DEBUG"
-				return 1
-			fi
-		fi
-		return 0
-	else
-		return 0
-	fi
+        if kill -0 "$pid" > /dev/null 2>&1; then
+                # Warning: pgrep is not native on cygwin, have this checked in CheckEnvironment
+                if children="$(pgrep -P "$pid")"; then
+                        if [[ "$pid" == *"$children"* ]]; then
+                                Logger "Bogus pgrep implementation." "CRITICAL"
+                                children="${children/$pid/}"
+                        fi
+                        for child in $children; do
+                                KillChilds "$child" true
+                        done
+                fi
+        fi
+
+        # Try to kill nicely, if not, wait 15 seconds to let Trap actions happen before killing
+        if [ "$self" == true ]; then
+                # We need to check for pid again because it may have disappeared after recursive function call
+                if kill -0 "$pid" > /dev/null 2>&1; then
+                        kill -s TERM "$pid"
+                        Logger "Sent SIGTERM to process [$pid]." "DEBUG"
+                        if [ $? != 0 ]; then
+                                sleep 15
+                                Logger "Sending SIGTERM to process [$pid] failed." "DEBUG"
+                                kill -9 "$pid"
+                                if [ $? != 0 ]; then
+                                        Logger "Sending SIGKILL to process [$pid] failed." "DEBUG"
+                                        return 1
+                                fi      # Simplify the return 0 logic here
+                        else
+                                return 0
+                        fi
+                else
+                        return 0
+                fi
+        else
+                return 0
+        fi
 }
 
 # osync/obackup/pmocr script specific mail alert function, use SendEmail function for generic mail sending
@@ -754,10 +778,10 @@ function WaitForTaskCompletion {
 				KillChilds $pid
 				if [ $? == 0 ]; then
 					Logger "Task stopped successfully" "NOTICE"
-					return 0
 				else
-					return 1
+					Logger "Could not stop task" "ERROR"
 				fi
+				return 1
 			fi
 		fi
 		sleep $SLEEP_TIME
@@ -801,10 +825,16 @@ function WaitForCompletion {
 				KillChilds $pid
 				if [ $? == 0 ]; then
 					Logger "Task stopped successfully" "NOTICE"
-					return 0
 				else
-					return 1
+					Logger "Could not stop task" "ERROR"
 				fi
+				return 1
+				#if [ $? == 0 ]; then
+				#	Logger "Task stopped successfully" "NOTICE"
+				#	return 0
+				#else
+				#	return 1
+				#fi
 			fi
 		fi
 		sleep $SLEEP_TIME
@@ -1136,9 +1166,9 @@ function PreInit {
 function PostInit {
 
 	# Define remote commands
-	SSH_CMD="$(type -p ssh) $SSH_COMP -i $SSH_RSA_PRIVATE_KEY $SSH_OPTS $REMOTE_USER@$REMOTE_HOST -p $REMOTE_PORT"
-	SCP_CMD="$(type -p scp) $SSH_COMP -i $SSH_RSA_PRIVATE_KEY -P $REMOTE_PORT"
-	RSYNC_SSH_CMD="$(type -p ssh) $SSH_COMP -i $SSH_RSA_PRIVATE_KEY $SSH_OPTS -p $REMOTE_PORT"
+	SSH_CMD="$(type -p ssh) $SSH_COMP -q -i $SSH_RSA_PRIVATE_KEY $SSH_OPTS $REMOTE_USER@$REMOTE_HOST -p $REMOTE_PORT"
+	SCP_CMD="$(type -p scp) $SSH_COMP -q -i $SSH_RSA_PRIVATE_KEY -P $REMOTE_PORT"
+	RSYNC_SSH_CMD="$(type -p ssh) $SSH_COMP -q -i $SSH_RSA_PRIVATE_KEY $SSH_OPTS -p $REMOTE_PORT"
 }
 
 function InitLocalOSSettings {
@@ -1215,7 +1245,7 @@ function TrapStop {
 }
 
 function TrapQuit {
-	local exitcode=
+	local exitcode
 
 	# Get ERROR / WARN alert flags from subprocesses that call Logger
 	if [ -f "$RUN_DIR/$PROGRAM.Logger.warn.$SCRIPT_PID" ]; then
@@ -2802,7 +2832,6 @@ do
 		;;
 		--initiator=*)
 		_QUICK_SYNC=$(($_QUICK_SYNC + 1))
-		no_maxtime=1
 		INITIATOR_SYNC_DIR=${i##*=}
 		opts=$opts" --initiator=\"$INITIATOR_SYNC_DIR\""
 		;;
@@ -2810,7 +2839,6 @@ do
 		_QUICK_SYNC=$(($_QUICK_SYNC + 1))
 		TARGET_SYNC_DIR=${i##*=}
 		opts=$opts" --target=\"$TARGET_SYNC_DIR\""
-		no_maxtime=1
 		;;
 		--rsakey=*)
 		SSH_RSA_PRIVATE_KEY=${i##*=}
@@ -2922,7 +2950,7 @@ opts="${opts# *}"
 		GetRemoteOS
 		InitRemoteOSSettings
 
-		if [ $no_maxtime -eq 1 ]; then
+		if [ $no_maxtime -eq 1 ] ; then
 			SOFT_MAX_EXEC_TIME=0
 			HARD_MAX_EXEC_TIME=0
 		fi
