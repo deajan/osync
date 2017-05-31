@@ -872,9 +872,8 @@ function timestampList {
 	local escapedReplicaPath
 	local rsyncCmd
 
-	Logger "Getting file stats for $replicaType replica." "NOTICE"
+	Logger "Getting file stats for $replicaType replica [$replicaPath]." "NOTICE"
 
-	Logger "Creating $replicaType replica file list [$replicaPath]." "NOTICE"
 	if [ "$REMOTE_OPERATION" == "yes" ] && [ "$replicaType" == "${TARGET[$__type]}" ]; then
 		CheckConnectivity3rdPartyHosts
 		CheckConnectivityRemoteHost
@@ -906,7 +905,7 @@ function conflictList {
 }
 
 #WIP
-function renameConflictList {
+function renameTimeStampFiles {
 	return 0
 
 	local timestampCurrentFilename="${3}" # filename of current timestamp list (will be prefixed with $replicaType)
