@@ -4,7 +4,7 @@ PROGRAM="osync" # Rsync based two way sync engine with fault tolerance
 AUTHOR="(C) 2013-2017 by Orsiris de Jong"
 CONTACT="http://www.netpower.fr/osync - ozy@netpower.fr"
 PROGRAM_VERSION=1.2.2-dev
-PROGRAM_BUILD=2017053007
+PROGRAM_BUILD=2017053101
 IS_STABLE=no
 
 
@@ -789,7 +789,7 @@ function _getFileCtimeMtimeLocal {
 	local replicaPath="${1}" # Contains replica path
 	local replicaType="${2}" # Initiator / Target
 	local fileList="${3}" # Contains list of files to get time attrs
-	local timestampFile="${4}"
+	local timestampFile="${4}" # Where to store the timestamp file
 
 	#WIP change output file to timestampFile
 
@@ -798,7 +798,7 @@ function _getFileCtimeMtimeLocal {
 	local retval
 
 	echo -n "" > "$RUN_DIR/$PROGRAM.ctime_mtime.$replicaType.$SCRIPT_PID.$TSTAMP"
-	while read -r file; do $STAT_CTIME_MTIME_CMD "$replicaPath$file" | sort >> "$RUN_DIR/$PROGRAM.ctime_mtime.$replicaType.$SCRIPT_PID.$TSTAMP"; done < "$replicaPathfileList"
+	while read -r file; do $STAT_CTIME_MTIME_CMD "$replicaPath$file" | sort >> "$RUN_DIR/$PROGRAM.ctime_mtime.$replicaType.$SCRIPT_PID.$TSTAMP"; done < "${INITIATOR[$__replicaDir]}${INITIATOR[$__stateDir]}/$fileList"
 	retval=$?
 	if [ $retval -ne 0 ]; then
 		Logger "Getting file attributes failed [$retval] on $replicaType. Stopping execution." "CRITICAL" $retval
@@ -824,7 +824,7 @@ function _getFileCtimeMtimeRemote {
 	local cmd
 
 	#WIP check if the following works with env remote token on top of cat
-	cmd='cat "'$fileList'" | '$SSH_CMD' "env _REMOTE_TOKEN=$_REMOTE_TOKEN cat > \".$PROGRAM.ctime_mtime.$replicaType.$SCRIPT_PID.$TSTAMP\""'
+	cmd='cat "'${INITIATOR[$__replicaDir]}${INITIATOR[$__stateDir]}/$fileList'" | '$SSH_CMD' "env _REMOTE_TOKEN=$_REMOTE_TOKEN cat > \".$PROGRAM.ctime_mtime.$replicaType.$SCRIPT_PID.$TSTAMP\""'
 	Logger "Launching command [$cmd]." "DEBUG"
 	eval "$cmd"
 	retval=$?
@@ -874,14 +874,6 @@ function timestampList {
 
 	Logger "Getting file stats for $replicaType replica." "NOTICE"
 
-	if [ "$replicaType" == "${INITIATOR[$__type]}" ]; then
-		timestampFilename="${TARGET[$__type]}"
-	elif [ "$replicaType" == "${TARGET[$__type]}" ]; then
-		timestampFilename="${INITIATOR[$__type]}"
-	else
-		Logger "Bogus replicaType in [${FUNCNAME[0]}]." "CRITICAL"
-		exit 1
-	fi
 	Logger "Creating $replicaType replica file list [$replicaPath]." "NOTICE"
 	if [ "$REMOTE_OPERATION" == "yes" ] && [ "$replicaType" == "${TARGET[$__type]}" ]; then
 		CheckConnectivity3rdPartyHosts
@@ -1575,12 +1567,12 @@ function Sync {
 		if [[ "$RSYNC_ATTR_ARGS" == *"-X"* ]] || [[ "$RSYNC_ATTR_ARGS" == *"-A"* ]] || [ "$LOG_CONFLICTS" == "yes" ]; then
 
 			if [ "$resumeInitiator" == "${SYNC_ACTION[2]}" ]; then
-				timestampList "${INITIATOR[$__replicaDir]}" "${INITIATOR[$__type]}" "${INITIATOR[$__type]}${INITIATOR[$__treeCurrentFile]}" "${INITIATOR[$__timestampCurrentFile]}" &
+				timestampList "${INITIATOR[$__replicaDir]}" "${INITIATOR[$__type]}" "${INITIATOR[$__type]}${INITIATOR[$__treeCurrentFile]}" "${INITIATOR[$__type]}${INITIATOR[$__timestampCurrentFile]}" &
 				initiatorPid="$!"
 			fi
 
 			if [ "$resumeTarget" == "${SYNC_ACTION[2]}" ]; then
-				timestampList "${TARGET[$__replicaDir]}" "${TARGET[$__type]}" "${TARGET[$__type]}${TARGET[$__treeCurrentFile]}" "${TARGET[$__timestampCurrentFile]}" &
+				timestampList "${TARGET[$__replicaDir]}" "${TARGET[$__type]}" "${TARGET[$__type]}${TARGET[$__treeCurrentFile]}" "${TARGET[$__type]}${TARGET[$__timestampCurrentFile]}" &
 				targetPid="$!"
 			fi
 
