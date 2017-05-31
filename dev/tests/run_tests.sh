@@ -7,7 +7,7 @@
 
 ## On CYGWIN / MSYS, ACL and extended attributes aren't supported
 
-# osync test suite 2016121202
+# osync test suite 2017053101
 
 # 4 tests:
 # quicklocal
@@ -191,6 +191,10 @@ function oneTimeSetUp () {
 	START_TIME=$SECONDS
 
 	source "$DEV_DIR/ofunctions.sh"
+
+        # Fix default umask because of ACL test that expects 0022 when creating test files
+        umask 0022
+
 	GetLocalOS
 
 	echo "Detected OS: $LOCAL_OS"

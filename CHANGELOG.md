@@ -7,7 +7,11 @@ KNOWN ISSUES
 RECENT CHANGES
 --------------
 
-dd mmm YYYY: osync v1.1.6 released
+31 May 2017: osync v1.1.6 released
+- Backported v1.2.1 fixes
+	- Fixed bogus pgrep can lead to segfault 11 because of recursive KillChilds
+	- Fixed osync deletion not working on systems with ssh banner enabled
+	- Fixed low severity security issue where log and run files could be read by other users
 - SLEEP_TIME, SOFT_MAX_EXEC_TIME and HARD_MAX_EXEC_TIME can now be set as environment variables
 - Backported unit tests from v1.2-beta allowing to fix the following
 	- HARD_MAX_EXEC_TIME wasn't enforced properly
