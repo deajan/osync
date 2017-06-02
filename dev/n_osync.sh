@@ -6,7 +6,7 @@ PROGRAM="osync" # Rsync based two way sync engine with fault tolerance
 AUTHOR="(C) 2013-2017 by Orsiris de Jong"
 CONTACT="http://www.netpower.fr/osync - ozy@netpower.fr"
 PROGRAM_VERSION=1.2.2-dev
-PROGRAM_BUILD=2017060101
+PROGRAM_BUILD=2017060201
 IS_STABLE=no
 
 
@@ -898,7 +898,7 @@ function conflictList {
 	local timestampPreviousFilename="${2}" # filename of previous timestamp list (will be prefixed with $replicaType)
 	local conflictFilename="{3}" # filename of conflicts
 
-	__CheckArguments 4 $# "$@"	#__WITH_PARANOIA_DEBUG
+	__CheckArguments 3 $# "$@"	#__WITH_PARANOIA_DEBUG
 
 	local retval
 	local escapedReplicaPath
@@ -910,6 +910,7 @@ function conflictList {
 		sed -i'.replicaPath' "s;^${TARGET[$__replicaDir]};;g" "${INITIATOR[$__replicaDir]}${INITIATOR[$__stateDir]}/${TARGET[$__type]}$timestampCurrentFilename"
 	fi
 
+	   echo "${INITIATOR[$__replicaDir]}${INITIATOR[$__stateDir]}/${INITIATOR[$__type]}-$timestampPreviousFilename-     ${INITIATOR[$__replicaDir]}${INITIATOR[$__stateDir]}/${TARGET[$__type]}$timestampPreviousFilename"
 	if [ -f "${INITIATOR[$__replicaDir]}${INITIATOR[$__stateDir]}/${INITIATOR[$__type]}$timestampPreviousFilename" ] && [ -f "${INITIATOR[$__replicaDir]}${INITIATOR[$__stateDir]}/${TARGET[$__type]}$timestampPreviousFilename" ]; then
 
 		Logger "Creating conflictual file list." "NOTICE"
@@ -920,6 +921,8 @@ function conflictList {
 
 		cp "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.${INITIATOR[$__type]}.$SCRIPT_PID.$STAMP" /tmp/i
 		cp "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.${TARGET[$__type]}.$SCRIPT_PID.$STAMP" /tmp/t
+	else
+		Logger "Mongo" "WARN"
 	fi
 }
 
@@ -1637,7 +1640,7 @@ function Sync {
 	## Step 3a & 3b
 	if [ "$resumeInitiator" == "${SYNC_ACTION[3]}" ] || [ "$resumeTarget" == "${SYNC_ACTION[3]}" ]; then
 		if [[ "$RSYNC_ATTR_ARGS" == *"-X"* ]] || [[ "$RSYNC_ATTR_ARGS" == *"-A"* ]] || [ "$LOG_CONFLICTS" == "yes" ]; then
-			conflictList "${INITIATOR[$__timestampCurrentFile]}" "${INITIATOR[$__timestempPreviousFile]}" &
+			conflictList "${INITIATOR[$__timestampCurrentFile]}" "${INITIATOR[$__timestampPreviousFile]}" "${INITIATOR[$__conflictListFile]}" &
 			WaitForTaskCompletion $! $SOFT_MAX_EXEC_TIME $HARD_MAX_EXEC_TIME $SLEEP_TIME $KEEP_LOGGING false true false
 			if [ $? -ne 0 ]; then
 				echo "${SYNC_ACTION[3]}" > "${INITIATOR[$__initiatorLastActionFile]}"
