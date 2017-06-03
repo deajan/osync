@@ -2,7 +2,6 @@
 
 #TODO treeList, deleteList, _getFileCtimeMtime, conflictList should be called without having statedir informed. Just give the full path ?
 #TODO add error handling to new functions
-#TODO replace renameTimestampFiles with another _getFileCtimeMtime run in order to get real values after execution
 #TODO check if _getCtimeMtime | sort removal needs to be backported
 
 PROGRAM="osync" # Rsync based two way sync engine with fault tolerance
@@ -3056,8 +3055,6 @@ function _getFileCtimeMtimeRemote {
 	local fileList="${3}"
 	local timestampFile="${4}"
 
-	#WIP change output file to timestampFile
-
 	__CheckArguments 4 $# "$@"	#__WITH_PARANOIA_DEBUG
 
 	local retval
@@ -3157,13 +3154,9 @@ function conflictList {
 
 		Logger "Creating conflictual file list." "NOTICE"
 
-		#WIP --nocheck-order or check why comm is complaining
 		comm -23 "${INITIATOR[$__replicaDir]}${INITIATOR[$__stateDir]}/${INITIATOR[$__type]}$timestampCurrentFilename" "${INITIATOR[$__replicaDir]}${INITIATOR[$__stateDir]}/${INITIATOR[$__type]}$timestampAfterFilename" > "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.${INITIATOR[$__type]}.$SCRIPT_PID.$TSTAMP"
 		comm -23 "${INITIATOR[$__replicaDir]}${INITIATOR[$__stateDir]}/${TARGET[$__type]}$timestampCurrentFilename" "${INITIATOR[$__replicaDir]}${INITIATOR[$__stateDir]}/${TARGET[$__type]}$timestampAfterFilename" > "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.${TARGET[$__type]}.$SCRIPT_PID.$TSTAMP"
 
-		#WIP
-		cp "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.${INITIATOR[$__type]}.$SCRIPT_PID.$TSTAMP" /tmp/i
-		cp "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.${TARGET[$__type]}.$SCRIPT_PID.$TSTAMP" /tmp/t
 		join -j 1 -t ';' -o 1.1,1.2,1.3,2.2,2.3 "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.${INITIATOR[$__type]}.$SCRIPT_PID.$TSTAMP" "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.${TARGET[$__type]}.$SCRIPT_PID.$TSTAMP" > "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.comapre.$SCRIPT_PID.$TSTAMP"
 
 	fi
@@ -3771,8 +3764,8 @@ function deletionPropagation {
 ###### Step 4: Update file attributes
 ###### Step 5a & 5b: Update replicas
 ###### Step 6a & 6b: Propagate deletions on replicas
-###### Step 7a & 8b: Create after run file list of replicas
-###### Step 8: Rename timestamp files from current to previous
+###### Step 7a & 7b: Create after run file list of replicas
+###### Step 8a & 8b: Create ctime & mtime file lost of replicas
 
 function Sync {
 	__CheckArguments 0 $# "$@"	#__WITH_PARANOIA_DEBUG
@@ -4005,7 +3998,6 @@ function Sync {
 		fi
 	fi
 
-#WIP reenable syncAttrs. Also check attr tests since they should trigger an error
 	## Step 4
 	if [ "$resumeInitiator" == "${SYNC_ACTION[4]}" ] || [ "$resumeTarget" == "${SYNC_ACTION[4]}" ]; then
 		if [[ "$RSYNC_ATTR_ARGS" == *"-X"* ]] || [[ "$RSYNC_ATTR_ARGS" == *"-A"* ]]; then
@@ -4176,7 +4168,7 @@ function Sync {
 		fi
 	fi
 
-	# Step 8 #WIP adapt to last function
+	# Step 8a & 8b
 	if [ "$resumeInitiator" == "${SYNC_ACTION[8]}" ] || [ "$resumeTarget" == "${SYNC_ACTION[8]}" ]; then
 		if [[ "$RSYNC_ATTR_ARGS" == *"-X"* ]] || [[ "$RSYNC_ATTR_ARGS" == *"-A"* ]] || [ "$LOG_CONFLICTS" == "yes" ]; then
 
@@ -4618,13 +4610,13 @@ function Init {
 	SYNC_ACTION=(
 	'replica-tree'
 	'deleted-list'
-	'ctime-mtime-list'
+	'timestampList-list'
 	'conflict-list'
 	'sync_attrs'
 	'update-replica'
 	'delete-propagation'
 	'replica-tree-after'
-	'rename-timestamp-files'
+	'timestampList-after'
 	'synced'
 	)
 }
