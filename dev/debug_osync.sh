@@ -1,11 +1,17 @@
 #!/usr/bin/env bash
 
+#TODO treeList, deleteList, _getFileCtimeMtime, conflictList should be called without having statedir informed. Just give the full path ?
+#TODO add error handling to new functions
+#TODO replace renameTimestampFiles with another _getFileCtimeMtime run in order to get real values after execution
+#TODO check if _getCtimeMtime | sort removal needs to be backported
+
 PROGRAM="osync" # Rsync based two way sync engine with fault tolerance
 AUTHOR="(C) 2013-2017 by Orsiris de Jong"
 CONTACT="http://www.netpower.fr/osync - ozy@netpower.fr"
-PROGRAM_VERSION=1.2.1-dev
-PROGRAM_BUILD=2017052201
-IS_STABLE=yes
+PROGRAM_VERSION=1.2.2-dev
+PROGRAM_BUILD=2017060303
+IS_STABLE=no
+
 
 ##### Execution order						#__WITH_PARANOIA_DEBUG
 #####	Function Name				Is parallel	#__WITH_PARANOIA_DEBUG
@@ -23,24 +29,22 @@ IS_STABLE=yes
 #	 	HandleLocks			yes		#__WITH_PARANOIA_DEBUG
 #	 	Sync				no		#__WITH_PARANOIA_DEBUG
 #			treeList		yes		#__WITH_PARANOIA_DEBUG
-#			treeList		yes		#__WITH_PARANOIA_DEBUG
 #			deleteList		yes		#__WITH_PARANOIA_DEBUG
-#			deleteList		yes		#__WITH_PARANOIA_DEBUG
+#			timestampList		yes		#__WITH_PARANOIA_DEBUG
+#			conflictList		no		#__WITH_PARANOIA_DEBUG
 #			syncAttrs		no		#__WITH_PARANOIA_DEBUG
-#			_getFileCtimeMtime	yes		#__WITH_PARANOIA_DEBUG
 #			syncUpdate		no		#__WITH_PARANOIA_DEBUG
 #			syncUpdate		no		#__WITH_PARANOIA_DEBUG
 #			deletionPropagation	yes		#__WITH_PARANOIA_DEBUG
-#			deletionPropagation	yes		#__WITH_PARANOIA_DEBUG
 #			treeList		yes		#__WITH_PARANOIA_DEBUG
-#			treeList		yes		#__WITH_PARANOIA_DEBUG
+#			timestampList		yes		#__WITH_PARANOIA_DEBUG
 #		SoftDelete			yes		#__WITH_PARANOIA_DEBUG
 #	RunAfterHook				yes		#__WITH_PARANOIA_DEBUG
 #	UnlockReplicas				yes		#__WITH_PARANOIA_DEBUG
 #	CleanUp					no		#__WITH_PARANOIA_DEBUG
 
 
-_OFUNCTIONS_VERSION=2.1.4-dev
+_OFUNCTIONS_VERSION=2.1.4-rc1
 _OFUNCTIONS_BUILD=2017052902
 _OFUNCTIONS_BOOTSTRAP=true
 
@@ -2945,7 +2949,7 @@ function treeList {
 	retval=$?
 
 	if [ -f "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$replicaType.$SCRIPT_PID.$TSTAMP" ]; then
-		mv -f "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$replicaType.$SCRIPT_PID.$TSTAMP" "${INITIATOR[$__replicaDir]}${INITIATOR[$__stateDir]}/$replicaType$treeFilename"
+		mv -f "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$replicaType.$SCRIPT_PID.$TSTAMP" "$treeFilename"
 	fi
 
 	## Retval 24 = some files vanished while creating list
@@ -3025,13 +3029,14 @@ function _getFileCtimeMtimeLocal {
 	local replicaPath="${1}" # Contains replica path
 	local replicaType="${2}" # Initiator / Target
 	local fileList="${3}" # Contains list of files to get time attrs
+	local timestampFile="${4}" # Where to store the timestamp file
 
-	__CheckArguments 3 $# "$@"	#__WITH_PARANOIA_DEBUG
+	__CheckArguments 4 $# "$@"	#__WITH_PARANOIA_DEBUG
 
 	local retval
 
 	echo -n "" > "$RUN_DIR/$PROGRAM.ctime_mtime.$replicaType.$SCRIPT_PID.$TSTAMP"
-	while read -r file; do $STAT_CTIME_MTIME_CMD "$replicaPath$file" | sort >> "$RUN_DIR/$PROGRAM.ctime_mtime.$replicaType.$SCRIPT_PID.$TSTAMP"; done < "$fileList"
+	while read -r file; do $STAT_CTIME_MTIME_CMD "$replicaPath$file" >> "$RUN_DIR/$PROGRAM.ctime_mtime.$replicaType.$SCRIPT_PID.$TSTAMP"; done < "$fileList"
 	retval=$?
 	if [ $retval -ne 0 ]; then
 		Logger "Getting file attributes failed [$retval] on $replicaType. Stopping execution." "CRITICAL" $retval
@@ -3039,6 +3044,8 @@ function _getFileCtimeMtimeLocal {
 			Logger "Command output:\n$(cat $RUN_DIR/$PROGRAM.ctime_mtime.$replicaType.$SCRIPT_PID.$TSTAMP)" "WARN"
 		fi
 		return 1
+	else
+		cat "$RUN_DIR/$PROGRAM.ctime_mtime.$replicaType.$SCRIPT_PID.$TSTAMP" | sort > "$timestampFile"
 	fi
 
 }
@@ -3047,7 +3054,11 @@ function _getFileCtimeMtimeRemote {
 	local replicaPath="${1}" # Contains replica path
 	local replicaType="${2}"
 	local fileList="${3}"
-	__CheckArguments 3 $# "$@"	#__WITH_PARANOIA_DEBUG
+	local timestampFile="${4}"
+
+	#WIP change output file to timestampFile
+
+	__CheckArguments 4 $# "$@"	#__WITH_PARANOIA_DEBUG
 
 	local retval
 	local cmd
@@ -3066,11 +3077,14 @@ function _getFileCtimeMtimeRemote {
 		return 1
 	fi
 
+#WIP LANG=C... backport to v1.2.1 and v1.1
+
 $SSH_CMD env _REMOTE_TOKEN="$_REMOTE_TOKEN" \
 env _DEBUG="'$_DEBUG'" env _PARANOIA_DEBUG="'$_PARANOIA_DEBUG'" env _LOGGER_SILENT="'$_LOGGER_SILENT'" env _LOGGER_VERBOSE="'$_LOGGER_VERBOSE'" env _LOGGER_PREFIX="'$_LOGGER_PREFIX'" env _LOGGER_ERR_ONLY="'$_LOGGER_ERR_ONLY'" \
 env PROGRAM="'$PROGRAM'" env SCRIPT_PID="'$SCRIPT_PID'" TSTAMP="'$TSTAMP'" \
-env replicaPath="'$replicaPath'" env replicaType="'$replicaType'" env REMOTE_STAT_CTIME_MTIME_CMD="'$REMOTE_STAT_CTIME_MTIME_CMD'" $COMMAND_SUDO' bash -s' << 'ENDSSH' > "$RUN_DIR/$PROGRAM.ctime_mtime.$replicaType.$SCRIPT_PID.$TSTAMP"
-	while read -r file; do $REMOTE_STAT_CTIME_MTIME_CMD "$replicaPath$file" | sort; done < ".$PROGRAM.ctime_mtime.$replicaType.$SCRIPT_PID.$TSTAMP"
+env replicaPath="'$replicaPath'" env replicaType="'$replicaType'" env REMOTE_STAT_CTIME_MTIME_CMD="'$REMOTE_STAT_CTIME_MTIME_CMD'" \
+env LANG=C $COMMAND_SUDO' bash -s' << 'ENDSSH' > "$RUN_DIR/$PROGRAM.ctime_mtime.$replicaType.$SCRIPT_PID.$TSTAMP"
+	while read -r file; do $REMOTE_STAT_CTIME_MTIME_CMD "$replicaPath$file"; done < ".$PROGRAM.ctime_mtime.$replicaType.$SCRIPT_PID.$TSTAMP"
 		if [ -f ".$PROGRAM.ctime_mtime.$replicaType.$SCRIPT_PID.$TSTAMP" ]; then
 			rm -f ".$PROGRAM.ctime_mtime.$replicaType.$SCRIPT_PID.$TSTAMP"
 		fi
@@ -3085,6 +3099,73 @@ ENDSSH
 	else
 		# Ugly fix for csh in FreeBSD 11 that adds leading and trailing '\"'
 		sed -i.tmp -e 's/^\\"//' -e 's/\\"$//' "$RUN_DIR/$PROGRAM.ctime_mtime.$replicaType.$SCRIPT_PID.$TSTAMP"
+		 cat "$RUN_DIR/$PROGRAM.ctime_mtime.$replicaType.$SCRIPT_PID.$TSTAMP" | sort > "$timestampFile"
+	fi
+}
+
+#WIP function that takes treeList files and gets ctime and mtime for each file, then compares those files to create the conflict file list
+function timestampList {
+	local replicaPath="${1}" # path to the replica for which a tree needs to be constructed
+	local replicaType="${2}" # replica type: initiator, target
+	local fileList="${3}" # List of files to get timestamps for
+	local timestampFilename="${4}" # filename to output timestamp list (will be prefixed with $replicaType)
+
+	__CheckArguments 4 $# "$@"	#__WITH_PARANOIA_DEBUG
+
+	local retval
+	local escapedReplicaPath
+	local rsyncCmd
+
+	Logger "Getting file stats for $replicaType replica [$replicaPath]." "NOTICE"
+
+	if [ "$REMOTE_OPERATION" == "yes" ] && [ "$replicaType" == "${TARGET[$__type]}" ]; then
+		CheckConnectivity3rdPartyHosts
+		CheckConnectivityRemoteHost
+		_getFileCtimeMtimeRemote "$replicaPath" "$replicaType" "$fileList" "$timestampFilename"
+	else
+		_getFileCtimeMtimeLocal "$replicaPath" "$replicaType" "$fileList" "$timestampFilename"
+	fi
+	retval=$?
+	return $retval
+}
+
+#WIP
+function conflictList {
+	local timestampCurrentFilename="${1}" # filename of current timestamp list (will be prefixed with $replicaType)
+	local timestampAfterFilename="${2}" # filename of previous timestamp list (will be prefixed with $replicaType)
+	local conflictFilename="{3}" # filename of conflicts
+
+	__CheckArguments 3 $# "$@"	#__WITH_PARANOIA_DEBUG
+
+	local retval
+	local escapedReplicaPath
+	local rsyncCmd
+
+	if [ -f "${INITIATOR[$__replicaDir]}${INITIATOR[$__stateDir]}/${INITIATOR[$__type]}$timestampCurrentFilename" ] && [ -f "${INITIATOR[$__replicaDir]}${INITIATOR[$__stateDir]}/${TARGET[$__type]}$timestampCurrentFilename" ]; then
+		# Remove prepending replicaPaths
+		sed -i'.replicaPath' "s;^${INITIATOR[$__replicaDir]};;g" "${INITIATOR[$__replicaDir]}${INITIATOR[$__stateDir]}/${INITIATOR[$__type]}$timestampCurrentFilename"
+		sed -i'.replicaPath' "s;^${TARGET[$__replicaDir]};;g" "${INITIATOR[$__replicaDir]}${INITIATOR[$__stateDir]}/${TARGET[$__type]}$timestampCurrentFilename"
+	fi
+
+	if [ -f "${INITIATOR[$__replicaDir]}${INITIATOR[$__stateDir]}/${INITIATOR[$__type]}$timestampAfterFilename" ] && [ -f "${INITIATOR[$__replicaDir]}${INITIATOR[$__stateDir]}/${TARGET[$__type]}$timestampAfterFilename" ]; then
+		# Remove prepending replicaPaths
+		sed -i'.replicaPath' "s;^${INITIATOR[$__replicaDir]};;g" "${INITIATOR[$__replicaDir]}${INITIATOR[$__stateDir]}/${INITIATOR[$__type]}$timestampAfterFilename"
+		sed -i'.replicaPath' "s;^${TARGET[$__replicaDir]};;g" "${INITIATOR[$__replicaDir]}${INITIATOR[$__stateDir]}/${TARGET[$__type]}$timestampAfterFilename"
+	fi
+
+	if [ -f "${INITIATOR[$__replicaDir]}${INITIATOR[$__stateDir]}/${INITIATOR[$__type]}$timestampAfterFilename" ] && [ -f "${INITIATOR[$__replicaDir]}${INITIATOR[$__stateDir]}/${TARGET[$__type]}$timestampAfterFilename" ]; then
+
+		Logger "Creating conflictual file list." "NOTICE"
+
+		#WIP --nocheck-order or check why comm is complaining
+		comm -23 "${INITIATOR[$__replicaDir]}${INITIATOR[$__stateDir]}/${INITIATOR[$__type]}$timestampCurrentFilename" "${INITIATOR[$__replicaDir]}${INITIATOR[$__stateDir]}/${INITIATOR[$__type]}$timestampAfterFilename" > "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.${INITIATOR[$__type]}.$SCRIPT_PID.$TSTAMP"
+		comm -23 "${INITIATOR[$__replicaDir]}${INITIATOR[$__stateDir]}/${TARGET[$__type]}$timestampCurrentFilename" "${INITIATOR[$__replicaDir]}${INITIATOR[$__stateDir]}/${TARGET[$__type]}$timestampAfterFilename" > "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.${TARGET[$__type]}.$SCRIPT_PID.$TSTAMP"
+
+		#WIP
+		cp "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.${INITIATOR[$__type]}.$SCRIPT_PID.$TSTAMP" /tmp/i
+		cp "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.${TARGET[$__type]}.$SCRIPT_PID.$TSTAMP" /tmp/t
+		join -j 1 -t ';' -o 1.1,1.2,1.3,2.2,2.3 "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.${INITIATOR[$__type]}.$SCRIPT_PID.$TSTAMP" "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.${TARGET[$__type]}.$SCRIPT_PID.$TSTAMP" > "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.comapre.$SCRIPT_PID.$TSTAMP"
+
 	fi
 }
 
@@ -3142,16 +3223,17 @@ function syncAttrs {
 		fi
 	fi
 
+	#WIP: replace 4th argument with some state file
 	Logger "Getting ctimes for pending files on initiator." "NOTICE"
-	_getFileCtimeMtimeLocal "${INITIATOR[$__replicaDir]}" "${INITIATOR[$__type]}" "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}-cleaned.$SCRIPT_PID.$TSTAMP" &
+	_getFileCtimeMtimeLocal "${INITIATOR[$__replicaDir]}" "${INITIATOR[$__type]}" "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}-cleaned.$SCRIPT_PID.$TSTAMP" "$RUN_DIR/$PROGRAM.ctime_mtime___.${INITIATOR[$__type]}.$SCRIPT_PID.$TSTAMP" &
 	pids="$!"
 
 	Logger "Getting ctimes for pending files on target." "NOTICE"
 	if [ "$REMOTE_OPERATION" != "yes" ]; then
-		_getFileCtimeMtimeLocal "${TARGET[$__replicaDir]}" "${TARGET[$__type]}" "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}-cleaned.$SCRIPT_PID.$TSTAMP" &
+		_getFileCtimeMtimeLocal "${TARGET[$__replicaDir]}" "${TARGET[$__type]}" "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}-cleaned.$SCRIPT_PID.$TSTAMP" "$RUN_DIR/$PROGRAM.ctime_mtime___.${TARGET[$__type]}.$SCRIPT_PID.$TSTAMP" &
 		pids="$pids;$!"
 	else
-		_getFileCtimeMtimeRemote "${TARGET[$__replicaDir]}" "${TARGET[$__type]}" "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}-cleaned.$SCRIPT_PID.$TSTAMP" &
+		_getFileCtimeMtimeRemote "${TARGET[$__replicaDir]}" "${TARGET[$__type]}" "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}-cleaned.$SCRIPT_PID.$TSTAMP" "$RUN_DIR/$PROGRAM.ctime_mtime___.${TARGET[$__type]}.$SCRIPT_PID.$TSTAMP" &
 		pids="$pids;$!"
 	fi
 	WaitForTaskCompletion $pids $SOFT_MAX_EXEC_TIME $HARD_MAX_EXEC_TIME $SLEEP_TIME $KEEP_LOGGING false true false
@@ -3164,8 +3246,8 @@ function syncAttrs {
 	# If target gets updated first, then sync_attr must update initiators attrs first
 	# For join, remove leading replica paths
 
-	sed -i'.tmp' "s;^${INITIATOR[$__replicaDir]};;g" "$RUN_DIR/$PROGRAM.ctime_mtime.${INITIATOR[$__type]}.$SCRIPT_PID.$TSTAMP"
-	sed -i'.tmp' "s;^${TARGET[$__replicaDir]};;g" "$RUN_DIR/$PROGRAM.ctime_mtime.${TARGET[$__type]}.$SCRIPT_PID.$TSTAMP"
+	sed -i'.tmp' "s;^${INITIATOR[$__replicaDir]};;g" "$RUN_DIR/$PROGRAM.ctime_mtime___.${INITIATOR[$__type]}.$SCRIPT_PID.$TSTAMP"
+	sed -i'.tmp' "s;^${TARGET[$__replicaDir]};;g" "$RUN_DIR/$PROGRAM.ctime_mtime___.${TARGET[$__type]}.$SCRIPT_PID.$TSTAMP"
 
 	if [ "$CONFLICT_PREVALANCE" == "${TARGET[$__type]}" ]; then
 		sourceDir="${INITIATOR[$__replicaDir]}"
@@ -3173,14 +3255,14 @@ function syncAttrs {
 		destDir="${TARGET[$__replicaDir]}"
 		escDestDir=$(EscapeSpaces "${TARGET[$__replicaDir]}")
 		destReplica="${TARGET[$__type]}"
-		join -j 1 -t ';' -o 1.1,1.2,2.2 "$RUN_DIR/$PROGRAM.ctime_mtime.${INITIATOR[$__type]}.$SCRIPT_PID.$TSTAMP" "$RUN_DIR/$PROGRAM.ctime_mtime.${TARGET[$__type]}.$SCRIPT_PID.$TSTAMP" | awk -F';' '{if ($2 > $3) print $1}' > "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}-ctime_files.$SCRIPT_PID.$TSTAMP"
+		join -j 1 -t ';' -o 1.1,1.2,2.2 "$RUN_DIR/$PROGRAM.ctime_mtime___.${INITIATOR[$__type]}.$SCRIPT_PID.$TSTAMP" "$RUN_DIR/$PROGRAM.ctime_mtime___.${TARGET[$__type]}.$SCRIPT_PID.$TSTAMP" | awk -F';' '{if ($2 > $3) print $1}' > "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}-ctime_files.$SCRIPT_PID.$TSTAMP"
 	else
 		sourceDir="${TARGET[$__replicaDir]}"
 		escSourceDir=$(EscapeSpaces "${TARGET[$__replicaDir]}")
 		destDir="${INITIATOR[$__replicaDir]}"
 		escDestDir=$(EscapeSpaces "${INITIATOR[$__replicaDir]}")
 		destReplica="${INITIATOR[$__type]}"
-		join -j 1 -t ';' -o 1.1,1.2,2.2 "$RUN_DIR/$PROGRAM.ctime_mtime.${TARGET[$__type]}.$SCRIPT_PID.$TSTAMP" "$RUN_DIR/$PROGRAM.ctime_mtime.${INITIATOR[$__type]}.$SCRIPT_PID.$TSTAMP" | awk -F';' '{if ($2 > $3) print $1}' > "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}-ctime_files.$SCRIPT_PID.$TSTAMP"
+		join -j 1 -t ';' -o 1.1,1.2,2.2 "$RUN_DIR/$PROGRAM.ctime_mtime___.${TARGET[$__type]}.$SCRIPT_PID.$TSTAMP" "$RUN_DIR/$PROGRAM.ctime_mtime___.${INITIATOR[$__type]}.$SCRIPT_PID.$TSTAMP" | awk -F';' '{if ($2 > $3) print $1}' > "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}-ctime_files.$SCRIPT_PID.$TSTAMP"
 	fi
 
 	if [ $(wc -l < "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}-ctime_files.$SCRIPT_PID.$TSTAMP") -eq 0 ]; then
@@ -3680,14 +3762,17 @@ function deletionPropagation {
 	fi
 }
 
-###### Sync function in 6 steps
+###### Sync function in 9 steps
 ######
 ###### Step 0a & 0b: Create current file list of replicas
 ###### Step 1a & 1b: Create deleted file list of replicas
-###### Step 3: Update file attributes
-###### Step 3a & 3b: Update replicas
-###### Step 4a & 4b: Propagate deletions on replicas
-###### Step 5a & 5b: Create after run file list of replicas
+###### Step 2a & 2b: Create ctime & mtime file list of replicas
+###### Step 3a & 3b: Merge conflict file list
+###### Step 4: Update file attributes
+###### Step 5a & 5b: Update replicas
+###### Step 6a & 6b: Propagate deletions on replicas
+###### Step 7a & 8b: Create after run file list of replicas
+###### Step 8: Rename timestamp files from current to previous
 
 function Sync {
 	__CheckArguments 0 $# "$@"	#__WITH_PARANOIA_DEBUG
@@ -3738,7 +3823,9 @@ function Sync {
 				resumeTarget="none"
 			fi
 		else
-			Logger "Will not resume aborted execution. Too many resume tries [$resumeCount]." "WARN"
+			if [ $RESUME_TRY -ne 0 ]; then
+				Logger "Will not resume aborted execution. Too many resume tries [$resumeCount]." "WARN"
+			fi
 			echo "0" > "${INITIATOR[$__resumeCount]}"
 			resumeInitiator="none"
 			resumeTarget="none"
@@ -3754,12 +3841,12 @@ function Sync {
 	## Step 0a & 0b
 	if [ "$resumeInitiator" == "none" ] || [ "$resumeTarget" == "none" ] || [ "$resumeInitiator" == "${SYNC_ACTION[0]}" ] || [ "$resumeTarget" == "${SYNC_ACTION[0]}" ]; then
 		if [ "$resumeInitiator" == "none" ] || [ "$resumeInitiator" == "${SYNC_ACTION[0]}" ]; then
-			treeList "${INITIATOR[$__replicaDir]}" "${INITIATOR[$__type]}" "${INITIATOR[$__treeCurrentFile]}" &
+			treeList "${INITIATOR[$__replicaDir]}" "${INITIATOR[$__type]}" "${INITIATOR[$__replicaDir]}${INITIATOR[$__stateDir]}/${INITIATOR[$__type]}${INITIATOR[$__treeCurrentFile]}" &
 			initiatorPid="$!"
 		fi
 
 		if [ "$resumeTarget" == "none" ] || [ "$resumeTarget" == "${SYNC_ACTION[0]}" ]; then
-			treeList "${TARGET[$__replicaDir]}" "${TARGET[$__type]}" "${INITIATOR[$__treeCurrentFile]}" &
+			treeList "${TARGET[$__replicaDir]}" "${TARGET[$__type]}" "${INITIATOR[$__replicaDir]}${INITIATOR[$__stateDir]}/${TARGET[$__type]}${INITIATOR[$__treeCurrentFile]}" &
 			targetPid="$!"
 		fi
 
@@ -3841,21 +3928,50 @@ function Sync {
 		fi
 	fi
 
-	## Step 2
+	## Step 2a & 2b
 	if [ "$resumeInitiator" == "${SYNC_ACTION[2]}" ] || [ "$resumeTarget" == "${SYNC_ACTION[2]}" ]; then
-		if [[ "$RSYNC_ATTR_ARGS" == *"-X"* ]] || [[ "$RSYNC_ATTR_ARGS" == *"-A"* ]]; then
-			syncAttrs "${INITIATOR[$__replicaDir]}" "$TARGET_SYNC_DIR" &
-			WaitForTaskCompletion $! $SOFT_MAX_EXEC_TIME $HARD_MAX_EXEC_TIME $SLEEP_TIME $KEEP_LOGGING false true false
+		if [[ "$RSYNC_ATTR_ARGS" == *"-X"* ]] || [[ "$RSYNC_ATTR_ARGS" == *"-A"* ]] || [ "$LOG_CONFLICTS" == "yes" ]; then
+
+			if [ "$resumeInitiator" == "${SYNC_ACTION[2]}" ]; then
+				timestampList "${INITIATOR[$__replicaDir]}" "${INITIATOR[$__type]}" "${INITIATOR[$__replicaDir]}${INITIATOR[$__stateDir]}/${INITIATOR[$__type]}${INITIATOR[$__treeCurrentFile]}" "${INITIATOR[$__replicaDir]}${INITIATOR[$__stateDir]}/${INITIATOR[$__type]}${INITIATOR[$__timestampCurrentFile]}" &
+				initiatorPid="$!"
+			fi
+
+			if [ "$resumeTarget" == "${SYNC_ACTION[2]}" ]; then
+				timestampList "${TARGET[$__replicaDir]}" "${TARGET[$__type]}" "${INITIATOR[$__replicaDir]}${INITIATOR[$__stateDir]}/${TARGET[$__type]}${TARGET[$__treeCurrentFile]}" "${INITIATOR[$__replicaDir]}${INITIATOR[$__stateDir]}/${TARGET[$__type]}${TARGET[$__timestampCurrentFile]}" &
+				targetPid="$!"
+			fi
+
+			WaitForTaskCompletion "$initiatorPid;$targetPid" $SOFT_MAX_EXEC_TIME $HARD_MAX_EXEC_TIME $SLEEP_TIME $KEEP_LOGGING false true false
 			if [ $? -ne 0 ]; then
-				echo "${SYNC_ACTION[2]}" > "${INITIATOR[$__initiatorLastActionFile]}"
-				echo "${SYNC_ACTION[2]}" > "${INITIATOR[$__targetLastActionFile]}"
+				IFS=';' read -r -a pidArray <<< "$(eval echo \"\$WAIT_FOR_TASK_COMPLETION_${FUNCNAME[0]}\")"
+				initiatorFail=false
+				targetFail=false
+				for pid in "${pidArray[@]}"; do
+					pid=${pid%:*}
+					if [ "$pid" == "$initiatorPid" ]; then
+						echo "${SYNC_ACTION[2]}" > "${INITIATOR[$__initiatorLastActionFile]}"
+						initiatorFail=true
+					elif [ "$pid" == "$targetPid" ]; then
+						echo "${SYNC_ACTION[2]}" > "${INITIATOR[$__targetLastActionFile]}"
+						targetFail=true
+					fi
+				done
+
+				if [ $initiatorFail == false ]; then
+					echo "${SYNC_ACTION[3]}" > "${INITIATOR[$__initiatorLastActionFile]}"
+				fi
+
+				if [ $targetFail == false ]; then
+					echo "${SYNC_ACTION[3]}" > "${INITIATOR[$__targetLastActionFile]}"
+				fi
+
 				exit 1
 			else
 				echo "${SYNC_ACTION[3]}" > "${INITIATOR[$__initiatorLastActionFile]}"
 				echo "${SYNC_ACTION[3]}" > "${INITIATOR[$__targetLastActionFile]}"
 				resumeInitiator="${SYNC_ACTION[3]}"
 				resumeTarget="${SYNC_ACTION[3]}"
-
 			fi
 		else
 			echo "${SYNC_ACTION[3]}" > "${INITIATOR[$__initiatorLastActionFile]}"
@@ -3867,67 +3983,116 @@ function Sync {
 
 	## Step 3a & 3b
 	if [ "$resumeInitiator" == "${SYNC_ACTION[3]}" ] || [ "$resumeTarget" == "${SYNC_ACTION[3]}" ]; then
+		if [[ "$RSYNC_ATTR_ARGS" == *"-X"* ]] || [[ "$RSYNC_ATTR_ARGS" == *"-A"* ]] || [ "$LOG_CONFLICTS" == "yes" ]; then
+			conflictList "${INITIATOR[$__timestampCurrentFile]}" "${INITIATOR[$__timestampAfterFile]}" "${INITIATOR[$__conflictListFile]}" &
+			WaitForTaskCompletion $! $SOFT_MAX_EXEC_TIME $HARD_MAX_EXEC_TIME $SLEEP_TIME $KEEP_LOGGING false true false
+			if [ $? -ne 0 ]; then
+				echo "${SYNC_ACTION[3]}" > "${INITIATOR[$__initiatorLastActionFile]}"
+				echo "${SYNC_ACTION[3]}" > "${INITIATOR[$__targetLastActionFile]}"
+				exit 1
+			else
+				echo "${SYNC_ACTION[4]}" > "${INITIATOR[$__initiatorLastActionFile]}"
+				echo "${SYNC_ACTION[4]}" > "${INITIATOR[$__targetLastActionFile]}"
+				resumeInitiator="${SYNC_ACTION[4]}"
+				resumeTarget="${SYNC_ACTION[4]}"
+
+			fi
+		else
+			echo "${SYNC_ACTION[4]}" > "${INITIATOR[$__initiatorLastActionFile]}"
+			echo "${SYNC_ACTION[4]}" > "${INITIATOR[$__targetLastActionFile]}"
+			resumeInitiator="${SYNC_ACTION[4]}"
+			resumeTarget="${SYNC_ACTION[4]}"
+		fi
+	fi
+
+#WIP reenable syncAttrs. Also check attr tests since they should trigger an error
+	## Step 4
+	if [ "$resumeInitiator" == "${SYNC_ACTION[4]}" ] || [ "$resumeTarget" == "${SYNC_ACTION[4]}" ]; then
+		if [[ "$RSYNC_ATTR_ARGS" == *"-X"* ]] || [[ "$RSYNC_ATTR_ARGS" == *"-A"* ]]; then
+			syncAttrs "${INITIATOR[$__replicaDir]}" "$TARGET_SYNC_DIR" &
+			WaitForTaskCompletion $! $SOFT_MAX_EXEC_TIME $HARD_MAX_EXEC_TIME $SLEEP_TIME $KEEP_LOGGING false true false
+			if [ $? -ne 0 ]; then
+				echo "${SYNC_ACTION[4]}" > "${INITIATOR[$__initiatorLastActionFile]}"
+				echo "${SYNC_ACTION[4]}" > "${INITIATOR[$__targetLastActionFile]}"
+				exit 1
+			else
+				echo "${SYNC_ACTION[5]}" > "${INITIATOR[$__initiatorLastActionFile]}"
+				echo "${SYNC_ACTION[5]}" > "${INITIATOR[$__targetLastActionFile]}"
+				resumeInitiator="${SYNC_ACTION[5]}"
+				resumeTarget="${SYNC_ACTION[5]}"
+
+			fi
+		else
+			echo "${SYNC_ACTION[5]}" > "${INITIATOR[$__initiatorLastActionFile]}"
+			echo "${SYNC_ACTION[5]}" > "${INITIATOR[$__targetLastActionFile]}"
+			resumeInitiator="${SYNC_ACTION[5]}"
+			resumeTarget="${SYNC_ACTION[5]}"
+		fi
+	fi
+
+	## Step 5a & 5b
+	if [ "$resumeInitiator" == "${SYNC_ACTION[5]}" ] || [ "$resumeTarget" == "${SYNC_ACTION[5]}" ]; then
 		if [ "$CONFLICT_PREVALANCE" == "${TARGET[$__type]}" ]; then
-			if [ "$resumeTarget" == "${SYNC_ACTION[3]}" ]; then
+			if [ "$resumeTarget" == "${SYNC_ACTION[5]}" ]; then
 				syncUpdate "${TARGET[$__type]}" "${INITIATOR[$__type]}" &
 				WaitForTaskCompletion $! $SOFT_MAX_EXEC_TIME $HARD_MAX_EXEC_TIME $SLEEP_TIME $KEEP_LOGGING false true false
 				if [ $? -ne 0 ]; then
-					echo "${SYNC_ACTION[3]}" > "${INITIATOR[$__targetLastActionFile]}"
-					resumeTarget="${SYNC_ACTION[3]}"
+					echo "${SYNC_ACTION[5]}" > "${INITIATOR[$__targetLastActionFile]}"
+					resumeTarget="${SYNC_ACTION[5]}"
 					exit 1
 				else
-					echo "${SYNC_ACTION[4]}" > "${INITIATOR[$__targetLastActionFile]}"
-					resumeTarget="${SYNC_ACTION[4]}"
+					echo "${SYNC_ACTION[6]}" > "${INITIATOR[$__targetLastActionFile]}"
+					resumeTarget="${SYNC_ACTION[6]}"
 				fi
 			fi
-			if [ "$resumeInitiator" == "${SYNC_ACTION[3]}" ]; then
+			if [ "$resumeInitiator" == "${SYNC_ACTION[5]}" ]; then
 				syncUpdate "${INITIATOR[$__type]}" "${TARGET[$__type]}" &
 				WaitForTaskCompletion $! $SOFT_MAX_EXEC_TIME $HARD_MAX_EXEC_TIME $SLEEP_TIME $KEEP_LOGGING false true false
 				if [ $? -ne 0 ]; then
-					echo "${SYNC_ACTION[3]}" > "${INITIATOR[$__initiatorLastActionFile]}"
-					resumeInitiator="${SYNC_ACTION[3]}"
+					echo "${SYNC_ACTION[5]}" > "${INITIATOR[$__initiatorLastActionFile]}"
+					resumeInitiator="${SYNC_ACTION[5]}"
 					exit 1
 				else
-					echo "${SYNC_ACTION[4]}" > "${INITIATOR[$__initiatorLastActionFile]}"
-					resumeInitiator="${SYNC_ACTION[4]}"
+					echo "${SYNC_ACTION[6]}" > "${INITIATOR[$__initiatorLastActionFile]}"
+					resumeInitiator="${SYNC_ACTION[6]}"
 				fi
 			fi
 		else
-			if [ "$resumeInitiator" == "${SYNC_ACTION[3]}" ]; then
+			if [ "$resumeInitiator" == "${SYNC_ACTION[5]}" ]; then
 				syncUpdate "${INITIATOR[$__type]}" "${TARGET[$__type]}" &
 				WaitForTaskCompletion $! $SOFT_MAX_EXEC_TIME $HARD_MAX_EXEC_TIME $SLEEP_TIME $KEEP_LOGGING false true false
 				if [ $? -ne 0 ]; then
-					echo "${SYNC_ACTION[3]}" > "${INITIATOR[$__initiatorLastActionFile]}"
-					resumeInitiator="${SYNC_ACTION[3]}"
+					echo "${SYNC_ACTION[5]}" > "${INITIATOR[$__initiatorLastActionFile]}"
+					resumeInitiator="${SYNC_ACTION[5]}"
 					exit 1
 				else
-					echo "${SYNC_ACTION[4]}" > "${INITIATOR[$__initiatorLastActionFile]}"
-					resumeInitiator="${SYNC_ACTION[4]}"
+					echo "${SYNC_ACTION[6]}" > "${INITIATOR[$__initiatorLastActionFile]}"
+					resumeInitiator="${SYNC_ACTION[6]}"
 				fi
 			fi
-			if [ "$resumeTarget" == "${SYNC_ACTION[3]}" ]; then
+			if [ "$resumeTarget" == "${SYNC_ACTION[5]}" ]; then
 				syncUpdate "${TARGET[$__type]}" "${INITIATOR[$__type]}" &
 				WaitForTaskCompletion $! $SOFT_MAX_EXEC_TIME $HARD_MAX_EXEC_TIME $SLEEP_TIME $KEEP_LOGGING false true false
 				if [ $? -ne 0 ]; then
-					echo "${SYNC_ACTION[3]}" > "${INITIATOR[$__targetLastActionFile]}"
-					resumeTarget="${SYNC_ACTION[3]}"
+					echo "${SYNC_ACTION[5]}" > "${INITIATOR[$__targetLastActionFile]}"
+					resumeTarget="${SYNC_ACTION[5]}"
 					exit 1
 				else
-					echo "${SYNC_ACTION[4]}" > "${INITIATOR[$__targetLastActionFile]}"
-					resumeTarget="${SYNC_ACTION[4]}"
+					echo "${SYNC_ACTION[6]}" > "${INITIATOR[$__targetLastActionFile]}"
+					resumeTarget="${SYNC_ACTION[6]}"
 				fi
 			fi
 		fi
 	fi
 
-	## Step 4a & 4b
-	if [ "$resumeInitiator" == "${SYNC_ACTION[4]}" ] || [ "$resumeTarget" == "${SYNC_ACTION[4]}" ]; then
-		if [ "$resumeInitiator" == "${SYNC_ACTION[4]}" ]; then
+	## Step 6a & 6b
+	if [ "$resumeInitiator" == "${SYNC_ACTION[6]}" ] || [ "$resumeTarget" == "${SYNC_ACTION[6]}" ]; then
+		if [ "$resumeInitiator" == "${SYNC_ACTION[6]}" ]; then
 			deletionPropagation "${INITIATOR[$__type]}" &
 			initiatorPid="$!"
 		fi
 
-		if [ "$resumeTarget" == "${SYNC_ACTION[4]}" ]; then
+		if [ "$resumeTarget" == "${SYNC_ACTION[6]}" ]; then
 			deletionPropagation "${TARGET[$__type]}" &
 			targetPid="$!"
 		fi
@@ -3940,41 +4105,41 @@ function Sync {
 			for pid in "${pidArray[@]}"; do
 				pid=${pid%:*}
 				if [ "$pid" == "$initiatorPid" ]; then
-					echo "${SYNC_ACTION[4]}" > "${INITIATOR[$__initiatorLastActionFile]}"
+					echo "${SYNC_ACTION[6]}" > "${INITIATOR[$__initiatorLastActionFile]}"
 					initiatorFail=true
 				elif [ "$pid" == "$targetPid" ]; then
-					echo "${SYNC_ACTION[4]}" > "${INITIATOR[$__targetLastActionFile]}"
+					echo "${SYNC_ACTION[6]}" > "${INITIATOR[$__targetLastActionFile]}"
 					targetFail=true
 				fi
 			done
 
 			if [ $initiatorFail == false ]; then
-				echo "${SYNC_ACTION[5]}" > "${INITIATOR[$__initiatorLastActionFile]}"
+				echo "${SYNC_ACTION[7]}" > "${INITIATOR[$__initiatorLastActionFile]}"
 			fi
 
 			if [ $targetFail == false ]; then
-				echo "${SYNC_ACTION[5]}" > "${INITIATOR[$__targetLastActionFile]}"
+				echo "${SYNC_ACTION[7]}" > "${INITIATOR[$__targetLastActionFile]}"
 			fi
 
 			exit 1
 		else
-			echo "${SYNC_ACTION[5]}" > "${INITIATOR[$__initiatorLastActionFile]}"
-			echo "${SYNC_ACTION[5]}" > "${INITIATOR[$__targetLastActionFile]}"
-			resumeInitiator="${SYNC_ACTION[5]}"
-			resumeTarget="${SYNC_ACTION[5]}"
+			echo "${SYNC_ACTION[7]}" > "${INITIATOR[$__initiatorLastActionFile]}"
+			echo "${SYNC_ACTION[7]}" > "${INITIATOR[$__targetLastActionFile]}"
+			resumeInitiator="${SYNC_ACTION[7]}"
+			resumeTarget="${SYNC_ACTION[7]}"
 
 		fi
 	fi
 
-	## Step 5a & 5b
-	if [ "$resumeInitiator" == "${SYNC_ACTION[5]}" ] || [ "$resumeTarget" == "${SYNC_ACTION[5]}" ]; then
-		if [ "$resumeInitiator" == "${SYNC_ACTION[5]}" ]; then
-			treeList "${INITIATOR[$__replicaDir]}" "${INITIATOR[$__type]}" "${INITIATOR[$__treeAfterFile]}" &
+	## Step 7a & 7b
+	if [ "$resumeInitiator" == "${SYNC_ACTION[7]}" ] || [ "$resumeTarget" == "${SYNC_ACTION[7]}" ]; then
+		if [ "$resumeInitiator" == "${SYNC_ACTION[7]}" ]; then
+			treeList "${INITIATOR[$__replicaDir]}" "${INITIATOR[$__type]}" "${INITIATOR[$__replicaDir]}${INITIATOR[$__stateDir]}/${INITIATOR[$__type]}${INITIATOR[$__treeAfterFile]}" &
 			initiatorPid="$!"
 		fi
 
-		if [ "$resumeTarget" == "${SYNC_ACTION[5]}" ]; then
-			treeList "${TARGET[$__replicaDir]}" "${TARGET[$__type]}" "${INITIATOR[$__treeAfterFile]}" &
+		if [ "$resumeTarget" == "${SYNC_ACTION[7]}" ]; then
+			treeList "${TARGET[$__replicaDir]}" "${TARGET[$__type]}" "${INITIATOR[$__replicaDir]}${INITIATOR[$__stateDir]}/${TARGET[$__type]}${INITIATOR[$__treeAfterFile]}" &
 			targetPid="$!"
 		fi
 
@@ -3986,28 +4151,81 @@ function Sync {
 			for pid in "${pidArray[@]}"; do
 				pid=${pid%:*}
 				if [ "$pid" == "$initiatorPid" ]; then
-					echo "${SYNC_ACTION[5]}" > "${INITIATOR[$__initiatorLastActionFile]}"
+					echo "${SYNC_ACTION[7]}" > "${INITIATOR[$__initiatorLastActionFile]}"
 					initiatorFail=true
 				elif [ "$pid" == "$targetPid" ]; then
-					echo "${SYNC_ACTION[5]}" > "${INITIATOR[$__targetLastActionFile]}"
+					echo "${SYNC_ACTION[7]}" > "${INITIATOR[$__targetLastActionFile]}"
 					targetFail=true
 				fi
 			done
 
 			if [ $initiatorFail == false ]; then
-				echo "${SYNC_ACTION[6]}" > "${INITIATOR[$__initiatorLastActionFile]}"
+				echo "${SYNC_ACTION[8]}" > "${INITIATOR[$__initiatorLastActionFile]}"
 			fi
 
 			if [ $targetFail == false ]; then
-				echo "${SYNC_ACTION[6]}" > "${INITIATOR[$__targetLastActionFile]}"
+				echo "${SYNC_ACTION[8]}" > "${INITIATOR[$__targetLastActionFile]}"
 			fi
 
 			exit 1
 		else
-			echo "${SYNC_ACTION[6]}" > "${INITIATOR[$__initiatorLastActionFile]}"
-			echo "${SYNC_ACTION[6]}" > "${INITIATOR[$__targetLastActionFile]}"
-			resumeInitiator="${SYNC_ACTION[6]}"
-			resumeTarget="${SYNC_ACTION[6]}"
+			echo "${SYNC_ACTION[8]}" > "${INITIATOR[$__initiatorLastActionFile]}"
+			echo "${SYNC_ACTION[8]}" > "${INITIATOR[$__targetLastActionFile]}"
+			resumeInitiator="${SYNC_ACTION[8]}"
+			resumeTarget="${SYNC_ACTION[8]}"
+		fi
+	fi
+
+	# Step 8 #WIP adapt to last function
+	if [ "$resumeInitiator" == "${SYNC_ACTION[8]}" ] || [ "$resumeTarget" == "${SYNC_ACTION[8]}" ]; then
+		if [[ "$RSYNC_ATTR_ARGS" == *"-X"* ]] || [[ "$RSYNC_ATTR_ARGS" == *"-A"* ]] || [ "$LOG_CONFLICTS" == "yes" ]; then
+
+			if [ "$resumeInitiator" == "${SYNC_ACTION[8]}" ]; then
+				timestampList "${INITIATOR[$__replicaDir]}" "${INITIATOR[$__type]}" "${INITIATOR[$__replicaDir]}${INITIATOR[$__stateDir]}/${INITIATOR[$__type]}${INITIATOR[$__treeAfterFile]}" "${INITIATOR[$__replicaDir]}${INITIATOR[$__stateDir]}/${INITIATOR[$__type]}${INITIATOR[$__timestampAfterFile]}" &
+				initiatorPid="$!"
+			fi
+
+			if [ "$resumeTarget" == "${SYNC_ACTION[8]}" ]; then
+				timestampList "${TARGET[$__replicaDir]}" "${TARGET[$__type]}" "${INITIATOR[$__replicaDir]}${INITIATOR[$__stateDir]}/${TARGET[$__type]}${TARGET[$__treeAfterFile]}" "${INITIATOR[$__replicaDir]}${INITIATOR[$__stateDir]}/${TARGET[$__type]}${TARGET[$__timestampAfterFile]}" &
+				targetPid="$!"
+			fi
+
+			WaitForTaskCompletion "$initiatorPid;$targetPid" $SOFT_MAX_EXEC_TIME $HARD_MAX_EXEC_TIME $SLEEP_TIME $KEEP_LOGGING false true false
+			if [ $? -ne 0 ]; then
+				IFS=';' read -r -a pidArray <<< "$(eval echo \"\$WAIT_FOR_TASK_COMPLETION_${FUNCNAME[0]}\")"
+				initiatorFail=false
+				targetFail=false
+				for pid in "${pidArray[@]}"; do
+					pid=${pid%:*}
+					if [ "$pid" == "$initiatorPid" ]; then
+						echo "${SYNC_ACTION[8]}" > "${INITIATOR[$__initiatorLastActionFile]}"
+						initiatorFail=true
+					elif [ "$pid" == "$targetPid" ]; then
+						echo "${SYNC_ACTION[8]}" > "${INITIATOR[$__targetLastActionFile]}"
+						targetFail=true
+					fi
+				done
+
+				if [ $initiatorFail == false ]; then
+					echo "${SYNC_ACTION[9]}" > "${INITIATOR[$__initiatorLastActionFile]}"
+				fi
+
+				if [ $targetFail == false ]; then
+					echo "${SYNC_ACTION[9]}" > "${INITIATOR[$__targetLastActionFile]}"
+				fi
+
+				exit 1
+			else
+				echo "${SYNC_ACTION[9]}" > "${INITIATOR[$__initiatorLastActionFile]}"
+				echo "${SYNC_ACTION[9]}" > "${INITIATOR[$__targetLastActionFile]}"
+				resumeInitiator="${SYNC_ACTION[9]}"
+				resumeTarget="${SYNC_ACTION[9]}"
+			fi
+		else
+			echo "${SYNC_ACTION[9]}" > "${INITIATOR[$__initiatorLastActionFile]}"
+			echo "${SYNC_ACTION[9]}" > "${INITIATOR[$__targetLastActionFile]}"
+			resumeInitiator="${SYNC_ACTION[9]}"
+			resumeTarget="${SYNC_ACTION[3]}"
 		fi
 	fi
 
@@ -4200,6 +4418,20 @@ function Summary {
 	)
 }
 
+function LogConflicts {
+	__CheckArguments 0 $# "$@"	#__WITH_PARANOIA_DEBUG
+
+	(
+	_LOGGER_PREFIX=""
+	Logger "File conflicts: INITIATOR << >> TARGET" "ALWAYS"
+	if [ -f "$RUN_DIR/$PROGRAM.conflictList.comapre.$SCRIPT_PID.$TSTAMP" ]; then
+		while read -r line; do
+			Logger "${INITIATOR[$__replicaDir]}$(echo $line | awk -F';' '{print $1}') -- ${TARGET[$__replicaDir]}$(echo $line | awk -F';' '{print $1}')" "ALWAYS"
+		done < "$RUN_DIR/$PROGRAM.conflictList.comapre.$SCRIPT_PID.$TSTAMP"
+	fi
+	)
+}
+
 function Init {
 	__CheckArguments 0 $# "$@"	#__WITH_PARANOIA_DEBUG
 
@@ -4305,6 +4537,9 @@ function Init {
 	readonly __deletedListFile=13
 	readonly __failedDeletedListFile=14
 	readonly __successDeletedListFile=15
+	readonly __timestampCurrentFile=16
+	readonly __timestampAfterFile=17
+	readonly __conflictListFile=18
 
 	INITIATOR=()
 	INITIATOR[$__type]='initiator'
@@ -4323,6 +4558,9 @@ function Init {
 	INITIATOR[$__deletedListFile]="-deleted-list-$INSTANCE_ID$drySuffix"
 	INITIATOR[$__failedDeletedListFile]="-failed-delete-$INSTANCE_ID$drySuffix"
 	INITIATOR[$__successDeletedListFile]="-success-delete-$INSTANCE_ID$drySuffix"
+	INITIATOR[$__timestampCurrentFile]="-timestamps-current-$INSTANCE_ID$drySuffix"
+	INITIATOR[$__timestampAfterFile]="-timestamps-after-$INSTANCE_ID$drySuffix"
+	INITIATOR[$__conflictListFile]="conflicts-$INSTANCE_ID$drySuffix"
 
 	TARGET=()
 	TARGET[$__type]='target'
@@ -4341,6 +4579,9 @@ function Init {
 	TARGET[$__deletedListFile]="-deleted-list-$INSTANCE_ID$drySuffix"								# unused
 	TARGET[$__failedDeletedListFile]="-failed-delete-$INSTANCE_ID$drySuffix"
 	TARGET[$__successDeletedListFile]="-success-delete-$INSTANCE_ID$drySuffix"
+	TARGET[$__timestampCurrentFile]="-timestamps-current-$INSTANCE_ID$drySuffix"
+	TARGET[$__timestampAfterFile]="-timestamps-after-$INSTANCE_ID$drySuffix"
+	TARGET[$__conflictListFile]="conflicts-$INSTANCE_ID$drySuffix"
 
 	PARTIAL_DIR="${INITIATOR[$__partialDir]}"
 
@@ -4371,13 +4612,19 @@ function Init {
 		TARGET_BACKUP=""
 	fi
 
+	#WIP: change resume numbers when new conflict function will be done
+	#WIP: conflict list is not mandatory, but is still needed for acl resolution
+	#WIP: syncAttrs must move the file list to sub function, which checks which kind of file list to use
 	SYNC_ACTION=(
 	'replica-tree'
 	'deleted-list'
+	'ctime-mtime-list'
+	'conflict-list'
 	'sync_attrs'
 	'update-replica'
 	'delete-propagation'
 	'replica-tree-after'
+	'rename-timestamp-files'
 	'synced'
 	)
 }
@@ -4406,17 +4653,20 @@ function Usage {
 	echo "or     osync.sh --initiator=/path/to/initiator/replica --target=ssh://[backupuser]@remotehost.com[:portnumber]//path/to/target/replica [OPTIONS] [QUICKSYNC OPTIONS]"
 	echo ""
 	echo "[OPTIONS]"
-	echo "--dry             Will run osync without actually doing anything; just testing"
-	echo "--no-prefix       Will suppress time / date suffix from output"
-	echo "--silent          Will run osync without any output to stdout, used for cron jobs"
-	echo "--errors-only     Output only errors (can be combined with silent or verbose)"
-	echo "--summary         Outputs a list of transferred / deleted files at the end of the run"
-	echo "--verbose         Increases output"
-	echo "--stats           Adds rsync transfer statistics to verbose output"
-	echo "--partial         Allows rsync to keep partial downloads that can be resumed later (experimental)"
-	echo "--no-maxtime      Disables any soft and hard execution time checks"
-	echo "--force-unlock    Will override any existing active or dead locks on initiator and target replica"
-	echo "--on-changes      Will launch a sync task after a short wait period if there is some file activity on initiator replica. You should try daemon mode instead"
+	echo "--dry                  Will run osync without actually doing anything; just testing"
+	echo "--no-prefix            Will suppress time / date suffix from output"
+	echo "--silent               Will run osync without any output to stdout, used for cron jobs"
+	echo "--errors-only          Output only errors (can be combined with silent or verbose)"
+	echo "--summary              Outputs a list of transferred / deleted files at the end of the run"
+	echo "--log-conflicts        Outputs a list of conflicted files"
+	echo "--verbose              Increases output"
+	echo "--stats                Adds rsync transfer statistics to verbose output"
+	echo "--partial              Allows rsync to keep partial downloads that can be resumed later (experimental)"
+	echo "--no-maxtime           Disables any soft and hard execution time checks"
+	echo "--force-unlock         Will override any existing active or dead locks on initiator and target replica"
+	echo "--on-changes           Will launch a sync task after a short wait period if there is some file activity on initiator replica. You should try daemon mode instead"
+	echo "--no-resume            Do not try to resume a failed run. By default, execution is resumed once"
+
 	echo ""
 	echo "[QUICKSYNC OPTIONS]"
 	echo "--initiator=\"\"		Master replica path. Will contain state and backup directory (is mandatory)"
@@ -4511,6 +4761,7 @@ DESTINATION_MAILS=""
 INITIATOR_LOCK_FILE_EXISTS=false
 TARGET_LOCK_FILE_EXISTS=false
 FORCE_UNLOCK=false
+LOG_CONFLICTS="no"
 no_maxtime=false
 opts=""
 ERROR_ALERT=false
@@ -4594,16 +4845,27 @@ for i in "$@"; do
 		_NOLOCKS=true
 		_LOGGER_PREFIX="date"
 		;;
+		--no-resume)
+		opts=$opts" --no-resume"
+		RESUME_TRY=0
+		;;
 		--no-locks)
 		_NOLOCKS=true
 		;;
 		--errors-only)
+		opts=$opts" --errors-only"
 		_LOGGER_ERR_ONLY=true
 		;;
 		--summary)
+		opts=$opts" --summary"
 		_SUMMARY=true
 		;;
+		--log-conflicts)
+		LOG_CONFLICTS="yes"
+		opts=$opts" --log-conflicts"
+		;;
 		--no-prefix)
+		opts=$opts" --no-prefix"
 		_LOGGER_PREFIX=""
 		;;
 		--destination-mails=*)
@@ -4720,5 +4982,8 @@ else
 	fi
 	if [ $_SUMMARY == true ]; then
 		Summary
+	fi
+	if [ $LOG_CONFLICTS == "yes" ]; then
+		LogConflicts
 	fi
 fi
