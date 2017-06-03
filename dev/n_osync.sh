@@ -9,7 +9,7 @@ PROGRAM="osync" # Rsync based two way sync engine with fault tolerance
 AUTHOR="(C) 2013-2017 by Orsiris de Jong"
 CONTACT="http://www.netpower.fr/osync - ozy@netpower.fr"
 PROGRAM_VERSION=1.2.2-dev
-PROGRAM_BUILD=2017060301
+PROGRAM_BUILD=2017060303
 IS_STABLE=no
 
 
@@ -29,20 +29,15 @@ IS_STABLE=no
 #	 	HandleLocks			yes		#__WITH_PARANOIA_DEBUG
 #	 	Sync				no		#__WITH_PARANOIA_DEBUG
 #			treeList		yes		#__WITH_PARANOIA_DEBUG
-#			treeList		yes		#__WITH_PARANOIA_DEBUG
 #			deleteList		yes		#__WITH_PARANOIA_DEBUG
-#			deleteList		yes		#__WITH_PARANOIA_DEBUG
-#			_getFileCtimeMtime	yes		#__WITH_PARANOIA_DEBUG
-#			_getFileCtimeMtime	yes		#__WITH_PARANOIA_DEBUG
-#			conflictList		no		#__WITH_PARANOIA_FDEBUG
+#			timestampList		yes		#__WITH_PARANOIA_DEBUG
+#			conflictList		no		#__WITH_PARANOIA_DEBUG
 #			syncAttrs		no		#__WITH_PARANOIA_DEBUG
 #			syncUpdate		no		#__WITH_PARANOIA_DEBUG
 #			syncUpdate		no		#__WITH_PARANOIA_DEBUG
 #			deletionPropagation	yes		#__WITH_PARANOIA_DEBUG
-#			deletionPropagation	yes		#__WITH_PARANOIA_DEBUG
 #			treeList		yes		#__WITH_PARANOIA_DEBUG
-#			treeList		yes		#__WITH_PARANOIA_DEBUG
-#			renameTimestampFiles	no		#__WITH_PARANOIA_DEBUG
+#			timestampList		yes		#__WITH_PARANOIA_DEBUG
 #		SoftDelete			yes		#__WITH_PARANOIA_DEBUG
 #	RunAfterHook				yes		#__WITH_PARANOIA_DEBUG
 #	UnlockReplicas				yes		#__WITH_PARANOIA_DEBUG
@@ -798,8 +793,6 @@ function _getFileCtimeMtimeLocal {
 	local fileList="${3}" # Contains list of files to get time attrs
 	local timestampFile="${4}" # Where to store the timestamp file
 
-	#WIP change output file to timestampFile
-
 	__CheckArguments 4 $# "$@"	#__WITH_PARANOIA_DEBUG
 
 	local retval
@@ -901,7 +894,7 @@ function timestampList {
 #WIP
 function conflictList {
 	local timestampCurrentFilename="${1}" # filename of current timestamp list (will be prefixed with $replicaType)
-	local timestampPreviousFilename="${2}" # filename of previous timestamp list (will be prefixed with $replicaType)
+	local timestampAfterFilename="${2}" # filename of previous timestamp list (will be prefixed with $replicaType)
 	local conflictFilename="{3}" # filename of conflicts
 
 	__CheckArguments 3 $# "$@"	#__WITH_PARANOIA_DEBUG
@@ -916,31 +909,26 @@ function conflictList {
 		sed -i'.replicaPath' "s;^${TARGET[$__replicaDir]};;g" "${INITIATOR[$__replicaDir]}${INITIATOR[$__stateDir]}/${TARGET[$__type]}$timestampCurrentFilename"
 	fi
 
-	if [ -f "${INITIATOR[$__replicaDir]}${INITIATOR[$__stateDir]}/${INITIATOR[$__type]}$timestampPreviousFilename" ] && [ -f "${INITIATOR[$__replicaDir]}${INITIATOR[$__stateDir]}/${TARGET[$__type]}$timestampPreviousFilename" ]; then
+	if [ -f "${INITIATOR[$__replicaDir]}${INITIATOR[$__stateDir]}/${INITIATOR[$__type]}$timestampAfterFilename" ] && [ -f "${INITIATOR[$__replicaDir]}${INITIATOR[$__stateDir]}/${TARGET[$__type]}$timestampAfterFilename" ]; then
+		# Remove prepending replicaPaths
+		sed -i'.replicaPath' "s;^${INITIATOR[$__replicaDir]};;g" "${INITIATOR[$__replicaDir]}${INITIATOR[$__stateDir]}/${INITIATOR[$__type]}$timestampAfterFilename"
+		sed -i'.replicaPath' "s;^${TARGET[$__replicaDir]};;g" "${INITIATOR[$__replicaDir]}${INITIATOR[$__stateDir]}/${TARGET[$__type]}$timestampAfterFilename"
+	fi
+
+	if [ -f "${INITIATOR[$__replicaDir]}${INITIATOR[$__stateDir]}/${INITIATOR[$__type]}$timestampAfterFilename" ] && [ -f "${INITIATOR[$__replicaDir]}${INITIATOR[$__stateDir]}/${TARGET[$__type]}$timestampAfterFilename" ]; then
 
 		Logger "Creating conflictual file list." "NOTICE"
 
-		cat "${INITIATOR[$__replicaDir]}${INITIATOR[$__stateDir]}/${INITIATOR[$__type]}$timestampCurrentFilename"
-		cat "${INITIATOR[$__replicaDir]}${INITIATOR[$__stateDir]}/${INITIATOR[$__type]}$timestampPreviousFilename"
-
 		#WIP --nocheck-order or check why comm is complaining
-		comm -23 "${INITIATOR[$__replicaDir]}${INITIATOR[$__stateDir]}/${INITIATOR[$__type]}$timestampCurrentFilename" "${INITIATOR[$__replicaDir]}${INITIATOR[$__stateDir]}/${INITIATOR[$__type]}$timestampPreviousFilename" > "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.${INITIATOR[$__type]}.$SCRIPT_PID.$TSTAMP"
-		comm -23 "${INITIATOR[$__replicaDir]}${INITIATOR[$__stateDir]}/${TARGET[$__type]}$timestampCurrentFilename" "${INITIATOR[$__replicaDir]}${INITIATOR[$__stateDir]}/${TARGET[$__type]}$timestampPreviousFilename" > "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.${TARGET[$__type]}.$SCRIPT_PID.$TSTAMP"
+		comm -23 "${INITIATOR[$__replicaDir]}${INITIATOR[$__stateDir]}/${INITIATOR[$__type]}$timestampCurrentFilename" "${INITIATOR[$__replicaDir]}${INITIATOR[$__stateDir]}/${INITIATOR[$__type]}$timestampAfterFilename" > "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.${INITIATOR[$__type]}.$SCRIPT_PID.$TSTAMP"
+		comm -23 "${INITIATOR[$__replicaDir]}${INITIATOR[$__stateDir]}/${TARGET[$__type]}$timestampCurrentFilename" "${INITIATOR[$__replicaDir]}${INITIATOR[$__stateDir]}/${TARGET[$__type]}$timestampAfterFilename" > "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.${TARGET[$__type]}.$SCRIPT_PID.$TSTAMP"
 
-		#WIP: work here
+		#WIP
+		cp "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.${INITIATOR[$__type]}.$SCRIPT_PID.$TSTAMP" /tmp/i
+		cp "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.${TARGET[$__type]}.$SCRIPT_PID.$TSTAMP" /tmp/t
+		join -j 1 -t ';' -o 1.1,1.2,1.3,2.2,2.3 "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.${INITIATOR[$__type]}.$SCRIPT_PID.$TSTAMP" "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.${TARGET[$__type]}.$SCRIPT_PID.$TSTAMP" > "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.comapre.$SCRIPT_PID.$TSTAMP"
+
 	fi
-}
-
-#WIP
-function renameTimestampFiles {
-	local timestampCurrentFilename="${1}" # filename of current timestamp list (will be prefixed with $replicaType)
-	local timestampPreviousFilename="${2}" # filename of previous timestamp list (will be prefixed with $replicaType)
-
-	__CheckArguments 2 $# "$@"	#__WITH_PARANOIA_DEBUG
-
-	# WIP missing exit code tests
-	mv -f "${INITIATOR[$__replicaDir]}${INITIATOR[$__stateDir]}/${INITIATOR[$__type]}$timestampCurrentFilename" "${INITIATOR[$__replicaDir]}${INITIATOR[$__stateDir]}/${INITIATOR[$__type]}$timestampPreviousFilename"
-	mv -f "${INITIATOR[$__replicaDir]}${INITIATOR[$__stateDir]}/${TARGET[$__type]}$timestampCurrentFilename" "${INITIATOR[$__replicaDir]}${INITIATOR[$__stateDir]}/${TARGET[$__type]}$timestampPreviousFilename"
 }
 
 # rsync does sync with mtime, but file attribute modifications only change ctime.
@@ -1645,7 +1633,7 @@ function Sync {
 	## Step 3a & 3b
 	if [ "$resumeInitiator" == "${SYNC_ACTION[3]}" ] || [ "$resumeTarget" == "${SYNC_ACTION[3]}" ]; then
 		if [[ "$RSYNC_ATTR_ARGS" == *"-X"* ]] || [[ "$RSYNC_ATTR_ARGS" == *"-A"* ]] || [ "$LOG_CONFLICTS" == "yes" ]; then
-			conflictList "${INITIATOR[$__timestampCurrentFile]}" "${INITIATOR[$__timestampPreviousFile]}" "${INITIATOR[$__conflictListFile]}" &
+			conflictList "${INITIATOR[$__timestampCurrentFile]}" "${INITIATOR[$__timestampAfterFile]}" "${INITIATOR[$__conflictListFile]}" &
 			WaitForTaskCompletion $! $SOFT_MAX_EXEC_TIME $HARD_MAX_EXEC_TIME $SLEEP_TIME $KEEP_LOGGING false true false
 			if [ $? -ne 0 ]; then
 				echo "${SYNC_ACTION[3]}" > "${INITIATOR[$__initiatorLastActionFile]}"
@@ -1840,24 +1828,53 @@ function Sync {
 	# Step 8 #WIP adapt to last function
 	if [ "$resumeInitiator" == "${SYNC_ACTION[8]}" ] || [ "$resumeTarget" == "${SYNC_ACTION[8]}" ]; then
 		if [[ "$RSYNC_ATTR_ARGS" == *"-X"* ]] || [[ "$RSYNC_ATTR_ARGS" == *"-A"* ]] || [ "$LOG_CONFLICTS" == "yes" ]; then
-			renameTimestampFiles "${INITIATOR[$__timestampCurrentFile]}" "${INITIATOR[$__timestampPreviousFile]}" &
-			WaitForTaskCompletion $! $SOFT_MAX_EXEC_TIME $HARD_MAX_EXEC_TIME $SLEEP_TIME $KEEP_LOGGING false true false
+
+			if [ "$resumeInitiator" == "${SYNC_ACTION[8]}" ]; then
+				timestampList "${INITIATOR[$__replicaDir]}" "${INITIATOR[$__type]}" "${INITIATOR[$__replicaDir]}${INITIATOR[$__stateDir]}/${INITIATOR[$__type]}${INITIATOR[$__treeAfterFile]}" "${INITIATOR[$__replicaDir]}${INITIATOR[$__stateDir]}/${INITIATOR[$__type]}${INITIATOR[$__timestampAfterFile]}" &
+				initiatorPid="$!"
+			fi
+
+			if [ "$resumeTarget" == "${SYNC_ACTION[8]}" ]; then
+				timestampList "${TARGET[$__replicaDir]}" "${TARGET[$__type]}" "${INITIATOR[$__replicaDir]}${INITIATOR[$__stateDir]}/${TARGET[$__type]}${TARGET[$__treeAfterFile]}" "${INITIATOR[$__replicaDir]}${INITIATOR[$__stateDir]}/${TARGET[$__type]}${TARGET[$__timestampAfterFile]}" &
+				targetPid="$!"
+			fi
+
+			WaitForTaskCompletion "$initiatorPid;$targetPid" $SOFT_MAX_EXEC_TIME $HARD_MAX_EXEC_TIME $SLEEP_TIME $KEEP_LOGGING false true false
 			if [ $? -ne 0 ]; then
-				echo "${SYNC_ACTION[8]}" > "${INITIATOR[$__initiatorLastActionFile]}"
-				echo "${SYNC_ACTION[8]}" > "${INITIATOR[$__targetLastActionFile]}"
+				IFS=';' read -r -a pidArray <<< "$(eval echo \"\$WAIT_FOR_TASK_COMPLETION_${FUNCNAME[0]}\")"
+				initiatorFail=false
+				targetFail=false
+				for pid in "${pidArray[@]}"; do
+					pid=${pid%:*}
+					if [ "$pid" == "$initiatorPid" ]; then
+						echo "${SYNC_ACTION[8]}" > "${INITIATOR[$__initiatorLastActionFile]}"
+						initiatorFail=true
+					elif [ "$pid" == "$targetPid" ]; then
+						echo "${SYNC_ACTION[8]}" > "${INITIATOR[$__targetLastActionFile]}"
+						targetFail=true
+					fi
+				done
+
+				if [ $initiatorFail == false ]; then
+					echo "${SYNC_ACTION[9]}" > "${INITIATOR[$__initiatorLastActionFile]}"
+				fi
+
+				if [ $targetFail == false ]; then
+					echo "${SYNC_ACTION[9]}" > "${INITIATOR[$__targetLastActionFile]}"
+				fi
+
 				exit 1
 			else
 				echo "${SYNC_ACTION[9]}" > "${INITIATOR[$__initiatorLastActionFile]}"
 				echo "${SYNC_ACTION[9]}" > "${INITIATOR[$__targetLastActionFile]}"
-				resumeInitiator="${SYNC_ACTION[5]}"
-				resumeTarget="${SYNC_ACTION[5]}"
-
+				resumeInitiator="${SYNC_ACTION[9]}"
+				resumeTarget="${SYNC_ACTION[9]}"
 			fi
 		else
 			echo "${SYNC_ACTION[9]}" > "${INITIATOR[$__initiatorLastActionFile]}"
 			echo "${SYNC_ACTION[9]}" > "${INITIATOR[$__targetLastActionFile]}"
 			resumeInitiator="${SYNC_ACTION[9]}"
-			resumeTarget="${SYNC_ACTION[9]}"
+			resumeTarget="${SYNC_ACTION[3]}"
 		fi
 	fi
 
@@ -2050,6 +2067,20 @@ function Summary {
 	)
 }
 
+function LogConflicts {
+	__CheckArguments 0 $# "$@"	#__WITH_PARANOIA_DEBUG
+
+	(
+	_LOGGER_PREFIX=""
+	Logger "File conflicts: INITIATOR << >> TARGET" "ALWAYS"
+	if [ -f "$RUN_DIR/$PROGRAM.conflictList.comapre.$SCRIPT_PID.$TSTAMP" ]; then
+		while read -r line; do
+			Logger "${INITIATOR[$__replicaDir]}$(echo $line | awk -F';' '{print $1}') -- ${TARGET[$__replicaDir]}$(echo $line | awk -F';' '{print $1}')" "ALWAYS"
+		done < "$RUN_DIR/$PROGRAM.conflictList.comapre.$SCRIPT_PID.$TSTAMP"
+	fi
+	)
+}
+
 function Init {
 	__CheckArguments 0 $# "$@"	#__WITH_PARANOIA_DEBUG
 
@@ -2156,7 +2187,7 @@ function Init {
 	readonly __failedDeletedListFile=14
 	readonly __successDeletedListFile=15
 	readonly __timestampCurrentFile=16
-	readonly __timestampPreviousFile=17
+	readonly __timestampAfterFile=17
 	readonly __conflictListFile=18
 
 	INITIATOR=()
@@ -2177,7 +2208,7 @@ function Init {
 	INITIATOR[$__failedDeletedListFile]="-failed-delete-$INSTANCE_ID$drySuffix"
 	INITIATOR[$__successDeletedListFile]="-success-delete-$INSTANCE_ID$drySuffix"
 	INITIATOR[$__timestampCurrentFile]="-timestamps-current-$INSTANCE_ID$drySuffix"
-	INITIATOR[$__timestampPreviousFile]="-timestamps-previous-$INSTANCE_ID$drySuffix"
+	INITIATOR[$__timestampAfterFile]="-timestamps-after-$INSTANCE_ID$drySuffix"
 	INITIATOR[$__conflictListFile]="conflicts-$INSTANCE_ID$drySuffix"
 
 	TARGET=()
@@ -2198,7 +2229,7 @@ function Init {
 	TARGET[$__failedDeletedListFile]="-failed-delete-$INSTANCE_ID$drySuffix"
 	TARGET[$__successDeletedListFile]="-success-delete-$INSTANCE_ID$drySuffix"
 	TARGET[$__timestampCurrentFile]="-timestamps-current-$INSTANCE_ID$drySuffix"
-	TARGET[$__timestampPreviousFile]="-timestamps-previous-$INSTANCE_ID$drySuffix"
+	TARGET[$__timestampAfterFile]="-timestamps-after-$INSTANCE_ID$drySuffix"
 	TARGET[$__conflictListFile]="conflicts-$INSTANCE_ID$drySuffix"
 
 	PARTIAL_DIR="${INITIATOR[$__partialDir]}"
@@ -2600,5 +2631,8 @@ else
 	fi
 	if [ $_SUMMARY == true ]; then
 		Summary
+	fi
+	if [ $LOG_CONFLICTS == "yes" ]; then
+		LogConflicts
 	fi
 fi
