@@ -1,21 +1,25 @@
 #!/usr/bin/env bash
 
 #TODO treeList, deleteList, _getFileCtimeMtime, conflictList should be called without having statedir informed. Just give the full path ?
-#TODO add error handling to new functions
 #TODO check if _getCtimeMtime | sort removal needs to be backported
+#TODO backport treeList sed -r sed -E 's/^.{10} +[0-9]+ [0-9/]{10} [0-9:]{8} //' fix && _getFileCtimeMtime* IFS read fix
+#TODO LANG=C... backport to v1.2.1 and v1.1
+#TODO: conflict list is not mandatory, but is still needed for acl resolution
+#TODO: syncAttrs must move the file list to sub function, which checks which kind of file list to use
+#TODO: double .xz extension when sending email alert with attachment
 
 PROGRAM="osync" # Rsync based two way sync engine with fault tolerance
 AUTHOR="(C) 2013-2017 by Orsiris de Jong"
 CONTACT="http://www.netpower.fr/osync - ozy@netpower.fr"
 PROGRAM_VERSION=1.2.2-dev
-PROGRAM_BUILD=2017060303
+PROGRAM_BUILD=2017060504
 IS_STABLE=no
 
 
 
 
 _OFUNCTIONS_VERSION=2.1.4-rc1
-_OFUNCTIONS_BUILD=2017052902
+_OFUNCTIONS_BUILD=2017060401
 _OFUNCTIONS_BOOTSTRAP=true
 
 ## BEGIN Generic bash functions written in 2013-2017 by Orsiris de Jong - http://www.netpower.fr - ozy@netpower.fr
@@ -39,6 +43,8 @@ fi
 
 ## Correct output of sort command (language agnostic sorting)
 export LC_ALL=C
+export LOCALE=C
+export LC_COLLATE=C
 
 ## Default umask for file creation
 umask 0077
@@ -2740,19 +2746,17 @@ function treeList {
 	# operation explanation
 	# (command || :) = Return code 0 regardless of command return code
 	# (grep -E \"^-|^d|^l\" || :) = Be sure line begins with '-' or 'd' or 'l' (rsync semantics for file, directory or symlink)
-	# (awk '{\$1=\$2=\$3=\$4=\"\" ;print}' || :) = Remove the first four columns of rsync output
-	# (awk '{\$1=\$1 ;print}' || :) = Removes leading spaces
-	# (awk '{$1=$2=$3=$4="" ;print substr(\$0,5)}' || :) = Same the two lines above, replaces them
-	# (awk 'BEGIN { FS=\" -> \" } ; { print \$1 }' || :) = Only show output before ' -> ' in order to remove symlink destionations
+	# (sed -E 's/^.{10} +[0-9]+ [0-9/]{10} [0-9:]{8} //' || :) = Remove everything before timestamps
+	# (awk 'BEGIN { FS=\" -> \" } ; { print \$1 }' || :) = Only show output before ' -> ' in order to remove symlink destinations
 	# (grep -v \"^\.$\" || :) = Removes line containing current directory sign '.'
 
 	Logger "Creating $replicaType replica file list [$replicaPath]." "NOTICE"
 	if [ "$REMOTE_OPERATION" == "yes" ] && [ "$replicaType" == "${TARGET[$__type]}" ]; then
 		CheckConnectivity3rdPartyHosts
 		CheckConnectivityRemoteHost
-		rsyncCmd="$(type -p $RSYNC_EXECUTABLE) --rsync-path=\"env _REMOTE_TOKEN=$_REMOTE_TOKEN $RSYNC_PATH\" $RSYNC_ARGS $RSYNC_ATTR_ARGS $RSYNC_TYPE_ARGS --exclude \"$OSYNC_DIR\" $RSYNC_PATTERNS $RSYNC_PARTIAL_EXCLUDE -e \"$RSYNC_SSH_CMD\" --list-only $REMOTE_USER@$REMOTE_HOST:\"$escapedReplicaPath\" 2> \"$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$replicaType.error.$SCRIPT_PID.$TSTAMP\" | (grep -E \"^-|^d|^l\" || :) | (awk '{\$1=\$2=\$3=\$4=\"\" ;print substr(\$0,5)}' || :) | (awk 'BEGIN { FS=\" -> \" } ; { print \$1 }' || :) | (grep -v \"^\.$\" || :) | sort > \"$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$replicaType.$SCRIPT_PID.$TSTAMP\""
+		rsyncCmd="$(type -p $RSYNC_EXECUTABLE) --rsync-path=\"env _REMOTE_TOKEN=$_REMOTE_TOKEN $RSYNC_PATH\" $RSYNC_ARGS $RSYNC_ATTR_ARGS $RSYNC_TYPE_ARGS --exclude \"$OSYNC_DIR\" $RSYNC_PATTERNS $RSYNC_PARTIAL_EXCLUDE -e \"$RSYNC_SSH_CMD\" --list-only $REMOTE_USER@$REMOTE_HOST:\"$escapedReplicaPath\" 2> \"$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$replicaType.error.$SCRIPT_PID.$TSTAMP\" | (grep -E \"^-|^d|^l\" || :) | (sed -E 's/^.{10} +[0-9]+ [0-9/]{10} [0-9:]{8} //' || :) | (awk 'BEGIN { FS=\" -> \" } ; { print \$1 }' || :) | (grep -v \"^\.$\" || :) | sort > \"$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$replicaType.$SCRIPT_PID.$TSTAMP\""
 	else
-		rsyncCmd="$(type -p $RSYNC_EXECUTABLE) --rsync-path=\"env _REMOTE_TOKEN=$_REMOTE_TOKEN $RSYNC_PATH\" $RSYNC_ARGS $RSYNC_ATTR_ARGS $RSYNC_TYPE_ARGS --exclude \"$OSYNC_DIR\" $RSYNC_PATTERNS $RSYNC_PARTIAL_EXCLUDE --list-only \"$replicaPath\" 2> \"$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$replicaType.error.$SCRIPT_PID.$TSTAMP\" | (grep -E \"^-|^d|^l\" || :) | (awk '{\$1=\$2=\$3=\$4=\"\" ;print substr(\$0,5)}' || :) | (awk 'BEGIN { FS=\" -> \" } ; { print \$1 }' || :) | (grep -v \"^\.$\" || :) | sort > \"$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$replicaType.$SCRIPT_PID.$TSTAMP\""
+		rsyncCmd="$(type -p $RSYNC_EXECUTABLE) --rsync-path=\"env _REMOTE_TOKEN=$_REMOTE_TOKEN $RSYNC_PATH\" $RSYNC_ARGS $RSYNC_ATTR_ARGS $RSYNC_TYPE_ARGS --exclude \"$OSYNC_DIR\" $RSYNC_PATTERNS $RSYNC_PARTIAL_EXCLUDE --list-only \"$replicaPath\" 2> \"$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$replicaType.error.$SCRIPT_PID.$TSTAMP\" | (grep -E \"^-|^d|^l\" || :) | (sed -E 's/^.{10} +[0-9]+ [0-9/]{10} [0-9:]{8} //' || :) | (awk 'BEGIN { FS=\" -> \" } ; { print \$1 }' || :) | (grep -v \"^\.$\" || :) | sort > \"$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$replicaType.$SCRIPT_PID.$TSTAMP\""
 	fi
 	Logger "RSYNC_CMD: $rsyncCmd" "DEBUG"
 	eval "$rsyncCmd"
@@ -2844,16 +2848,18 @@ function _getFileCtimeMtimeLocal {
 	local retval
 
 	echo -n "" > "$RUN_DIR/$PROGRAM.ctime_mtime.$replicaType.$SCRIPT_PID.$TSTAMP"
-	while read -r file; do $STAT_CTIME_MTIME_CMD "$replicaPath$file" >> "$RUN_DIR/$PROGRAM.ctime_mtime.$replicaType.$SCRIPT_PID.$TSTAMP"; done < "$fileList"
+	while IFS='' read -r file; do $STAT_CTIME_MTIME_CMD "$replicaPath$file" >> "$RUN_DIR/$PROGRAM.ctime_mtime.$replicaType.$SCRIPT_PID.$TSTAMP"; done < "$fileList"
 	retval=$?
 	if [ $retval -ne 0 ]; then
 		Logger "Getting file attributes failed [$retval] on $replicaType. Stopping execution." "CRITICAL" $retval
 		if [ -f "$RUN_DIR/$PROGRAM.ctime_mtime.$replicaType.$SCRIPT_PID.$TSTAMP" ]; then
 			Logger "Command output:\n$(cat $RUN_DIR/$PROGRAM.ctime_mtime.$replicaType.$SCRIPT_PID.$TSTAMP)" "WARN"
 		fi
-		return 1
+		return $retval
 	else
 		cat "$RUN_DIR/$PROGRAM.ctime_mtime.$replicaType.$SCRIPT_PID.$TSTAMP" | sort > "$timestampFile"
+		retval=$?
+		return $retval
 	fi
 
 }
@@ -2868,7 +2874,6 @@ function _getFileCtimeMtimeRemote {
 	local retval
 	local cmd
 
-	#WIP check if the following works with env remote token on top of cat
 	cmd='cat "'$fileList'" | '$SSH_CMD' "env _REMOTE_TOKEN=$_REMOTE_TOKEN cat > \".$PROGRAM.ctime_mtime.$replicaType.$SCRIPT_PID.$TSTAMP\""'
 	Logger "Launching command [$cmd]." "DEBUG"
 	eval "$cmd"
@@ -2879,17 +2884,16 @@ function _getFileCtimeMtimeRemote {
 		if [ -f "$RUN_DIR/$PROGRAM.ctime_mtime.$replicaType.$SCRIPT_PID.$TSTAMP" ]; then
 			Logger "Command output:\n$(cat $RUN_DIR/$PROGRAM.ctime_mtime.$replicaType.$SCRIPT_PID.$TSTAMP)" "WARN"
 		fi
-		return 1
+		return $retval
 	fi
 
-#WIP LANG=C... backport to v1.2.1 and v1.1
 
 $SSH_CMD env _REMOTE_TOKEN="$_REMOTE_TOKEN" \
 env _DEBUG="'$_DEBUG'" env _PARANOIA_DEBUG="'$_PARANOIA_DEBUG'" env _LOGGER_SILENT="'$_LOGGER_SILENT'" env _LOGGER_VERBOSE="'$_LOGGER_VERBOSE'" env _LOGGER_PREFIX="'$_LOGGER_PREFIX'" env _LOGGER_ERR_ONLY="'$_LOGGER_ERR_ONLY'" \
 env PROGRAM="'$PROGRAM'" env SCRIPT_PID="'$SCRIPT_PID'" TSTAMP="'$TSTAMP'" \
 env replicaPath="'$replicaPath'" env replicaType="'$replicaType'" env REMOTE_STAT_CTIME_MTIME_CMD="'$REMOTE_STAT_CTIME_MTIME_CMD'" \
-env LANG=C $COMMAND_SUDO' bash -s' << 'ENDSSH' > "$RUN_DIR/$PROGRAM.ctime_mtime.$replicaType.$SCRIPT_PID.$TSTAMP"
-	while read -r file; do $REMOTE_STAT_CTIME_MTIME_CMD "$replicaPath$file"; done < ".$PROGRAM.ctime_mtime.$replicaType.$SCRIPT_PID.$TSTAMP"
+env LANG=C env LOCALE=C env LC_COLLATE=C $COMMAND_SUDO' bash -s' << 'ENDSSH' > "$RUN_DIR/$PROGRAM.ctime_mtime.$replicaType.$SCRIPT_PID.$TSTAMP"
+	while IFS='' read -r file; do $REMOTE_STAT_CTIME_MTIME_CMD "$replicaPath$file"; done < ".$PROGRAM.ctime_mtime.$replicaType.$SCRIPT_PID.$TSTAMP"
 		if [ -f ".$PROGRAM.ctime_mtime.$replicaType.$SCRIPT_PID.$TSTAMP" ]; then
 			rm -f ".$PROGRAM.ctime_mtime.$replicaType.$SCRIPT_PID.$TSTAMP"
 		fi
@@ -2904,7 +2908,16 @@ ENDSSH
 	else
 		# Ugly fix for csh in FreeBSD 11 that adds leading and trailing '\"'
 		sed -i.tmp -e 's/^\\"//' -e 's/\\"$//' "$RUN_DIR/$PROGRAM.ctime_mtime.$replicaType.$SCRIPT_PID.$TSTAMP"
-		 cat "$RUN_DIR/$PROGRAM.ctime_mtime.$replicaType.$SCRIPT_PID.$TSTAMP" | sort > "$timestampFile"
+		retval=$?
+		if [ $retval -ne 0 ]; then
+			Logger "Cannot fix FreeBDS 11 remote" "ERROR"
+			return $retval
+		fi
+		cat "$RUN_DIR/$PROGRAM.ctime_mtime.$replicaType.$SCRIPT_PID.$TSTAMP" | sort > "$timestampFile"
+		if [ $retval -ne 0 ]; then
+			Logger "Cannot create timestamp file for $replicaType." "ERROR"
+			return $retval
+		fi
 	fi
 }
 
@@ -2933,7 +2946,6 @@ function timestampList {
 	return $retval
 }
 
-#WIP
 function conflictList {
 	local timestampCurrentFilename="${1}" # filename of current timestamp list (will be prefixed with $replicaType)
 	local timestampAfterFilename="${2}" # filename of previous timestamp list (will be prefixed with $replicaType)
@@ -2947,23 +2959,59 @@ function conflictList {
 	if [ -f "${INITIATOR[$__replicaDir]}${INITIATOR[$__stateDir]}/${INITIATOR[$__type]}$timestampCurrentFilename" ] && [ -f "${INITIATOR[$__replicaDir]}${INITIATOR[$__stateDir]}/${TARGET[$__type]}$timestampCurrentFilename" ]; then
 		# Remove prepending replicaPaths
 		sed -i'.replicaPath' "s;^${INITIATOR[$__replicaDir]};;g" "${INITIATOR[$__replicaDir]}${INITIATOR[$__stateDir]}/${INITIATOR[$__type]}$timestampCurrentFilename"
+		retval=$?
+		if [ $retval -ne 0 ]; then
+			Logger "Cannot remove prepending replicaPaths for current initiator timestamp file." "ERROR"
+			return $retval
+		fi
 		sed -i'.replicaPath' "s;^${TARGET[$__replicaDir]};;g" "${INITIATOR[$__replicaDir]}${INITIATOR[$__stateDir]}/${TARGET[$__type]}$timestampCurrentFilename"
+		retval=$?
+		if [ $retval -ne 0 ]; then
+			Logger "Cannot remove prepending replicaPaths for current target timestamp file." "ERROR"
+			return $retval
+		fi
 	fi
 
 	if [ -f "${INITIATOR[$__replicaDir]}${INITIATOR[$__stateDir]}/${INITIATOR[$__type]}$timestampAfterFilename" ] && [ -f "${INITIATOR[$__replicaDir]}${INITIATOR[$__stateDir]}/${TARGET[$__type]}$timestampAfterFilename" ]; then
 		# Remove prepending replicaPaths
 		sed -i'.replicaPath' "s;^${INITIATOR[$__replicaDir]};;g" "${INITIATOR[$__replicaDir]}${INITIATOR[$__stateDir]}/${INITIATOR[$__type]}$timestampAfterFilename"
+		retval=$?
+		if [ $retval -ne 0 ]; then
+			Logger "Cannot remove prepending replicaPaths for after initiator timestamp file." "ERROR"
+			return $retval
+		fi
 		sed -i'.replicaPath' "s;^${TARGET[$__replicaDir]};;g" "${INITIATOR[$__replicaDir]}${INITIATOR[$__stateDir]}/${TARGET[$__type]}$timestampAfterFilename"
+		retval=$?
+		if [ $retval -ne 0 ]; then
+			Logger "Cannot remove prepending replicaPaths for after target timestamp file." "ERROR"
+			return $retval
+		fi
 	fi
 
 	if [ -f "${INITIATOR[$__replicaDir]}${INITIATOR[$__stateDir]}/${INITIATOR[$__type]}$timestampAfterFilename" ] && [ -f "${INITIATOR[$__replicaDir]}${INITIATOR[$__stateDir]}/${TARGET[$__type]}$timestampAfterFilename" ]; then
 
 		Logger "Creating conflictual file list." "NOTICE"
 
-		comm -23 "${INITIATOR[$__replicaDir]}${INITIATOR[$__stateDir]}/${INITIATOR[$__type]}$timestampCurrentFilename" "${INITIATOR[$__replicaDir]}${INITIATOR[$__stateDir]}/${INITIATOR[$__type]}$timestampAfterFilename" > "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.${INITIATOR[$__type]}.$SCRIPT_PID.$TSTAMP"
-		comm -23 "${INITIATOR[$__replicaDir]}${INITIATOR[$__stateDir]}/${TARGET[$__type]}$timestampCurrentFilename" "${INITIATOR[$__replicaDir]}${INITIATOR[$__stateDir]}/${TARGET[$__type]}$timestampAfterFilename" > "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.${TARGET[$__type]}.$SCRIPT_PID.$TSTAMP"
+		comm -23 "${INITIATOR[$__replicaDir]}${INITIATOR[$__stateDir]}/${INITIATOR[$__type]}$timestampCurrentFilename" "${INITIATOR[$__replicaDir]}${INITIATOR[$__stateDir]}/${INITIATOR[$__type]}$timestampAfterFilename" | sort -k 1,1 > "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.${INITIATOR[$__type]}.$SCRIPT_PID.$TSTAMP"
+		retval=$?
+		if [ $retval -ne 0 ]; then
+			Logger "Cannot extract conflict data for initiator replica." "ERROR"
+			return $retval
+		fi
+		comm -23 "${INITIATOR[$__replicaDir]}${INITIATOR[$__stateDir]}/${TARGET[$__type]}$timestampCurrentFilename" "${INITIATOR[$__replicaDir]}${INITIATOR[$__stateDir]}/${TARGET[$__type]}$timestampAfterFilename" | sort -k 1,1 > "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.${TARGET[$__type]}.$SCRIPT_PID.$TSTAMP"
+		retval=$?
+		if [ $retval -ne 0 ]; then
+			Logger "Cannot extract conflict data for target replica.." "ERROR"
+			return $retval
+		fi
 
-		join -j 1 -t ';' -o 1.1,1.2,1.3,2.2,2.3 "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.${INITIATOR[$__type]}.$SCRIPT_PID.$TSTAMP" "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.${TARGET[$__type]}.$SCRIPT_PID.$TSTAMP" > "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.comapre.$SCRIPT_PID.$TSTAMP"
+		# Add --nocheck-order because sorted files still make join fail for unholy reasons
+		join -j 1 -t ';' --nocheck-order -o 1.1,1.2,1.3,2.2,2.3 "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.${INITIATOR[$__type]}.$SCRIPT_PID.$TSTAMP" "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.${TARGET[$__type]}.$SCRIPT_PID.$TSTAMP" > "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.comapre.$SCRIPT_PID.$TSTAMP"
+		retval=$?
+		if [ $retval -ne 0 ]; then
+			Logger "Cannot create conflict list file." "ERROR"
+			return $retval
+		fi
 
 	fi
 }
@@ -3021,7 +3069,6 @@ function syncAttrs {
 		fi
 	fi
 
-	#WIP: replace 4th argument with some state file
 	Logger "Getting ctimes for pending files on initiator." "NOTICE"
 	_getFileCtimeMtimeLocal "${INITIATOR[$__replicaDir]}" "${INITIATOR[$__type]}" "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}-cleaned.$SCRIPT_PID.$TSTAMP" "$RUN_DIR/$PROGRAM.ctime_mtime___.${INITIATOR[$__type]}.$SCRIPT_PID.$TSTAMP" &
 	pids="$!"
@@ -3767,8 +3814,8 @@ function Sync {
 
 	## Step 3a & 3b
 	if [ "$resumeInitiator" == "${SYNC_ACTION[3]}" ] || [ "$resumeTarget" == "${SYNC_ACTION[3]}" ]; then
-		if [[ "$RSYNC_ATTR_ARGS" == *"-X"* ]] || [[ "$RSYNC_ATTR_ARGS" == *"-A"* ]] || [ "$LOG_CONFLICTS" == "yes" ]; then
-			conflictList "${INITIATOR[$__timestampCurrentFile]}" "${INITIATOR[$__timestampAfterFile]}" "${INITIATOR[$__conflictListFile]}" &
+		if [ "$LOG_CONFLICTS" == "yes" ]; then
+			conflictList "${INITIATOR[$__timestampCurrentFile]}" "${INITIATOR[$__timestampAfterFileNoSuffix]}" "${INITIATOR[$__conflictListFile]}" &
 			WaitForTaskCompletion $! $SOFT_MAX_EXEC_TIME $HARD_MAX_EXEC_TIME $SLEEP_TIME $KEEP_LOGGING false true false
 			if [ $? -ne 0 ]; then
 				echo "${SYNC_ACTION[3]}" > "${INITIATOR[$__initiatorLastActionFile]}"
@@ -4198,13 +4245,26 @@ function Summary {
 
 function LogConflicts {
 
+	local subject
+	local body
+
 	(
 	_LOGGER_PREFIX=""
 	Logger "File conflicts: INITIATOR << >> TARGET" "ALWAYS"
 	if [ -f "$RUN_DIR/$PROGRAM.conflictList.comapre.$SCRIPT_PID.$TSTAMP" ]; then
+		echo "" > "${INITIATOR[$__replicaDir]}${INITIATOR[$__stateDir]}/${INITIATOR[$__conflictListFile]}"
 		while read -r line; do
-			Logger "${INITIATOR[$__replicaDir]}$(echo $line | awk -F';' '{print $1}') -- ${TARGET[$__replicaDir]}$(echo $line | awk -F';' '{print $1}')" "ALWAYS"
+			echo "${INITIATOR[$__replicaDir]}$(echo $line | awk -F';' '{print $1}') -- ${TARGET[$__replicaDir]}$(echo $line | awk -F';' '{print $1}')" >> "${INITIATOR[$__replicaDir]}${INITIATOR[$__stateDir]}/${INITIATOR[$__conflictListFile]}"
 		done < "$RUN_DIR/$PROGRAM.conflictList.comapre.$SCRIPT_PID.$TSTAMP"
+
+		Logger "$(cat ${INITIATOR[$__replicaDir]}${INITIATOR[$__stateDir]}/${INITIATOR[$__conflictListFile]})" "ALWAYS"
+
+		if [ "$ALERT_CONFLICTS" == "yes" ] && [ -s "$RUN_DIR/$PROGRAM.conflictList.comapre.$SCRIPT_PID.$TSTAMP" ]; then
+			subject="Conflictual files found in [$INSTANCE_ID]"
+			body="List of conflictual files:"$'\n'"$(cat ${INITIATOR[$__replicaDir]}${INITIATOR[$__stateDir]}/${INITIATOR[$__conflictListFile]})"
+
+			SendEmail "$subject" "$body" "$DESTINATION_MAILS" "" "$SENDER_MAIL" "$SMTP_SERVER" "$SMTP_PORT" "$SMTP_ENCRYPTION" "$SMTP_USER" "$SMTP_PASSWORD"
+		fi
 	fi
 	)
 }
@@ -4315,7 +4375,8 @@ function Init {
 	readonly __successDeletedListFile=15
 	readonly __timestampCurrentFile=16
 	readonly __timestampAfterFile=17
-	readonly __conflictListFile=18
+	readonly __timestampAfterFileNoSuffix=18
+	readonly __conflictListFile=19
 
 	INITIATOR=()
 	INITIATOR[$__type]='initiator'
@@ -4336,6 +4397,7 @@ function Init {
 	INITIATOR[$__successDeletedListFile]="-success-delete-$INSTANCE_ID$drySuffix"
 	INITIATOR[$__timestampCurrentFile]="-timestamps-current-$INSTANCE_ID$drySuffix"
 	INITIATOR[$__timestampAfterFile]="-timestamps-after-$INSTANCE_ID$drySuffix"
+	INITIATOR[$__timestampAfterFileNoSuffix]="-timestamps-after-$INSTANCE_ID"
 	INITIATOR[$__conflictListFile]="conflicts-$INSTANCE_ID$drySuffix"
 
 	TARGET=()
@@ -4351,12 +4413,14 @@ function Init {
 	TARGET[$__resumeCount]="$TARGET_SYNC_DIR$OSYNC_DIR/$stateDir/$resumeCount-$INSTANCE_ID$drySuffix"				# unused
 	TARGET[$__treeCurrentFile]="-tree-current-$INSTANCE_ID$drySuffix"								# unused
 	TARGET[$__treeAfterFile]="-tree-after-$INSTANCE_ID$drySuffix"									# unused
+	#WIP NoSuffix file to add to timestamp
 	TARGET[$__treeAfterFileNoSuffix]="-tree-after-$INSTANCE_ID"									# unused
 	TARGET[$__deletedListFile]="-deleted-list-$INSTANCE_ID$drySuffix"								# unused
 	TARGET[$__failedDeletedListFile]="-failed-delete-$INSTANCE_ID$drySuffix"
 	TARGET[$__successDeletedListFile]="-success-delete-$INSTANCE_ID$drySuffix"
 	TARGET[$__timestampCurrentFile]="-timestamps-current-$INSTANCE_ID$drySuffix"
 	TARGET[$__timestampAfterFile]="-timestamps-after-$INSTANCE_ID$drySuffix"
+	TARGET[$__timestampAfterFileNoSuffix]="-timestamps-after-$INSTANCE_ID"
 	TARGET[$__conflictListFile]="conflicts-$INSTANCE_ID$drySuffix"
 
 	PARTIAL_DIR="${INITIATOR[$__partialDir]}"
@@ -4388,9 +4452,6 @@ function Init {
 		TARGET_BACKUP=""
 	fi
 
-	#WIP: change resume numbers when new conflict function will be done
-	#WIP: conflict list is not mandatory, but is still needed for acl resolution
-	#WIP: syncAttrs must move the file list to sub function, which checks which kind of file list to use
 	SYNC_ACTION=(
 	'replica-tree'
 	'deleted-list'
@@ -4433,6 +4494,7 @@ function Usage {
 	echo "--errors-only          Output only errors (can be combined with silent or verbose)"
 	echo "--summary              Outputs a list of transferred / deleted files at the end of the run"
 	echo "--log-conflicts        Outputs a list of conflicted files"
+	echo "--alert-conflicts      Send an email if conflictual files found (implies --log-conflicts)"
 	echo "--verbose              Increases output"
 	echo "--stats                Adds rsync transfer statistics to verbose output"
 	echo "--partial              Allows rsync to keep partial downloads that can be resumed later (experimental)"
@@ -4535,6 +4597,7 @@ INITIATOR_LOCK_FILE_EXISTS=false
 TARGET_LOCK_FILE_EXISTS=false
 FORCE_UNLOCK=false
 LOG_CONFLICTS="no"
+ALERT_CONFLICTS="no"
 no_maxtime=false
 opts=""
 ERROR_ALERT=false
@@ -4636,6 +4699,11 @@ for i in "$@"; do
 		--log-conflicts)
 		LOG_CONFLICTS="yes"
 		opts=$opts" --log-conflicts"
+		;;
+		--alert-conflicts)
+		ALERT_CONFLICTS="yes"
+		LOG_CONFLICTS="yes"
+		opts=$opts" --alert-conflicts"
 		;;
 		--no-prefix)
 		opts=$opts" --no-prefix"
