@@ -6,14 +6,13 @@
 #TODO LANG=C... backport to v1.2.1 and v1.1
 #TODO: conflict list is not mandatory, but is still needed for acl resolution
 #TODO: syncAttrs must move the file list to sub function, which checks which kind of file list to use
-#TODO: nosuffix in order not to overwrite on dryrun
 #TODO: double .xz extension when sending email alert with attachment
 
 PROGRAM="osync" # Rsync based two way sync engine with fault tolerance
 AUTHOR="(C) 2013-2017 by Orsiris de Jong"
 CONTACT="http://www.netpower.fr/osync - ozy@netpower.fr"
 PROGRAM_VERSION=1.2.2-dev
-PROGRAM_BUILD=2017060503
+PROGRAM_BUILD=2017060504
 IS_STABLE=no
 
 
@@ -1672,7 +1671,7 @@ function Sync {
 	## Step 3a & 3b
 	if [ "$resumeInitiator" == "${SYNC_ACTION[3]}" ] || [ "$resumeTarget" == "${SYNC_ACTION[3]}" ]; then
 		if [ "$LOG_CONFLICTS" == "yes" ]; then
-			conflictList "${INITIATOR[$__timestampCurrentFile]}" "${INITIATOR[$__timestampAfterFile]}" "${INITIATOR[$__conflictListFile]}" &
+			conflictList "${INITIATOR[$__timestampCurrentFile]}" "${INITIATOR[$__timestampAfterFileNoSuffix]}" "${INITIATOR[$__conflictListFile]}" &
 			WaitForTaskCompletion $! $SOFT_MAX_EXEC_TIME $HARD_MAX_EXEC_TIME $SLEEP_TIME $KEEP_LOGGING false true false
 			if [ $? -ne 0 ]; then
 				echo "${SYNC_ACTION[3]}" > "${INITIATOR[$__initiatorLastActionFile]}"
