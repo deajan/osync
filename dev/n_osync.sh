@@ -3,12 +3,17 @@
 #TODO treeList, deleteList, _getFileCtimeMtime, conflictList should be called without having statedir informed. Just give the full path ?
 #TODO check if _getCtimeMtime | sort removal needs to be backported
 #TODO backport treeList sed -r sed -E 's/^.{10} +[0-9]+ [0-9/]{10} [0-9:]{8} //' fix && _getFileCtimeMtime* IFS read fix
+#TODO LANG=C... backport to v1.2.1 and v1.1
+#TODO: conflict list is not mandatory, but is still needed for acl resolution
+#TODO: syncAttrs must move the file list to sub function, which checks which kind of file list to use
+#TODO: nosuffix in order not to overwrite on dryrun
+#TODO: double .xz extension when sending email alert with attachment
 
 PROGRAM="osync" # Rsync based two way sync engine with fault tolerance
 AUTHOR="(C) 2013-2017 by Orsiris de Jong"
 CONTACT="http://www.netpower.fr/osync - ozy@netpower.fr"
 PROGRAM_VERSION=1.2.2-dev
-PROGRAM_BUILD=2017060501
+PROGRAM_BUILD=2017060503
 IS_STABLE=no
 
 
@@ -822,7 +827,6 @@ function _getFileCtimeMtimeRemote {
 	local retval
 	local cmd
 
-	#WIP check if the following works with env remote token on top of cat
 	cmd='cat "'$fileList'" | '$SSH_CMD' "env _REMOTE_TOKEN=$_REMOTE_TOKEN cat > \".$PROGRAM.ctime_mtime.$replicaType.$SCRIPT_PID.$TSTAMP\""'
 	Logger "Launching command [$cmd]." "DEBUG"
 	eval "$cmd"
@@ -836,7 +840,6 @@ function _getFileCtimeMtimeRemote {
 		return $retval
 	fi
 
-#WIP LANG=C... backport to v1.2.1 and v1.1
 
 $SSH_CMD env _REMOTE_TOKEN="$_REMOTE_TOKEN" \
 env _DEBUG="'$_DEBUG'" env _PARANOIA_DEBUG="'$_PARANOIA_DEBUG'" env _LOGGER_SILENT="'$_LOGGER_SILENT'" env _LOGGER_VERBOSE="'$_LOGGER_VERBOSE'" env _LOGGER_PREFIX="'$_LOGGER_PREFIX'" env _LOGGER_ERR_ONLY="'$_LOGGER_ERR_ONLY'" \
@@ -897,7 +900,6 @@ function timestampList {
 	return $retval
 }
 
-#WIP
 function conflictList {
 	local timestampCurrentFilename="${1}" # filename of current timestamp list (will be prefixed with $replicaType)
 	local timestampAfterFilename="${2}" # filename of previous timestamp list (will be prefixed with $replicaType)
@@ -1023,7 +1025,6 @@ function syncAttrs {
 		fi
 	fi
 
-	#WIP: replace 4th argument with some state file
 	Logger "Getting ctimes for pending files on initiator." "NOTICE"
 	_getFileCtimeMtimeLocal "${INITIATOR[$__replicaDir]}" "${INITIATOR[$__type]}" "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}-cleaned.$SCRIPT_PID.$TSTAMP" "$RUN_DIR/$PROGRAM.ctime_mtime___.${INITIATOR[$__type]}.$SCRIPT_PID.$TSTAMP" &
 	pids="$!"
@@ -1670,7 +1671,7 @@ function Sync {
 
 	## Step 3a & 3b
 	if [ "$resumeInitiator" == "${SYNC_ACTION[3]}" ] || [ "$resumeTarget" == "${SYNC_ACTION[3]}" ]; then
-		if [[ "$RSYNC_ATTR_ARGS" == *"-X"* ]] || [[ "$RSYNC_ATTR_ARGS" == *"-A"* ]] || [ "$LOG_CONFLICTS" == "yes" ]; then
+		if [ "$LOG_CONFLICTS" == "yes" ]; then
 			conflictList "${INITIATOR[$__timestampCurrentFile]}" "${INITIATOR[$__timestampAfterFile]}" "${INITIATOR[$__conflictListFile]}" &
 			WaitForTaskCompletion $! $SOFT_MAX_EXEC_TIME $HARD_MAX_EXEC_TIME $SLEEP_TIME $KEEP_LOGGING false true false
 			if [ $? -ne 0 ]; then
@@ -2107,13 +2108,26 @@ function Summary {
 function LogConflicts {
 	__CheckArguments 0 $# "$@"	#__WITH_PARANOIA_DEBUG
 
+	local subject
+	local body
+
 	(
 	_LOGGER_PREFIX=""
 	Logger "File conflicts: INITIATOR << >> TARGET" "ALWAYS"
 	if [ -f "$RUN_DIR/$PROGRAM.conflictList.comapre.$SCRIPT_PID.$TSTAMP" ]; then
+		echo "" > "${INITIATOR[$__replicaDir]}${INITIATOR[$__stateDir]}/${INITIATOR[$__conflictListFile]}"
 		while read -r line; do
-			Logger "${INITIATOR[$__replicaDir]}$(echo $line | awk -F';' '{print $1}') -- ${TARGET[$__replicaDir]}$(echo $line | awk -F';' '{print $1}')" "ALWAYS"
+			echo "${INITIATOR[$__replicaDir]}$(echo $line | awk -F';' '{print $1}') -- ${TARGET[$__replicaDir]}$(echo $line | awk -F';' '{print $1}')" >> "${INITIATOR[$__replicaDir]}${INITIATOR[$__stateDir]}/${INITIATOR[$__conflictListFile]}"
 		done < "$RUN_DIR/$PROGRAM.conflictList.comapre.$SCRIPT_PID.$TSTAMP"
+
+		Logger "$(cat ${INITIATOR[$__replicaDir]}${INITIATOR[$__stateDir]}/${INITIATOR[$__conflictListFile]})" "ALWAYS"
+
+		if [ "$ALERT_CONFLICTS" == "yes" ] && [ -s "$RUN_DIR/$PROGRAM.conflictList.comapre.$SCRIPT_PID.$TSTAMP" ]; then
+			subject="Conflictual files found in [$INSTANCE_ID]"
+			body="List of conflictual files:"$'\n'"$(cat ${INITIATOR[$__replicaDir]}${INITIATOR[$__stateDir]}/${INITIATOR[$__conflictListFile]})"
+
+			SendEmail "$subject" "$body" "$DESTINATION_MAILS" "" "$SENDER_MAIL" "$SMTP_SERVER" "$SMTP_PORT" "$SMTP_ENCRYPTION" "$SMTP_USER" "$SMTP_PASSWORD"
+		fi
 	fi
 	)
 }
@@ -2225,7 +2239,8 @@ function Init {
 	readonly __successDeletedListFile=15
 	readonly __timestampCurrentFile=16
 	readonly __timestampAfterFile=17
-	readonly __conflictListFile=18
+	readonly __timestampAfterFileNoSuffix=18
+	readonly __conflictListFile=19
 
 	INITIATOR=()
 	INITIATOR[$__type]='initiator'
@@ -2246,6 +2261,7 @@ function Init {
 	INITIATOR[$__successDeletedListFile]="-success-delete-$INSTANCE_ID$drySuffix"
 	INITIATOR[$__timestampCurrentFile]="-timestamps-current-$INSTANCE_ID$drySuffix"
 	INITIATOR[$__timestampAfterFile]="-timestamps-after-$INSTANCE_ID$drySuffix"
+	INITIATOR[$__timestampAfterFileNoSuffix]="-timestamps-after-$INSTANCE_ID"
 	INITIATOR[$__conflictListFile]="conflicts-$INSTANCE_ID$drySuffix"
 
 	TARGET=()
@@ -2261,12 +2277,14 @@ function Init {
 	TARGET[$__resumeCount]="$TARGET_SYNC_DIR$OSYNC_DIR/$stateDir/$resumeCount-$INSTANCE_ID$drySuffix"				# unused
 	TARGET[$__treeCurrentFile]="-tree-current-$INSTANCE_ID$drySuffix"								# unused
 	TARGET[$__treeAfterFile]="-tree-after-$INSTANCE_ID$drySuffix"									# unused
+	#WIP NoSuffix file to add to timestamp
 	TARGET[$__treeAfterFileNoSuffix]="-tree-after-$INSTANCE_ID"									# unused
 	TARGET[$__deletedListFile]="-deleted-list-$INSTANCE_ID$drySuffix"								# unused
 	TARGET[$__failedDeletedListFile]="-failed-delete-$INSTANCE_ID$drySuffix"
 	TARGET[$__successDeletedListFile]="-success-delete-$INSTANCE_ID$drySuffix"
 	TARGET[$__timestampCurrentFile]="-timestamps-current-$INSTANCE_ID$drySuffix"
 	TARGET[$__timestampAfterFile]="-timestamps-after-$INSTANCE_ID$drySuffix"
+	TARGET[$__timestampAfterFileNoSuffix]="-timestamps-after-$INSTANCE_ID"
 	TARGET[$__conflictListFile]="conflicts-$INSTANCE_ID$drySuffix"
 
 	PARTIAL_DIR="${INITIATOR[$__partialDir]}"
@@ -2298,9 +2316,6 @@ function Init {
 		TARGET_BACKUP=""
 	fi
 
-	#WIP: change resume numbers when new conflict function will be done
-	#WIP: conflict list is not mandatory, but is still needed for acl resolution
-	#WIP: syncAttrs must move the file list to sub function, which checks which kind of file list to use
 	SYNC_ACTION=(
 	'replica-tree'
 	'deleted-list'
@@ -2345,6 +2360,7 @@ function Usage {
 	echo "--errors-only          Output only errors (can be combined with silent or verbose)"
 	echo "--summary              Outputs a list of transferred / deleted files at the end of the run"
 	echo "--log-conflicts        Outputs a list of conflicted files"
+	echo "--alert-conflicts      Send an email if conflictual files found (implies --log-conflicts)"
 	echo "--verbose              Increases output"
 	echo "--stats                Adds rsync transfer statistics to verbose output"
 	echo "--partial              Allows rsync to keep partial downloads that can be resumed later (experimental)"
@@ -2448,6 +2464,7 @@ INITIATOR_LOCK_FILE_EXISTS=false
 TARGET_LOCK_FILE_EXISTS=false
 FORCE_UNLOCK=false
 LOG_CONFLICTS="no"
+ALERT_CONFLICTS="no"
 no_maxtime=false
 opts=""
 ERROR_ALERT=false
@@ -2549,6 +2566,11 @@ for i in "$@"; do
 		--log-conflicts)
 		LOG_CONFLICTS="yes"
 		opts=$opts" --log-conflicts"
+		;;
+		--alert-conflicts)
+		ALERT_CONFLICTS="yes"
+		LOG_CONFLICTS="yes"
+		opts=$opts" --alert-conflicts"
 		;;
 		--no-prefix)
 		opts=$opts" --no-prefix"
