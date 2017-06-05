@@ -1,7 +1,6 @@
 #!/usr/bin/env bash
 
 #TODO treeList, deleteList, _getFileCtimeMtime, conflictList should be called without having statedir informed. Just give the full path ?
-#TODO add error handling to new functions
 #TODO check if _getCtimeMtime | sort removal needs to be backported
 #TODO backport treeList sed -r sed -E 's/^.{10} +[0-9]+ [0-9/]{10} [0-9:]{8} //' fix && _getFileCtimeMtime* IFS read fix
 
@@ -9,7 +8,7 @@ PROGRAM="osync" # Rsync based two way sync engine with fault tolerance
 AUTHOR="(C) 2013-2017 by Orsiris de Jong"
 CONTACT="http://www.netpower.fr/osync - ozy@netpower.fr"
 PROGRAM_VERSION=1.2.2-dev
-PROGRAM_BUILD=2017060403
+PROGRAM_BUILD=2017060501
 IS_STABLE=no
 
 
@@ -803,9 +802,11 @@ function _getFileCtimeMtimeLocal {
 		if [ -f "$RUN_DIR/$PROGRAM.ctime_mtime.$replicaType.$SCRIPT_PID.$TSTAMP" ]; then
 			Logger "Command output:\n$(cat $RUN_DIR/$PROGRAM.ctime_mtime.$replicaType.$SCRIPT_PID.$TSTAMP)" "WARN"
 		fi
-		return 1
+		return $retval
 	else
 		cat "$RUN_DIR/$PROGRAM.ctime_mtime.$replicaType.$SCRIPT_PID.$TSTAMP" | sort > "$timestampFile"
+		retval=$?
+		return $retval
 	fi
 
 }
@@ -832,7 +833,7 @@ function _getFileCtimeMtimeRemote {
 		if [ -f "$RUN_DIR/$PROGRAM.ctime_mtime.$replicaType.$SCRIPT_PID.$TSTAMP" ]; then
 			Logger "Command output:\n$(cat $RUN_DIR/$PROGRAM.ctime_mtime.$replicaType.$SCRIPT_PID.$TSTAMP)" "WARN"
 		fi
-		return 1
+		return $retval
 	fi
 
 #WIP LANG=C... backport to v1.2.1 and v1.1
@@ -841,7 +842,7 @@ $SSH_CMD env _REMOTE_TOKEN="$_REMOTE_TOKEN" \
 env _DEBUG="'$_DEBUG'" env _PARANOIA_DEBUG="'$_PARANOIA_DEBUG'" env _LOGGER_SILENT="'$_LOGGER_SILENT'" env _LOGGER_VERBOSE="'$_LOGGER_VERBOSE'" env _LOGGER_PREFIX="'$_LOGGER_PREFIX'" env _LOGGER_ERR_ONLY="'$_LOGGER_ERR_ONLY'" \
 env PROGRAM="'$PROGRAM'" env SCRIPT_PID="'$SCRIPT_PID'" TSTAMP="'$TSTAMP'" \
 env replicaPath="'$replicaPath'" env replicaType="'$replicaType'" env REMOTE_STAT_CTIME_MTIME_CMD="'$REMOTE_STAT_CTIME_MTIME_CMD'" \
-env LANG=C env LOCALE=C $COMMAND_SUDO' bash -s' << 'ENDSSH' > "$RUN_DIR/$PROGRAM.ctime_mtime.$replicaType.$SCRIPT_PID.$TSTAMP"
+env LANG=C env LOCALE=C env LC_COLLATE=C $COMMAND_SUDO' bash -s' << 'ENDSSH' > "$RUN_DIR/$PROGRAM.ctime_mtime.$replicaType.$SCRIPT_PID.$TSTAMP"
 	while IFS='' read -r file; do $REMOTE_STAT_CTIME_MTIME_CMD "$replicaPath$file"; done < ".$PROGRAM.ctime_mtime.$replicaType.$SCRIPT_PID.$TSTAMP"
 		if [ -f ".$PROGRAM.ctime_mtime.$replicaType.$SCRIPT_PID.$TSTAMP" ]; then
 			rm -f ".$PROGRAM.ctime_mtime.$replicaType.$SCRIPT_PID.$TSTAMP"
@@ -857,7 +858,16 @@ ENDSSH
 	else
 		# Ugly fix for csh in FreeBSD 11 that adds leading and trailing '\"'
 		sed -i.tmp -e 's/^\\"//' -e 's/\\"$//' "$RUN_DIR/$PROGRAM.ctime_mtime.$replicaType.$SCRIPT_PID.$TSTAMP"
-		 cat "$RUN_DIR/$PROGRAM.ctime_mtime.$replicaType.$SCRIPT_PID.$TSTAMP" | sort > "$timestampFile"
+		retval=$?
+		if [ $retval -ne 0 ]; then
+			Logger "Cannot fix FreeBDS 11 remote" "ERROR"
+			return $retval
+		fi
+		cat "$RUN_DIR/$PROGRAM.ctime_mtime.$replicaType.$SCRIPT_PID.$TSTAMP" | sort > "$timestampFile"
+		if [ $retval -ne 0 ]; then
+			Logger "Cannot create timestamp file for $replicaType." "ERROR"
+			return $retval
+		fi
 	fi
 }
 
@@ -902,13 +912,33 @@ function conflictList {
 	if [ -f "${INITIATOR[$__replicaDir]}${INITIATOR[$__stateDir]}/${INITIATOR[$__type]}$timestampCurrentFilename" ] && [ -f "${INITIATOR[$__replicaDir]}${INITIATOR[$__stateDir]}/${TARGET[$__type]}$timestampCurrentFilename" ]; then
 		# Remove prepending replicaPaths
 		sed -i'.replicaPath' "s;^${INITIATOR[$__replicaDir]};;g" "${INITIATOR[$__replicaDir]}${INITIATOR[$__stateDir]}/${INITIATOR[$__type]}$timestampCurrentFilename"
+		retval=$?
+		if [ $retval -ne 0 ]; then
+			Logger "Cannot remove prepending replicaPaths for current initiator timestamp file." "ERROR"
+			return $retval
+		fi
 		sed -i'.replicaPath' "s;^${TARGET[$__replicaDir]};;g" "${INITIATOR[$__replicaDir]}${INITIATOR[$__stateDir]}/${TARGET[$__type]}$timestampCurrentFilename"
+		retval=$?
+		if [ $retval -ne 0 ]; then
+			Logger "Cannot remove prepending replicaPaths for current target timestamp file." "ERROR"
+			return $retval
+		fi
 	fi
 
 	if [ -f "${INITIATOR[$__replicaDir]}${INITIATOR[$__stateDir]}/${INITIATOR[$__type]}$timestampAfterFilename" ] && [ -f "${INITIATOR[$__replicaDir]}${INITIATOR[$__stateDir]}/${TARGET[$__type]}$timestampAfterFilename" ]; then
 		# Remove prepending replicaPaths
 		sed -i'.replicaPath' "s;^${INITIATOR[$__replicaDir]};;g" "${INITIATOR[$__replicaDir]}${INITIATOR[$__stateDir]}/${INITIATOR[$__type]}$timestampAfterFilename"
+		retval=$?
+		if [ $retval -ne 0 ]; then
+			Logger "Cannot remove prepending replicaPaths for after initiator timestamp file." "ERROR"
+			return $retval
+		fi
 		sed -i'.replicaPath' "s;^${TARGET[$__replicaDir]};;g" "${INITIATOR[$__replicaDir]}${INITIATOR[$__stateDir]}/${TARGET[$__type]}$timestampAfterFilename"
+		retval=$?
+		if [ $retval -ne 0 ]; then
+			Logger "Cannot remove prepending replicaPaths for after target timestamp file." "ERROR"
+			return $retval
+		fi
 	fi
 
 	if [ -f "${INITIATOR[$__replicaDir]}${INITIATOR[$__stateDir]}/${INITIATOR[$__type]}$timestampAfterFilename" ] && [ -f "${INITIATOR[$__replicaDir]}${INITIATOR[$__stateDir]}/${TARGET[$__type]}$timestampAfterFilename" ]; then
@@ -916,10 +946,25 @@ function conflictList {
 		Logger "Creating conflictual file list." "NOTICE"
 
 		comm -23 "${INITIATOR[$__replicaDir]}${INITIATOR[$__stateDir]}/${INITIATOR[$__type]}$timestampCurrentFilename" "${INITIATOR[$__replicaDir]}${INITIATOR[$__stateDir]}/${INITIATOR[$__type]}$timestampAfterFilename" | sort -k 1,1 > "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.${INITIATOR[$__type]}.$SCRIPT_PID.$TSTAMP"
+		retval=$?
+		if [ $retval -ne 0 ]; then
+			Logger "Cannot extract conflict data for initiator replica." "ERROR"
+			return $retval
+		fi
 		comm -23 "${INITIATOR[$__replicaDir]}${INITIATOR[$__stateDir]}/${TARGET[$__type]}$timestampCurrentFilename" "${INITIATOR[$__replicaDir]}${INITIATOR[$__stateDir]}/${TARGET[$__type]}$timestampAfterFilename" | sort -k 1,1 > "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.${TARGET[$__type]}.$SCRIPT_PID.$TSTAMP"
+		retval=$?
+		if [ $retval -ne 0 ]; then
+			Logger "Cannot extract conflict data for target replica.." "ERROR"
+			return $retval
+		fi
 
 		# Add --nocheck-order because sorted files still make join fail for unholy reasons
 		join -j 1 -t ';' --nocheck-order -o 1.1,1.2,1.3,2.2,2.3 "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.${INITIATOR[$__type]}.$SCRIPT_PID.$TSTAMP" "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.${TARGET[$__type]}.$SCRIPT_PID.$TSTAMP" > "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.comapre.$SCRIPT_PID.$TSTAMP"
+		retval=$?
+		if [ $retval -ne 0 ]; then
+			Logger "Cannot create conflict list file." "ERROR"
+			return $retval
+		fi
 
 	fi
 }
