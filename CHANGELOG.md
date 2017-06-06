@@ -10,6 +10,7 @@ dd Mmm YYYY: osync v1.2.2 release
 dd Mmm YYYY: osync v1.2.1 release
 
 - Added --no-resume option in order to disable resuming execution on failure
+- Fixed an issue with filenames ending with spaces, their deletion not being propagated, and ACL / conflicts not being managed (still they got synced)
 - Fixed missing options passed to subprocess in daemon mode
 - Fixed bogus pgrep can lead to segfault 11 because of recursive KillChilds
 - Fixed osync deletion not working on systems with ssh banner enabled
@@ -17,9 +18,6 @@ dd Mmm YYYY: osync v1.2.1 release
 - Fixed GetRemoteOS missing GetConfFileValue preventing to get OS details from /etc/os-release
 - Fixed low severity security issue where log and run files could be read by other users
 - Minor enhancements in installer / ofunctions
-- Fixed an issue with filenames ending with spaces, their deletion not being propagated, and ACL / conflicts not being managed (still they got synced)
-
-dd Mmm YYYY: osync v1.1 release
 - Fixed an issue with filenames ending with spaces, their deletion not being propagated, and ACL / conflicts not being managed (still they got synced)
 
 
