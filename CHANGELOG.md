@@ -7,8 +7,9 @@ KNOWN ISSUES
 RECENT CHANGES
 --------------
 
-31 May 2017: osync v1.1.6 released
+dd Mmm YYYY: osync v1.1.6 released
 - Backported v1.2.1 fixes
+	- Fixed an issue with filenames ending with spaces, their deletion not being propagated, and ACL / conflicts not being managed (still they got synced)
 	- Fixed bogus pgrep can lead to segfault 11 because of recursive KillChilds
 	- Fixed osync deletion not working on systems with ssh banner enabled
 	- Fixed low severity security issue where log and run files could be read by other users
