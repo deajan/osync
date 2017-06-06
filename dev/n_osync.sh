@@ -596,7 +596,7 @@ function _get_file_ctime_mtime_remote {
 
 	local cmd
 
-	cmd='cat "'$file_list'" | '$SSH_CMD' "while IFS=\'\' read file; do '$REMOTE_STAT_CTIME_MTIME_CMD' \"'$replica_path'\$file\"; done | sort" > "'$RUN_DIR/$PROGRAM.ctime_mtime.$replica_type.$SCRIPT_PID'"'
+	cmd='cat "'$file_list'" | '$SSH_CMD' "while IFS='' read file; do '$REMOTE_STAT_CTIME_MTIME_CMD' \"'$replica_path'\$file\"; done | sort" > "'$RUN_DIR/$PROGRAM.ctime_mtime.$replica_type.$SCRIPT_PID'"'
 	Logger "CMD: $cmd" "DEBUG"
 	eval $cmd
 	WaitForCompletion $! $SOFT_MAX_EXEC_TIME $HARD_MAX_EXEC_TIME ${FUNCNAME[0]}
