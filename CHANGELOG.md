@@ -1,15 +1,10 @@
 RECENT CHANGES
 --------------
 
-dd Mmm YYYY: osync v1.2.2. release
-
-! Added an option to log conflictual files
-! Presence of conflictual files can trigger a special mail
-! new option FORCE_CONFLICT_PREVALANCE
-
 dd Mmm YYYY: osync v1.2.1 release
 
 - Added --no-resume option in order to disable resuming execution on failure
+- Fixed an issue with filenames ending with spaces, their deletion not being propagated, and ACL / conflicts not being managed (still they got synced)
 - Fixed missing options passed to subprocess in daemon mode
 - Fixed bogus pgrep can lead to segfault 11 because of recursive KillChilds
 - Fixed osync deletion not working on systems with ssh banner enabled
