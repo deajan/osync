@@ -1,7 +1,7 @@
 RECENT CHANGES
 --------------
 
-dd Mmm YYYY: osync v1.2.2. release
+dd Mmm YYYY: osync v1.2.2 release
 
 ! Added an option to log conflictual files
 ! Presence of conflictual files can trigger a special mail
@@ -17,6 +17,11 @@ dd Mmm YYYY: osync v1.2.1 release
 - Fixed GetRemoteOS missing GetConfFileValue preventing to get OS details from /etc/os-release
 - Fixed low severity security issue where log and run files could be read by other users
 - Minor enhancements in installer / ofunctions
+- Fixed an issue with filenames ending with spaces, their deletion not being propagated, and ACL / conflicts not being managed (still they got synced)
+
+dd Mmm YYYY: osync v1.1 release
+- Fixed an issue with filenames ending with spaces, their deletion not being propagated, and ACL / conflicts not being managed (still they got synced)
+
 
 25 Mar 2017: osync v1.2 release (for full changelog of v1.2 branch see all v1.2-beta/RC entries)
 
