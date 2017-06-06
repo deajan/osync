@@ -6,7 +6,7 @@ AUTHOR="(C) 2016-2017 by Orsiris de Jong"
 CONTACT="http://www.netpower.fr/osync - ozy@netpower.fr"
 OLD_PROGRAM_VERSION="v1.0x-v1.1x"
 NEW_PROGRAM_VERSION="v1.2x"
-CONFIG_FILE_VERSION=2017020801
+CONFIG_FILE_VERSION=2017060501
 PROGRAM_BUILD=2016121101
 
 ## type -p does not work on platforms other than linux (bash). If if does not work, always assume output is not a zero exitcode
@@ -60,6 +60,8 @@ HARD_MAX_EXEC_TIME
 KEEP_LOGGING
 MIN_WAIT
 MAX_WAIT
+LOG_CONFLICTS
+ALERT_CONFLICTS
 CONFLICT_BACKUP
 CONFLICT_BACKUP_MULTIPLE
 CONFLICT_BACKUP_DAYS
@@ -131,6 +133,8 @@ yes
 1801
 60
 7200
+yes
+no
 yes
 no
 30
