@@ -179,7 +179,6 @@ MAIL_BODY_CHARSET=""
 ## Additional mail parameters needed for Android / Busybox / Cygwin / MSYS
 ## Android & Busybox use sendmail (and openssl if encryption is needed)
 ## MSYS & Cygwin Windows mail support relies on mailsend.exe from muquit, http://github.com/muquit/mailsend which needs to be in %PATH% environment variable
-
 SENDER_MAIL="alert@your.system.tld"
 SMTP_SERVER=smtp.your.isp.tld
 SMTP_PORT=25
