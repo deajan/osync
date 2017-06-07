@@ -1,6 +1,6 @@
 # osync  [![Build Status](https://travis-ci.org/deajan/osync.svg?branch=master)](https://travis-ci.org/deajan/osync) [![License](https://img.shields.io/badge/License-BSD%203--Clause-blue.svg)](https://opensource.org/licenses/BSD-3-Clause) [![GitHub Release](https://img.shields.io/github/release/deajan/osync.svg?label=Latest)](https://github.com/deajan/osync/releases/latest)
 
-A two way filesync script running on bash Llinux, BSD, Android, MacOSX, Cygwin, MSYS2, Win10 bash  and virtually any system supporting bash).
+A two way filesync script running on bash Linux, BSD, Android, MacOSX, Cygwin, MSYS2, Win10 bash  and virtually any system supporting bash).
 File synchronization is bidirectional, and can be run manually, as scheduled task, or triggered on file changes in deamon mode.
 It is a command line tool rsync wrapper with a lot of additional features baked in.
 
@@ -52,7 +52,7 @@ Getting osync via github (remove the -b "stable" if you want latest dev snapshot
 	$ bash install.sh
 
 There is also a RPM file that should fit RHEL/CentOS/Fedora and basically any RPM based distro, see the github release.
-Please note that RPM files will install osync to /usr/bin instead of /usr/bin in order to enforce good practices.
+Please note that RPM files will install osync to /usr/bin instead of /usr/local/bin in order to enforce good practices.
 
 osync will install itself to /usr/local/bin and an example configuration file will be installed to /etc/osync
 
