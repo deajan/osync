@@ -12,7 +12,7 @@ PROGRAM="osync" # Rsync based two way sync engine with fault tolerance
 AUTHOR="(C) 2013-2017 by Orsiris de Jong"
 CONTACT="http://www.netpower.fr/osync - ozy@netpower.fr"
 PROGRAM_VERSION=1.2.2-dev
-PROGRAM_BUILD=2017060602
+PROGRAM_BUILD=2017060701
 IS_STABLE=no
 
 
@@ -1616,7 +1616,9 @@ function Sync {
 
 	## Step 2a & 2b
 	if [ "$resumeInitiator" == "${SYNC_ACTION[2]}" ] || [ "$resumeTarget" == "${SYNC_ACTION[2]}" ]; then
-		if [[ "$RSYNC_ATTR_ARGS" == *"-X"* ]] || [[ "$RSYNC_ATTR_ARGS" == *"-A"* ]] || [ "$LOG_CONFLICTS" == "yes" ]; then
+		#if [[ "$RSYNC_ATTR_ARGS" == *"-X"* ]] || [[ "$RSYNC_ATTR_ARGS" == *"-A"* ]] || [ "$LOG_CONFLICTS" == "yes" ]; then
+		#TODO: refactor in v1.3 with syncattrs
+		if [ "$LOG_CONFLICTS" == "yes" ]; then
 
 			if [ "$resumeInitiator" == "${SYNC_ACTION[2]}" ]; then
 				timestampList "${INITIATOR[$__replicaDir]}" "${INITIATOR[$__type]}" "${INITIATOR[$__replicaDir]}${INITIATOR[$__stateDir]}/${INITIATOR[$__type]}${INITIATOR[$__treeCurrentFile]}" "${INITIATOR[$__replicaDir]}${INITIATOR[$__stateDir]}/${INITIATOR[$__type]}${INITIATOR[$__timestampCurrentFile]}" &
@@ -1863,7 +1865,9 @@ function Sync {
 
 	# Step 8a & 8b
 	if [ "$resumeInitiator" == "${SYNC_ACTION[8]}" ] || [ "$resumeTarget" == "${SYNC_ACTION[8]}" ]; then
-		if [[ "$RSYNC_ATTR_ARGS" == *"-X"* ]] || [[ "$RSYNC_ATTR_ARGS" == *"-A"* ]] || [ "$LOG_CONFLICTS" == "yes" ]; then
+		#if [[ "$RSYNC_ATTR_ARGS" == *"-X"* ]] || [[ "$RSYNC_ATTR_ARGS" == *"-A"* ]] || [ "$LOG_CONFLICTS" == "yes" ]; then
+		#TODO: refactor in v1.3 with syncattrs
+		if [ "$LOG_CONFLICTS" == "yes" ]; then
 
 			if [ "$resumeInitiator" == "${SYNC_ACTION[8]}" ]; then
 				timestampList "${INITIATOR[$__replicaDir]}" "${INITIATOR[$__type]}" "${INITIATOR[$__replicaDir]}${INITIATOR[$__stateDir]}/${INITIATOR[$__type]}${INITIATOR[$__treeAfterFile]}" "${INITIATOR[$__replicaDir]}${INITIATOR[$__stateDir]}/${INITIATOR[$__type]}${INITIATOR[$__timestampAfterFile]}" &
