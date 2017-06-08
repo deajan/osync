@@ -2,8 +2,6 @@
 
 #TODO treeList, deleteList, _getFileCtimeMtime, conflictList should be called without having statedir informed. Just give the full path ?
 #TODO check if _getCtimeMtime | sort removal needs to be backported
-#TODO backport treeList sed -r sed -E 's/^.{10} +[0-9,]+ [0-9/]{10} [0-9:]{8} //' fix && _getFileCtimeMtime* IFS read fix
-#TODO LANG=C... backport to v1.2.1 and v1.1
 #TODO: conflict list is not mandatory, but is still needed for acl resolution
 #TODO: syncAttrs must move the file list to sub function, which checks which kind of file list to use
 #TODO: double .xz extension when sending email alert with attachment
@@ -12,7 +10,7 @@ PROGRAM="osync" # Rsync based two way sync engine with fault tolerance
 AUTHOR="(C) 2013-2017 by Orsiris de Jong"
 CONTACT="http://www.netpower.fr/osync - ozy@netpower.fr"
 PROGRAM_VERSION=1.2.2-dev
-PROGRAM_BUILD=2017060801
+PROGRAM_BUILD=2017060802
 IS_STABLE=no
 
 
@@ -810,7 +808,7 @@ function _getFileCtimeMtimeLocal {
 		fi
 		return $retval
 	else
-		cat "$RUN_DIR/$PROGRAM.ctime_mtime.$replicaType.$SCRIPT_PID.$TSTAMP" | sort > "$timestampFile"
+		cat "$RUN_DIR/$PROGRAM.ctime_mtime.$replicaType.$SCRIPT_PID.$TSTAMP" | sort -t ';' -k 1,1 > "$timestampFile"
 		retval=$?
 		return $retval
 	fi
@@ -867,7 +865,7 @@ ENDSSH
 			Logger "Cannot fix FreeBDS 11 remote" "ERROR"
 			return $retval
 		fi
-		cat "$RUN_DIR/$PROGRAM.ctime_mtime.$replicaType.$SCRIPT_PID.$TSTAMP" | sort > "$timestampFile"
+		cat "$RUN_DIR/$PROGRAM.ctime_mtime.$replicaType.$SCRIPT_PID.$TSTAMP" | sort -t ';' -k 1,1 > "$timestampFile"
 		if [ $retval -ne 0 ]; then
 			Logger "Cannot create timestamp file for $replicaType." "ERROR"
 			return $retval
