@@ -1,4 +1,4 @@
-## FUNC_BUILD=2016071902-i
+## FUNC_BUILD=2016071902-j
 ## BEGIN Generic functions for osync & obackup written in 2013-2016 by Orsiris de Jong - http://www.netpower.fr - ozy@netpower.fr
 
 ## type -p does not work on platforms other than linux (bash). If if does not work, always assume output is not a zero exitcode
@@ -666,7 +666,7 @@ function GetLocalOS {
 		*"BSD"*)
 		LOCAL_OS="BSD"
 		;;
-		*"MINGW32"*|*"CYGWIN"*)
+		*"MINGW32"*|*"MINGW64"*|*"MSYS"*|*"CYGWIN"*)
 		LOCAL_OS="msys"
 		;;
 		*"Darwin"*)
@@ -726,7 +726,7 @@ function GetRemoteOS {
 			*"BSD"*)
 			REMOTE_OS="BSD"
 			;;
-			*"MINGW32"*|*"CYGWIN"*)
+			*"MINGW32"*|*"MINGW64"*|*"MSYS"*|*"CYGWIN"*)
 			REMOTE_OS="msys"
 			;;
 			*"Darwin"*)
