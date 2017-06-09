@@ -2,7 +2,6 @@
 
 #TODO treeList, deleteList, _getFileCtimeMtime, conflictList should be called without having statedir informed. Just give the full path ?
 #TODO check if _getCtimeMtime | sort removal needs to be backported
-#TODO: double .xz extension when sending email alert with attachment
 
 PROGRAM="osync" # Rsync based two way sync engine with fault tolerance
 AUTHOR="(C) 2013-2017 by Orsiris de Jong"
