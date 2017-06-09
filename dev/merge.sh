@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-## MERGE 2016080601
+## MERGE 2016080601-b
 
 ## Merges ofunctions.sh and n_program.sh into program.sh
 ## Adds installer
@@ -45,7 +45,7 @@ function CleanDebug {
 #}
 #p
 
-	sed -n '/'$PARANOIA_DEBUG_BEGIN'/{p; :a; N; /'$PARANOIA_DEBUG_END'/!ba; s/.*\n//}; p' debug_$PROGRAM.sh | grep -v "$PARANOIA_DEBUG_LINE" > ../$PROGRAM.sh
+	sed '/'$PARANOIA_DEBUG_BEGIN'/,/'$PARANOIA_DEBUG_END'/d' debug_$PROGRAM.sh | grep -v "$PARANOIA_DEBUG_LINE" > ../$PROGRAM.sh
 	chmod +x ../$PROGRAM.sh
 }
 
