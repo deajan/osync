@@ -25,6 +25,7 @@ osync tasks may be launched sequentially by osync osync-batch tool.
 
 Currently, it has been tested on CentOS 5.x, 6.x, 7.x, Debian 6, Debian 7, Linux Mint 14-17, Ubuntu 12.04, 12.10, FreeBSD 8.3, 10.1, 10.3, Mac OS X and pfSense.
 Microsoft Windows is supported via MSYS or Cygwin.
+Note that FreeBSD 11 is only supported in versions v1.2+.
 
 
 ## Installation
