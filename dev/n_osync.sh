@@ -2,10 +2,6 @@
 
 #TODO treeList, deleteList, _getFileCtimeMtime, conflictList should be called without having statedir informed. Just give the full path ?
 #TODO check if _getCtimeMtime | sort removal needs to be backported
-#TODO backport treeList sed -r 's/^.{10} +[0-9,]+ [0-9/]{10} [0-9:]{8} //' fix && _getFileCtimeMtime* IFS read fix
-#TODO LANG=C... backport to v1.2.1 and v1.1
-#TODO: conflict list is not mandatory, but is still needed for acl resolution
-#TODO: syncAttrs must move the file list to sub function, which checks which kind of file list to use
 #TODO: double .xz extension when sending email alert with attachment
 
 PROGRAM="osync" # Rsync based two way sync engine with fault tolerance
