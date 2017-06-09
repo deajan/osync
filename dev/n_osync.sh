@@ -12,7 +12,7 @@ PROGRAM="osync" # Rsync based two way sync engine with fault tolerance
 AUTHOR="(C) 2013-2017 by Orsiris de Jong"
 CONTACT="http://www.netpower.fr/osync - ozy@netpower.fr"
 PROGRAM_VERSION=1.2.2-dev
-PROGRAM_BUILD=2017060801
+PROGRAM_BUILD=2017060901
 IS_STABLE=no
 
 
@@ -864,7 +864,7 @@ ENDSSH
 		sed -i.tmp -e 's/^\\"//' -e 's/\\"$//' "$RUN_DIR/$PROGRAM.ctime_mtime.$replicaType.$SCRIPT_PID.$TSTAMP"
 		retval=$?
 		if [ $retval -ne 0 ]; then
-			Logger "Cannot fix FreeBDS 11 remote" "ERROR"
+			Logger "Cannot fix FreeBSD 11 remote csh syntax." "ERROR"
 			return $retval
 		fi
 		cat "$RUN_DIR/$PROGRAM.ctime_mtime.$replicaType.$SCRIPT_PID.$TSTAMP" | sort > "$timestampFile"
