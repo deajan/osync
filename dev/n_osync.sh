@@ -7,7 +7,7 @@ PROGRAM="osync" # Rsync based two way sync engine with fault tolerance
 AUTHOR="(C) 2013-2017 by Orsiris de Jong"
 CONTACT="http://www.netpower.fr/osync - ozy@netpower.fr"
 PROGRAM_VERSION=1.2.2-dev
-PROGRAM_BUILD=2017060901
+PROGRAM_BUILD=2017061801
 IS_STABLE=no
 
 
@@ -2349,10 +2349,10 @@ function Usage {
 	echo "$AUTHOR"
 	echo "$CONTACT"
 	echo ""
-	echo "You may use osync with a full blown configuration file, or use its default options for quick command line sync."
-	echo "Usage: osync.sh /path/to/config/file [OPTIONS]"
-	echo "or     osync.sh --initiator=/path/to/initiator/replica --target=/path/to/target/replica [OPTIONS] [QUICKSYNC OPTIONS]"
-	echo "or     osync.sh --initiator=/path/to/initiator/replica --target=ssh://[backupuser]@remotehost.com[:portnumber]//path/to/target/replica [OPTIONS] [QUICKSYNC OPTIONS]"
+	echo "You may use $PROGRAM with a full blown configuration file, or use its default options for quick command line sync."
+	echo "Usage: $0 /path/to/config/file [OPTIONS]"
+	echo "or     $0 --initiator=/path/to/initiator/replica --target=/path/to/target/replica [OPTIONS] [QUICKSYNC OPTIONS]"
+	echo "or     $0 --initiator=/path/to/initiator/replica --target=ssh://[backupuser]@remotehost.com[:portnumber]//path/to/target/replica [OPTIONS] [QUICKSYNC OPTIONS]"
 	echo ""
 	echo "[OPTIONS]"
 	echo "--dry                  Will run osync without actually doing anything; just testing"
@@ -2382,7 +2382,7 @@ function Usage {
 	echo "--destination-mails=\"\"  Double quoted list of space separated email addresses to send alerts to"
 	echo ""
 	echo "Additionaly, you may set most osync options at runtime. eg:"
-	echo "SOFT_DELETE_DAYS=365 osync.sh --initiator=/path --target=/other/path"
+	echo "SOFT_DELETE_DAYS=365 $0 --initiator=/path --target=/other/path"
 	echo ""
 	exit 128
 }
@@ -2410,7 +2410,7 @@ function SyncOnChanges {
 		exit 1
 	fi
 
-	Logger "#### Running osync in file monitor mode." "NOTICE"
+	Logger "#### Running $PROGRAM in file monitor mode." "NOTICE"
 
 	while true; do
 		if [ "$ConfigFile" != "" ]; then
@@ -2444,7 +2444,7 @@ function SyncOnChanges {
 		elif [ $retval -eq 2 ]; then
 			Logger "#### $MAX_WAIT timeout reached, running sync." "NOTICE"
 		elif [ $retval -eq 1 ]; then
-			Logger "#### inotify error  detected, waiting $MIN_WAIT seconds before running next sync." "ERROR" $retval
+			Logger "#### inotify error detected, waiting $MIN_WAIT seconds before running next sync." "ERROR" $retval
 			sleep $MIN_WAIT
 		fi
 	done
