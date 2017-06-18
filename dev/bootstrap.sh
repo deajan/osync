@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-## dev pre-processor bootstrap rev 2016121302
+## dev pre-processor bootstrap rev 2017061801
 ## Yeah !!! A really tech sounding name... In fact it's just include emulation in bash
 
 if [ ! -f "./merge.sh" ]; then
@@ -9,9 +9,15 @@ if [ ! -f "./merge.sh" ]; then
 fi
 
 outputFileName="$0"
+if [ "$1" == "" ]; then
+	PRG=osync
+else
+	PRG="$1"
+fi
 
 source "merge.sh"
-__PREPROCESSOR_PROGRAM=osync
+
+__PREPROCESSOR_PROGRAM=$PRG
 __PREPROCESSOR_Constants
 
 cp "n_$__PREPROCESSOR_PROGRAM.sh" "$outputFileName.tmp.sh"
@@ -22,9 +28,9 @@ fi
 for subset in "${__PREPROCESSOR_SUBSETS[@]}"; do
 	__PREPROCESSOR_MergeSubset "$subset" "${subset//SUBSET/SUBSET END}" "ofunctions.sh" "$outputFileName.tmp.sh"
 done
-chmod +x "$0.tmp.sh"
+chmod +x "$outputFileName.tmp.sh"
 if [ $? != 0 ]; then
-	echo "Cannot make [$outputFileName] executable.."
+	echo "Cannot make [$outputFileName] executable."
 	exit 1
 fi
 
