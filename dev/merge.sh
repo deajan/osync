@@ -1,9 +1,15 @@
 #!/usr/bin/env bash
 
-## MERGE 2017061801
+## MERGE 2017061901
 
 ## Merges ofunctions.sh and n_program.sh into program.sh
 ## Adds installer
+
+function Usage {
+	echo "Merges ofunctions.sh and n_program.sh into debug_program.sh and ../program.sh"
+	echo "Usage"
+	echo "$0 osync|obackup|pmocr"
+}
 
 function __PREPROCESSOR_Merge {
 	local PROGRAM="$1"
@@ -175,8 +181,19 @@ function __PREPROCESSOR_CopyCommons {
 
 # If sourced don't do anything
 if [ "$(basename $0)" == "merge.sh" ]; then
-	__PREPROCESSOR_Merge osync
-	__PREPROCESSOR_Merge osync_target_helper
-	__PREPROCESSOR_CopyCommons osync
+	if [ "$1" == "osync" ]; then
 
+		__PREPROCESSOR_Merge osync
+		__PREPROCESSOR_Merge osync_target_helper
+		__PREPROCESSOR_CopyCommons osync
+	elif [ "$1" == "obackup" ]; then
+		__PREPROCESSOR_Merge obackup
+		__PREPROCESSOR_CopyCommons obackup
+	elif [ "$1" == "pmocr" ]; then
+		__PREPROCESSOR_Merge pmocr
+		__PREPROCESSOR_CopyCommons pmocr
+	else
+		echo "No valid program given."
+		exit 1
+	fi
 fi
