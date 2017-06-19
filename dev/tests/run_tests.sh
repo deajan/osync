@@ -285,7 +285,7 @@ function setUp () {
 # This test has to be done everytime in order for osync executable to be fresh
 function test_Merge () {
 	cd "$DEV_DIR"
-	./merge.sh
+	./merge.sh osync
 	assertEquals "Merging code" "0" $?
 
 	cd "$OSYNC_DIR"
