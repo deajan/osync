@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-## dev pre-processor bootstrap rev 2017061901
+## dev pre-processor bootstrap rev 2017062001
 ## Yeah !!! A really tech sounding name... In fact it's just include emulation in bash
 
 function Usage {
@@ -35,16 +35,22 @@ done
 if [ "$bootstrapProgram" == "" ]; then
 	Usage
 	exit 128
+else
+	source "merge.sh"
+
+	__PREPROCESSOR_PROGRAM=$bootstrapProgram
+	__PREPROCESSOR_PROGRAM_EXEC="n_$bootstrapProgram.sh"
+	__PREPROCESSOR_Constants
+
+	if [ ! -f "$__PREPROCESSOR_PROGRAM_EXEC" ]; then
+		echo "Cannot find file [n_$bootstrapProgram.sh]."
+		exit 1
+	fi
 fi
 
-source "merge.sh"
-
-__PREPROCESSOR_PROGRAM=$bootstrapProgram
-__PREPROCESSOR_Constants
-
-cp "n_$__PREPROCESSOR_PROGRAM.sh" "$outputFileName.tmp.sh"
+cp "$__PREPROCESSOR_PROGRAM_EXEC" "$outputFileName.tmp.sh"
 if [ $? != 0 ]; then
-	echo "Cannot copy original file [n_$__PREPROCESSOR_PROGRAM.sh] to [$outputFileName.tmp.sh]."
+	echo "Cannot copy original file [$__PREPROCESSOR_PROGRAM_EXEC] to [$outputFileName.tmp.sh]."
 	exit 1
 fi
 for subset in "${__PREPROCESSOR_SUBSETS[@]}"; do
