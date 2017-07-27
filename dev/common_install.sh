@@ -324,6 +324,7 @@ function Usage {
 	echo "--silent		Will log and bypass user interaction."
 	echo "--no-stats	Used with --silent in order to refuse sending anonymous install stats."
 	echo "--remove          Remove the program."
+	echo "--prefix=/path    Use prefix to install path."
 	exit 127
 }
 
