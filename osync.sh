@@ -2,24 +2,20 @@
 
 #TODO treeList, deleteList, _getFileCtimeMtime, conflictList should be called without having statedir informed. Just give the full path ?
 #TODO check if _getCtimeMtime | sort removal needs to be backported
-#TODO backport treeList sed -r sed -E 's/^.{10} +[0-9,]+ [0-9/]{10} [0-9:]{8} //' fix && _getFileCtimeMtime* IFS read fix
-#TODO LANG=C... backport to v1.2.1 and v1.1
-#TODO: conflict list is not mandatory, but is still needed for acl resolution
-#TODO: syncAttrs must move the file list to sub function, which checks which kind of file list to use
-#TODO: double .xz extension when sending email alert with attachment
+#Check dryruns with nosuffix mode for timestampList
 
 PROGRAM="osync" # Rsync based two way sync engine with fault tolerance
 AUTHOR="(C) 2013-2017 by Orsiris de Jong"
 CONTACT="http://www.netpower.fr/osync - ozy@netpower.fr"
 PROGRAM_VERSION=1.2.2-dev
-PROGRAM_BUILD=2017060801
+PROGRAM_BUILD=2017072701
 IS_STABLE=no
 
 
 
 
 _OFUNCTIONS_VERSION=2.1.4-rc1
-_OFUNCTIONS_BUILD=2017060701
+_OFUNCTIONS_BUILD=2017060903
 _OFUNCTIONS_BOOTSTRAP=true
 
 ## BEGIN Generic bash functions written in 2013-2017 by Orsiris de Jong - http://www.netpower.fr - ozy@netpower.fr
@@ -394,7 +390,6 @@ function SendAlert {
 
 	eval "cat \"$LOG_FILE\" $COMPRESSION_PROGRAM > $ALERT_LOG_FILE"
 	if [ $? != 0 ]; then
-		Logger "Cannot create [$ALERT_LOG_FILE]" "WARN"
 		attachment=false
 	else
 		attachment=true
@@ -1582,7 +1577,10 @@ function SetCompression {
 			COMPRESSION_EXTENSION=
 		fi
 	fi
-	ALERT_LOG_FILE="$ALERT_LOG_FILE$COMPRESSION_EXTENSION"
+
+	if [ ".${ALERT_LOG_FILE##*.}" != "$COMPRESSION_EXTENSION" ]; then
+		ALERT_LOG_FILE="$ALERT_LOG_FILE$COMPRESSION_EXTENSION"
+	fi
 }
 
 function InitLocalOSDependingSettings {
@@ -2746,7 +2744,7 @@ function treeList {
 	# operation explanation
 	# (command || :) = Return code 0 regardless of command return code
 	# (grep -E \"^-|^d|^l\" || :) = Be sure line begins with '-' or 'd' or 'l' (rsync semantics for file, directory or symlink)
-	# (sed -E 's/^.{10} +[0-9,]+ [0-9/]{10} [0-9:]{8} //' || :) = Remove everything before timestamps
+	# (sed -r 's/^.{10} +[0-9,]+ [0-9/]{10} [0-9:]{8} //' || :) = Remove everything before timestamps
 	# (awk 'BEGIN { FS=\" -> \" } ; { print \$1 }' || :) = Only show output before ' -> ' in order to remove symlink destinations
 	# (grep -v \"^\.$\" || :) = Removes line containing current directory sign '.'
 
@@ -2754,9 +2752,9 @@ function treeList {
 	if [ "$REMOTE_OPERATION" == "yes" ] && [ "$replicaType" == "${TARGET[$__type]}" ]; then
 		CheckConnectivity3rdPartyHosts
 		CheckConnectivityRemoteHost
-		rsyncCmd="$(type -p $RSYNC_EXECUTABLE) --rsync-path=\"env LC_ALL=C env _REMOTE_TOKEN=$_REMOTE_TOKEN $RSYNC_PATH\" $RSYNC_ARGS $RSYNC_ATTR_ARGS $RSYNC_TYPE_ARGS --exclude \"$OSYNC_DIR\" $RSYNC_PATTERNS $RSYNC_PARTIAL_EXCLUDE -e \"$RSYNC_SSH_CMD\" --list-only $REMOTE_USER@$REMOTE_HOST:\"$escapedReplicaPath\" 2> \"$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$replicaType.error.$SCRIPT_PID.$TSTAMP\" | (grep -E \"^-|^d|^l\" || :) | (sed -E 's/^.{10} +[0-9,]+ [0-9/]{10} [0-9:]{8} //' || :) | (awk 'BEGIN { FS=\" -> \" } ; { print \$1 }' || :) | (grep -v \"^\.$\" || :) | sort > \"$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$replicaType.$SCRIPT_PID.$TSTAMP\""
+		rsyncCmd="$(type -p $RSYNC_EXECUTABLE) --rsync-path=\"env LC_ALL=C env _REMOTE_TOKEN=$_REMOTE_TOKEN $RSYNC_PATH\" $RSYNC_ARGS $RSYNC_ATTR_ARGS $RSYNC_TYPE_ARGS --exclude \"$OSYNC_DIR\" $RSYNC_PATTERNS $RSYNC_PARTIAL_EXCLUDE -e \"$RSYNC_SSH_CMD\" --list-only $REMOTE_USER@$REMOTE_HOST:\"$escapedReplicaPath\" 2> \"$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$replicaType.error.$SCRIPT_PID.$TSTAMP\" | (grep -E \"^-|^d|^l\" || :) | (sed -r 's/^.{10} +[0-9,]+ [0-9/]{10} [0-9:]{8} //' || :) | (awk 'BEGIN { FS=\" -> \" } ; { print \$1 }' || :) | (grep -v \"^\.$\" || :) | sort > \"$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$replicaType.$SCRIPT_PID.$TSTAMP\""
 	else
-		rsyncCmd="$(type -p $RSYNC_EXECUTABLE) --rsync-path=\"env LC_ALL=C env _REMOTE_TOKEN=$_REMOTE_TOKEN $RSYNC_PATH\" $RSYNC_ARGS $RSYNC_ATTR_ARGS $RSYNC_TYPE_ARGS --exclude \"$OSYNC_DIR\" $RSYNC_PATTERNS $RSYNC_PARTIAL_EXCLUDE --list-only \"$replicaPath\" 2> \"$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$replicaType.error.$SCRIPT_PID.$TSTAMP\" | (grep -E \"^-|^d|^l\" || :) | (sed -E 's/^.{10} +[0-9,]+ [0-9/]{10} [0-9:]{8} //' || :) | (awk 'BEGIN { FS=\" -> \" } ; { print \$1 }' || :) | (grep -v \"^\.$\" || :) | sort > \"$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$replicaType.$SCRIPT_PID.$TSTAMP\""
+		rsyncCmd="$(type -p $RSYNC_EXECUTABLE) --rsync-path=\"env LC_ALL=C env _REMOTE_TOKEN=$_REMOTE_TOKEN $RSYNC_PATH\" $RSYNC_ARGS $RSYNC_ATTR_ARGS $RSYNC_TYPE_ARGS --exclude \"$OSYNC_DIR\" $RSYNC_PATTERNS $RSYNC_PARTIAL_EXCLUDE --list-only \"$replicaPath\" 2> \"$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$replicaType.error.$SCRIPT_PID.$TSTAMP\" | (grep -E \"^-|^d|^l\" || :) | (sed -r 's/^.{10} +[0-9,]+ [0-9/]{10} [0-9:]{8} //' || :) | (awk 'BEGIN { FS=\" -> \" } ; { print \$1 }' || :) | (grep -v \"^\.$\" || :) | sort > \"$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$replicaType.$SCRIPT_PID.$TSTAMP\""
 	fi
 	Logger "RSYNC_CMD: $rsyncCmd" "DEBUG"
 	eval "$rsyncCmd"
@@ -2910,7 +2908,7 @@ ENDSSH
 		sed -i.tmp -e 's/^\\"//' -e 's/\\"$//' "$RUN_DIR/$PROGRAM.ctime_mtime.$replicaType.$SCRIPT_PID.$TSTAMP"
 		retval=$?
 		if [ $retval -ne 0 ]; then
-			Logger "Cannot fix FreeBDS 11 remote" "ERROR"
+			Logger "Cannot fix FreeBSD 11 remote csh syntax." "ERROR"
 			return $retval
 		fi
 		cat "$RUN_DIR/$PROGRAM.ctime_mtime.$replicaType.$SCRIPT_PID.$TSTAMP" | sort > "$timestampFile"
@@ -4382,6 +4380,7 @@ function Init {
 	readonly __timestampAfterFile=17
 	readonly __timestampAfterFileNoSuffix=18
 	readonly __conflictListFile=19
+	readonly __updateTriggerFile=20
 
 	INITIATOR=()
 	INITIATOR[$__type]='initiator'
@@ -4404,6 +4403,7 @@ function Init {
 	INITIATOR[$__timestampAfterFile]="-timestamps-after-$INSTANCE_ID$drySuffix"
 	INITIATOR[$__timestampAfterFileNoSuffix]="-timestamps-after-$INSTANCE_ID"
 	INITIATOR[$__conflictListFile]="conflicts-$INSTANCE_ID$drySuffix"
+	INITIATOR[$__updateTriggerFile]="$INITIATOR_SYNC_DIR$OSYNC_DIR/.osync-update.push"
 
 	TARGET=()
 	TARGET[$__type]='target'
@@ -4418,7 +4418,6 @@ function Init {
 	TARGET[$__resumeCount]="$TARGET_SYNC_DIR$OSYNC_DIR/$stateDir/$resumeCount-$INSTANCE_ID$drySuffix"				# unused
 	TARGET[$__treeCurrentFile]="-tree-current-$INSTANCE_ID$drySuffix"								# unused
 	TARGET[$__treeAfterFile]="-tree-after-$INSTANCE_ID$drySuffix"									# unused
-	#WIP NoSuffix file to add to timestamp
 	TARGET[$__treeAfterFileNoSuffix]="-tree-after-$INSTANCE_ID"									# unused
 	TARGET[$__deletedListFile]="-deleted-list-$INSTANCE_ID$drySuffix"								# unused
 	TARGET[$__failedDeletedListFile]="-failed-delete-$INSTANCE_ID$drySuffix"
@@ -4427,6 +4426,7 @@ function Init {
 	TARGET[$__timestampAfterFile]="-timestamps-after-$INSTANCE_ID$drySuffix"
 	TARGET[$__timestampAfterFileNoSuffix]="-timestamps-after-$INSTANCE_ID"
 	TARGET[$__conflictListFile]="conflicts-$INSTANCE_ID$drySuffix"
+	TARGET[$__updateTriggerFile]="$TARGET_SYNC_DIR$OSYNC_DIR/.osync-update.push"
 
 	PARTIAL_DIR="${INITIATOR[$__partialDir]}"
 
@@ -4487,10 +4487,10 @@ function Usage {
 	echo "$AUTHOR"
 	echo "$CONTACT"
 	echo ""
-	echo "You may use osync with a full blown configuration file, or use its default options for quick command line sync."
-	echo "Usage: osync.sh /path/to/config/file [OPTIONS]"
-	echo "or     osync.sh --initiator=/path/to/initiator/replica --target=/path/to/target/replica [OPTIONS] [QUICKSYNC OPTIONS]"
-	echo "or     osync.sh --initiator=/path/to/initiator/replica --target=ssh://[backupuser]@remotehost.com[:portnumber]//path/to/target/replica [OPTIONS] [QUICKSYNC OPTIONS]"
+	echo "You may use $PROGRAM with a full blown configuration file, or use its default options for quick command line sync."
+	echo "Usage: $0 /path/to/config/file [OPTIONS]"
+	echo "or     $0 --initiator=/path/to/initiator/replica --target=/path/to/target/replica [OPTIONS] [QUICKSYNC OPTIONS]"
+	echo "or     $0 --initiator=/path/to/initiator/replica --target=ssh://[backupuser]@remotehost.com[:portnumber]//path/to/target/replica [OPTIONS] [QUICKSYNC OPTIONS]"
 	echo ""
 	echo "[OPTIONS]"
 	echo "--dry                  Will run osync without actually doing anything; just testing"
@@ -4520,7 +4520,7 @@ function Usage {
 	echo "--destination-mails=\"\"  Double quoted list of space separated email addresses to send alerts to"
 	echo ""
 	echo "Additionaly, you may set most osync options at runtime. eg:"
-	echo "SOFT_DELETE_DAYS=365 osync.sh --initiator=/path --target=/other/path"
+	echo "SOFT_DELETE_DAYS=365 $0 --initiator=/path --target=/other/path"
 	echo ""
 	exit 128
 }
@@ -4547,7 +4547,7 @@ function SyncOnChanges {
 		exit 1
 	fi
 
-	Logger "#### Running osync in file monitor mode." "NOTICE"
+	Logger "#### Running $PROGRAM in file monitor mode." "NOTICE"
 
 	while true; do
 		if [ "$ConfigFile" != "" ]; then
@@ -4581,7 +4581,7 @@ function SyncOnChanges {
 		elif [ $retval -eq 2 ]; then
 			Logger "#### $MAX_WAIT timeout reached, running sync." "NOTICE"
 		elif [ $retval -eq 1 ]; then
-			Logger "#### inotify error  detected, waiting $MIN_WAIT seconds before running next sync." "ERROR" $retval
+			Logger "#### inotify error detected, waiting $MIN_WAIT seconds before running next sync." "ERROR" $retval
 			sleep $MIN_WAIT
 		fi
 	done
@@ -4616,164 +4616,168 @@ _NOLOCKS=false
 osync_cmd=$0
 _SUMMARY=false
 
-if [ $# -eq 0 ]
-then
-	Usage
-fi
 
-first=1
-for i in "$@"; do
-	case $i in
-		--dry)
-		_DRYRUN=true
-		opts=$opts" --dry"
-		;;
-		--silent)
-		_LOGGER_SILENT=true
-		opts=$opts" --silent"
-		;;
-		--verbose)
-		_LOGGER_VERBOSE=true
-		opts=$opts" --verbose"
-		;;
-		--stats)
-		STATS=true
-		opts=$opts" --stats"
-		;;
-		--partial)
-		PARTIAL="yes"
-		opts=$opts" --partial"
-		;;
-		--force-unlock)
-		FORCE_UNLOCK=true
-		opts=$opts" --force-unlock"
-		;;
-		--no-maxtime)
-		no_maxtime=true
-		opts=$opts" --no-maxtime"
-		;;
-		--help|-h|--version|-v)
+function GetCommandlineArguments {
+	local isFirstArgument=true
+
+	if [ $# -eq 0 ]
+	then
 		Usage
-		;;
-		--initiator=*)
-		_QUICK_SYNC=$(($_QUICK_SYNC + 1))
-		INITIATOR_SYNC_DIR=${i##*=}
-		opts=$opts" --initiator=\"$INITIATOR_SYNC_DIR\""
-		;;
-		--target=*)
-		_QUICK_SYNC=$(($_QUICK_SYNC + 1))
-		TARGET_SYNC_DIR=${i##*=}
-		opts=$opts" --target=\"$TARGET_SYNC_DIR\""
-		;;
-		--rsakey=*)
-		SSH_RSA_PRIVATE_KEY=${i##*=}
-		opts=$opts" --rsakey=\"$SSH_RSA_PRIVATE_KEY\""
-		;;
-		--password-file=*)
-		SSH_PASSWORD_FILE=${i##*=}
-		opts=$opts" --password-file\"$SSH_PASSWORD_FILE\""
-		;;
-		--instance-id=*)
-		INSTANCE_ID=${i##*=}
-		opts=$opts" --instance-id=\"$INSTANCE_ID\""
-		;;
-		--skip-deletion=*)
-		opts=$opts" --skip-deletion=\"${i##*=}\""
-		SKIP_DELETION=${##*=}
-		;;
-		--on-changes)
-		sync_on_changes=true
-		_NOLOCKS=true
-		_LOGGER_PREFIX="date"
-		;;
-		--no-resume)
-		opts=$opts" --no-resume"
-		RESUME_TRY=0
-		;;
-		--no-locks)
-		_NOLOCKS=true
-		;;
-		--errors-only)
-		opts=$opts" --errors-only"
-		_LOGGER_ERR_ONLY=true
-		;;
-		--summary)
-		opts=$opts" --summary"
-		_SUMMARY=true
-		;;
-		--log-conflicts)
-		LOG_CONFLICTS="yes"
-		opts=$opts" --log-conflicts"
-		;;
-		--alert-conflicts)
-		ALERT_CONFLICTS="yes"
-		LOG_CONFLICTS="yes"
-		opts=$opts" --alert-conflicts"
-		;;
-		--no-prefix)
-		opts=$opts" --no-prefix"
-		_LOGGER_PREFIX=""
-		;;
-		--destination-mails=*)
-		DESTINATION_MAILS=${i##*=}
-		;;
-		--remote-token=*)
-		_REMOTE_TOKEN=${i##*=}
-		;;
-		*)
-		if [ $first == "0" ]; then
-			Logger "Unknown option '$i'" "CRITICAL"
-			Usage
-		fi
-		;;
-	esac
-	first=0
-done
-
-# Remove leading space if there is one
-opts="${opts# *}"
-
-	## Here we set default options for quicksync tasks when no configuration file is provided.
-
-	if [ $_QUICK_SYNC -eq 2 ]; then
-		if [ "$INSTANCE_ID" == "" ]; then
-			INSTANCE_ID="quicksync_task"
-		fi
-
-		# Let the possibility to initialize those values directly via command line like SOFT_DELETE_DAYS=60 ./osync.sh
-
-		if [ $(IsInteger $MINIMUM_SPACE) -ne 1 ]; then
-			MINIMUM_SPACE=1024
-		fi
-
-		if [ $(IsInteger $CONFLICT_BACKUP_DAYS) -ne 1 ]; then
-			CONFLICT_BACKUP_DAYS=30
-		fi
-
-		if [ $(IsInteger $SOFT_DELETE_DAYS) -ne 1 ]; then
-			SOFT_DELETE_DAYS=30
-		fi
-
-		if [ $(IsInteger $RESUME_TRY) -ne 1 ]; then
-			RESUME_TRY=1
-		fi
-
-		if [ $(IsInteger $SOFT_MAX_EXEC_TIME) -ne 1 ]; then
-			SOFT_MAX_EXEC_TIME=0
-		fi
-		if [ $(IsInteger $HARD_MAX_EXEC_TIME) -ne 1 ]; then
-			HARD_MAX_EXEC_TIME=0
-		fi
-
-		if [ "$PATH_SEPARATOR_CHAR" == "" ]; then
-			PATH_SEPARATOR_CHAR=";"
-		fi
-
-		MIN_WAIT=30
-	else
-		ConfigFile="${1}"
-		LoadConfigFile "$ConfigFile"
 	fi
+
+	for i in "$@"; do
+		case $i in
+			--dry)
+			_DRYRUN=true
+			opts=$opts" --dry"
+			;;
+			--silent)
+			_LOGGER_SILENT=true
+			opts=$opts" --silent"
+			;;
+			--verbose)
+			_LOGGER_VERBOSE=true
+			opts=$opts" --verbose"
+			;;
+			--stats)
+			STATS=true
+			opts=$opts" --stats"
+			;;
+			--partial)
+			PARTIAL="yes"
+			opts=$opts" --partial"
+			;;
+			--force-unlock)
+			FORCE_UNLOCK=true
+			opts=$opts" --force-unlock"
+			;;
+			--no-maxtime)
+			no_maxtime=true
+			opts=$opts" --no-maxtime"
+			;;
+			--help|-h|--version|-v)
+			Usage
+			;;
+			--initiator=*)
+			_QUICK_SYNC=$(($_QUICK_SYNC + 1))
+			INITIATOR_SYNC_DIR=${i##*=}
+			opts=$opts" --initiator=\"$INITIATOR_SYNC_DIR\""
+			;;
+			--target=*)
+			_QUICK_SYNC=$(($_QUICK_SYNC + 1))
+			TARGET_SYNC_DIR=${i##*=}
+			opts=$opts" --target=\"$TARGET_SYNC_DIR\""
+			;;
+			--rsakey=*)
+			SSH_RSA_PRIVATE_KEY=${i##*=}
+			opts=$opts" --rsakey=\"$SSH_RSA_PRIVATE_KEY\""
+			;;
+			--password-file=*)
+			SSH_PASSWORD_FILE=${i##*=}
+			opts=$opts" --password-file\"$SSH_PASSWORD_FILE\""
+			;;
+			--instance-id=*)
+			INSTANCE_ID=${i##*=}
+			opts=$opts" --instance-id=\"$INSTANCE_ID\""
+			;;
+			--skip-deletion=*)
+			opts=$opts" --skip-deletion=\"${i##*=}\""
+			SKIP_DELETION=${##*=}
+			;;
+			--on-changes)
+			sync_on_changes=true
+			_NOLOCKS=true
+			_LOGGER_PREFIX="date"
+			;;
+			--no-resume)
+			opts=$opts" --no-resume"
+			RESUME_TRY=0
+			;;
+			--no-locks)
+			_NOLOCKS=true
+			;;
+			--errors-only)
+			opts=$opts" --errors-only"
+			_LOGGER_ERR_ONLY=true
+			;;
+			--summary)
+			opts=$opts" --summary"
+			_SUMMARY=true
+			;;
+			--log-conflicts)
+			LOG_CONFLICTS="yes"
+			opts=$opts" --log-conflicts"
+			;;
+			--alert-conflicts)
+			ALERT_CONFLICTS="yes"
+			LOG_CONFLICTS="yes"
+			opts=$opts" --alert-conflicts"
+			;;
+			--no-prefix)
+			opts=$opts" --no-prefix"
+			_LOGGER_PREFIX=""
+			;;
+			--destination-mails=*)
+			DESTINATION_MAILS=${i##*=}
+			;;
+			--remote-token=*)
+			_REMOTE_TOKEN=${i##*=}
+			;;
+			*)
+			if [ $isFirstArgument == false ]; then
+				Logger "Unknown option '$i'" "CRITICAL"
+				Usage
+			fi
+			;;
+		esac
+		isFirstArgument=false
+	done
+
+	# Remove leading space if there is one
+	opts="${opts# *}"
+}
+
+GetCommandlineArguments "$@"
+
+## Here we set default options for quicksync tasks when no configuration file is provided.
+if [ $_QUICK_SYNC -eq 2 ]; then
+	if [ "$INSTANCE_ID" == "" ]; then
+		INSTANCE_ID="quicksync_task"
+	fi
+
+	# Let the possibility to initialize those values directly via command line like SOFT_DELETE_DAYS=60 ./osync.sh
+	if [ $(IsInteger $MINIMUM_SPACE) -ne 1 ]; then
+		MINIMUM_SPACE=1024
+	fi
+
+	if [ $(IsInteger $CONFLICT_BACKUP_DAYS) -ne 1 ]; then
+		CONFLICT_BACKUP_DAYS=30
+	fi
+
+	if [ $(IsInteger $SOFT_DELETE_DAYS) -ne 1 ]; then
+		SOFT_DELETE_DAYS=30
+	fi
+
+	if [ $(IsInteger $RESUME_TRY) -ne 1 ]; then
+		RESUME_TRY=1
+	fi
+
+	if [ $(IsInteger $SOFT_MAX_EXEC_TIME) -ne 1 ]; then
+		SOFT_MAX_EXEC_TIME=0
+	fi
+
+	if [ $(IsInteger $HARD_MAX_EXEC_TIME) -ne 1 ]; then
+		HARD_MAX_EXEC_TIME=0
+	fi
+
+	if [ "$PATH_SEPARATOR_CHAR" == "" ]; then
+		PATH_SEPARATOR_CHAR=";"
+	fi
+		MIN_WAIT=30
+else
+	ConfigFile="${1}"
+	LoadConfigFile "$ConfigFile"
+fi
 
 if [ "$LOGFILE" == "" ]; then
 	if [ -w /var/log ]; then
