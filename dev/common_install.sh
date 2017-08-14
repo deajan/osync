@@ -12,7 +12,7 @@ PROGRAM_BINARY=$PROGRAM".sh"
 PROGRAM_BATCH=$PROGRAM"-batch.sh"
 SSH_FILTER="ssh_filter.sh"
 
-SCRIPT_BUILD=2017041701
+SCRIPT_BUILD=2017072701
 
 ## osync / obackup / pmocr / zsnap install script
 ## Tested on RHEL / CentOS 6 & 7, Fedora 23, Debian 7 & 8, Mint 17 and FreeBSD 8, 10 and 11
@@ -20,6 +20,39 @@ SCRIPT_BUILD=2017041701
 
 # Get current install.sh path from http://stackoverflow.com/a/246128/2635443
 SCRIPT_PATH="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
+
+_LOGGER_SILENT=false
+_STATS=1
+ACTION="install"
+FAKEROOT=""
+
+function GetCommandlineArguments {
+        for i in "$@"; do
+                case $i in
+			--prefix=*)
+                        FAKEROOT="${i##*=}"
+                        ;;
+			--silent)
+			_LOGGER_SILENT=true
+			;;
+			--no-stats)
+			_STATS=0
+			;;
+			--remove)
+			ACTION="uninstall"
+			;;
+			--help|-h|-?)
+			Usage
+			;;
+                        *)
+			Logger "Unknown option '$i'" "CRITICAL"
+			Usage
+                        ;;
+                esac
+	done
+}
+
+GetCommandlineArguments "$@"
 
 CONF_DIR=$FAKEROOT/etc/$PROGRAM
 BIN_DIR="$FAKEROOT/usr/local/bin"
@@ -105,7 +138,7 @@ function CreateDir {
 	local dir="${1}"
 
 	if [ ! -d "$dir" ]; then
-		mkdir "$dir"
+		mkdir -p "$dir"
 		if [ $? == 0 ]; then
 			QuickLogger "Created directory [$dir]."
 		else
@@ -209,8 +242,10 @@ function CopyProgram {
 
 function CopyServiceFiles {
 	if ([ "$init" == "systemd" ] && [ -f "$SCRIPT_PATH/$SERVICE_FILE_SYSTEMD_SYSTEM" ]); then
+		CreateDir "$SERVICE_DIR_SYSTEMD_SYSTEM"
 		CopyFile "$SCRIPT_PATH" "$SERVICE_DIR_SYSTEMD_SYSTEM" "$SERVICE_FILE_SYSTEMD_SYSTEM" "" "" "" true
-		if [ -f "$SCRIPT_PATH/$SERVICE_FILE_SYSTEMD_SYSTEM_USER" ]; then
+		if [ -f "$SCRIPT_PATH/$SERVICE_FILE_SYSTEMD_USER" ]; then
+			CreateDir "$SERVICE_DIR_SYSTEMD_USER"
 			CopyFile "$SCRIPT_PATH" "$SERVICE_DIR_SYSTEMD_USER" "$SERVICE_FILE_SYSTEMD_USER" "" "" "" true
 		fi
 
@@ -219,6 +254,7 @@ function CopyServiceFiles {
 		QuickLogger "Can be enabled on boot with [systemctl enable $SERVICE_NAME@instance.conf]."
 		QuickLogger "In userland, active with [systemctl --user start $SERVICE_NAME@instance.conf]."
 	elif ([ "$init" == "initV" ] && [ -f "$SCRIPT_PATH/$SERVICE_FILE_INIT" ] && [ -d "$SERVICE_DIR_INIT" ]); then
+		CreateDir "$SERVICE_DIR_INIT"
 		CopyFile "$SCRIPT_PATH" "$SERVICE_DIR_INIT" "$SERVICE_FILE_INIT" "755" "" "" true
 
 		QuickLogger "Created [$SERVICE_NAME] service in [$SERVICE_DIR_INIT]."
@@ -276,7 +312,7 @@ function RemoveAll {
 		QuickLogger "Skipping removal of [$BIN_DIR/$SSH_FILTER] because other programs present that need it."
 	fi
 	RemoveFile "$SERVICE_DIR_SYSTEMD_SYSTEM/$SERVICE_FILE_SYSTEMD_SYSTEM"
-	RemoveFile "$SERVICE_DIR_SYSTEMD_USER/$SERVICE_FILE_SYSTEMD_SYSTEM"
+	RemoveFile "$SERVICE_DIR_SYSTEMD_USER/$SERVICE_FILE_SYSTEMD_USER"
 	RemoveFile "$SERVICE_DIR_INIT/$SERVICE_FILE_INIT"
 
 	QuickLogger "Skipping configuration files in [$CONF_DIR]. You may remove this directory manually."
@@ -288,33 +324,9 @@ function Usage {
 	echo "--silent		Will log and bypass user interaction."
 	echo "--no-stats	Used with --silent in order to refuse sending anonymous install stats."
 	echo "--remove          Remove the program."
+	echo "--prefix=/path    Use prefix to install path."
 	exit 127
 }
-
-_LOGGER_SILENT=false
-_STATS=1
-ACTION="install"
-
-for i in "$@"
-do
-	case $i in
-		--silent)
-		_LOGGER_SILENT=true
-		;;
-		--no-stats)
-		_STATS=0
-		;;
-		--remove)
-		ACTION="uninstall"
-		;;
-		--help|-h|-?)
-		Usage
-	esac
-done
-
-if [ "$FAKEROOT" != "" ]; then
-	mkdir -p "$SERVICE_DIR_SYSTEMD_SYSTEM" "$SERVICE_DIR_SYSTEMD_USER" "$BIN_DIR"
-fi
 
 GetLocalOS
 SetLocalOSSettings
