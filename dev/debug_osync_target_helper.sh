@@ -1768,7 +1768,7 @@ function InitRemoteOSDependingSettings {
 	fi
 
 	## Set rsync default arguments
-	RSYNC_ARGS="-rltD -8"
+	RSYNC_ARGS="-rltD -8 --modify-window=2"
 	if [ "$_DRYRUN" == true ]; then
 		RSYNC_DRY_ARG="-n"
 		DRY_WARNING="/!\ DRY RUN "
