@@ -10,7 +10,7 @@ IS_STABLE=yes
 
 
 _OFUNCTIONS_VERSION=2.1.4-rc1
-_OFUNCTIONS_BUILD=2017060801
+_OFUNCTIONS_BUILD=2017092201
 _OFUNCTIONS_BOOTSTRAP=true
 
 ## BEGIN Generic bash functions written in 2013-2017 by Orsiris de Jong - http://www.netpower.fr - ozy@netpower.fr
@@ -1131,7 +1131,7 @@ function GetLocalOS {
 	# Get linux versions
 	if [ -f "/etc/os-release" ]; then
 		localOsName=$(GetConfFileValue "/etc/os-release" "NAME")
-		localOsVer=$(GetConfFileValue "/etc/os-release" "VERSION")
+		localOsVer=$(GetConfFileValue "/etc/os-release" "VERSION" true)
 	fi
 
 	# Add a global variable for statistics in installer
@@ -1780,6 +1780,7 @@ function VerComp () {
 function GetConfFileValue () {
         local file="${1}"
         local name="${2}"
+	local noError="${3:-false}"
         local value
 
         value=$(grep "^$name=" "$file")
@@ -1787,7 +1788,11 @@ function GetConfFileValue () {
                 value="${value##*=}"
                 echo "$value"
         else
-		Logger "Cannot get value for [$name] in config file [$file]." "ERROR"
+		if [ $noError == true ]; then
+			Logger "Cannot get value for [$name] in config file [$file]." "NOTICE"
+		else
+			Logger "Cannot get value for [$name] in config file [$file]." "ERROR"
+		fi
         fi
 }
 
