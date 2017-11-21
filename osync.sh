@@ -4682,7 +4682,7 @@ function GetCommandlineArguments {
 			;;
 			--skip-deletion=*)
 			opts=$opts" --skip-deletion=\"${i##*=}\""
-			SKIP_DELETION=${##*=}
+			SKIP_DELETION=${i##*=}
 			;;
 			--on-changes)
 			sync_on_changes=true
