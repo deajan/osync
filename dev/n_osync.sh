@@ -8,7 +8,7 @@ PROGRAM="osync" # Rsync based two way sync engine with fault tolerance
 AUTHOR="(C) 2013-2017 by Orsiris de Jong"
 CONTACT="http://www.netpower.fr/osync - ozy@netpower.fr"
 PROGRAM_VERSION=1.2.2-dev
-PROGRAM_BUILD=2017081401
+PROGRAM_BUILD=2017112201
 IS_STABLE=no
 
 
@@ -378,7 +378,7 @@ function _HandleLocksLocal {
 	local lockfileContent
 	local lockPid
 	local lockInstanceID
-	local writeLocks
+	local writeLocks=false
 
 	if [ ! -d "$replicaStateDir" ]; then
 		mkdir -p "$replicaStateDir" > "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$replicaType.$SCRIPT_PID.$TSTAMP" 2>&1
@@ -466,6 +466,8 @@ include #### IsInteger SUBSET ####
 include #### RemoteLogger SUBSET ####
 
 function _HandleLocksRemoteSub {
+	local writeLocks=false
+
 	if [ ! -d "$replicaStateDir" ]; then
 		mkdir -p "$replicaStateDir"
 		retval=$?
@@ -572,6 +574,7 @@ function HandleLocks {
 			_HandleLocksRemote "${TARGET[$__replicaDir]}${TARGET[$__stateDir]}" "${TARGET[$__lockFile]}" "${TARGET[$__type]}" $overwrite &
 			pids="$pids;$!"
 		fi
+		#Assume locks could be created unless pid returns with exit code
 		INITIATOR_LOCK_FILE_EXISTS=true
 		TARGET_LOCK_FILE_EXISTS=true
 		WaitForTaskCompletion $pids 720 1800 $SLEEP_TIME $KEEP_LOGGING true true false
