@@ -3,7 +3,7 @@
 #### OFUNCTIONS MINI SUBSET ####
 
 _OFUNCTIONS_VERSION=2.1.4-rc1
-_OFUNCTIONS_BUILD=2017060903
+_OFUNCTIONS_BUILD=2017112301
 #### _OFUNCTIONS_BOOTSTRAP SUBSET ####
 _OFUNCTIONS_BOOTSTRAP=true
 #### _OFUNCTIONS_BOOTSTRAP SUBSET END ####
@@ -320,7 +320,7 @@ function KillChilds {
 	local self="${2:-false}" # Should parent be killed too ?
 
 	# Paranoid checks, we can safely assume that $pid shouldn't be 0 nor 1
-	if [ $(IsNumeric "$pid") -eq 0 ] || [ "$pid" == "" ] || [ "$pid" == "0" ] || [ "$pid" == "1" ]; then
+	if [ $(IsInteger "$pid") -eq 0 ] || [ "$pid" == "" ] || [ "$pid" == "0" ] || [ "$pid" == "1" ]; then
 		Logger "Bogus pid given [$pid]." "CRITICAL"
 		return 1
 	fi
