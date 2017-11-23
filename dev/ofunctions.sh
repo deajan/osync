@@ -2,7 +2,7 @@
 #### OFUNCTIONS FULL SUBSET ####
 #### OFUNCTIONS MINI SUBSET ####
 
-_OFUNCTIONS_VERSION=2.1.4-rc1
+_OFUNCTIONS_VERSION=2.1.4-rc1+
 _OFUNCTIONS_BUILD=2017112301
 #### _OFUNCTIONS_BOOTSTRAP SUBSET ####
 _OFUNCTIONS_BOOTSTRAP=true
@@ -18,6 +18,8 @@ _OFUNCTIONS_BOOTSTRAP=true
 ## _LOGGER_VERBOSE=true/false
 ## _LOGGER_ERR_ONLY=true/false
 ## _LOGGER_PREFIX="date"/"time"/""
+
+#TODO: global WAIT_FOR_TASK_COMPLETION_id instead of callerName has to be backported to ParallelExec and osync / obackup / pmocr ocde
 
 ## Logger sets {ERROR|WARN}_ALERT variable when called with critical / error / warn loglevel
 ## When called from subprocesses, variable of main process can't be set. Status needs to be get via $RUN_DIR/$PROGRAM.Logger.{error|warn}.$SCRIPT_PID.$TSTAMP
@@ -684,9 +686,10 @@ function WaitForTaskCompletion {
 	local counting="${6:-true}"	# Count time since function has been launched (true), or since script has been launched (false)
 	local spinner="${7:-true}"	# Show spinner (true), don't show anything (false)
 	local noErrorLog="${8:-false}"	# Log errors when reaching soft / hard max time (false), don't log errors on those triggers (true)
+	local id="${9-base}"		# Optional id in order to get $WAIT_FOR_TASK_COMPLETION_id global variable
 
 	local callerName="${FUNCNAME[1]}"
-	Logger "${FUNCNAME[0]} called by [$callerName]." "PARANOIA_DEBUG"	#__WITH_PARANOIA_DEBUG
+	Logger "${FUNCNAME[0]} called by [${FUNCNAME[0]} < ${FUNCNAME[1]} < ${FUNCNAME[2]} < ${FUNCNAME[3]} < ${FUNCNAME[4]} ...]." "PARANOIA_DEBUG"	#__WITH_PARANOIA_DEBUG
 	__CheckArguments 8 $# "$@"				#__WITH_PARANOIA_DEBUG
 
 	local log_ttime=0 # local time instance for comparaison
@@ -714,8 +717,8 @@ function WaitForTaskCompletion {
 	pidCount=${#pidsArray[@]}
 
 	# Set global var default
-	eval "WAIT_FOR_TASK_COMPLETION_$callerName=\"\""
-	eval "HARD_MAX_EXEC_TIME_REACHED_$callerName=false"
+	eval "WAIT_FOR_TASK_COMPLETION_$id=\"\""
+	eval "HARD_MAX_EXEC_TIME_REACHED_$id=false"
 
 	while [ ${#pidsArray[@]} -gt 0 ]; do
 		newPidsArray=()
@@ -762,7 +765,7 @@ function WaitForTaskCompletion {
 			if [ $noErrorLog != true ]; then
 				SendAlert true
 			fi
-			eval "HARD_MAX_EXEC_TIME_REACHED_$callerName=true"
+			eval "HARD_MAX_EXEC_TIME_REACHED_$id=true"
 			return $errorcount
 		fi
 
@@ -782,10 +785,10 @@ function WaitForTaskCompletion {
 						Logger "${FUNCNAME[0]} called by [$callerName] finished monitoring [$pid] with exitcode [$retval]." "DEBUG"
 						errorcount=$((errorcount+1))
 						# Welcome to variable variable bash hell
-						if [ "$(eval echo \"\$WAIT_FOR_TASK_COMPLETION_$callerName\")" == "" ]; then
-							eval "WAIT_FOR_TASK_COMPLETION_$callerName=\"$pid:$retval\""
+						if [ "$(eval echo \"\$WAIT_FOR_TASK_COMPLETION_$id\")" == "" ]; then
+							eval "WAIT_FOR_TASK_COMPLETION_$id=\"$pid:$retval\""
 						else
-							eval "WAIT_FOR_TASK_COMPLETION_$callerName=\";$pid:$retval\""
+							eval "WAIT_FOR_TASK_COMPLETION_$id=\";$pid:$retval\""
 						fi
 					fi
 				fi
