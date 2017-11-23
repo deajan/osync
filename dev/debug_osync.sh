@@ -8,7 +8,7 @@ PROGRAM="osync" # Rsync based two way sync engine with fault tolerance
 AUTHOR="(C) 2013-2017 by Orsiris de Jong"
 CONTACT="http://www.netpower.fr/osync - ozy@netpower.fr"
 PROGRAM_VERSION=1.2.2-dev
-PROGRAM_BUILD=2017112201
+PROGRAM_BUILD=2017112302
 IS_STABLE=no
 
 
@@ -43,8 +43,8 @@ IS_STABLE=no
 #	CleanUp					no		#__WITH_PARANOIA_DEBUG
 
 
-_OFUNCTIONS_VERSION=2.1.4-rc1
-_OFUNCTIONS_BUILD=2017060903
+_OFUNCTIONS_VERSION=2.1.4-rc1+
+_OFUNCTIONS_BUILD=2017112301
 _OFUNCTIONS_BOOTSTRAP=true
 
 ## BEGIN Generic bash functions written in 2013-2017 by Orsiris de Jong - http://www.netpower.fr - ozy@netpower.fr
@@ -57,6 +57,8 @@ _OFUNCTIONS_BOOTSTRAP=true
 ## _LOGGER_VERBOSE=true/false
 ## _LOGGER_ERR_ONLY=true/false
 ## _LOGGER_PREFIX="date"/"time"/""
+
+#TODO: global WAIT_FOR_TASK_COMPLETION_id instead of callerName has to be backported to ParallelExec and osync / obackup / pmocr ocde
 
 ## Logger sets {ERROR|WARN}_ALERT variable when called with critical / error / warn loglevel
 ## When called from subprocesses, variable of main process can't be set. Status needs to be get via $RUN_DIR/$PROGRAM.Logger.{error|warn}.$SCRIPT_PID.$TSTAMP
@@ -353,7 +355,7 @@ function KillChilds {
 	local self="${2:-false}" # Should parent be killed too ?
 
 	# Paranoid checks, we can safely assume that $pid shouldn't be 0 nor 1
-	if [ $(IsNumeric "$pid") -eq 0 ] || [ "$pid" == "" ] || [ "$pid" == "0" ] || [ "$pid" == "1" ]; then
+	if [ $(IsInteger "$pid") -eq 0 ] || [ "$pid" == "" ] || [ "$pid" == "0" ] || [ "$pid" == "1" ]; then
 		Logger "Bogus pid given [$pid]." "CRITICAL"
 		return 1
 	fi
@@ -715,9 +717,10 @@ function WaitForTaskCompletion {
 	local counting="${6:-true}"	# Count time since function has been launched (true), or since script has been launched (false)
 	local spinner="${7:-true}"	# Show spinner (true), don't show anything (false)
 	local noErrorLog="${8:-false}"	# Log errors when reaching soft / hard max time (false), don't log errors on those triggers (true)
+	local id="${9-base}"		# Optional id in order to get $WAIT_FOR_TASK_COMPLETION_id global variable
 
 	local callerName="${FUNCNAME[1]}"
-	Logger "${FUNCNAME[0]} called by [$callerName]." "PARANOIA_DEBUG"	#__WITH_PARANOIA_DEBUG
+	Logger "${FUNCNAME[0]} called by [${FUNCNAME[0]} < ${FUNCNAME[1]} < ${FUNCNAME[2]} < ${FUNCNAME[3]} < ${FUNCNAME[4]} ...]." "PARANOIA_DEBUG"	#__WITH_PARANOIA_DEBUG
 	__CheckArguments 8 $# "$@"				#__WITH_PARANOIA_DEBUG
 
 	local log_ttime=0 # local time instance for comparaison
@@ -745,8 +748,8 @@ function WaitForTaskCompletion {
 	pidCount=${#pidsArray[@]}
 
 	# Set global var default
-	eval "WAIT_FOR_TASK_COMPLETION_$callerName=\"\""
-	eval "HARD_MAX_EXEC_TIME_REACHED_$callerName=false"
+	eval "WAIT_FOR_TASK_COMPLETION_$id=\"\""
+	eval "HARD_MAX_EXEC_TIME_REACHED_$id=false"
 
 	while [ ${#pidsArray[@]} -gt 0 ]; do
 		newPidsArray=()
@@ -793,7 +796,7 @@ function WaitForTaskCompletion {
 			if [ $noErrorLog != true ]; then
 				SendAlert true
 			fi
-			eval "HARD_MAX_EXEC_TIME_REACHED_$callerName=true"
+			eval "HARD_MAX_EXEC_TIME_REACHED_$id=true"
 			return $errorcount
 		fi
 
@@ -813,10 +816,10 @@ function WaitForTaskCompletion {
 						Logger "${FUNCNAME[0]} called by [$callerName] finished monitoring [$pid] with exitcode [$retval]." "DEBUG"
 						errorcount=$((errorcount+1))
 						# Welcome to variable variable bash hell
-						if [ "$(eval echo \"\$WAIT_FOR_TASK_COMPLETION_$callerName\")" == "" ]; then
-							eval "WAIT_FOR_TASK_COMPLETION_$callerName=\"$pid:$retval\""
+						if [ "$(eval echo \"\$WAIT_FOR_TASK_COMPLETION_$id\")" == "" ]; then
+							eval "WAIT_FOR_TASK_COMPLETION_$id=\"$pid:$retval\""
 						else
-							eval "WAIT_FOR_TASK_COMPLETION_$callerName=\";$pid:$retval\""
+							eval "WAIT_FOR_TASK_COMPLETION_$id=\";$pid:$retval\""
 						fi
 					fi
 				fi
@@ -925,7 +928,7 @@ function ParallelExec {
 			if [ $((($exec_time + 1) % $keepLogging)) -eq 0 ]; then
 				if [ $log_ttime -ne $exec_time ]; then # Fix when sleep time lower than 1s
 					log_ttime=$exec_time
-					Logger "Current tasks still running with pids [$(joinString , ${pidsArray[@]})]." "NOTICE"
+					Logger "There are $((commandCount-counter-numberOfProcess)) / $commandCount in the task queue. Currently, $numberofProcess tasks still running with pids [$(joinString , ${pidsArray[@]})]." "NOTICE"
 				fi
 			fi
 		fi
@@ -2795,7 +2798,13 @@ function HandleLocks {
 
 	local retval
 	local pids
+	local initiatorPid
+	local targetPid
 	local overwrite=false
+
+	# Assume lock files are created successfully unless stated otherwise
+	local initiatorLockSuccess=true
+	local targetLockSuccess=true
 
 	if [ $_NOLOCKS == true ]; then
 		return 0
@@ -2806,29 +2815,39 @@ function HandleLocks {
 		overwrite=true
 	else
 		_HandleLocksLocal "${INITIATOR[$__replicaDir]}${INITIATOR[$__stateDir]}" "${INITIATOR[$__lockFile]}" "${INITIATOR[$__type]}" $overwrite &
-		pids="$!"
+		initiatorPid=$!
+		pids="$initiatorPid"
 		if [ "$REMOTE_OPERATION" != "yes" ]; then
 			_HandleLocksLocal "${TARGET[$__replicaDir]}${TARGET[$__stateDir]}" "${TARGET[$__lockFile]}" "${TARGET[$__type]}" $overwrite &
-			pids="$pids;$!"
+			targetPid=$!
+			pids="$pids;$targetPid"
 		else
 			_HandleLocksRemote "${TARGET[$__replicaDir]}${TARGET[$__stateDir]}" "${TARGET[$__lockFile]}" "${TARGET[$__type]}" $overwrite &
-			pids="$pids;$!"
+			targetPid=$!
+			pids="$pids;$targetPid"
 		fi
-		#Assume locks could be created unless pid returns with exit code
-		INITIATOR_LOCK_FILE_EXISTS=true
-		TARGET_LOCK_FILE_EXISTS=true
-		WaitForTaskCompletion $pids 720 1800 $SLEEP_TIME $KEEP_LOGGING true true false
+		WaitForTaskCompletion $pids 720 1800 $SLEEP_TIME $KEEP_LOGGING true true false ${FUNCNAME[0]}
 		retval=$?
 		if [ $retval -ne 0 ]; then
+			echo $WAIT_FOR_TASK_COMPLETION_${FUNCNAME[0]}
 			IFS=';' read -r -a pidArray <<< "$(eval echo \"\$WAIT_FOR_TASK_COMPLETION_${FUNCNAME[0]}\")"
 			for pid in "${pidArray[@]}"; do
 				pid=${pid%:*}
+				echo "$pid - $initiatorPid - $targetPid"
 				if [ "$pid" == "$initiatorPid" ]; then
-					INITIATOR_LOCK_FILE_EXISTS=false
+					initiatorLockSuccess=false
 				elif [ "$pid" == "$targetPid" ]; then
-					TARGET_LOCK_FILE_EXISTS=false
+					targetLockSuccess=false
 				fi
 			done
+
+			if [ $initiatorLockSuccess  == true ]; then
+				INITIATOR_LOCK_FILE_EXISTS=true
+			fi
+
+			if [ $targetLockSuccess == true ]; then
+				TARGET_LOCK_FILE_EXISTS=true
+			fi
 
 			Logger "Cancelling task." "CRITICAL" $retval
 			exit 1
@@ -3891,7 +3910,7 @@ function Sync {
 			targetPid="$!"
 		fi
 
-		WaitForTaskCompletion "$initiatorPid;$targetPid" $SOFT_MAX_EXEC_TIME $HARD_MAX_EXEC_TIME $SLEEP_TIME $KEEP_LOGGING false true false
+		WaitForTaskCompletion "$initiatorPid;$targetPid" $SOFT_MAX_EXEC_TIME $HARD_MAX_EXEC_TIME $SLEEP_TIME $KEEP_LOGGING false true false ${FUNCNAME[0]}
 		if [ $? -ne 0 ]; then
 			IFS=';' read -r -a pidArray <<< "$(eval echo \"\$WAIT_FOR_TASK_COMPLETION_${FUNCNAME[0]}\")"
 			initiatorFail=false
@@ -3936,7 +3955,7 @@ function Sync {
 			targetPid="$!"
 		fi
 
-		WaitForTaskCompletion "$initiatorPid;$targetPid" $SOFT_MAX_EXEC_TIME $HARD_MAX_EXEC_TIME $SLEEP_TIME $KEEP_LOGGING false true false
+		WaitForTaskCompletion "$initiatorPid;$targetPid" $SOFT_MAX_EXEC_TIME $HARD_MAX_EXEC_TIME $SLEEP_TIME $KEEP_LOGGING false true false ${FUNCNAME[0]}
 		if [ $? -ne 0 ]; then
 			IFS=';' read -r -a pidArray <<< "$(eval echo \"\$WAIT_FOR_TASK_COMPLETION_${FUNCNAME[0]}\")"
 			initiatorFail=false
@@ -3985,7 +4004,7 @@ function Sync {
 				targetPid="$!"
 			fi
 
-			WaitForTaskCompletion "$initiatorPid;$targetPid" $SOFT_MAX_EXEC_TIME $HARD_MAX_EXEC_TIME $SLEEP_TIME $KEEP_LOGGING false true false
+			WaitForTaskCompletion "$initiatorPid;$targetPid" $SOFT_MAX_EXEC_TIME $HARD_MAX_EXEC_TIME $SLEEP_TIME $KEEP_LOGGING false true false ${FUNCNAME[0]}
 			if [ $? -ne 0 ]; then
 				IFS=';' read -r -a pidArray <<< "$(eval echo \"\$WAIT_FOR_TASK_COMPLETION_${FUNCNAME[0]}\")"
 				initiatorFail=false
@@ -4139,7 +4158,7 @@ function Sync {
 			targetPid="$!"
 		fi
 
-		WaitForTaskCompletion "$initiatorPid;$targetPid" $SOFT_MAX_EXEC_TIME $HARD_MAX_EXEC_TIME $SLEEP_TIME $KEEP_LOGGING false true false
+		WaitForTaskCompletion "$initiatorPid;$targetPid" $SOFT_MAX_EXEC_TIME $HARD_MAX_EXEC_TIME $SLEEP_TIME $KEEP_LOGGING false true false ${FUNCNAME[0]}
 		if [ $? -ne 0 ]; then
 			IFS=';' read -r -a pidArray <<< "$(eval echo \"\$WAIT_FOR_TASK_COMPLETION_${FUNCNAME[0]}\")"
 			initiatorFail=false
@@ -4185,7 +4204,7 @@ function Sync {
 			targetPid="$!"
 		fi
 
-		WaitForTaskCompletion "$initiatorPid;$targetPid" $SOFT_MAX_EXEC_TIME $HARD_MAX_EXEC_TIME $SLEEP_TIME $KEEP_LOGGING false true false
+		WaitForTaskCompletion "$initiatorPid;$targetPid" $SOFT_MAX_EXEC_TIME $HARD_MAX_EXEC_TIME $SLEEP_TIME $KEEP_LOGGING false true false ${FUNCNAME[0]}
 		if [ $? -ne 0 ]; then
 			IFS=';' read -r -a pidArray <<< "$(eval echo \"\$WAIT_FOR_TASK_COMPLETION_${FUNCNAME[0]}\")"
 			initiatorFail=false
@@ -4234,7 +4253,7 @@ function Sync {
 				targetPid="$!"
 			fi
 
-			WaitForTaskCompletion "$initiatorPid;$targetPid" $SOFT_MAX_EXEC_TIME $HARD_MAX_EXEC_TIME $SLEEP_TIME $KEEP_LOGGING false true false
+			WaitForTaskCompletion "$initiatorPid;$targetPid" $SOFT_MAX_EXEC_TIME $HARD_MAX_EXEC_TIME $SLEEP_TIME $KEEP_LOGGING false true false ${FUNCNAME[0]}
 			if [ $? -ne 0 ]; then
 				IFS=';' read -r -a pidArray <<< "$(eval echo \"\$WAIT_FOR_TASK_COMPLETION_${FUNCNAME[0]}\")"
 				initiatorFail=false
