@@ -1452,7 +1452,7 @@ function RsyncPatterns {
 			RsyncPatternsFromAdd "exclude" "$RSYNC_EXCLUDE_FROM"
 		fi
 		if [ "$RSYNC_INCLUDE_PATTERN" != "" ]; then
-			RsyncPatternsAdd "$RSYNC_INCLUDE_PATTERN" "include"
+			RsyncPatternsAdd "include" "$RSYNC_INCLUDE_PATTERN"
 		fi
 		if [ "$RSYNC_INCLUDE_FROM" != "" ]; then
 			RsyncPatternsFromAdd "include" "$RSYNC_INCLUDE_FROM"
