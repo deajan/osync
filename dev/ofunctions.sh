@@ -840,6 +840,7 @@ function ParallelExec {
 	local noErrorLog="${10:-false}"		# Log errors when reaching soft / hard max time (false), don't log errors on those triggers (true)
 
 	local callerName="${FUNCNAME[1]}"
+	Logger "${FUNCNAME[0]} called by [${FUNCNAME[0]} < ${FUNCNAME[1]} < ${FUNCNAME[2]} < ${FUNCNAME[3]} < ${FUNCNAME[4]} ...]." "PARANOIA_DEBUG"	#__WITH_PARANOIA_DEBUG
 	__CheckArguments 2-10 $# "$@"				#__WITH_PARANOIA_DEBUG
 
 	local log_ttime=0 # local time instance for comparaison
@@ -897,7 +898,7 @@ function ParallelExec {
 			if [ $((($exec_time + 1) % $keepLogging)) -eq 0 ]; then
 				if [ $log_ttime -ne $exec_time ]; then # Fix when sleep time lower than 1s
 					log_ttime=$exec_time
-					Logger "There are $((commandCount-counter-numberOfProcess)) / $commandCount in the task queue. Currently, $numberofProcess tasks still running with pids [$(joinString , ${pidsArray[@]})]." "NOTICE"
+					Logger "There are $((commandCount-counter-numberOfProcess)) / $commandCount in the task queue. Currently, ${#pidsArray[@]} tasks running with pids [$(joinString , ${pidsArray[@]})]." "NOTICE"
 				fi
 			fi
 		fi
