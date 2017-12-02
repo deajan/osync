@@ -898,7 +898,7 @@ function ParallelExec {
 			if [ $((($exec_time + 1) % $keepLogging)) -eq 0 ]; then
 				if [ $log_ttime -ne $exec_time ]; then # Fix when sleep time lower than 1s
 					log_ttime=$exec_time
-					Logger "There are $((commandCount-counter-numberOfProcess)) / $commandCount in the task queue. Currently, ${#pidsArray[@]} tasks running with pids [$(joinString , ${pidsArray[@]})]." "NOTICE"
+					Logger "There are $((commandCount-counter)) / $commandCount tasks in the queue. Currently, ${#pidsArray[@]} tasks running with pids [$(joinString , ${pidsArray[@]})]." "NOTICE"
 				fi
 			fi
 		fi
