@@ -44,7 +44,7 @@ IS_STABLE=no
 
 
 _OFUNCTIONS_VERSION=2.1.4-rc1+
-_OFUNCTIONS_BUILD=2017123001
+_OFUNCTIONS_BUILD=2017123002
 _OFUNCTIONS_BOOTSTRAP=true
 
 ## BEGIN Generic bash functions written in 2013-2017 by Orsiris de Jong - http://www.netpower.fr - ozy@netpower.fr
@@ -1607,7 +1607,7 @@ function RsyncPatterns {
 			RsyncPatternsFromAdd "exclude" "$RSYNC_EXCLUDE_FROM"
 		fi
 		if [ "$RSYNC_INCLUDE_PATTERN" != "" ]; then
-			RsyncPatternsAdd "$RSYNC_INCLUDE_PATTERN" "include"
+			RsyncPatternsAdd "include" "$RSYNC_INCLUDE_PATTERN"
 		fi
 		if [ "$RSYNC_INCLUDE_FROM" != "" ]; then
 			RsyncPatternsFromAdd "include" "$RSYNC_INCLUDE_FROM"
