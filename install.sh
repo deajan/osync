@@ -184,8 +184,8 @@ function GetLocalOS {
 
 	# Get linux versions
 	if [ -f "/etc/os-release" ]; then
-		localOsName=$(GetConfFileValue "/etc/os-release" "NAME")
-		localOsVer=$(GetConfFileValue "/etc/os-release" "VERSION")
+		localOsName=$(GetConfFileValue "/etc/os-release" "NAME" true)
+		localOsVer=$(GetConfFileValue "/etc/os-release" "VERSION" true)
 	fi
 
 	# Add a global variable for statistics in installer
@@ -198,6 +198,8 @@ function GetLocalOS {
 function GetConfFileValue () {
         local file="${1}"
         local name="${2}"
+	local noError="${3:-false}"
+
         local value
 
         value=$(grep "^$name=" "$file")
@@ -205,9 +207,14 @@ function GetConfFileValue () {
                 value="${value##*=}"
                 echo "$value"
         else
-		Logger "Cannot get value for [$name] in config file [$file]." "ERROR"
+		if [ $noError == true ]; then
+ 			Logger "Cannot get value for [$name] in config file [$file]." "NOTICE"
+		else
+			Logger "Cannot get value for [$name] in config file [$file]." "ERROR"
+		fi
         fi
 }
+
 
 function SetLocalOSSettings {
 	USER=root

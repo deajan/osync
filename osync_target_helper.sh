@@ -8,8 +8,8 @@ PROGRAM_BUILD=2017061901
 IS_STABLE=no
 
 
-_OFUNCTIONS_VERSION=2.1.4-rc1
-_OFUNCTIONS_BUILD=2017060903
+_OFUNCTIONS_VERSION=2.1.4-rc1+
+_OFUNCTIONS_BUILD=2017123001
 _OFUNCTIONS_BOOTSTRAP=true
 
 ## BEGIN Generic bash functions written in 2013-2017 by Orsiris de Jong - http://www.netpower.fr - ozy@netpower.fr
@@ -22,6 +22,8 @@ _OFUNCTIONS_BOOTSTRAP=true
 ## _LOGGER_VERBOSE=true/false
 ## _LOGGER_ERR_ONLY=true/false
 ## _LOGGER_PREFIX="date"/"time"/""
+
+#TODO: global WAIT_FOR_TASK_COMPLETION_id instead of callerName has to be backported to ParallelExec and osync / obackup / pmocr ocde
 
 ## Logger sets {ERROR|WARN}_ALERT variable when called with critical / error / warn loglevel
 ## When called from subprocesses, variable of main process can't be set. Status needs to be get via $RUN_DIR/$PROGRAM.Logger.{error|warn}.$SCRIPT_PID.$TSTAMP
@@ -303,7 +305,7 @@ function KillChilds {
 	local self="${2:-false}" # Should parent be killed too ?
 
 	# Paranoid checks, we can safely assume that $pid shouldn't be 0 nor 1
-	if [ $(IsNumeric "$pid") -eq 0 ] || [ "$pid" == "" ] || [ "$pid" == "0" ] || [ "$pid" == "1" ]; then
+	if [ $(IsInteger "$pid") -eq 0 ] || [ "$pid" == "" ] || [ "$pid" == "0" ] || [ "$pid" == "1" ]; then
 		Logger "Bogus pid given [$pid]." "CRITICAL"
 		return 1
 	fi
@@ -645,6 +647,7 @@ function WaitForTaskCompletion {
 	local counting="${6:-true}"	# Count time since function has been launched (true), or since script has been launched (false)
 	local spinner="${7:-true}"	# Show spinner (true), don't show anything (false)
 	local noErrorLog="${8:-false}"	# Log errors when reaching soft / hard max time (false), don't log errors on those triggers (true)
+	local id="${9-base}"		# Optional id in order to get $WAIT_FOR_TASK_COMPLETION_id global variable
 
 	local callerName="${FUNCNAME[1]}"
 
@@ -672,8 +675,8 @@ function WaitForTaskCompletion {
 	pidCount=${#pidsArray[@]}
 
 	# Set global var default
-	eval "WAIT_FOR_TASK_COMPLETION_$callerName=\"\""
-	eval "HARD_MAX_EXEC_TIME_REACHED_$callerName=false"
+	eval "WAIT_FOR_TASK_COMPLETION_$id=\"\""
+	eval "HARD_MAX_EXEC_TIME_REACHED_$id=false"
 
 	while [ ${#pidsArray[@]} -gt 0 ]; do
 		newPidsArray=()
@@ -720,7 +723,7 @@ function WaitForTaskCompletion {
 			if [ $noErrorLog != true ]; then
 				SendAlert true
 			fi
-			eval "HARD_MAX_EXEC_TIME_REACHED_$callerName=true"
+			eval "HARD_MAX_EXEC_TIME_REACHED_$id=true"
 			return $errorcount
 		fi
 
@@ -740,10 +743,10 @@ function WaitForTaskCompletion {
 						Logger "${FUNCNAME[0]} called by [$callerName] finished monitoring [$pid] with exitcode [$retval]." "DEBUG"
 						errorcount=$((errorcount+1))
 						# Welcome to variable variable bash hell
-						if [ "$(eval echo \"\$WAIT_FOR_TASK_COMPLETION_$callerName\")" == "" ]; then
-							eval "WAIT_FOR_TASK_COMPLETION_$callerName=\"$pid:$retval\""
+						if [ "$(eval echo \"\$WAIT_FOR_TASK_COMPLETION_$id\")" == "" ]; then
+							eval "WAIT_FOR_TASK_COMPLETION_$id=\"$pid:$retval\""
 						else
-							eval "WAIT_FOR_TASK_COMPLETION_$callerName=\";$pid:$retval\""
+							eval "WAIT_FOR_TASK_COMPLETION_$id=\";$pid:$retval\""
 						fi
 					fi
 				fi
@@ -842,7 +845,7 @@ function ParallelExec {
 			if [ $((($exec_time + 1) % $keepLogging)) -eq 0 ]; then
 				if [ $log_ttime -ne $exec_time ]; then # Fix when sleep time lower than 1s
 					log_ttime=$exec_time
-					Logger "Current tasks still running with pids [$(joinString , ${pidsArray[@]})]." "NOTICE"
+					Logger "There are $((commandCount-counter)) / $commandCount tasks in the queue. Currently, ${#pidsArray[@]} tasks running with pids [$(joinString , ${pidsArray[@]})]." "NOTICE"
 				fi
 			fi
 		fi
@@ -1128,8 +1131,8 @@ function GetLocalOS {
 
 	# Get linux versions
 	if [ -f "/etc/os-release" ]; then
-		localOsName=$(GetConfFileValue "/etc/os-release" "NAME")
-		localOsVer=$(GetConfFileValue "/etc/os-release" "VERSION")
+		localOsName=$(GetConfFileValue "/etc/os-release" "NAME" true)
+		localOsVer=$(GetConfFileValue "/etc/os-release" "VERSION" true)
 	fi
 
 	# Add a global variable for statistics in installer
@@ -1781,6 +1784,8 @@ function VerComp () {
 function GetConfFileValue () {
         local file="${1}"
         local name="${2}"
+	local noError="${3:-false}"
+
         local value
 
         value=$(grep "^$name=" "$file")
@@ -1788,9 +1793,14 @@ function GetConfFileValue () {
                 value="${value##*=}"
                 echo "$value"
         else
-		Logger "Cannot get value for [$name] in config file [$file]." "ERROR"
+		if [ $noError == true ]; then
+ 			Logger "Cannot get value for [$name] in config file [$file]." "NOTICE"
+		else
+			Logger "Cannot get value for [$name] in config file [$file]." "ERROR"
+		fi
         fi
 }
+
 
 function SetConfFileValue () {
         local file="${1}"

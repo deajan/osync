@@ -15,7 +15,7 @@ IS_STABLE=no
 
 
 _OFUNCTIONS_VERSION=2.1.4-rc1+
-_OFUNCTIONS_BUILD=2017112301
+_OFUNCTIONS_BUILD=2017123001
 _OFUNCTIONS_BOOTSTRAP=true
 
 ## BEGIN Generic bash functions written in 2013-2017 by Orsiris de Jong - http://www.netpower.fr - ozy@netpower.fr
@@ -851,7 +851,7 @@ function ParallelExec {
 			if [ $((($exec_time + 1) % $keepLogging)) -eq 0 ]; then
 				if [ $log_ttime -ne $exec_time ]; then # Fix when sleep time lower than 1s
 					log_ttime=$exec_time
-					Logger "There are $((commandCount-counter-numberOfProcess)) / $commandCount in the task queue. Currently, $numberofProcess tasks still running with pids [$(joinString , ${pidsArray[@]})]." "NOTICE"
+					Logger "There are $((commandCount-counter)) / $commandCount tasks in the queue. Currently, ${#pidsArray[@]} tasks running with pids [$(joinString , ${pidsArray[@]})]." "NOTICE"
 				fi
 			fi
 		fi
@@ -1137,8 +1137,8 @@ function GetLocalOS {
 
 	# Get linux versions
 	if [ -f "/etc/os-release" ]; then
-		localOsName=$(GetConfFileValue "/etc/os-release" "NAME")
-		localOsVer=$(GetConfFileValue "/etc/os-release" "VERSION")
+		localOsName=$(GetConfFileValue "/etc/os-release" "NAME" true)
+		localOsVer=$(GetConfFileValue "/etc/os-release" "VERSION" true)
 	fi
 
 	# Add a global variable for statistics in installer
@@ -1790,6 +1790,8 @@ function VerComp () {
 function GetConfFileValue () {
         local file="${1}"
         local name="${2}"
+	local noError="${3:-false}"
+
         local value
 
         value=$(grep "^$name=" "$file")
@@ -1797,9 +1799,14 @@ function GetConfFileValue () {
                 value="${value##*=}"
                 echo "$value"
         else
-		Logger "Cannot get value for [$name] in config file [$file]." "ERROR"
+		if [ $noError == true ]; then
+ 			Logger "Cannot get value for [$name] in config file [$file]." "NOTICE"
+		else
+			Logger "Cannot get value for [$name] in config file [$file]." "ERROR"
+		fi
         fi
 }
+
 
 function SetConfFileValue () {
         local file="${1}"
