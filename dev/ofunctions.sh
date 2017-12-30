@@ -3,7 +3,7 @@
 #### OFUNCTIONS MINI SUBSET ####
 
 _OFUNCTIONS_VERSION=2.1.4-rc1+
-_OFUNCTIONS_BUILD=2017123001
+_OFUNCTIONS_BUILD=2017123002
 #### _OFUNCTIONS_BOOTSTRAP SUBSET ####
 _OFUNCTIONS_BOOTSTRAP=true
 #### _OFUNCTIONS_BOOTSTRAP SUBSET END ####
@@ -1587,7 +1587,7 @@ function RsyncPatterns {
 			RsyncPatternsFromAdd "exclude" "$RSYNC_EXCLUDE_FROM"
 		fi
 		if [ "$RSYNC_INCLUDE_PATTERN" != "" ]; then
-			RsyncPatternsAdd "$RSYNC_INCLUDE_PATTERN" "include"
+			RsyncPatternsAdd "include" "$RSYNC_INCLUDE_PATTERN"
 		fi
 		if [ "$RSYNC_INCLUDE_FROM" != "" ]; then
 			RsyncPatternsFromAdd "include" "$RSYNC_INCLUDE_FROM"
