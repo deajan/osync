@@ -126,7 +126,7 @@ function GetLocalOS {
 	local localOsName
 	local localOsVer
 
-	# There's no good way to tell if currently running in BusyBox shell. Using sluggish way.
+	# There is no good way to tell if currently running in BusyBox shell. Using sluggish way.
 	if ls --help 2>&1 | grep -i "BusyBox" > /dev/null; then
 		localOsVar="BusyBox"
 	else
