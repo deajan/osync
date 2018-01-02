@@ -1,6 +1,9 @@
 RECENT CHANGES
 --------------
 
+dd Mmm YYYY: osync v1.2.3 release
+! Refactored time control and parallel execution functions into one single function
+
 dd Mmm YYYY: osync v1.2.2 release
 
 ! Added an option to log conflictual files
