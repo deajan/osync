@@ -1022,7 +1022,7 @@ function syncAttrs {
 	fi
 	Logger "RSYNC_CMD: $rsyncCmd" "DEBUG"
 	eval "$rsyncCmd"
-	ExecTasks "${FUNCNAME[0]}" 0 0 $SOFT_MAX_EXEC_TIME $HARD_MAX_EXEC_TIME $SLEEP_TIME $KEEP_LOGGING true true false false 1 $!
+	ExecTasks "${FUNCNAME[0]}" 0 0 $SOFT_MAX_EXEC_TIME $HARD_MAX_EXEC_TIME $SLEEP_TIME $KEEP_LOGGING false true false false 1 $!
 	retval=$?
 
 	if [ $retval -ne 0 ] && [ $retval -ne 24 ]; then
@@ -1056,7 +1056,7 @@ function syncAttrs {
 		_getFileCtimeMtimeRemote "${TARGET[$__replicaDir]}" "${TARGET[$__type]}" "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}-cleaned.$SCRIPT_PID.$TSTAMP" "$RUN_DIR/$PROGRAM.ctime_mtime___.${TARGET[$__type]}.$SCRIPT_PID.$TSTAMP" &
 		pids="$pids;$!"
 	fi
-	ExecTasks "${FUNCNAME[0]}" 0 0 $SOFT_MAX_EXEC_TIME $HARD_MAX_EXEC_TIME $SLEEP_TIME $KEEP_LOGGING true true false false 1 $pids
+	ExecTasks "${FUNCNAME[0]}" 0 0 $SOFT_MAX_EXEC_TIME $HARD_MAX_EXEC_TIME $SLEEP_TIME $KEEP_LOGGING false true false false 1 $pids
 	retval=$?
 	if [ $retval -ne 0 ]; then
 		Logger "Getting ctime attributes failed." "CRITICAL" $retval
@@ -1109,7 +1109,7 @@ function syncAttrs {
 
 	Logger "RSYNC_CMD: $rsyncCmd" "DEBUG"
 	eval "$rsyncCmd"
-	ExecTasks "${FUNCNAME[0]}" 0 0 $SOFT_MAX_EXEC_TIME $HARD_MAX_EXEC_TIME $SLEEP_TIME $KEEP_LOGGING true true false false 1 $!
+	ExecTasks "${FUNCNAME[0]}" 0 0 $SOFT_MAX_EXEC_TIME $HARD_MAX_EXEC_TIME $SLEEP_TIME $KEEP_LOGGING false true false false 1 $!
 	retval=$?
 
 	if [ $retval -ne 0 ] && [ $retval -ne 24 ]; then
