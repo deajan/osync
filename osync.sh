@@ -15,7 +15,7 @@ IS_STABLE=no
 
 
 _OFUNCTIONS_VERSION=2.2.0-dev
-_OFUNCTIONS_BUILD=2018010201
+_OFUNCTIONS_BUILD=2018010303
 _OFUNCTIONS_BOOTSTRAP=true
 
 ## BEGIN Generic bash functions written in 2013-2017 by Orsiris de Jong - http://www.netpower.fr - ozy@netpower.fr
@@ -666,7 +666,11 @@ function ParallelExec {
         local spinner="${9:-false}"
         local noErrorLog="${10:-false}"
 
-	ExecTasks "base" 0 0 "$softMaxTime" "$hardMaxTime" "$sleepTime" "$keepLogging" "$counting" "$spinner" "$noErrorLog" false 3 "$commandsArg" "" "$numberOfProcesses"
+	if [ $readFromFile == true ]; then
+		ExecTasks "base" 0 0 "$softMaxTime" "$hardMaxTime" "$sleepTime" "$keepLogging" "$counting" "$spinner" "$noErrorLog" false 6 "$commandsArg" "" "$numberOfProcesses"
+	else
+		ExecTasks "base" 0 0 "$softMaxTime" "$hardMaxTime" "$sleepTime" "$keepLogging" "$counting" "$spinner" "$noErrorLog" false 3 "$commandsArg" "" "$numberOfProcesses"
+	fi
 }
 
 ## Main asynchronous execution function
@@ -702,6 +706,8 @@ function ParallelExec {
 	# conditions="[ -d /var ];[ -d /etc ];[ -d /home];[ -d /usr]"
 	# ExecTasks "some_identifier" 0 0 300 900 1 1800 true true false false 4 "$commands" "$conditions" 3
 
+	# ParallelExecMode also creates output for commands in "$RUN_DIR/$PROGRAM.ExecTasks.$id.$SCRIPT_PID.$TSTAMP"
+
 ## ofunctions.sh subfunction requirements:
 ## Spinner
 ## Logger
@@ -720,6 +726,7 @@ function ExecTasks {
 	local counting="${8:-true}"		# Count time since function has been launched (true), or since script has been launched (false)
 	local spinner="${9:-true}"		# Show spinner (true), do not show anything (false)
 	local noTimeErrorLog="${10:-false}"	# Log errors when reaching soft / hard max time (false), do not log errors on those triggers (true)
+	#TODO not implemented
 	local noErrorLogAtAll="${11:-false}"	# Do not log errros at all (false)
 	local execTasksMode="${12:-1}"		# In which mode the function should work, see above
 	local mainInput="${13}"			# Contains list of pids / commands or filepath to list of pids / commands
@@ -727,8 +734,6 @@ function ExecTasks {
         local numberOfProcesses="${15:-2}"	# Number of simultaneous commands to run in ParallExec mode
 
 	local i
-
-	local callerName="${FUNCNAME[1]}"
 
 
 	# Since ExecTasks takes up to 15 arguments, do a quick preflight check in DEBUG mode
@@ -746,7 +751,7 @@ function ExecTasks {
 	fi
 
 	# ParallelExec specific variables
-	local auxCount			# Number of conditional commands
+	local auxItemCount=0		# Number of conditional commands
 	local commandsArray=()		# Array containing commands
 	local commandsConditionArray=()	# Array containing conditional commands
 	local currentCommand		# Variable containing currently processed command
@@ -757,7 +762,7 @@ function ExecTasks {
 	# Common variables
 	local pid			# Current pid working on
 	local pidState 			# State of the process
-	local mainItemCount 		# number of given items (pids or commands)
+	local mainItemCount=0 		# number of given items (pids or commands)
 	local readFromFile		# Should we read pids / commands from a file (true)
  	local counter=0
 	local log_ttime=0		# local time instance for comparaison
@@ -799,7 +804,6 @@ function ExecTasks {
                         mainItemCount=$(wc -l < "$mainInput")
 			readFromFile=true
                 else
-                        mainItemCount=0
 			Logger "Cannot read file [$mainInput]." "WARN"
                 fi
 		functionMode=WaitForTaskCompletion
@@ -835,7 +839,6 @@ function ExecTasks {
                         mainItemCount=$(wc -l < "$mainInput")
 			readFromFile=true
                 else
-                        mainItemCount=0
 			Logger "Cannot read file [$mainInput]." "WARN"
                 fi
 		functionMode=ParallelExec
@@ -845,13 +848,11 @@ function ExecTasks {
                         mainItemCount=$(wc -l < "$mainInput")
 			readFromFile=true
                 else
-                        mainItemCount=0
 			Logger "Cannot read file [$mainInput]." "WARN"
                 fi
                 if [ -f "$auxInput" ]; then
-                        auxCount=$(wc -l < "$auxInput")
+                        auxItemCount=$(wc -l < "$auxInput")
                 else
-                        auxCount=0
 			Logger "Cannot read file [$auxInput]." "WARN"
                 fi
 		postPoneIfConditionFails=false
@@ -862,13 +863,11 @@ function ExecTasks {
                         mainItemCount=$(wc -l < "$mainInput")
 			readFromFile=true
                 else
-                        mainItemCount=0
 			Logger "Cannot read file [$mainInput]." "WARN"
                 fi
                 if [ -f "$auxInput" ]; then
-                        auxCount=$(wc -l < "$auxInput")
+                        auxItemCount=$(wc -l < "$auxInput")
                 else
-                        auxCount=0
 			Logger "Cannot read file [$auxInput]." "WARN"
                 fi
 		postPoneIfConditionFails=true
@@ -909,7 +908,7 @@ function ExecTasks {
 
 		if [ $exec_time -gt $softMaxTime ]; then
 			if [ "$softAlert" != true ] && [ $softMaxTime -ne 0 ] && [ $noTimeErrorLog != true ]; then
-				Logger "Max soft execution time exceeded for task [$callerName] with pids [$(joinString , ${pidsArray[@]})]." "WARN"
+				Logger "Max soft execution time exceeded for task [$id] with pids [$(joinString , ${pidsArray[@]})]." "WARN"
 				softAlert=true
 				SendAlert true
 			fi
@@ -917,7 +916,7 @@ function ExecTasks {
 
 		if [ $exec_time -gt $hardMaxTime ] && [ $hardMaxTime -ne 0 ]; then
 			if [ $noTimeErrorLog != true ]; then
-				Logger "Max hard execution time exceeded for task [$callerName] with pids [$(joinString , ${pidsArray[@]})]. Stopping task execution." "ERROR"
+				Logger "Max hard execution time exceeded for task [$id] with pids [$(joinString , ${pidsArray[@]})]. Stopping task execution." "ERROR"
 			fi
 			for pid in "${pidsArray[@]}"; do
 				KillChilds $pid true
@@ -944,18 +943,22 @@ function ExecTasks {
 			while [ $counter -lt "$mainItemCount" ] && [ ${#pidsArray[@]} -lt $numberOfProcesses ]; do
         	                if [ $readFromFile == true ]; then
                	                	currentCommand=$(awk 'NR == num_line {print; exit}' num_line=$((counter+1)) "$mainInput")
-                                	currentCommandCondition=$(awk 'NR == num_line {print; exit}' num_line=$((counter+1)) "$auxInput")
+					if [ $auxItemCount -ne 0 ]; then
+                                		currentCommandCondition=$(awk 'NR == num_line {print; exit}' num_line=$((counter+1)) "$auxInput")
+					fi
                         	else
-                               		currentCommand="${commandArray[$counter]}"
-                                	currentCommandCondition="${commandConditionArray[$counter]}"
+                               		currentCommand="${commandsArray[$counter]}"
+					if [ $auxItemCount -ne 0 ]; then
+                                		currentCommandCondition="${commandsConditionArray[$counter]}"
+					fi
                         	fi
-
 				executeCommand=false
-                        	if [ $auxCount -ne 0 ]; then
+                        	if [ $auxItemCount -ne 0 ]; then
                                 	Logger "Checking condition [$currentCommandCondition] for command [$currentCommand]." "DEBUG"
                                 	eval "$currentCommandCondition" &
 					ExecTasks "subConditionCheck" 0 0 1800 3600 1 $KEEP_LOGGING true true true true 1 $!
-                                	if [ $? -ne 0 ]; then
+					retval=$?
+                                	if [ $retval -ne 0 ]; then
                                         	if [ $postPoneIfConditionFails == true ]; then
                                                 	Logger "Condition not met for command [$currentCommand]. Postponing command." "NOTICE"
                                                 	if [ $readFromFile == true ]; then
@@ -963,7 +966,7 @@ function ExecTasks {
                                                         	echo "$currentCommand" >> "$mainInput"
                                                         	echo "$currentCommandCondition" >> "$auxInput"
                                                 	else
-                                                        	commansdArray+=($currentCommand)
+                                                        	commandsArray+=($currentCommand)
                                                         	commandsConditionArray+=($currentCommandCondition)
                                                 	fi
                                                 	mainItemCount=$((mainItemCount+1))
@@ -982,13 +985,15 @@ function ExecTasks {
 
 				if [ $executeCommand == true ]; then
                                         Logger "Running command [$currentCommand]." "DEBUG"
-                                        eval "$currentCommand" >> "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$callerName.$SCRIPT_PID.$TSTAMP" 2>&1 &
+                                        eval "$currentCommand" >> "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$id.$SCRIPT_PID.$TSTAMP" 2>&1 &
                                         pid=$!
                                         pidsArray+=($pid)
                                         commandsArrayPid[$pid]="$currentCommand"
 					#TODO not implemented
 					pidsTimeArray[$pid]=$((SECONDS - seconds_begin))
-                        	fi
+                        	else
+					Logger "Skipping command [$currentCommand]." "DEBUG"
+				fi
                         	counter=$((counter+1))
                 	done
 		fi
@@ -1007,7 +1012,7 @@ function ExecTasks {
 					wait $pid
 					retval=$?
 					if [ $retval -ne 0 ]; then
-						Logger "${FUNCNAME[0]} called by [$callerName] finished monitoring [$pid] [$currentCommad] with exitcode [$retval]." "DEBUG"
+						Logger "${FUNCNAME[0]} called by [$id] finished monitoring [$pid] [$currentCommad] with exitcode [$retval]." "DEBUG"
 						errorcount=$((errorcount+1))
 						# Welcome to variable variable bash hell
 						if [ "$(eval echo \"\$WAIT_FOR_TASK_COMPLETION_$id\")" == "" ]; then
@@ -1016,7 +1021,7 @@ function ExecTasks {
 							eval "WAIT_FOR_TASK_COMPLETION_$id=\";$pid:$retval\""
 						fi
 					else
-						Logger "${FUNCNAME[0]} called by [$callerName] finished monitoring [$pid] [$currentCommand] with exitcode [$retval]." "DEBUG"
+						Logger "${FUNCNAME[0]} called by [$id] finished monitoring [$pid] [$currentCommand] with exitcode [$retval]." "DEBUG"
 					fi
 				fi
 			fi
@@ -1032,9 +1037,10 @@ function ExecTasks {
 
 	# Return exit code if only one process was monitored, else return number of errors
 	# As we cannot return multiple values, a global variable WAIT_FOR_TASK_COMPLETION contains all pids with their return value
-	if [ $noErrorLogAtAll == true ]; then
-		return 0
-	fi
+	#WIP: return code has nothing to do with logging
+	#if [ $noErrorLogAtAll == true ]; then
+	#	return 0
+	#fi
 
 	if [ $mainItemCount -eq 1 ]; then
 		return $retval
