@@ -3,7 +3,7 @@
 #### OFUNCTIONS MINI SUBSET ####
 
 _OFUNCTIONS_VERSION=2.2.0-dev
-_OFUNCTIONS_BUILD=2018010302
+_OFUNCTIONS_BUILD=2018010303
 #### _OFUNCTIONS_BOOTSTRAP SUBSET ####
 _OFUNCTIONS_BOOTSTRAP=true
 #### _OFUNCTIONS_BOOTSTRAP SUBSET END ####
@@ -740,6 +740,8 @@ function ParallelExec {
 	# conditions="[ -d /var ];[ -d /etc ];[ -d /home];[ -d /usr]"
 	# ExecTasks "some_identifier" 0 0 300 900 1 1800 true true false false 4 "$commands" "$conditions" 3
 
+	# ParallelExecMode also creates output for commands in "$RUN_DIR/$PROGRAM.ExecTasks.$id.$SCRIPT_PID.$TSTAMP"
+
 ## ofunctions.sh subfunction requirements:
 ## Spinner
 ## Logger
@@ -766,8 +768,6 @@ function ExecTasks {
         local numberOfProcesses="${15:-2}"	# Number of simultaneous commands to run in ParallExec mode
 
 	local i
-
-	local callerName="${FUNCNAME[1]}"
 
 	Logger "${FUNCNAME[0]} called in $execTasksMode mode by [${FUNCNAME[0]} < ${FUNCNAME[1]} < ${FUNCNAME[2]} < ${FUNCNAME[3]} < ${FUNCNAME[4]} ...]." "PARANOIA_DEBUG"	#__WITH_PARANOIA_DEBUG
 	__CheckArguments 13-15 $# "$@"																		#__WITH_PARANOIA_DEBUG
@@ -953,7 +953,7 @@ function ExecTasks {
 
 		if [ $exec_time -gt $softMaxTime ]; then
 			if [ "$softAlert" != true ] && [ $softMaxTime -ne 0 ] && [ $noTimeErrorLog != true ]; then
-				Logger "Max soft execution time exceeded for task [$callerName] with pids [$(joinString , ${pidsArray[@]})]." "WARN"
+				Logger "Max soft execution time exceeded for task [$id] with pids [$(joinString , ${pidsArray[@]})]." "WARN"
 				softAlert=true
 				SendAlert true
 			fi
@@ -961,7 +961,7 @@ function ExecTasks {
 
 		if [ $exec_time -gt $hardMaxTime ] && [ $hardMaxTime -ne 0 ]; then
 			if [ $noTimeErrorLog != true ]; then
-				Logger "Max hard execution time exceeded for task [$callerName] with pids [$(joinString , ${pidsArray[@]})]. Stopping task execution." "ERROR"
+				Logger "Max hard execution time exceeded for task [$id] with pids [$(joinString , ${pidsArray[@]})]. Stopping task execution." "ERROR"
 			fi
 			for pid in "${pidsArray[@]}"; do
 				KillChilds $pid true
@@ -1030,7 +1030,7 @@ function ExecTasks {
 
 				if [ $executeCommand == true ]; then
                                         Logger "Running command [$currentCommand]." "DEBUG"
-                                        eval "$currentCommand" >> "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$callerName.$SCRIPT_PID.$TSTAMP" 2>&1 &
+                                        eval "$currentCommand" >> "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$id.$SCRIPT_PID.$TSTAMP" 2>&1 &
                                         pid=$!
                                         pidsArray+=($pid)
                                         commandsArrayPid[$pid]="$currentCommand"
@@ -1057,7 +1057,7 @@ function ExecTasks {
 					wait $pid
 					retval=$?
 					if [ $retval -ne 0 ]; then
-						Logger "${FUNCNAME[0]} called by [$callerName] finished monitoring [$pid] [$currentCommad] with exitcode [$retval]." "DEBUG"
+						Logger "${FUNCNAME[0]} called by [$id] finished monitoring [$pid] [$currentCommad] with exitcode [$retval]." "DEBUG"
 						errorcount=$((errorcount+1))
 						# Welcome to variable variable bash hell
 						if [ "$(eval echo \"\$WAIT_FOR_TASK_COMPLETION_$id\")" == "" ]; then
@@ -1066,7 +1066,7 @@ function ExecTasks {
 							eval "WAIT_FOR_TASK_COMPLETION_$id=\";$pid:$retval\""
 						fi
 					else
-						Logger "${FUNCNAME[0]} called by [$callerName] finished monitoring [$pid] [$currentCommand] with exitcode [$retval]." "DEBUG"
+						Logger "${FUNCNAME[0]} called by [$id] finished monitoring [$pid] [$currentCommand] with exitcode [$retval]." "DEBUG"
 					fi
 				fi
 				hasPids=true					##__WITH_PARANOIA_DEBUG
@@ -1086,7 +1086,7 @@ function ExecTasks {
 		fi								##__WITH_PARANOIA_DEBUG
 	done
 
-	Logger "${FUNCNAME[0]} ended for [$callerName] using [$mainItemCount] subprocesses with [$errorcount] errors." "PARANOIA_DEBUG"	#__WITH_PARANOIA_DEBUG
+	Logger "${FUNCNAME[0]} ended for [$id] using [$mainItemCount] subprocesses with [$errorcount] errors." "PARANOIA_DEBUG"	#__WITH_PARANOIA_DEBUG
 
 	# Return exit code if only one process was monitored, else return number of errors
 	# As we cannot return multiple values, a global variable WAIT_FOR_TASK_COMPLETION contains all pids with their return value
