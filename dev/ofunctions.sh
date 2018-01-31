@@ -3,7 +3,7 @@
 #### OFUNCTIONS MINI SUBSET ####
 
 _OFUNCTIONS_VERSION=2.2.0-dev
-_OFUNCTIONS_BUILD=2018010303
+_OFUNCTIONS_BUILD=2018013101
 #### _OFUNCTIONS_BOOTSTRAP SUBSET ####
 _OFUNCTIONS_BOOTSTRAP=true
 #### _OFUNCTIONS_BOOTSTRAP SUBSET END ####
@@ -1441,6 +1441,11 @@ function GetOs {
 GetOs
 
 ENDSSH
+	if [ $? != 0 ]; then
+		Logger "Cannot connect to remote system [$REMOTE_HOST] port [$REMOTE_PORT]." "CRITICAL"
+		exit 1
+	fi
+
 
 	if [ -f "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$SCRIPT_PID.$TSTAMP" ]; then
 		remoteOsVar=$(cat "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$SCRIPT_PID.$TSTAMP")
