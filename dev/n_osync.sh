@@ -8,7 +8,7 @@ PROGRAM="osync" # Rsync based two way sync engine with fault tolerance
 AUTHOR="(C) 2013-2017 by Orsiris de Jong"
 CONTACT="http://www.netpower.fr/osync - ozy@netpower.fr"
 PROGRAM_VERSION=1.2.5-dev
-PROGRAM_BUILD=2018022002
+PROGRAM_BUILD=2018022003
 IS_STABLE=no
 
 
@@ -2511,6 +2511,9 @@ function SyncOnChanges {
 		elif [ $retval -eq 1 ]; then
 			Logger "#### inotify error detected, waiting $MIN_WAIT seconds before running next sync." "ERROR" $retval
 			sleep $MIN_WAIT
+		elif [ $retval -eq 127 ]; then
+			Logger "inotifywait could not load succesfully. Please check if all necessary libraries for inotifywait are present." "CRITICAL"
+			exit 1
 		fi
 	done
 
