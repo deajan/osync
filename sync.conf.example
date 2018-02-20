@@ -85,6 +85,7 @@ REMOTE_3RD_PARTY_HOSTS="www.kernel.org www.google.com"
 ## Optional arguments passed to rsync executable. The following are already managed by the program and shoul never be passed here
 ## -r -l -p -t -g -o -D -E - u- i- n --executability -A -X -L -K -H -8 -zz –skip-compress –checksum –bwlimit –partial –partial-dir –no-whole-file –whole-file –backup –backup-dir –suffix
 ## --exclude --exclude-from --include --include-from --list-only --stats
+## When dealing with different filesystems for sync, or using SMB mountpoints, try adding --modify-window=2 --omit-dir-times as optional arguments.
 RSYNC_OPTIONAL_ARGS=""
 
 ## Preserve basic linux permissions
