@@ -36,14 +36,14 @@ if [ ! -w $(dirname $pidfile) ]; then
 fi
 
 start() {
-	if [ ! -f $confdir/*.conf ]; then
+	if ! ls "$confdir/"*.conf > /dev/null 2>&1; then
 		echo "Cannot find any configuration files in $confdir."
 		exit 1
 	fi
 
 	errno=0
 
-	for cfgfile in $confdir/*.conf
+	for cfgfile in "$confdir/"*.conf
 	do
 		if [ -f $progpath/$progexec ]; then
 			$progpath/$progexec $cfgfile --on-changes --errors-only > /dev/null 2>&1 &
