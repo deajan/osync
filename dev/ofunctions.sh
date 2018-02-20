@@ -9,8 +9,8 @@
 #done: SendMail and SendEmail convert functions inverted, check on osync and obackup
 #command line arguments don't take -AaqV for example
 
-_OFUNCTIONS_VERSION=2.2.0-dev
-_OFUNCTIONS_BUILD=2018013101
+_OFUNCTIONS_VERSION=2.3.0-dev
+_OFUNCTIONS_BUILD=2018022001
 #### _OFUNCTIONS_BOOTSTRAP SUBSET ####
 _OFUNCTIONS_BOOTSTRAP=true
 #### _OFUNCTIONS_BOOTSTRAP SUBSET END ####
@@ -1985,10 +1985,12 @@ function InitLocalOSDependingSettings {
 		# Tested on BSD and Mac
 		STAT_CMD="stat -f \"%Sm\""
 		STAT_CTIME_MTIME_CMD="stat -f %N;%c;%m"
+		SED_REGEX_ARG="-E"
 	else
 		# Tested on GNU stat, busybox and Cygwin
 		STAT_CMD="stat -c %y"
 		STAT_CTIME_MTIME_CMD="stat -c %n;%Z;%Y"
+		SED_REGEX_ARG="-r"
 	fi
 
 	# Set compression first time when we know what local os we have
