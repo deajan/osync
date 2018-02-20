@@ -8,8 +8,15 @@ PROGRAM_BUILD=2017061901
 IS_STABLE=no
 
 
-_OFUNCTIONS_VERSION=2.2.0-dev
-_OFUNCTIONS_BUILD=2018010303
+#TODO: ExecTasks postponed arrays / files grow a lot. Consider having them "rolling"
+#done: add checkRFC function (and use it for --destination-mails)
+#done: ExecTasks still needs some better call argument list
+#done: ExecTasks sub function relocate
+#done: SendMail and SendEmail convert functions inverted, check on osync and obackup
+#command line arguments don't take -AaqV for example
+
+_OFUNCTIONS_VERSION=2.3.0-dev
+_OFUNCTIONS_BUILD=2018022001
 _OFUNCTIONS_BOOTSTRAP=true
 
 ## BEGIN Generic bash functions written in 2013-2017 by Orsiris de Jong - http://www.netpower.fr - ozy@netpower.fr
@@ -390,14 +397,8 @@ function SendAlert {
 	else
 		attachment=true
 	fi
-	if [ -e "$RUN_DIR/$PROGRAM._Logger.$SCRIPT_PID.$TSTAMP" ]; then
-		if [ "$MAIL_BODY_CHARSET" != "" ] && type iconv > /dev/null 2>&1; then
-			iconv -f UTF-8 -t $MAIL_BODY_CHARSET "$RUN_DIR/$PROGRAM._Logger.$SCRIPT_PID.$TSTAMP" > "$RUN_DIR/$PROGRAM._Logger.iconv.$SCRIPT_PID.$TSTAMP"
-			body="$MAIL_ALERT_MSG"$'\n\n'"$(cat $RUN_DIR/$PROGRAM._Logger.iconv.$SCRIPT_PID.$TSTAMP)"
-		else
-			body="$MAIL_ALERT_MSG"$'\n\n'"$(cat $RUN_DIR/$PROGRAM._Logger.$SCRIPT_PID.$TSTAMP)"
-		fi
-	fi
+
+	body="$MAIL_ALERT_MSG"$'\n\n'"Last 1000 lines of log"$'\n\n'"$(tail -n 1000 $RUN_DIR/$PROGRAM._Logger.$SCRIPT_PID.$TSTAMP)"
 
 	if [ $ERROR_ALERT == true ]; then
 		subject="Error alert for $INSTANCE_ID"
@@ -454,6 +455,24 @@ function SendEmail {
 
 	local encryption_string=
 	local auth_string=
+
+	local i
+
+	for i in "${destinationMails}"; do
+		if [ $(CheckRFC822 "$i") -ne 1 ]; then
+			Logger "Given email [$i] does not seem to be valid." "WARN"
+		fi
+	done
+
+	# Prior to sending an email, convert its body if needed
+	if [ "$MAIL_BODY_CHARSET" != "" ]; then
+		if type iconv > /dev/null 2>&1; then
+			echo "$message" | iconv -f UTF-8 -t $MAIL_BODY_CHARSET -o "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.iconv.$SCRIPT_PID.$TSTAMP"
+			message="$(cat $RUN_DIR/$PROGRAM.${FUNCNAME[0]}.iconv.$SCRIPT_PID.$TSTAMP)"
+		else
+			Logger "iconv utility not installed. Will not convert email charset." "NOTICE"
+		fi
+	fi
 
 	if [ ! -f "$attachment" ]; then
 		attachment_command="-a $attachment"
@@ -626,7 +645,6 @@ function Spinner {
 		return 0
 	else
 		printf " [%c]  \b\b\b\b\b\b" "$_OFUNCTIONS_SPINNER"
-		#printf "\b\b\b\b\b\b"
 		_OFUNCTIONS_SPINNER=${_OFUNCTIONS_SPINNER#?}${_OFUNCTIONS_SPINNER%%???}
 		return 0
 	fi
@@ -634,142 +652,150 @@ function Spinner {
 
 # WaitForTaskCompletion function emulation, now uses ExecTasks
 function WaitForTaskCompletion {
-        local pids="${1}"
-        local softMaxTime="${2:-0}"
-        local hardMaxTime="${3:-0}"
-        local sleepTime="${4:-.05}"
-        local keepLogging="${5:-0}"
-        local counting="${6:-true}"
-        local spinner="${7:-true}"
-        local noErrorLog="${8:-false}"
-        local id="${9-base}"
+	local pids="${1}"
+	local softMaxTime="${2:-0}"
+	local hardMaxTime="${3:-0}"
+	local sleepTime="${4:-.05}"
+	local keepLogging="${5:-0}"
+	local counting="${6:-true}"
+	local spinner="${7:-true}"
+	local noErrorLog="${8:-false}"
+	local id="${9-base}"
 
-	ExecTasks "$id" 0 0 "$softMaxTime" "$hardMaxTime" "$sleepTime" "$keepLogging" "$counting" "$spinner" "$noErrorlog" false 1 "$pids" "" ""
+	ExecTasks "$pids" "$id" false 0 0 "$softMaxTime" "$hardMaxTime" "$counting" "$sleepTime" "$keepLogging" "$spinner" "$noErrorlog"
 }
 
 # ParallelExec function emulation, now uses ExecTasks
 function ParallelExec {
-        local numberOfProcesses="${1}"
-        local commandsArg="${2}"
-        local readFromFile="${3:-false}"
-        local softMaxTime="${4:-0}"
-        local hardMaxTime="${5:-0}"
-        local sleepTime="${6:-.05}"
-        local keepLogging="${7:-0}"
-        local counting="${8:-true}"
-        local spinner="${9:-false}"
-        local noErrorLog="${10:-false}"
+	local numberOfProcesses="${1}"
+	local commandsArg="${2}"
+	local readFromFile="${3:-false}"
+	local softMaxTime="${4:-0}"
+	local hardMaxTime="${5:-0}"
+	local sleepTime="${6:-.05}"
+	local keepLogging="${7:-0}"
+	local counting="${8:-true}"
+	local spinner="${9:-false}"
+	local noErrorLog="${10:-false}"
 
 	if [ $readFromFile == true ]; then
-		ExecTasks "base" 0 0 "$softMaxTime" "$hardMaxTime" "$sleepTime" "$keepLogging" "$counting" "$spinner" "$noErrorLog" false 6 "$commandsArg" "" "$numberOfProcesses"
+		ExecTasks "$commandsArg" "base" $readFromFile 0 0 "$softMaxTime" "$hardMaxTime" "$counting" "$sleepTime" "$keepLogging" "$spinner" "$noErrorLog" false "$numberOfProcesses"
 	else
-		ExecTasks "base" 0 0 "$softMaxTime" "$hardMaxTime" "$sleepTime" "$keepLogging" "$counting" "$spinner" "$noErrorLog" false 3 "$commandsArg" "" "$numberOfProcesses"
+		ExecTasks "$commandsArg" "base" $readFromFile 0 0 "$softMaxTime" "$hardMaxTime" "$counting" "$sleepTime" "$keepLogging" "$spinner" "$noErrorLog" false "$numberOfProcesses"
 	fi
 }
 
 ## Main asynchronous execution function
-## This function can monitor given pids as background processes, and stop them if max execution time is reached. Suitable for multiple synchronous processes.
-## It can also take a list of commands to execute in parallel, and stop them if max execution time is reached.
+## Function can work in:
+## WaitForTaskCompletion mode: monitors given pid in background, and stops them if max execution time is reached. Suitable for multiple synchronous pids to monitor and wait for
+## ParallExec mode: takes list of commands to execute in parallel per batch, and stops them if max execution time is reahed.
 
-## Function has 8 execution modes
+## Example of improved wait $!
+## ExecTasks $! "some_identifier" false 0 0 0 0 true 1 1800 false
+## Example: monitor two sleep processes, warn if execution time is higher than 10 seconds, stop after 20 seconds
+## sleep 15 &
+## pid=$!
+## sleep 20 &
+## pid2=$!
+## ExecTasks "some_identifier" 0 0 10 20 1 1800 true true false false 1 "$pid;$pid2"
 
-	# WaitForTaskCompletion mode: Monitor given pids as background processes, stop them if max execution time is reached. Suitaable for multiple synhronous processes.
-	# 1 : WaitForTaskCompletion, semi-colon separated list of pids to monitor
-	# 2 : WaitForTaskCompletion, list of pids to monior, from file, one per line
+## Example of parallel execution of four commands, only if directories exist. Warn if execution takes more than 300 seconds. Stop if takes longer than 900 seconds. Exeute max 3 commands in parallel.
+## commands="du -csh /var;du -csh /etc;du -csh /home;du -csh /usr"
+## conditions="[ -d /var ];[ -d /etc ];[ -d /home];[ -d /usr]"
+## ExecTasks "$commands" "some_identifier" false 0 0 300 900 true 1 1800 true false false 3 "$conditions"
 
-	# Example of improved wait $! emulation
-	# ExecTasks "some_identifier" 0 0 0 0 1 1800 true false true true 1 $!
-	# Example: monitor two sleep processes, warn if execution time is higher than 10 seconds, stop after 20 seconds
-	# sleep 15 &
-	# pid=$!
-	# sleep 20 &
-	# pid2=$!
-	# ExecTasks "some_identifier" 0 0 10 20 1 1800 true true false false 1 "$pid;$pid2"
+## Bear in mind that given commands and conditions need to be quoted
 
-	# ParallelExecMode: Take list of commands to execute in parallel, stop them if max execution time is reached.
-	# Also take optional conditional arguments to verifiy before execution main commands. Conditional command exit code 0 means ready to execute. Other exit codes will ignore/postpone main command.
-	# 3 : ParallelExec, semi-colon separated list of commands to execute in parallel, no conditions
-	# 4 : ParallelExec, semi-colon separated list of commands to execute in parallel , semi-colon separated list of conditional commands, ignoring main commands on condition failures
-	# 5 : ParallelExec, semi-colon separated list of commands, semi-colon separated list of conditional commands, postponing main commands on condition failures
-	# 6 : ParallelExec, list of commands from file, one per line, no conditions
-	# 7 : ParallelExec, list of commands from file, one per line, list of conditional commands from file, one per line, ignoring main commands on condition failures
-	# 8 : ParallelExec, list of commands from file, one per line, list of conditional commands from file, one per line, postponing main commands on condition failures
-
-	# Exmaple: execute four du commands, only if directories exist, warn if execution takes more than 300 seconds, stop if takes longer than 900 seconds. Execute max 3 commands in parallel.
-	# commands="du -csh /var;du -csh /etc;du -csh /home;du -csh /usr"
-	# conditions="[ -d /var ];[ -d /etc ];[ -d /home];[ -d /usr]"
-	# ExecTasks "some_identifier" 0 0 300 900 1 1800 true true false false 4 "$commands" "$conditions" 3
-
-	# ParallelExecMode also creates output for commands in "$RUN_DIR/$PROGRAM.ExecTasks.$id.$SCRIPT_PID.$TSTAMP"
-
-## ofunctions.sh subfunction requirements:
+## ExecTasks has the following ofunctions subfunction requirements:
 ## Spinner
 ## Logger
 ## JoinString
 ## KillChilds
 
+## Full call
+##ExecTasks "$mainInput" "$id" $readFromFile $softPerProcessTime $hardPerProcessTime $softMaxTime $hardMaxTime $counting $sleepTime $keepLogging $spinner $noTimeErrorLog $noErrorLogsAtAll $numberOfProcesses $auxInput $maxPostponeRetries $minTimeBetweenRetries $validExitCodes
+
 function ExecTasks {
-	local id="${1:-base}"			# Optional ID in order to identify global variables from this run (only bash variable names, no '-'). Global variables are WAIT_FOR_TASK_COMPLETION_$id and HARD_MAX_EXEC_TIME_REACHED_$id
-	#TODO: not implemented yet
-	local softPerProcessTime="${2:-0}"
-	local hardPerProcessTime="${3:-0}"
-	local softMaxTime="${4:-0}"		# If process(es) with pid(s) $pids take longer than $softMaxTime seconds, will log a warning, unless $softMaxTime equals 0.
-	local hardMaxTime="${5:-0}"		# If process(es) with pid(s) $pids take longer than $hardMaxTime seconds, will stop execution, unless $hardMaxTime equals 0.
-	local sleepTime="${6:-.05}"		# Seconds between each state check, the shorter this value, the snappier it will be, but as a tradeoff cpu power will be used (general values between .05 and 1).
-	local keepLogging="${7:-0}"		# Every keepLogging seconds, an alive message is logged. Setting this value to zero disables any alive logging.
-	local counting="${8:-true}"		# Count time since function has been launched (true), or since script has been launched (false)
-	local spinner="${9:-true}"		# Show spinner (true), do not show anything (false)
-	local noTimeErrorLog="${10:-false}"	# Log errors when reaching soft / hard max time (false), do not log errors on those triggers (true)
-	#TODO not implemented
-	local noErrorLogAtAll="${11:-false}"	# Do not log errros at all (false)
-	local execTasksMode="${12:-1}"		# In which mode the function should work, see above
-	local mainInput="${13}"			# Contains list of pids / commands or filepath to list of pids / commands
-	local auxInput="${14}"			# Contains list of conditional commands or filepath to list of conditional commands
-        local numberOfProcesses="${15:-2}"	# Number of simultaneous commands to run in ParallExec mode
+	# Mandatory arguments
+	local mainInput="${1}"                          # Contains list of pids / commands separated by semicolons or filepath to list of pids / commands
+
+	# Optional arguments
+	local id="${2:-base}"                           # Optional ID in order to identify global variables from this run (only bash variable names, no '-'). Global variables are WAIT_FOR_TASK_COMPLETION_$id and HARD_MAX_EXEC_TIME_REACHED_$id
+	local readFromFile="${3:-false}"                # Is mainInput / auxInput a semicolon separated list (true) or a filepath (false)
+	local softPerProcessTime="${4:-0}"              # Max time (in seconds) a pid or command can run before a warning is logged, unless set to 0
+	local hardPerProcessTime="${5:-0}"              # Max time (in seconds) a pid or command can run before the given command / pid is stopped, unless set to 0
+	local softMaxTime="${6:-0}"                     # Max time (in seconds) for the whole function to run before a warning is logged, unless set to 0
+	local hardMaxTime="${7:-0}"                     # Max time (in seconds) for the whole function to run before all pids / commands given are stopped, unless set to 0
+	local counting="${8:-true}"                     # Should softMaxTime and hardMaxTime be accounted since function begin (true) or since script begin (false)
+	local sleepTime="${9:-.5}"                      # Seconds between each state check. The shorter the value, the snappier ExecTasks will be, but as a tradeoff, more cpu power will be used (good values are between .05 and 1)
+	local keepLogging="${10:-1800}"                 # Every keepLogging seconds, an alive message is logged. Setting this value to zero disables any alive logging
+	local spinner="${11:-true}"                     # Show spinner (true) or do not show anything (false) while running
+	local noTimeErrorLog="${12:-false}"             # Log errors when reaching soft / hard execution times (false) or do not log errors on those triggers (true)
+	local noErrorLogsAtAll="${13:-false}"           # Do not log any errros at all (useful for recursive ExecTasks checks)
+
+	# Parallelism specific arguments
+	local numberOfProcesses="${14:-0}"              # Number of simulanteous commands to run, given as mainInput. Set to 0 by default (WaitForTaskCompletion mode). Setting this value enables ParallelExec mode.
+	local auxInput="${15}"                          # Contains list of commands separated by semicolons or filepath fo list of commands. Exit code of those commands decide whether main commands will be executed or not
+	local maxPostponeRetries="${16:-3}"             # If a conditional command fails, how many times shall we try to postpone the associated main command. Set this to 0 to disable postponing
+	local minTimeBetweenRetries="${17:-300}"        # Time (in seconds) between postponed command retries
+	local validExitCodes="${18:-0}"                 # Semi colon separated list of valid main command exit codes which will not trigger errors
 
 	local i
 
 
-	# Since ExecTasks takes up to 15 arguments, do a quick preflight check in DEBUG mode
+	# Since ExecTasks takes up to 17 arguments, do a quick preflight check in DEBUG mode
 	if [ "$_DEBUG" == "yes" ]; then
-        	declare -a booleans=(counting spinner noTimeErrorLog noErrorLogAtAll)
-        	for i in "${num_vars[@]}"; do
-                	test="if [ $i != false ] && [ $i != true ]; then Logger \"Bogus $i value [\$$i] given to ${FUNCNAME[0]}.\" \"CRITICAL\"; exit 1; fi"
-                	eval "$test"
-        	done
-		declare -a integers=(softPerProcessTime hardPerProcessTime softMaxTime hardMaxTime keepLogging execTasksMode numberOfProcesses)
+		declare -a booleans=(readFromFile counting spinner noTimeErrorLog noErrorLogsAtAll)
+		for i in "${booleans[@]}"; do
+			test="if [ \$$i != false ] && [ \$$i != true ]; then Logger \"Bogus $i value [\$$i] given to ${FUNCNAME[0]}.\" \"CRITICAL\"; exit 1; fi"
+			eval "$test"
+		done
+		declare -a integers=(softPerProcessTime hardPerProcessTime softMaxTime hardMaxTime keepLogging numberOfProcesses maxPostponeRetries minTimeBetweenRetries)
 		for i in "${integers[@]}"; do
 			test="if [ $(IsNumericExpand \"\$$i\") -eq 0 ]; then Logger \"Bogus $i value [\$$i] given to ${FUNCNAME[0]}.\" \"CRITICAL\"; exit 1; fi"
 			eval "$test"
 		done
 	fi
 
+	# Change '-' to '_' in task id
+	id="${id/-/_}"
+
+	# Expand validExitCodes into array
+	IFS=';' read -r -a validExitCodes <<< "$validExitCodes"
+
 	# ParallelExec specific variables
-	local auxItemCount=0		# Number of conditional commands
-	local commandsArray=()		# Array containing commands
-	local commandsConditionArray=()	# Array containing conditional commands
-	local currentCommand		# Variable containing currently processed command
-	local currentCommandCondition	# Variable containing currently processed conditional command
-	local commandsArrayPid		# Array containing pids of commands currently run
-	local postPoneIfConditionFails	# Boolean to check if command needs to be postponed if condition command fails
+	local auxItemCount=0            # Number of conditional commands
+	local commandsArray=()          # Array containing commands
+	local commandsConditionArray=() # Array containing conditional commands
+	local currentCommand            # Variable containing currently processed command
+	local currentCommandCondition   # Variable containing currently processed conditional command
+	local commandsArrayPid=()       # Array containing pids of commands currently run
+	local postponedRetryCount=0     # Number of current postponed commands retries
+	local postponedItemCount=0      # Number of commands that have been postponed (keep at least one in order to check once)
+	local postponedCounter=0
+	local isPostponedCommand=false  # Is the current command from a postponed file ?
+	local postponedExecTime=0       # How much time has passed since last postponed condition was checked
+	local needsPostponing           # Does currentCommand need to be postponed
+	local temp
 
 	# Common variables
-	local pid			# Current pid working on
-	local pidState 			# State of the process
-	local mainItemCount=0 		# number of given items (pids or commands)
-	local readFromFile		# Should we read pids / commands from a file (true)
- 	local counter=0
-	local log_ttime=0		# local time instance for comparaison
+	local pid                       # Current pid working on
+	local pidState                  # State of the process
+	local mainItemCount=0           # number of given items (pids or commands)
+	local readFromFile              # Should we read pids / commands from a file (true)
+	local counter=0
+	local log_ttime=0               # local time instance for comparaison
 
-	local seconds_begin=$SECONDS	# Seconds since the beginning of the script
-	local exec_time=0		# Seconds since the beginning of this function
+	local seconds_begin=$SECONDS    # Seconds since the beginning of the script
+	local exec_time=0               # Seconds since the beginning of this function
 
-	local retval=0			# return value of monitored pid process
-	local errorcount=0		# Number of pids that finished with errors
-	local pidsArray			# Array of currently running pids
-	local newPidsArray		# New array of currently running pids for next iteration
-	local pidsTimeArray		# Array containing execution begin time of pids
-	local executeCommand		# Boolean to check if currentCommand can be executed given a condition
+	local retval=0                  # return value of monitored pid process
+	local subRetval=0               # return value of condition commands
+	local errorcount=0              # Number of pids that finished with errors
+	local pidsArray                 # Array of currently running pids
+	local newPidsArray              # New array of currently running pids for next iteration
+	local pidsTimeArray             # Array containing execution begin time of pids
+	local executeCommand            # Boolean to check if currentCommand can be executed given a condition
 
 
 	local functionMode
@@ -784,100 +810,46 @@ function ExecTasks {
 	eval "WAIT_FOR_TASK_COMPLETION_$id=\"\""
 	eval "HARD_MAX_EXEC_TIME_REACHED_$id=false"
 
-	case $execTasksMode in
-		1)
-		IFS=';' read -r -a pidsArray <<< "$mainInput"
-		mainItemCount=${#pidsArray[@]}
-		readFromFile=false
+	# Init function variables depending on mode
+
+	if [ $numberOfProcesses -gt 0 ]; then
+		functionMode=ParallelExec
+	else
 		functionMode=WaitForTaskCompletion
-		# Force while condition to be true
-		counter=$mainItemCount
-		;;
-		2)
+	fi
+
+	if [ $readFromFile == false ]; then
+		if [ $functionMode == "WaitForTaskCompletion" ]; then
+			IFS=';' read -r -a pidsArray <<< "$mainInput"
+			mainItemCount="${#pidsArray[@]}"
+		else
+			IFS=';' read -r -a commandsArray <<< "$mainInput"
+			mainItemCount="${#commandsArray[@]}"
+			IFS=';' read -r -a commandsConditionArray <<< "$auxInput"
+			auxItemCount="${#commandsConditionArray[@]}"
+		fi
+	else
 		if [ -f "$mainInput" ]; then
-                        mainItemCount=$(wc -l < "$mainInput")
+			mainItemCount=$(wc -l < "$mainInput")
 			readFromFile=true
-                else
+		else
 			Logger "Cannot read file [$mainInput]." "WARN"
-                fi
-		functionMode=WaitForTaskCompletion
-		# Force while condition to be true
-		counter=$mainItemCount
-		;;
-		3)
-		IFS=';' read -r -a commandsArray <<< "$mainInput"
-                mainItemCount=${#commandsArray[@]}
-		readFromFile=false
-		functionMode=ParallelExec
-		;;
-		4)
-		IFS=';' read -r -a commandsArray <<< "$mainInput"
-                mainItemCount=${#commandsArray[@]}
-                IFS=';' read -r -a commandsConditionArray <<< "$auxInput"
-                auxItemCount=${#commandsConditionArray[@]}
-		readFromFile=false
-		postPoneIfConditionFails=false
-		functionMode=ParallelExec
-		;;
-		5)
-		IFS=';' read -r -a commandsArray <<< "$mainInput"
-                mainItemCount=${#commandsArray[@]}
-                IFS=';' read -r -a commandsConditionArray <<< "$auxInput"
-                auxItemCount=${#commandsConditionArray[@]}
-		readFromFile=false
-		postPoneIfConditionFails=true
-		functionMode=ParallelExec
-		;;
-		6)
-		if [ -f "$mainInput" ]; then
-                        mainItemCount=$(wc -l < "$mainInput")
-			readFromFile=true
-                else
-			Logger "Cannot read file [$mainInput]." "WARN"
-                fi
-		functionMode=ParallelExec
-		;;
-		7)
-		if [ -f "$mainInput" ]; then
-                        mainItemCount=$(wc -l < "$mainInput")
-			readFromFile=true
-                else
-			Logger "Cannot read file [$mainInput]." "WARN"
-                fi
-                if [ -f "$auxInput" ]; then
-                        auxItemCount=$(wc -l < "$auxInput")
-                else
+		fi
+		if [ -f "$auxInput" ]; then
+			auxItemCount=$(wc -l < "$auxInput")
+		else
 			Logger "Cannot read file [$auxInput]." "WARN"
-                fi
-		postPoneIfConditionFails=false
-		functionMode=ParallelExec
-		;;
-		8)
-		if [ -f "$mainInput" ]; then
-                        mainItemCount=$(wc -l < "$mainInput")
-			readFromFile=true
-                else
-			Logger "Cannot read file [$mainInput]." "WARN"
-                fi
-                if [ -f "$auxInput" ]; then
-                        auxItemCount=$(wc -l < "$auxInput")
-                else
-			Logger "Cannot read file [$auxInput]." "WARN"
-                fi
-		postPoneIfConditionFails=true
-		functionMode=ParallelExec
-		;;
-		*)
-		Logger "Unknown exec mode for ${FUNCNAME}." "CRITICAL"
-		exit 1
-	esac
+		fi
+	fi
+
+	if [ $functionMode == "WaitForTaskCompletion" ]; then
+		# Force first while loop condition to be true because we don't deal with counters but pids in WaitForTaskCompletion mode
+		counter=$mainItemCount
+	fi
 
 
-	#while [ ${#pidsArray[@]} -gt 0 ]; do
-	# The counter -lt mainItemCount has to be false for WaitForTaskCompletion modes
-	while [ ${#pidsArray[@]} -gt 0 ] || [ $counter -lt $mainItemCount ]; do
-		newPidsArray=()
-
+	# soft / hard execution time checks that needs to be a subfunction since it is called both from main loop and from parallelExec sub loop
+	function _ExecTasksTimeCheck {
 		if [ $spinner == true ]; then
 			Spinner
 		fi
@@ -888,13 +860,13 @@ function ExecTasks {
 		fi
 
 		if [ $keepLogging -ne 0 ]; then
-			if [ $((($exec_time + 1) % $keepLogging)) -eq 0 ]; then
+			if [ $(((exec_time + 1) % keepLogging)) -eq 0 ]; then
 				if [ $log_ttime -ne $exec_time ]; then # Fix when sleep time lower than 1 second
 					log_ttime=$exec_time
 					if [ $functionMode == "Wait" ]; then
 						Logger "Current tasks still running with pids [$(joinString , ${pidsArray[@]})]." "NOTICE"
 					elif [ $functionMode == "ParallelExec" ]; then
-						Logger "There are $((mainItemCount-counter)) / $mainItemCount tasks in the queue. Currently, ${#pidsArray[@]} tasks running with pids [$(joinString , ${pidsArray[@]})]." "NOTICE"
+						Logger "There are $((mainItemCount-counter+postponedItemCount)) / $mainItemCount tasks in the queue. Currently, ${#pidsArray[@]} tasks running with pids [$(joinString , ${pidsArray[@]})]." "NOTICE"
 					fi
 				fi
 			fi
@@ -902,7 +874,7 @@ function ExecTasks {
 
 		if [ $exec_time -gt $softMaxTime ]; then
 			if [ "$softAlert" != true ] && [ $softMaxTime -ne 0 ] && [ $noTimeErrorLog != true ]; then
-				Logger "Max soft execution time exceeded for task [$id] with pids [$(joinString , ${pidsArray[@]})]." "WARN"
+				Logger "Max soft execution time [$softMaxTime] exceeded for task [$id] with pids [$(joinString , ${pidsArray[@]})]." "WARN"
 				softAlert=true
 				SendAlert true
 			fi
@@ -910,14 +882,16 @@ function ExecTasks {
 
 		if [ $exec_time -gt $hardMaxTime ] && [ $hardMaxTime -ne 0 ]; then
 			if [ $noTimeErrorLog != true ]; then
-				Logger "Max hard execution time exceeded for task [$id] with pids [$(joinString , ${pidsArray[@]})]. Stopping task execution." "ERROR"
+				Logger "Max hard execution time [$hardMaxTime] exceeded for task [$id] with pids [$(joinString , ${pidsArray[@]})]. Stopping task execution." "ERROR"
 			fi
 			for pid in "${pidsArray[@]}"; do
 				KillChilds $pid true
 				if [ $? == 0 ]; then
 					Logger "Task with pid [$pid] stopped successfully." "NOTICE"
 				else
-					Logger "Could not stop task with pid [$pid]." "ERROR"
+					if [ $noErrorLogsAtAll != true ]; then
+						Logger "Could not stop task with pid [$pid]." "ERROR"
+					fi
 				fi
 				errorcount=$((errorcount+1))
 			done
@@ -927,70 +901,14 @@ function ExecTasks {
 			eval "HARD_MAX_EXEC_TIME_REACHED_$id=true"
 			if [ $functionMode == "WaitForTaskCompletion" ]; then
 				return $errorcount
-			elif [ $functionMode == "ParallelExec" ]; then
-				return $((mainItemCount - counter + ${#pidsArray[@]}))
+			else
+				return 129
 			fi
 		fi
+	}
 
-		# The following execution bloc is only needed in ParallelExec mode since WaitForTaskCompletion does not execute commands, but only monitors them
-		if [ $functionMode == "ParallelExec" ]; then
-			while [ $counter -lt "$mainItemCount" ] && [ ${#pidsArray[@]} -lt $numberOfProcesses ]; do
-        	                if [ $readFromFile == true ]; then
-               	                	currentCommand=$(awk 'NR == num_line {print; exit}' num_line=$((counter+1)) "$mainInput")
-					if [ $auxItemCount -ne 0 ]; then
-                                		currentCommandCondition=$(awk 'NR == num_line {print; exit}' num_line=$((counter+1)) "$auxInput")
-					fi
-                        	else
-                               		currentCommand="${commandsArray[$counter]}"
-					if [ $auxItemCount -ne 0 ]; then
-                                		currentCommandCondition="${commandsConditionArray[$counter]}"
-					fi
-                        	fi
-				executeCommand=false
-                        	if [ $auxItemCount -ne 0 ]; then
-                                	Logger "Checking condition [$currentCommandCondition] for command [$currentCommand]." "DEBUG"
-                                	eval "$currentCommandCondition" &
-					ExecTasks "subConditionCheck" 0 0 1800 3600 1 $KEEP_LOGGING true true true true 1 $!
-					retval=$?
-                                	if [ $retval -ne 0 ]; then
-                                        	if [ $postPoneIfConditionFails == true ]; then
-                                                	Logger "Condition not met for command [$currentCommand]. Postponing command." "NOTICE"
-                                                	if [ $readFromFile == true ]; then
-								# TODO: we should not write to the original file, but create a copy instead we can write postponed commands to
-                                                        	echo "$currentCommand" >> "$mainInput"
-                                                        	echo "$currentCommandCondition" >> "$auxInput"
-                                                	else
-                                                        	commandsArray+=($currentCommand)
-                                                        	commandsConditionArray+=($currentCommandCondition)
-                                                	fi
-                                                	mainItemCount=$((mainItemCount+1))
-
-                                                	# Trivial sleeptime so postponed commands will not stack too fast
-                                                	sleep $sleepTime
-                                        	else
-                                                	Logger "Condition not met for command [$currentCommand]. Ignoring command." "NOTICE"
-                                        	fi
-                                	else
-						executeCommand=true
-                                	fi
-                        	else
-					executeCommand=true
-				fi
-
-				if [ $executeCommand == true ]; then
-                                        Logger "Running command [$currentCommand]." "DEBUG"
-                                        eval "$currentCommand" >> "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$id.$SCRIPT_PID.$TSTAMP" 2>&1 &
-                                        pid=$!
-                                        pidsArray+=($pid)
-                                        commandsArrayPid[$pid]="$currentCommand"
-					#TODO not implemented
-					pidsTimeArray[$pid]=$((SECONDS - seconds_begin))
-                        	else
-					Logger "Skipping command [$currentCommand]." "DEBUG"
-				fi
-                        	counter=$((counter+1))
-                	done
-		fi
+	function _ExecTasksPidsCheck {
+		newPidsArray=()
 
 		for pid in "${pidsArray[@]}"; do
 			if [ $(IsInteger $pid) -eq 1 ]; then
@@ -998,15 +916,57 @@ function ExecTasks {
 					# Handle uninterruptible sleep state or zombies by ommiting them from running process array (How to kill that is already dead ? :)
 					pidState="$(eval $PROCESS_STATE_CMD)"
 					if [ "$pidState" != "D" ] && [ "$pidState" != "Z" ]; then
-						#TODO: implement pidsTimeArray[$pid] check here
+
+						# Check if pid hasn't run more than soft/hard perProcessTime
+						pidsTimeArray[$pid]=$((SECONDS - seconds_begin))
+						if [ ${pidsTimeArray[$pid]} -gt $softPerProcessTime ]; then
+							if [ "$softAlert" != true ] && [ $softPerProcessTime -ne 0 ] && [ $noTimeErrorLog != true ]; then
+								Logger "Max soft execution time [$softPerProcessTime]exceeded for pid [$pid]." "WARN"
+								if [ "${commandsArrayPid[$pid]}]" != "" ]; then
+									Logger "Command was [${commandsArrayPid[$pid]}]]." "WARN"
+								fi
+								softAlert=true
+								SendAlert true
+							fi
+						fi
+
+
+						if [ ${pidsTimeArray[$pid]} -gt $hardPerProcessTime ] && [ $hardPerProcessTime -ne 0 ]; then
+							if [ $noTimeErrorLog != true ] && [ $noErrorLogsAtAll != true ]; then
+								Logger "Max hard execution time [$hardPerProcessTime] exceeded for pid [$pid]. Stopping command execution." "ERROR"
+								if [ "${commandsArrayPid[$pid]}]" != "" ]; then
+									Logger "Command was [${commandsArrayPid[$pid]}]]." "WARN"
+								fi
+							fi
+							KillChilds $pid true
+							if [ $? == 0 ]; then
+								 Logger "Command with pid [$pid] stopped successfully." "NOTICE"
+							else
+								if [ $noErrorLogsAtAll != true ]; then
+								Logger "Could not stop command with pid [$pid]." "ERROR"
+								fi
+							fi
+							errorcount=$((errorcount+1))
+
+							if [ $noTimeErrorLog != true ]; then
+								SendAlert true
+							fi
+						fi
+
 						newPidsArray+=($pid)
 					fi
 				else
 					# pid is dead, get its exit code from wait command
 					wait $pid
 					retval=$?
-					if [ $retval -ne 0 ]; then
-						Logger "${FUNCNAME[0]} called by [$id] finished monitoring [$pid] [$currentCommad] with exitcode [$retval]." "DEBUG"
+					# Check for valid exit codes
+					if [ $(ArrayContains $retval "${validExitCodes[@]}") -eq 0 ]; then
+						if [ $noErrorLogsAtAll != true ]; then
+							Logger "${FUNCNAME[0]} called by [$id] finished monitoring pid [$pid] with exitcode [$retval]." "ERROR"
+							if [ "$functionMode" == "ParallelExec" ]; then
+								Logger "Command was [${commandsArrayPid[$pid]}]." "ERROR"
+							fi
+						fi
 						errorcount=$((errorcount+1))
 						# Welcome to variable variable bash hell
 						if [ "$(eval echo \"\$WAIT_FOR_TASK_COMPLETION_$id\")" == "" ]; then
@@ -1015,26 +975,156 @@ function ExecTasks {
 							eval "WAIT_FOR_TASK_COMPLETION_$id=\";$pid:$retval\""
 						fi
 					else
-						Logger "${FUNCNAME[0]} called by [$id] finished monitoring [$pid] [$currentCommand] with exitcode [$retval]." "DEBUG"
+						Logger "${FUNCNAME[0]} called by [$id] finished monitoring pid [$pid] with exitcode [$retval]." "DEBUG"
 					fi
 				fi
 			fi
 		done
 
+		# hasPids can be false on last iteration in ParallelExec mode
 		pidsArray=("${newPidsArray[@]}")
 
 		# Trivial wait time for bash to not eat up all CPU
 		sleep $sleepTime
 
+
+	}
+
+	while [ ${#pidsArray[@]} -gt 0 ] || [ $counter -lt $mainItemCount ] || [ $postponedItemCount -ne 0 ]; do
+		_ExecTasksTimeCheck
+		retval=$?
+		if [ $retval -ne 0 ]; then
+			return $retval;
+		fi
+
+		# The following execution bloc is only needed in ParallelExec mode since WaitForTaskCompletion does not execute commands, but only monitors them
+		if [ $functionMode == "ParallelExec" ]; then
+			while [ ${#pidsArray[@]} -lt $numberOfProcesses ] && ([ $counter -lt $mainItemCount ] || [ $postponedItemCount -ne 0 ]); do
+				_ExecTasksTimeCheck
+				retval=$?
+				if [ $retval -ne 0 ]; then
+					return $retval;
+				fi
+
+				executeCommand=false
+				isPostponedCommand=false
+				currentCommand=""
+				currentCommandCondition=""
+				needsPostponing=false
+
+				if [ $readFromFile == true ]; then
+					# awk identifies first line as 1 instead of 0 so we need to increase counter
+					currentCommand=$(awk 'NR == num_line {print; exit}' num_line=$((counter+1)) "$mainInput")
+					if [ $auxItemCount -ne 0 ]; then
+						currentCommandCondition=$(awk 'NR == num_line {print; exit}' num_line=$((counter+1)) "$auxInput")
+					fi
+
+					# Check if we need to fetch postponed commands
+					if [ "$currentCommand" == "" ]; then
+						currentCommand=$(awk 'NR == num_line {print; exit}' num_line=$((postponedCounter+1)) "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}-postponedMain.$id.$SCRIPT_PID.$TSTAMP")
+						currentCommandCondition=$(awk 'NR == num_line {print; exit}' num_line=$((postponedCounter+1)) "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}-postponedAux.$id.$SCRIPT_PID.$TSTAMP")
+						isPostponedCommand=true
+					fi
+				else
+					currentCommand="${commandsArray[$counter]}"
+					if [ $auxItemCount -ne 0 ]; then
+						currentCommandCondition="${commandsConditionArray[$counter]}"
+					fi
+
+					if [ "$currentCommand" == "" ]; then
+						currentCommand="${postponedCommandsArray[$postponedCounter]}"
+						currentCommandCondition="${postponedCommandsConditionArray[$postponedCounter]}"
+						isPostponedCommand=true
+					fi
+				fi
+
+				# Check if we execute postponed commands, or if we delay them
+				if [ $isPostponedCommand == true ]; then
+					# Get first value before '@'
+					postponedExecTime="${currentCommand%%@*}"
+					postponedExecTime=$((SECONDS-postponedExecTime))
+					# Get everything after first '@'
+					temp="${currentCommand#*@}"
+					# Get first value before '@'
+					postponedRetryCount="${temp%%@*}"
+					# Replace currentCommand with actual filtered currentCommand
+					currentCommand="${temp#*@}"
+
+					# Since we read a postponed command, we may decrase postponedItemCounter
+					postponedItemCount=$((postponedItemCount-1))
+					#Since we read one line, we need to increase the counter
+					postponedCounter=$((postponedCounter+1))
+
+				else
+					postponedRetryCount=0
+					postponedExecTime=0
+				fi
+				if ([ $postponedRetryCount -lt $maxPostponeRetries ] && [ $postponedExecTime -ge $((minTimeBetweenRetries)) ]) || [ $isPostponedCommand == false ]; then
+					if [ "$currentCommandCondition" != "" ]; then
+						Logger "Checking condition [$currentCommandCondition] for command [$currentCommand]." "DEBUG"
+						eval "$currentCommandCondition" &
+						ExecTasks $! "subConditionCheck" false 0 0 1800 3600 true $SLEEP_TIME $KEEP_LOGGING true true true
+						subRetval=$?
+						if [ $subRetval -ne 0 ]; then
+							# is postponing enabled ?
+							if [ $maxPostponeRetries -gt 0 ]; then
+								Logger "Condition [$currentCommandCondition] not met for command [$currentCommand]. Exit code [$subRetval]. Postponing command." "NOTICE"
+								postponedRetryCount=$((postponedRetryCount+1))
+								if [ $postponedRetryCount -ge $maxPostponeRetries ]; then
+									Logger "Max retries reached for postponed command [$currentCommand]. Skipping command." "NOTICE"
+								else
+									needsPostponing=true
+								fi
+								postponedExecTime=0
+							else
+								Logger "Condition [$currentCommandCondition] not met for command [$currentCommand]. Exit code [$subRetval]. Ignoring command." "NOTICE"
+							fi
+						else
+							executeCommand=true
+						fi
+					else
+						executeCommand=true
+					fi
+				else
+					needsPostponing=true
+				fi
+
+				if [ $needsPostponing == true ]; then
+					postponedItemCount=$((postponedItemCount+1))
+					if [ $readFromFile == true ]; then
+						echo "$((SECONDS-postponedExecTime))@$postponedRetryCount@$currentCommand" >> "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}-postponedMain.$id.$SCRIPT_PID.$TSTAMP"
+						echo "$currentCommandCondition" >> "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}-postponedAux.$id.$SCRIPT_PID.$TSTAMP"
+					else
+						postponedCommandsArray+=("$((SECONDS-postponedExecTime))@$postponedRetryCount@$currentCommand")
+						postponedCommandsConditionArray+=("$currentCommandCondition")
+					fi
+				fi
+
+				if [ $executeCommand == true ]; then
+					Logger "Running command [$currentCommand]." "DEBUG"
+					eval "$currentCommand" >> "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$id.$SCRIPT_PID.$TSTAMP" 2>&1 &
+					pid=$!
+					pidsArray+=($pid)
+					commandsArrayPid[$pid]="$currentCommand"
+					# Initialize pid execution time array
+					pidsTimeArray[$pid]=0
+				else
+					Logger "Skipping command [$currentCommand]." "DEBUG"
+				fi
+
+				if [ $isPostponedCommand == false ]; then
+					counter=$((counter+1))
+				fi
+				_ExecTasksPidsCheck
+			done
+		fi
+
+	_ExecTasksPidsCheck
 	done
 
 
 	# Return exit code if only one process was monitored, else return number of errors
 	# As we cannot return multiple values, a global variable WAIT_FOR_TASK_COMPLETION contains all pids with their return value
-	#WIP: return code has nothing to do with logging
-	#if [ $noErrorLogAtAll == true ]; then
-	#	return 0
-	#fi
 
 	if [ $mainItemCount -eq 1 ]; then
 		return $retval
@@ -1098,6 +1188,18 @@ function IsNumeric {
 	local value="${1}"
 
 	if [[ $value =~ ^[0-9]+([.][0-9]+)?$ ]]; then
+		echo 1
+	else
+		echo 0
+	fi
+}
+
+# Checks email address validity
+function checkRFC822 {
+	local mail="${1}"
+	local rfc822="^[a-z0-9!#\$%&'*+/=?^_\`{|}~-]+(\.[a-z0-9!#$%&'*+/=?^_\`{|}~-]+)*@([a-z0-9]([a-z0-9-]*[a-z0-9])?\.)+[a-z0-9]([a-z0-9-]*[a-z0-9])?\$"
+
+	if [[ $mail =~ $rfc822 ]]; then
 		echo 1
 	else
 		echo 0
@@ -1303,7 +1405,7 @@ function GetOs {
 	# Get linux versions
 	if [ -f "$osInfo" ]; then
 		localOsName=$(grep "^NAME=" "$osInfo")
-                localOsName="${localOsName##*=}"
+		localOsName="${localOsName##*=}"
 		localOsVer=$(grep "^VERSION=" "$osInfo")
 		localOsVer="${localOsVer##*=}"
 	fi
@@ -1314,6 +1416,11 @@ function GetOs {
 GetOs
 
 ENDSSH
+	if [ $? != 0 ]; then
+		Logger "Cannot connect to remote system [$REMOTE_HOST] port [$REMOTE_PORT]." "CRITICAL"
+		exit 1
+	fi
+
 
 	if [ -f "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$SCRIPT_PID.$TSTAMP" ]; then
 		remoteOsVar=$(cat "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$SCRIPT_PID.$TSTAMP")
@@ -1373,7 +1480,8 @@ function RunLocalCommand {
 	Logger "Running command [$command] on local host." "NOTICE"
 	eval "$command" > "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$SCRIPT_PID.$TSTAMP" 2>&1 &
 
-	ExecTasks "${FUNCNAME[0]}" 0 0 $SOFT_MAX_EXEC_TIME $HARD_MAX_EXEC_TIME $SLEEP_TIME $KEEP_LOGGING true true false false 1 $!
+	ExecTasks $! "${FUNCNAME[0]}" false 0 0 $SOFT_MAX_EXEC_TIME $HARD_MAX_EXEC_TIME true $SLEEP_TIME $KEEP_LOGGING
+	#ExecTasks "${FUNCNAME[0]}" 0 0 $SOFT_MAX_EXEC_TIME $HARD_MAX_EXEC_TIME $SLEEP_TIME $KEEP_LOGGING true true false false 1 $!
 	retval=$?
 	if [ $retval -eq 0 ]; then
 		Logger "Command succeded." "NOTICE"
@@ -1413,7 +1521,8 @@ function RunRemoteCommand {
 	cmd=$SSH_CMD' "env LC_ALL=C env _REMOTE_TOKEN="'$_REMOTE_TOKEN'" $command" > "'$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$SCRIPT_PID.$TSTAMP'" 2>&1'
 	Logger "cmd: $cmd" "DEBUG"
 	eval "$cmd" &
-	ExecTasks "${FUNCNAME[0]}" 0 0 $SOFT_MAX_EXEC_TIME $HARD_MAX_EXEC_TIME $SLEEP_TIME $KEEP_LOGGING true true false false 1 $!
+	ExecTasks $! "${FUNCNAME[0]}" false  0 0 $SOFT_MAX_EXEC_TIME $HARD_MAX_EXEC_TIME true $SLEEP_TIME $KEEP_LOGGING
+	#ExecTasks "${FUNCNAME[0]}" 0 0 $SOFT_MAX_EXEC_TIME $HARD_MAX_EXEC_TIME $SLEEP_TIME $KEEP_LOGGING true true false false 1 $!
 	retval=$?
 	if [ $retval -eq 0 ]; then
 		Logger "Command succeded." "NOTICE"
@@ -1446,7 +1555,8 @@ function RunBeforeHook {
 		pids="$pids;$!"
 	fi
 	if [ "$pids" != "" ]; then
-		ExecTasks "${FUNCNAME[0]}" 0 0 0 0 true true false false 1 $pids
+		ExecTasks $! "${FUNCNAME[0]}" false 0 0 0 0 true $SLEEP_TIME $KEEP_LOGGING
+		#ExecTasks "${FUNCNAME[0]}" 0 0 0 0 true true false false 1 $pids
 	fi
 }
 
@@ -1464,7 +1574,8 @@ function RunAfterHook {
 		pids="$pids;$!"
 	fi
 	if [ "$pids" != "" ]; then
-		ExecTasks "${FUNCNAME[0]}" 0 0 0 0 true true false false 1 $pids
+		ExecTasks $! "${FUNCNAME[0]}" false 0 0 0 0 true $SLEEP_TIME $KEEP_LOGGING
+		#ExecTasks "${FUNCNAME[0]}" 0 0 0 0 true true false false 1 $pids
 	fi
 }
 
@@ -1475,7 +1586,8 @@ function CheckConnectivityRemoteHost {
 
 		if [ "$REMOTE_HOST_PING" != "no" ] && [ "$REMOTE_OPERATION" != "no" ]; then
 			eval "$PING_CMD $REMOTE_HOST > /dev/null 2>&1" &
-			ExecTasks "${FUNCNAME[0]}" 0 0 60 180 $SLEEP_TIME $KEEP_LOGGING true true false false 1 $!
+			ExecTasks $! "${FUNCNAME[0]}" false 0 0 60 180 true $SLEEP_TIME $KEEP_LOGGING
+			#ExecTasks "${FUNCNAME[0]}" 0 0 60 180 $SLEEP_TIME $KEEP_LOGGING true true false false 1 $!
 			retval=$?
 			if [ $retval != 0 ]; then
 				Logger "Cannot ping [$REMOTE_HOST]. Return code [$retval]." "WARN"
@@ -1496,7 +1608,8 @@ function CheckConnectivity3rdPartyHosts {
 			for i in $REMOTE_3RD_PARTY_HOSTS
 			do
 				eval "$PING_CMD $i > /dev/null 2>&1" &
-				ExecTasks "${FUNCNAME[0]}" 0 0 180 360 $SLEEP_TIME $KEEP_LOGGING true true false false 1 $!
+				ExecTasks $! "${FUNCNAME[0]}" false 0 0 60 180 true $SLEEP_TIME $KEEP_LOGGING
+				#ExecTasks "${FUNCNAME[0]}" 0 0 180 360 $SLEEP_TIME $KEEP_LOGGING true true false false 1 $!
 				retval=$?
 				if [ $retval != 0 ]; then
 					Logger "Cannot ping 3rd party host [$i]. Return code [$retval]." "NOTICE"
@@ -1734,10 +1847,12 @@ function InitLocalOSDependingSettings {
 		# Tested on BSD and Mac
 		STAT_CMD="stat -f \"%Sm\""
 		STAT_CTIME_MTIME_CMD="stat -f %N;%c;%m"
+		SED_REGEX_ARG="-E"
 	else
 		# Tested on GNU stat, busybox and Cygwin
 		STAT_CMD="stat -c %y"
 		STAT_CTIME_MTIME_CMD="stat -c %n;%Z;%Y"
+		SED_REGEX_ARG="-r"
 	fi
 
 	# Set compression first time when we know what local os we have
@@ -1877,7 +1992,7 @@ function VerComp () {
 	# fill empty fields in ver1 with zeros
 	for ((i=${#ver1[@]}; i<${#ver2[@]}; i++))
 	do
-        	ver1[i]=0
+		ver1[i]=0
 	done
 	for ((i=0; i<${#ver1[@]}; i++))
 	do
@@ -1890,76 +2005,76 @@ function VerComp () {
 		then
 			echo 1
 			return
-        	fi
-        	if ((10#${ver1[i]} < 10#${ver2[i]}))
-        	then
+		fi
+		if ((10#${ver1[i]} < 10#${ver2[i]}))
+		then
 			echo 2
-            		return
-        	fi
-    	done
+			return
+		fi
+	done
 
-    	echo 0
+	echo 0
 	return
 }
 
 function GetConfFileValue () {
-        local file="${1}"
-        local name="${2}"
+	local file="${1}"
+	local name="${2}"
 	local noError="${3:-false}"
 
-        local value
+	local value
 
-        value=$(grep "^$name=" "$file")
-        if [ $? == 0 ]; then
-                value="${value##*=}"
-                echo "$value"
-        else
+	value=$(grep "^$name=" "$file")
+	if [ $? == 0 ]; then
+		value="${value##*=}"
+		echo "$value"
+	else
 		if [ $noError == true ]; then
- 			Logger "Cannot get value for [$name] in config file [$file]." "NOTICE"
+			Logger "Cannot get value for [$name] in config file [$file]." "NOTICE"
 		else
 			Logger "Cannot get value for [$name] in config file [$file]." "ERROR"
 		fi
-        fi
+	fi
 }
 
 
 function SetConfFileValue () {
-        local file="${1}"
-        local name="${2}"
-        local value="${3}"
+	local file="${1}"
+	local name="${2}"
+	local value="${3}"
 	local separator="${4:-#}"
 
-        if grep "^$name=" "$file" > /dev/null; then
-                # Using -i.tmp for BSD compat
-                sed -i.tmp "s$separator^$name=.*$separator$name=$value$separator" "$file"
-                rm -f "$file.tmp"
+	if grep "^$name=" "$file" > /dev/null; then
+		# Using -i.tmp for BSD compat
+		sed -i.tmp "s$separator^$name=.*$separator$name=$value$separator" "$file"
+		rm -f "$file.tmp"
 		Logger "Set [$name] to [$value] in config file [$file]." "DEBUG"
-        else
+	else
 		Logger "Cannot set value [$name] to [$value] in config file [$file]." "ERROR"
-        fi
+	fi
 }
 
 # Function can replace [ -f /some/file* ] tests
 # Modified version of http://stackoverflow.com/a/6364244/2635443
 function WildcardFileExists () {
-        local file="${1}"
-        local exists=0
+	local file="${1}"
+	local exists=0
 
-        for f in $file; do
-                ## Check if the glob gets expanded to existing files.
-                ## If not, f here will be exactly the pattern above
-                ## and the exists test will evaluate to false.
-                if [ -e "$f" ]; then
-                        exists=1
-                        break
-                fi
-        done
+	for f in $file; do
+		## Check if the glob gets expanded to existing files.
+		## If not, f here will be exactly the pattern above
+		## and the exists test will evaluate to false.
+		if [ -e "$f" ]; then
+			exists=1
+			break
+		fi
+	done
 
-        if [ $exists -eq 1 ]; then
-                echo 1
-        else
-                echo 0
-        fi
+	if [ $exists -eq 1 ]; then
+		echo 1
+	else
+		echo 0
+	fi
 }
 
 # If using "include" statements, make sure the script does not get executed unless it's loaded by bootstrap

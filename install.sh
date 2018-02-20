@@ -196,23 +196,23 @@ function GetLocalOS {
 	fi
 }
 function GetConfFileValue () {
-        local file="${1}"
-        local name="${2}"
+	local file="${1}"
+	local name="${2}"
 	local noError="${3:-false}"
 
-        local value
+	local value
 
-        value=$(grep "^$name=" "$file")
-        if [ $? == 0 ]; then
-                value="${value##*=}"
-                echo "$value"
-        else
+	value=$(grep "^$name=" "$file")
+	if [ $? == 0 ]; then
+		value="${value##*=}"
+		echo "$value"
+	else
 		if [ $noError == true ]; then
- 			Logger "Cannot get value for [$name] in config file [$file]." "NOTICE"
+			Logger "Cannot get value for [$name] in config file [$file]." "NOTICE"
 		else
 			Logger "Cannot get value for [$name] in config file [$file]." "ERROR"
 		fi
-        fi
+	fi
 }
 
 
