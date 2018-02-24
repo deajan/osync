@@ -10,7 +10,7 @@
 #command line arguments don't take -AaqV for example
 
 _OFUNCTIONS_VERSION=2.3.0-dev
-_OFUNCTIONS_BUILD=2018022001
+_OFUNCTIONS_BUILD=2018022402
 #### _OFUNCTIONS_BOOTSTRAP SUBSET ####
 _OFUNCTIONS_BOOTSTRAP=true
 #### _OFUNCTIONS_BOOTSTRAP SUBSET END ####
@@ -876,12 +876,14 @@ function ExecTasks {
 			mainItemCount=$(wc -l < "$mainInput")
 			readFromFile=true
 		else
-			Logger "Cannot read file [$mainInput]." "WARN"
+			Logger "Cannot read main file [$mainInput]." "WARN"
 		fi
-		if [ -f "$auxInput" ]; then
-			auxItemCount=$(wc -l < "$auxInput")
-		else
-			Logger "Cannot read file [$auxInput]." "WARN"
+		if [ "$auxInput" != "" ]; then
+			if [ -f "$auxInput" ]; then
+				auxItemCount=$(wc -l < "$auxInput")
+			else
+				Logger "Cannot read aux file [$auxInput]." "WARN"
+			fi
 		fi
 	fi
 
@@ -965,7 +967,7 @@ function ExecTasks {
 						pidsTimeArray[$pid]=$((SECONDS - seconds_begin))
 						if [ ${pidsTimeArray[$pid]} -gt $softPerProcessTime ]; then
 							if [ "$softAlert" != true ] && [ $softPerProcessTime -ne 0 ] && [ $noTimeErrorLog != true ]; then
-								Logger "Max soft execution time [$softPerProcessTime]exceeded for pid [$pid]." "WARN"
+								Logger "Max soft execution time [$softPerProcessTime] exceeded for pid [$pid]." "WARN"
 								if [ "${commandsArrayPid[$pid]}]" != "" ]; then
 									Logger "Command was [${commandsArrayPid[$pid]}]]." "WARN"
 								fi
