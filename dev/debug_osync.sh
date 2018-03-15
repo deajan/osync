@@ -51,7 +51,7 @@ IS_STABLE=no
 #command line arguments don't take -AaqV for example
 
 _OFUNCTIONS_VERSION=2.3.0-dev
-_OFUNCTIONS_BUILD=2018022001
+_OFUNCTIONS_BUILD=2018031501
 _OFUNCTIONS_BOOTSTRAP=true
 
 ## BEGIN Generic bash functions written in 2013-2017 by Orsiris de Jong - http://www.netpower.fr - ozy@netpower.fr
@@ -907,12 +907,14 @@ function ExecTasks {
 			mainItemCount=$(wc -l < "$mainInput")
 			readFromFile=true
 		else
-			Logger "Cannot read file [$mainInput]." "WARN"
+			Logger "Cannot read main file [$mainInput]." "WARN"
 		fi
-		if [ -f "$auxInput" ]; then
-			auxItemCount=$(wc -l < "$auxInput")
-		else
-			Logger "Cannot read file [$auxInput]." "WARN"
+		if [ "$auxInput" != "" ]; then
+			if [ -f "$auxInput" ]; then
+				auxItemCount=$(wc -l < "$auxInput")
+			else
+				Logger "Cannot read aux file [$auxInput]." "WARN"
+			fi
 		fi
 	fi
 
@@ -996,7 +998,7 @@ function ExecTasks {
 						pidsTimeArray[$pid]=$((SECONDS - seconds_begin))
 						if [ ${pidsTimeArray[$pid]} -gt $softPerProcessTime ]; then
 							if [ "$softAlert" != true ] && [ $softPerProcessTime -ne 0 ] && [ $noTimeErrorLog != true ]; then
-								Logger "Max soft execution time [$softPerProcessTime]exceeded for pid [$pid]." "WARN"
+								Logger "Max soft execution time [$softPerProcessTime] exceeded for pid [$pid]." "WARN"
 								if [ "${commandsArrayPid[$pid]}]" != "" ]; then
 									Logger "Command was [${commandsArrayPid[$pid]}]]." "WARN"
 								fi
@@ -1279,7 +1281,7 @@ function IsNumeric {
 }
 
 # Checks email address validity
-function checkRFC822 {
+function CheckRFC822 {
 	local mail="${1}"
 	local rfc822="^[a-z0-9!#\$%&'*+/=?^_\`{|}~-]+(\.[a-z0-9!#$%&'*+/=?^_\`{|}~-]+)*@([a-z0-9]([a-z0-9-]*[a-z0-9])?\.)+[a-z0-9]([a-z0-9-]*[a-z0-9])?\$"
 
@@ -1621,7 +1623,7 @@ function RunLocalCommand {
 	Logger "Running command [$command] on local host." "NOTICE"
 	eval "$command" > "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$SCRIPT_PID.$TSTAMP" 2>&1 &
 
-	ExecTasks $! "${FUNCNAME[0]}" false 0 0 $SOFT_MAX_EXEC_TIME $HARD_MAX_EXEC_TIME true $SLEEP_TIME $KEEP_LOGGING
+	ExecTasks $! "${FUNCNAME[0]}" false 0 0 0 $hardMaxTime true $SLEEP_TIME $KEEP_LOGGING
 	#ExecTasks "${FUNCNAME[0]}" 0 0 $SOFT_MAX_EXEC_TIME $HARD_MAX_EXEC_TIME $SLEEP_TIME $KEEP_LOGGING true true false false 1 $!
 	retval=$?
 	if [ $retval -eq 0 ]; then
@@ -1663,7 +1665,7 @@ function RunRemoteCommand {
 	cmd=$SSH_CMD' "env LC_ALL=C env _REMOTE_TOKEN="'$_REMOTE_TOKEN'" $command" > "'$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$SCRIPT_PID.$TSTAMP'" 2>&1'
 	Logger "cmd: $cmd" "DEBUG"
 	eval "$cmd" &
-	ExecTasks $! "${FUNCNAME[0]}" false  0 0 $SOFT_MAX_EXEC_TIME $HARD_MAX_EXEC_TIME true $SLEEP_TIME $KEEP_LOGGING
+	ExecTasks $! "${FUNCNAME[0]}" false  0 0 0 $hardMaxTime true $SLEEP_TIME $KEEP_LOGGING
 	#ExecTasks "${FUNCNAME[0]}" 0 0 $SOFT_MAX_EXEC_TIME $HARD_MAX_EXEC_TIME $SLEEP_TIME $KEEP_LOGGING true true false false 1 $!
 	retval=$?
 	if [ $retval -eq 0 ]; then
@@ -1698,7 +1700,7 @@ function RunBeforeHook {
 		pids="$pids;$!"
 	fi
 	if [ "$pids" != "" ]; then
-		ExecTasks $! "${FUNCNAME[0]}" false 0 0 0 0 true $SLEEP_TIME $KEEP_LOGGING
+		ExecTasks $pids "${FUNCNAME[0]}" false 0 0 0 0 true $SLEEP_TIME $KEEP_LOGGING
 		#ExecTasks "${FUNCNAME[0]}" 0 0 0 0 true true false false 1 $pids
 	fi
 }
@@ -1718,7 +1720,7 @@ function RunAfterHook {
 		pids="$pids;$!"
 	fi
 	if [ "$pids" != "" ]; then
-		ExecTasks $! "${FUNCNAME[0]}" false 0 0 0 0 true $SLEEP_TIME $KEEP_LOGGING
+		ExecTasks $pids "${FUNCNAME[0]}" false 0 0 0 0 true $SLEEP_TIME $KEEP_LOGGING
 		#ExecTasks "${FUNCNAME[0]}" 0 0 0 0 true true false false 1 $pids
 	fi
 }
