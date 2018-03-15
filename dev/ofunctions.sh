@@ -10,7 +10,7 @@
 #command line arguments don't take -AaqV for example
 
 _OFUNCTIONS_VERSION=2.3.0-dev
-_OFUNCTIONS_BUILD=2018022502
+_OFUNCTIONS_BUILD=2018031501
 #### _OFUNCTIONS_BOOTSTRAP SUBSET ####
 _OFUNCTIONS_BOOTSTRAP=true
 #### _OFUNCTIONS_BOOTSTRAP SUBSET END ####
@@ -1251,7 +1251,7 @@ function IsNumeric {
 
 #### CheckRFC822 SUBSET ####
 # Checks email address validity
-function checkRFC822 {
+function CheckRFC822 {
 	local mail="${1}"
 	local rfc822="^[a-z0-9!#\$%&'*+/=?^_\`{|}~-]+(\.[a-z0-9!#$%&'*+/=?^_\`{|}~-]+)*@([a-z0-9]([a-z0-9-]*[a-z0-9])?\.)+[a-z0-9]([a-z0-9-]*[a-z0-9])?\$"
 
