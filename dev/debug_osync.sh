@@ -5295,6 +5295,14 @@ if [ $_QUICK_SYNC -eq 2 ]; then
 		HARD_MAX_EXEC_TIME=0
 	fi
 
+	if [ $(IsInteger $MAX_EXEC_TIME_PER_CMD_BEFORE) -ne 1 ]; then
+		MAX_EXEC_TIME_PER_CMD_BEFORE=0
+	fi
+
+	if [ $(IsInteger $MAX_EXEC_TIME_PER_CMD_AFTER) -ne 1 ]; then
+		MAX_EXEC_TIME_PER_CMD_AFTER=0
+	fi
+
 	if [ "$PATH_SEPARATOR_CHAR" == "" ]; then
 		PATH_SEPARATOR_CHAR=";"
 	fi
