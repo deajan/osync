@@ -5298,7 +5298,11 @@ if [ $_QUICK_SYNC -eq 2 ]; then
 	if [ "$PATH_SEPARATOR_CHAR" == "" ]; then
 		PATH_SEPARATOR_CHAR=";"
 	fi
+
+	if [ $(IsInteger $MIN_WAIT) -ne 1 ]; then
 		MIN_WAIT=30
+
+	fi
 else
 	ConfigFile="${1}"
 	LoadConfigFile "$ConfigFile"
