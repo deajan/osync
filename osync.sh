@@ -8,7 +8,7 @@ PROGRAM="osync" # Rsync based two way sync engine with fault tolerance
 AUTHOR="(C) 2013-2017 by Orsiris de Jong"
 CONTACT="http://www.netpower.fr/osync - ozy@netpower.fr"
 PROGRAM_VERSION=1.2.5-dev
-PROGRAM_BUILD=2018022003
+PROGRAM_BUILD=2018032201
 IS_STABLE=no
 
 
@@ -4391,25 +4391,29 @@ function _SoftDeleteLocal {
 			Logger "Removing files older than $changeTime days on $replicaType replica for $deletionType deletion." "NOTICE"
 		fi
 
-		$FIND_CMD "$replicaDeletionPath" -type f -ctime +"$changeTime" -print0 | xargs -0 -I {} bash -c 'export file="{}"; if [ '$_LOGGER_VERBOSE' == true ]; then echo "On "'$replicaType'" will delete file {}"; fi; if [ '$_DRYRUN' == false ]; then rm -f "$file"; fi' > "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$replicaType.$SCRIPT_PID.$TSTAMP" 2>&1
-		retval=$?
-		if [ $retval -ne 0 ]; then
-			Logger "Error while executing file cleanup on $replicaType replica." "ERROR" $retval
-			Logger "Command output:\n$(cat $RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$replicaType.$SCRIPT_PID.$TSTAMP)" "WARN"
+		$FIND_CMD "$replicaDeletionPath" -type f -ctime +"$changeTime" > "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.deleteList.$replicaType.$SCRIPT_PID.$TSTAMP" 2>> "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.deleteErrors.$replicaType.$SCRIPT_PID.$TSTAMP"
+		while IFS='' read -r file; do
+			Logger "On $replicaType will delete file [$file]" "VERBOSE"
+			if [ $_DRYRUN == false ]; then
+				rm -f "$file" >> "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.deleteErrors.$replicaType.$SCRIPT_PID.$TSTAMP" 2>&1
+			fi
+		done < "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.deleteList.$replicaType.$SCRIPT_PID.$TSTAMP"
+
+		$FIND_CMD "$replicaDeletionPath" -type d -empty -ctime +"$changeTime" > "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.deleteList.$replicaType.$SCRIPT_PID.$TSTAMP" 2>> "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.deleteErrors.$replicaType.$SCRIPT_PID.$TSTAMP"
+		while IFS='' read -r file; do
+			Logger "On $replicaType will delete empty directory [$file]" "VERBOSE"
+			if [ $_DRYRUN == false ]; then
+				rm -f "$file" >> "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.deleteErrors.$replicaType.$SCRIPT_PID.$TSTAMP" 2>&1
+			fi
+		done < "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.deleteList.$replicaType.$SCRIPT_PID.$TSTAMP"
+
+		if [ -s "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.deleteErrors.$replicaType.$SCRIPT_PID.$TSTAMP" ]; then
+			Logger "Error while executing cleanup on $replicaType replica." "ERROR" $retval
+			Logger "Command output:\n$(cat $RUN_DIR/$PROGRAM.${FUNCNAME[0]}.deleteErrors.$replicaType.$SCRIPT_PID.$TSTAMP)" "WARN"
 		else
-			Logger "Command output:\n$(cat $RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$replicaType.$SCRIPT_PID.$TSTAMP)" "VERBOSE"
+			Logger "Command output:\n$(cat $RUN_DIR/$PROGRAM.${FUNCNAME[0]}.deleteErrors.$replicaType.$SCRIPT_PID.$TSTAMP)" "VERBOSE"
 			Logger "File cleanup complete on $replicaType replica." "NOTICE"
 		fi
-		$FIND_CMD "$replicaDeletionPath" -type d -empty -ctime +"$changeTime" -print0 | xargs -0 -I {} bash -c 'export file="{}"; if [ '$_LOGGER_VERBOSE' == true ]; then echo "On "'$replicaType'" will delete directory {}"; fi; if [ '$_DRYRUN' == false ]; then rm -rf "{}"; fi' > "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$replicaType.$SCRIPT_PID.$TSTAMP" 2>&1
-		retval=$?
-		if [ $retval -ne 0 ]; then
-			Logger "Error while executing directory cleanup on $replicaType replica." "ERROR" $retval
-			Logger "Command output:\n$(cat $RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$replicaType.$SCRIPT_PID.$TSTAMP)" "WARN"
-		else
-			Logger "Command output:\n$(cat $RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$replicaType.$SCRIPT_PID.$TSTAMP)" "VERBOSE"
-			Logger "Directory cleanup complete on $replicaType replica." "NOTICE"
-		fi
-
 
 	elif [ -d "$replicaDeletionPath" ] && ! [ -w "$replicaDeletionPath" ]; then
 		Logger "The $replicaType replica dir [$replicaDeletionPath] is not writable. Cannot clean old files." "ERROR"
@@ -4447,25 +4451,199 @@ env PROGRAM="'$PROGRAM'" env SCRIPT_PID="'$SCRIPT_PID'" TSTAMP="'$TSTAMP'" \
 env _DRYRUN="'$_DRYRUN'" env replicaType="'$replicaType'" env replicaDeletionPath="'$replicaDeletionPath'" env changeTime="'$changeTime'" env REMOTE_FIND_CMD="'$REMOTE_FIND_CMD'" \
 env LC_ALL=C $COMMAND_SUDO' bash -s' << 'ENDSSH' > "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$replicaType.$SCRIPT_PID.$TSTAMP" 2>&1
 
-# Cannot launch log function from xargs, ugly hack
-if [ -d "$replicaDeletionPath" ]; then
-	$REMOTE_FIND_CMD "$replicaDeletionPath" -type f -ctime +"$changeTime" -print0 | xargs -0 -I {} bash -c 'export file="{}"; if [ '$_LOGGER_VERBOSE' == true ]; then echo "On "'$replicaType'" will delete file {}"; fi; if [ '$_DRYRUN' == false ]; then rm -f "$file"; fi'
-	retval1=$?
-	$REMOTE_FIND_CMD "$replicaDeletionPath" -type d -empty -ctime +"$changeTime" -print0 | xargs -0 -I {} bash -c 'export file="{}"; if [ '$_LOGGER_VERBOSE' == true ]; then echo "On "'$replicaType'" will delete directory {}"; fi; if [ '$_DRYRUN' == false ]; then rm -rf "{}"; fi'
-	retval2=$?
+## allow debugging from command line with _DEBUG=yes
+if [ ! "$_DEBUG" == "yes" ]; then
+	_DEBUG=no
+	_LOGGER_VERBOSE=false
 else
-	echo "The $replicaType replica dir [$replicaDeletionPath] does not exist. Skipping cleaning of old files"
+	trap 'TrapError ${LINENO} $?' ERR
+	_LOGGER_VERBOSE=true
 fi
-exit $((retval1 + retval2))
+
+if [ "$SLEEP_TIME" == "" ]; then # Leave the possibity to set SLEEP_TIME as environment variable when runinng with bash -x in order to avoid spamming console
+	SLEEP_TIME=.05
+fi
+function TrapError {
+	local job="$0"
+	local line="$1"
+	local code="${2:-1}"
+
+	if [ $_LOGGER_SILENT == false ]; then
+		(>&2 echo -e "\e[45m/!\ ERROR in ${job}: Near line ${line}, exit code ${code}\e[0m")
+	fi
+}
+function IsInteger {
+	local value="${1}"
+
+	if [[ $value =~ ^[0-9]+$ ]]; then
+		echo 1
+	else
+		echo 0
+	fi
+}
+# Converts human readable sizes into integer kilobyte sizes
+# Usage numericSize="$(HumanToNumeric $humanSize)"
+function HumanToNumeric {
+	local value="${1}"
+
+	local notation
+	local suffix
+	local suffixPresent
+	local multiplier
+
+	notation=(K M G T P E)
+	for suffix in "${notation[@]}"; do
+		multiplier=$((multiplier+1))
+		if [[ "$value" == *"$suffix"* ]]; then
+			suffixPresent=$suffix
+			break;
+		fi
+	done
+
+	if [ "$suffixPresent" != "" ]; then
+		value=${value%$suffix*}
+		value=${value%.*}
+		# /1024 since we convert to kilobytes instead of bytes
+		value=$((value*(1024**multiplier/1024)))
+	else
+		value=${value%.*}
+	fi
+
+	echo $value
+}
+
+# Array to string converter, see http://stackoverflow.com/questions/1527049/bash-join-elements-of-an-array
+# usage: joinString separaratorChar Array
+function joinString {
+	local IFS="$1"; shift; echo "$*";
+}
+
+# Sub function of Logger
+function _Logger {
+	local logValue="${1}"		# Log to file
+	local stdValue="${2}"		# Log to screeen
+	local toStdErr="${3:-false}"	# Log to stderr instead of stdout
+
+	if [ "$logValue" != "" ]; then
+		echo -e "$logValue" >> "$LOG_FILE"
+		# Current log file
+		echo -e "$logValue" >> "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$SCRIPT_PID.$TSTAMP"
+	fi
+
+	if [ "$stdValue" != "" ] && [ "$_LOGGER_SILENT" != true ]; then
+		if [ $toStdErr == true ]; then
+			# Force stderr color in subshell
+			(>&2 echo -e "$stdValue")
+
+		else
+			echo -e "$stdValue"
+		fi
+	fi
+}
+
+# Remote logger similar to below Logger, without log to file and alert flags
+function RemoteLogger {
+	local value="${1}"		# Sentence to log (in double quotes)
+	local level="${2}"		# Log level
+	local retval="${3:-undef}"	# optional return value of command
+
+	if [ "$_LOGGER_PREFIX" == "time" ]; then
+		prefix="TIME: $SECONDS - "
+	elif [ "$_LOGGER_PREFIX" == "date" ]; then
+		prefix="R $(date) - "
+	else
+		prefix=""
+	fi
+
+	if [ "$level" == "CRITICAL" ]; then
+		_Logger "" "$prefix\e[1;33;41m$value\e[0m" true
+		if [ $_DEBUG == "yes" ]; then
+			_Logger -e "" "[$retval] in [$(joinString , ${FUNCNAME[@]})] SP=$SCRIPT_PID P=$$" true
+		fi
+		return
+	elif [ "$level" == "ERROR" ]; then
+		_Logger "" "$prefix\e[91m$value\e[0m" true
+		if [ $_DEBUG == "yes" ]; then
+			_Logger -e "" "[$retval] in [$(joinString , ${FUNCNAME[@]})] SP=$SCRIPT_PID P=$$" true
+		fi
+		return
+	elif [ "$level" == "WARN" ]; then
+		_Logger "" "$prefix\e[33m$value\e[0m" true
+		if [ $_DEBUG == "yes" ]; then
+			_Logger -e "" "[$retval] in [$(joinString , ${FUNCNAME[@]})] SP=$SCRIPT_PID P=$$" true
+		fi
+		return
+	elif [ "$level" == "NOTICE" ]; then
+		if [ $_LOGGER_ERR_ONLY != true ]; then
+			_Logger "" "$prefix$value"
+		fi
+		return
+	elif [ "$level" == "VERBOSE" ]; then
+		if [ $_LOGGER_VERBOSE == true ]; then
+			_Logger "" "$prefix$value"
+		fi
+		return
+	elif [ "$level" == "ALWAYS" ]; then
+		_Logger  "" "$prefix$value"
+		return
+	elif [ "$level" == "DEBUG" ]; then
+		if [ "$_DEBUG" == "yes" ]; then
+			_Logger "" "$prefix$value"
+			return
+		fi
+	else
+		_Logger "" "\e[41mLogger function called without proper loglevel [$level].\e[0m" true
+		_Logger "" "Value was: $prefix$value" true
+	fi
+}
+
+if [ -d "$replicaDeletionPath" ]; then
+		$REMOTE_FIND_CMD "$replicaDeletionPath" -type f -ctime +"$changeTime" > "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.deleteList.$replicaType.$SCRIPT_PID.$TSTAMP" 2>> "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.deleteErrors.$replicaType.$SCRIPT_PID.$TSTAMP"
+		while IFS='' read -r file; do
+			RemoteLogger "On $replicaType will delete file [$file]" "VERBOSE"
+			if [ $_DRYRUN == false ]; then
+				rm -f "$file" >> "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.deleteErrors.$replicaType.$SCRIPT_PID.$TSTAMP" 2>&1
+			fi
+		done < "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.deleteList.$replicaType.$SCRIPT_PID.$TSTAMP"
+
+		$REMOTE_FIND_CMD "$replicaDeletionPath" -type d -empty -ctime +"$changeTime" > "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.deleteList.$replicaType.$SCRIPT_PID.$TSTAMP" 2>> "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.deleteErrors.$replicaType.$SCRIPT_PID.$TSTAMP"
+		while IFS='' read -r file; do
+			RemoteLogger "On $replicaType will delete empty directory [$file]" "VERBOSE"
+			if [ $_DRYRUN == false ]; then
+				rm -f "$file" >> "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.deleteErrors.$replicaType.$SCRIPT_PID.$TSTAMP" 2>&1
+			fi
+		done < "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.deleteList.$replicaType.$SCRIPT_PID.$TSTAMP"
+
+		if [ -s "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.deleteErrors.$replicaType.$SCRIPT_PID.$TSTAMP" ]; then
+			RemoteLogger "Error while executing cleanup on $replicaType replica." "ERROR" $retval
+			RemoteLogger "Command output:\n$(cat $RUN_DIR/$PROGRAM.${FUNCNAME[0]}.deleteErrors.$replicaType.$SCRIPT_PID.$TSTAMP)" "WARN"
+			exit 1
+		else
+			RemoteLogger "Command output:\n$(cat $RUN_DIR/$PROGRAM.${FUNCNAME[0]}.deleteErrors.$replicaType.$SCRIPT_PID.$TSTAMP)" "VERBOSE"
+			RemoteLogger "File cleanup complete on $replicaType replica." "NOTICE"
+			exit 0
+		fi
+elif [ -d "$replicaDeletionPath" ] && ! [ -w "$replicaDeletionPath" ]; then
+	RemoteLogger "The $replicaType replica dir [$replicaDeletionPath] is not writable. Cannot clean old files." "ERROR"
+	exit 1
+else
+	RemoteLogger "The $replicaType replica dir [$replicaDeletionPath] does not exist. Skipping cleaning of old files." "VERBOSE"
+	exit 0
+fi
 ENDSSH
 	retval=$?
 	if [ $retval -ne 0 ]; then
 		Logger "Error while executing cleanup on remote $replicaType replica." "ERROR" $retval
+		(
+		_LOGGER_PREFIX=""
 		Logger "Command output:\n$(cat $RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$replicaType.$SCRIPT_PID.$TSTAMP)" "WARN"
+		)
 	else
 		Logger "Cleanup complete on $replicaType replica." "NOTICE"
+		(
+		_LOGGER_PREFIX=""
 		Logger "Command output:\n$(cat $RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$replicaType.$SCRIPT_PID.$TSTAMP)" "VERBOSE"
-
+		)
 	fi
 }
 
