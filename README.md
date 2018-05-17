@@ -148,7 +148,7 @@ Having multiple conf files can then be run in a single cron command like
 
 Daemon mode
 -----------
-Additionnaly, you may run osync in monitor mode, which means it will perform a sync upon file operations on initiator replica.
+Additionaly, you may run osync in monitor mode, which means it will perform a sync upon file operations on initiator replica.
 This can be a drawback on functionnality versus scheduled mode because this mode only launches a sync task if there are file modifications on the initiator replica, without being able to monitor the target replica.
 Target replica changes are only synced when initiator replica changes occur, or when a given amount of time (default 600 seconds) passed without any changes on initiator replica.
 File monitor mode can also be launched as a daemon with an init script. Please read the documentation for more info.
