@@ -60,7 +60,7 @@ start() {
 			echo "$prog successfully started for configuration file $cfgfile"
 		else
 			echo "Cannot start $prog for configuration file $cfgfile"
-			$errno = 1
+			errno=1
 		fi
 	done
 
@@ -106,7 +106,7 @@ status() {
 			echo "$prog instance $(basename $pfile) is running (pid $(cat $pfile))"
 		else
 			echo "$prog instance $pfile (pid $(cat $pfile)) is dead but pidfile exists."
-			$errno=1
+			errno=1
 		fi
 	done
 
