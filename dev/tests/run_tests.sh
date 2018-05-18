@@ -7,7 +7,7 @@
 
 ## On CYGWIN / MSYS, ACL and extended attributes aren't supported
 
-# osync test suite 2017040801
+# osync test suite 2018051801
 
 # 4 tests:
 # quicklocal
@@ -39,7 +39,7 @@
 
 # drupal servers are often unreachable for whetever reason or give 0 bytes files
 #LARGE_FILESET_URL="http://ftp.drupal.org/files/projects/drupal-8.2.2.tar.gz"
-LARGE_FILESET_URL="http://www.netpower.fr/sites/default/files/osync-test-files-drupal-8.2.2.tar.gz"
+LARGE_FILESET_URL="http://www.netpower.fr/sites/default/files/osync-test-files.tar.gz"
 
 OSYNC_DIR="$(pwd)"
 OSYNC_DIR=${OSYNC_DIR%%/dev*}
