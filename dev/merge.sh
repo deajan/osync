@@ -195,6 +195,7 @@ if [ "$(basename $0)" == "merge.sh" ]; then
 		__PREPROCESSOR_CopyCommons pmocr
 	else
 		echo "No valid program given."
+		Usage
 		exit 1
 	fi
 fi
