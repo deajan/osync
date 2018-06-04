@@ -10,7 +10,7 @@
 #command line arguments don't take -AaqV for example
 
 _OFUNCTIONS_VERSION=2.3.0-dev
-_OFUNCTIONS_BUILD=2018031501
+_OFUNCTIONS_BUILD=2018060401
 #### _OFUNCTIONS_BOOTSTRAP SUBSET ####
 _OFUNCTIONS_BOOTSTRAP=true
 #### _OFUNCTIONS_BOOTSTRAP SUBSET END ####
@@ -27,6 +27,8 @@ _OFUNCTIONS_BOOTSTRAP=true
 ## _LOGGER_PREFIX="date"/"time"/""
 
 #TODO: global WAIT_FOR_TASK_COMPLETION_id instead of callerName has to be backported to ParallelExec and osync / obackup / pmocr ocde
+
+#TODO: IsInteger regex or expr
 
 ## Logger sets {ERROR|WARN}_ALERT variable when called with critical / error / warn loglevel
 ## When called from subprocesses, variable of main process cannot be set. Status needs to be get via $RUN_DIR/$PROGRAM.Logger.{error|warn}.$SCRIPT_PID.$TSTAMP
@@ -81,9 +83,6 @@ fi
 
 SCRIPT_PID=$$
 
-# TODO: Check if %N works on MacOS
-TSTAMP=$(date '+%Y%m%dT%H%M%S.%N')
-
 LOCAL_USER=$(whoami)
 LOCAL_HOST=$(hostname)
 
@@ -111,6 +110,46 @@ else
 	RUN_DIR=.
 fi
 
+#### PoorMansRandomGenerator SUBSET ####
+# Get a random number on Windows BusyBox alike, also works on most Unixes
+function PoorMansRandomGenerator {
+	local digits="${1}"		# The number of digits to generate
+
+	local minimum=1
+	local maximum
+	local n=0
+	
+	if [ "$digits" == "" ]; then
+		digits=5
+	fi
+	
+	# Minimum already has a digit
+	for n in $(seq 1 $((digits-1))); do
+		minimum=$minimum"0"
+		maximum=$maximum"9"
+	done
+	maximum=$maximum"9"
+	
+	#n=0; while [ $n -lt $minimum ]; do n=$n$(dd if=/dev/urandom bs=100 count=1 2>/dev/null | tr -cd '0-9'); done; n=$(echo $n | sed -e 's/^0//')
+	# bs=19 since if real random strikes, having a 19 digits number is not supported
+	while [ $n -lt $minimum ] || [ $n -gt $maximum ]; do
+		if [ $n -lt $minimum ]; then
+			# Add numbers
+			n=$n$(dd if=/dev/urandom bs=19 count=1 2>/dev/null | tr -cd '0-9')
+			n=$(echo $n | sed -e 's/^0//')
+			if [ "$n" == "" ]; then
+				n=0
+			fi
+		elif [ $n -gt $maximum ]; then
+			n=$(echo $n | sed 's/.$//')
+		fi
+	done
+	echo $n
+}
+#### PoorMansRandomGenerator SUBSET END ####
+
+# Initial TSTMAP value before function declaration
+TSTAMP=$(date '+%Y%m%dT%H%M%S').$(PoorMansRandomGenerator 4)
 
 # Default alert attachment filename
 ALERT_LOG_FILE="$RUN_DIR/$PROGRAM.$SCRIPT_PID.$TSTAMP.last.log"
@@ -335,7 +374,7 @@ function KillChilds {
 	fi
 
 	if kill -0 "$pid" > /dev/null 2>&1; then
-		# Warning: pgrep is not native on cygwin, have this checked in CheckEnvironment
+		#TODO: Warning: pgrep is not native on cygwin, have this checked in CheckEnvironment
 		if children="$(pgrep -P "$pid")"; then
 			if [[ "$pid" == *"$children"* ]]; then
 				Logger "Bogus pgrep implementation." "CRITICAL"
