@@ -10,7 +10,7 @@
 #command line arguments don't take -AaqV for example
 
 _OFUNCTIONS_VERSION=2.3.0-dev
-_OFUNCTIONS_BUILD=2018060401
+_OFUNCTIONS_BUILD=2018060501
 #### _OFUNCTIONS_BOOTSTRAP SUBSET ####
 _OFUNCTIONS_BOOTSTRAP=true
 #### _OFUNCTIONS_BOOTSTRAP SUBSET END ####
@@ -1348,12 +1348,12 @@ function HumanToNumeric {
 #### HumanToNumeric SUBSET END ####
 
 #### UrlEncode SUBSET ####
-## from https://gist.github.com/cdown/1163649
+## Modified version of https://gist.github.com/cdown/1163649
 function UrlEncode {
 	local length="${#1}"
 
 	local LANG=C
-	for (( i = 0; i < length; i++ )); do
+	for i in $(seq 0 $((length-1))); do
 		local c="${1:i:1}"
 		case $c in
 			[a-zA-Z0-9.~_-])
