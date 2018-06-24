@@ -10,7 +10,7 @@
 #command line arguments don't take -AaqV for example
 
 _OFUNCTIONS_VERSION=2.3.0-dev
-_OFUNCTIONS_BUILD=2018060501
+_OFUNCTIONS_BUILD=2018062301
 #### _OFUNCTIONS_BOOTSTRAP SUBSET ####
 _OFUNCTIONS_BOOTSTRAP=true
 #### _OFUNCTIONS_BOOTSTRAP SUBSET END ####
@@ -27,8 +27,10 @@ _OFUNCTIONS_BOOTSTRAP=true
 ## _LOGGER_PREFIX="date"/"time"/""
 
 #TODO: global WAIT_FOR_TASK_COMPLETION_id instead of callerName has to be backported to ParallelExec and osync / obackup / pmocr ocde
+#TODO: IsInteger regex or expr for busybox
+#TODO: VerComp cant use for (( type, needs for i in seq instead
+# Check if expr and seq exist, if not, use old method
 
-#TODO: IsInteger regex or expr
 
 ## Logger sets {ERROR|WARN}_ALERT variable when called with critical / error / warn loglevel
 ## When called from subprocesses, variable of main process cannot be set. Status needs to be get via $RUN_DIR/$PROGRAM.Logger.{error|warn}.$SCRIPT_PID.$TSTAMP
@@ -1043,11 +1045,11 @@ function ExecTasks {
 				else
 					# pid is dead, get its exit code from wait command
 					wait $pid
-					retval=$?
+					retval=$?	#TODO: do we use retval codes somehow ?? where
 					# Check for valid exit codes
 					if [ $(ArrayContains $retval "${validExitCodes[@]}") -eq 0 ]; then
 						if [ $noErrorLogsAtAll != true ]; then
-							Logger "${FUNCNAME[0]} called by [$id] finished monitoring pid [$pid] with exitcode [$retval]." "ERROR"
+							Logger "${FUNCNAME[0]} called by [$id] finished monitoring pid [$pid] with exitcode [$retval]." "DEBUG" #TODO: set this to debug in order to stop complaints
 							if [ "$functionMode" == "ParallelExec" ]; then
 								Logger "Command was [${commandsArrayPid[$pid]}]." "ERROR"
 							fi
