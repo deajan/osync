@@ -8,7 +8,7 @@ PROGRAM="osync" # Rsync based two way sync engine with fault tolerance
 AUTHOR="(C) 2013-2017 by Orsiris de Jong"
 CONTACT="http://www.netpower.fr/osync - ozy@netpower.fr"
 PROGRAM_VERSION=1.2.5-dev
-PROGRAM_BUILD=2018032201
+PROGRAM_BUILD=2018062401
 IS_STABLE=no
 
 
@@ -2191,7 +2191,7 @@ function Summary {
 	_SummaryFromFile "${TARGET[$__replicaDir]}" "$RUN_DIR/$PROGRAM.attr-update.target.$SCRIPT_PID.$TSTAMP" "~ >>"
 	_SummaryFromFile "${INITIATOR[$__replicaDir]}" "$RUN_DIR/$PROGRAM.attr-update.initiator.$SCRIPT_PID.$TSTAMP" "~ <<"
 
-	Logger "File transfers: INITIATOR << >> TARGET" "ALWAYS"
+	Logger "File transfers: INITIATOR << >> TARGET (may include file ownership and timestamp attributes)" "ALWAYS"
 	_SummaryFromFile "${TARGET[$__replicaDir]}" "$RUN_DIR/$PROGRAM.update.target.$SCRIPT_PID.$TSTAMP" "+ >>"
 	_SummaryFromFile "${INITIATOR[$__replicaDir]}" "$RUN_DIR/$PROGRAM.update.initiator.$SCRIPT_PID.$TSTAMP" "+ <<"
 
