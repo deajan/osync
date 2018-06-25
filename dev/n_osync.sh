@@ -8,7 +8,7 @@ PROGRAM="osync" # Rsync based two way sync engine with fault tolerance
 AUTHOR="(C) 2013-2017 by Orsiris de Jong"
 CONTACT="http://www.netpower.fr/osync - ozy@netpower.fr"
 PROGRAM_VERSION=1.2.5-dev
-PROGRAM_BUILD=2018062401
+PROGRAM_BUILD=2018062501
 IS_STABLE=no
 
 
@@ -2211,9 +2211,13 @@ function LogConflicts {
 	local subject
 	local body
 
+	# We keep this in a separate if check because of the subshell used for Logger with _LOGGER_PREFIX
+	if [ -f "$RUN_DIR/$PROGRAM.conflictList.comapre.$SCRIPT_PID.$TSTAMP" ]; then
+		Logger "File conflicts: INITIATOR << >> TARGET" "ALWAYS"
+	fi
+
 	(
 	_LOGGER_PREFIX=""
-	Logger "File conflicts: INITIATOR << >> TARGET" "ALWAYS"
 	if [ -f "$RUN_DIR/$PROGRAM.conflictList.comapre.$SCRIPT_PID.$TSTAMP" ]; then
 		echo "" > "${INITIATOR[$__replicaDir]}${INITIATOR[$__stateDir]}/${INITIATOR[$__conflictListFile]}"
 		while read -r line; do
