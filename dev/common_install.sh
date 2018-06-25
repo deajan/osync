@@ -12,7 +12,7 @@ PROGRAM_BINARY=$PROGRAM".sh"
 PROGRAM_BATCH=$PROGRAM"-batch.sh"
 SSH_FILTER="ssh_filter.sh"
 
-SCRIPT_BUILD=2018062501
+SCRIPT_BUILD=2018062601
 
 ## osync / obackup / pmocr / zsnap install script
 ## Tested on RHEL / CentOS 6 & 7, Fedora 23, Debian 7 & 8, Mint 17 and FreeBSD 8, 10 and 11
@@ -61,6 +61,7 @@ SERVICE_DIR_INIT=$FAKEROOT/etc/init.d
 # Should be /usr/lib/systemd/system, but /lib/systemd/system exists on debian & rhel / fedora
 SERVICE_DIR_SYSTEMD_SYSTEM=$FAKEROOT/lib/systemd/system
 SERVICE_DIR_SYSTEMD_USER=$FAKEROOT/etc/systemd/user
+SERVICE_DIR_OPENRC=$FAKEROOT/etc/init.d
 
 if [ "$PROGRAM" == "osync" ]; then
 	SERVICE_NAME="osync-srv"
@@ -71,6 +72,7 @@ fi
 SERVICE_FILE_INIT="$SERVICE_NAME"
 SERVICE_FILE_SYSTEMD_SYSTEM="$SERVICE_NAME@.service"
 SERVICE_FILE_SYSTEMD_USER="$SERVICE_NAME@.service.user"
+SERVICE_FILE_OPENRC="$SERVICE_NAME-openrc"
 
 ## Generic code
 
@@ -123,11 +125,16 @@ function SetLocalOSSettings {
 }
 
 function GetInit {
-	if [ -f /sbin/init ]; then
+	if [ -f /sbin/openrc-run ]; then
+		init="openrc"
+		Logger "Detected openrc." "SIMPLE"
+	elif [ -f /sbin/init ]; then
 		if file /sbin/init | grep systemd > /dev/null; then
 			init="systemd"
+			Logger "Detected systemd." "SIMPLE"
 		else
 			init="initV"
+			Logger "Detected initV." "SIMPLE"
 		fi
 	else
 		Logger "Can't detect initV or systemd. Service files won't be installed. You can still run $PROGRAM manually or via cron." "SIMPLE"
@@ -152,36 +159,39 @@ function CreateDir {
 function CopyFile {
 	local sourcePath="${1}"
 	local destPath="${2}"
-	local fileName="${3}"
-	local fileMod="${4}"
-	local fileUser="${5}"
-	local fileGroup="${6}"
-	local overwrite="${7:-false}"
+	local sourceFileName="${3}"
+	local destFileName="${4}"
+	local fileMod="${5}"
+	local fileUser="${6}"
+	local fileGroup="${7}"
+	local overwrite="${8:-false}"
 
 	local userGroup=""
 	local oldFileName
 
-	if [ -f "$destPath/$fileName" ] && [ $overwrite == false ]; then
-		oldFileName="$fileName"
-		fileName="$oldFileName.new"
-		cp "$sourcePath/$oldFileName" "$destPath/$fileName"
-	else
-		cp "$sourcePath/$fileName" "$destPath"
+	if [ "$destFileName" == "" ]; then
+		destFileName="$sourceFileName"
 	fi
 
+	if [ -f "$destPath/$destFileName" ] && [ $overwrite == false ]; then
+		destfileName="$sourceFileName.new"
+		Logger "Copying [$sourceFileName] to [$destPath/$destFilename]." "SIMPLE"
+	fi
+
+	cp "$sourcePath/$sourceFileName" "$destPath/$destFileName"
 	if [ $? != 0 ]; then
-		Logger "Cannot copy [$fileName] to [$destPath]. Make sure to run install script in the directory containing all other files." "SIMPLE"
+		Logger "Cannot copy [$sourcePath/$sourceFileName] to [$destPath/$destFileName]. Make sure to run install script in the directory containing all other files." "SIMPLE"
 		Logger "Also make sure you have permissions to write to [$BIN_DIR]." "SIMPLE"
 		exit 1
 	else
-		Logger "Copied [$fileName] to [$destPath]." "SIMPLE"
+		Logger "Copied [$sourcePath/$sourceFileName] to [$destPath/$destFileName]." "SIMPLE"
 		if [ "$fileMod" != "" ]; then
-			chmod "$fileMod" "$destPath/$fileName"
+			chmod "$fileMod" "$destPath/$destFileName"
 			if [ $? != 0 ]; then
-				Logger "Cannot set file permissions of [$destPath/$fileName] to [$fileMod]." "SIMPLE"
+				Logger "Cannot set file permissions of [$destPath/$destFileName] to [$fileMod]." "SIMPLE"
 				exit 1
 			else
-				Logger "Set file permissions to [$fileMod] on [$destPath/$fileName]." "SIMPLE"
+				Logger "Set file permissions to [$fileMod] on [$destPath/$destFileName]." "SIMPLE"
 			fi
 		fi
 
@@ -192,12 +202,12 @@ function CopyFile {
 				userGroup="$userGroup"":$fileGroup"
 			fi
 
-			chown "$userGroup" "$destPath/$fileName"
+			chown "$userGroup" "$destPath/$destFileName"
 			if [ $? != 0 ]; then
-				Logger "Could not set file ownership on [$destPath/$fileName] to [$userGroup]." "SIMPLE"
+				Logger "Could not set file ownership on [$destPath/$destFileName] to [$userGroup]." "SIMPLE"
 				exit 1
 			else
-				Logger "Set file ownership on [$destPath/$fileName] to [$userGroup]." "SIMPLE"
+				Logger "Set file ownership on [$destPath/$destFileName] to [$userGroup]." "SIMPLE"
 			fi
 		fi
 	fi
@@ -213,7 +223,7 @@ function CopyExampleFiles {
 
 	for file in "${exampleFiles[@]}"; do
 		if [ -f "$SCRIPT_PATH/$file" ]; then
-			CopyFile "$SCRIPT_PATH" "$CONF_DIR" "$file" "" "" "" false
+			CopyFile "$SCRIPT_PATH" "$CONF_DIR" "$file" "$file" "" "" "" false
 		fi
 	done
 }
@@ -237,17 +247,17 @@ function CopyProgram {
 	fi
 
 	for file in "${binFiles[@]}"; do
-		CopyFile "$SCRIPT_PATH" "$BIN_DIR" "$file" 755 "$user" "$group" true
+		CopyFile "$SCRIPT_PATH" "$BIN_DIR" "$file" "$file" 755 "$user" "$group" true
 	done
 }
 
 function CopyServiceFiles {
 	if ([ "$init" == "systemd" ] && [ -f "$SCRIPT_PATH/$SERVICE_FILE_SYSTEMD_SYSTEM" ]); then
 		CreateDir "$SERVICE_DIR_SYSTEMD_SYSTEM"
-		CopyFile "$SCRIPT_PATH" "$SERVICE_DIR_SYSTEMD_SYSTEM" "$SERVICE_FILE_SYSTEMD_SYSTEM" "" "" "" true
+		CopyFile "$SCRIPT_PATH" "$SERVICE_DIR_SYSTEMD_SYSTEM" "$SERVICE_FILE_SYSTEMD_SYSTEM" "$SERVICE_FILE_SYSTEMD_SYSTEM" "" "" "" true
 		if [ -f "$SCRIPT_PATH/$SERVICE_FILE_SYSTEMD_USER" ]; then
 			CreateDir "$SERVICE_DIR_SYSTEMD_USER"
-			CopyFile "$SCRIPT_PATH" "$SERVICE_DIR_SYSTEMD_USER" "$SERVICE_FILE_SYSTEMD_USER" "" "" "" true
+			CopyFile "$SCRIPT_PATH" "$SERVICE_DIR_SYSTEMD_USER" "$SERVICE_FILE_SYSTEMD_USER" "$SERVICE_FILE_SYSTEMD_USER" "" "" "" true
 		fi
 
 		Logger "Created [$SERVICE_NAME] service in [$SERVICE_DIR_SYSTEMD_SYSTEM] and [$SERVICE_DIR_SYSTEMD_USER]." "SIMPLE"
@@ -255,12 +265,18 @@ function CopyServiceFiles {
 		Logger "Can be enabled on boot with [systemctl enable $SERVICE_NAME@instance.conf]." "SIMPLE"
 		Logger "In userland, active with [systemctl --user start $SERVICE_NAME@instance.conf]." "SIMPLE"
 	elif ([ "$init" == "initV" ] && [ -f "$SCRIPT_PATH/$SERVICE_FILE_INIT" ] && [ -d "$SERVICE_DIR_INIT" ]); then
-		CreateDir "$SERVICE_DIR_INIT"
-		CopyFile "$SCRIPT_PATH" "$SERVICE_DIR_INIT" "$SERVICE_FILE_INIT" "755" "" "" true
+		#CreateDir "$SERVICE_DIR_INIT"
+		CopyFile "$SCRIPT_PATH" "$SERVICE_DIR_INIT" "$SERVICE_FILE_INIT" "$SERVICE_FILE_INIT" "755" "" "" true
 
 		Logger "Created [$SERVICE_NAME] service in [$SERVICE_DIR_INIT]." "SIMPLE"
 		Logger "Can be activated with [service $SERVICE_FILE_INIT start]." "SIMPLE"
 		Logger "Can be enabled on boot with [chkconfig $SERVICE_FILE_INIT on]." "SIMPLE"
+	elif ([ "$init" == "openrc" && [ -f "$SCRIPT_PATH/$SERVICE_FILE_OPENRC" ] && [ -d "$SERVICE_DIR_OPENRC" ]); then
+		# Rename service to usual service file
+		CopyFile "$SCRIPT_PATH" "$SERVICE_DIR_OPENRC" "$SERVICE_FILE_OPENRC" "$SERVICE_FILE_INIT" "755" "" "" true
+
+		Logger "Created [$SERVICE_NAME] service in [$SERVICE_DIR_OPENRC]." "SIMPLE"
+		Logger "Can be activated with [rc-update add $SERVICE_NAME.instance] where instance is a configuration file found in /etc/osync." "SIMPLE"
 	else
 		Logger "Cannot define what init style is in use on this system. Skipping service file installation." "SIMPLE"
 	fi
