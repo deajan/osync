@@ -6,7 +6,7 @@
 #command line arguments don't take -AaqV for example
 
 _OFUNCTIONS_VERSION=2.3.0-dev
-_OFUNCTIONS_BUILD=2018062501
+_OFUNCTIONS_BUILD=2018062504
 #### _OFUNCTIONS_BOOTSTRAP SUBSET ####
 _OFUNCTIONS_BOOTSTRAP=true
 #### _OFUNCTIONS_BOOTSTRAP SUBSET END ####
@@ -23,10 +23,6 @@ _OFUNCTIONS_BOOTSTRAP=true
 ## _LOGGER_PREFIX="date"/"time"/""
 
 #TODO: global WAIT_FOR_TASK_COMPLETION_id instead of callerName has to be backported to ParallelExec and osync / obackup / pmocr ocde
-#TODO: IsInteger regex or expr for busybox
-#TODO: VerComp cant use for (( type, needs for i in seq instead
-# Check if expr and seq exist, if not, use old method
-
 
 ## Logger sets {ERROR|WARN}_ALERT variable when called with critical / error / warn loglevel
 ## When called from subprocesses, variable of main process cannot be set. Status needs to be get via $RUN_DIR/$PROGRAM.Logger.{error|warn}.$SCRIPT_PID.$TSTAMP
@@ -180,8 +176,11 @@ function _Logger {
 
 	if [ "$logValue" != "" ]; then
 		echo -e "$logValue" >> "$LOG_FILE"
-		# Current log file
-		echo -e "$logValue" >> "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$SCRIPT_PID.$TSTAMP"
+
+		# Build current log file for alerts if we have a sufficient environment
+		if [ "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$SCRIPT_PID.$TSTAMP" != "" ]; then
+			echo -e "$logValue" >> "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$SCRIPT_PID.$TSTAMP"
+		fi
 	fi
 
 	if [ "$stdValue" != "" ] && [ "$_LOGGER_SILENT" != true ]; then
@@ -272,6 +271,7 @@ function RemoteLogger {
 # VERBOSE sent to stdout if _LOGGER_VERBOSE = true
 # ALWAYS is sent to stdout unless _LOGGER_SILENT = true
 # DEBUG & PARANOIA_DEBUG are only sent to stdout if _DEBUG=yes
+# SIMPLE is a wrapper for QuickLogger that does not use advanced functionality
 function Logger {
 	local value="${1}"		# Sentence to log (in double quotes)
 	local level="${2}"		# Log level
@@ -328,37 +328,19 @@ function Logger {
 			_Logger "$prefix$value" "$prefix\e[35m$value\e[0m"	#__WITH_PARANOIA_DEBUG
 			return							#__WITH_PARANOIA_DEBUG
 		fi								#__WITH_PARANOIA_DEBUG
+	elif [ "$level" == "SIMPLE" ]; then
+		if [ "$_LOGGER_SILENT" == true ]; then
+			_Logger "$preix$value"
+		else
+			_Logger "$preix$value" "$prefix$value"
+		fi
+		return
 	else
 		_Logger "\e[41mLogger function called without proper loglevel [$level].\e[0m" "\e[41mLogger function called without proper loglevel [$level].\e[0m" true
 		_Logger "Value was: $prefix$value" "Value was: $prefix$value" true
 	fi
 }
 #### Logger SUBSET END ####
-
-#### QuickLogger SUBSET ####
-# QuickLogger subfunction, can be called directly
-function _QuickLogger {
-	local value="${1}"
-	local destination="${2}" # Destination: stdout, log, both
-
-	if ([ "$destination" == "log" ] || [ "$destination" == "both" ]); then
-		echo -e "$(date) - $value" >> "$LOG_FILE"
-	elif ([ "$destination" == "stdout" ] || [ "$destination" == "both" ]); then
-		echo -e "$value"
-	fi
-}
-
-# Generic quick logging function
-function QuickLogger {
-	local value="${1}"
-
-	if [ "$_LOGGER_SILENT" == true ]; then
-		_QuickLogger "$value" "log"
-	else
-		_QuickLogger "$value" "stdout"
-	fi
-}
-#### QuickLogger SUBSET END ####
 
 # Portable child (and grandchild) kill function tester under Linux, BSD and MacOS X
 function KillChilds {
@@ -1286,28 +1268,24 @@ function IsNumeric {
 	fi
 }
 
-#### CheckRFC822 SUBSET ####
-# Checks email address validity
-function CheckRFC822 {
-	local mail="${1}"
-	local rfc822="^[a-z0-9!#\$%&'*+/=?^_\`{|}~-]+(\.[a-z0-9!#$%&'*+/=?^_\`{|}~-]+)*@([a-z0-9]([a-z0-9-]*[a-z0-9])?\.)+[a-z0-9]([a-z0-9-]*[a-z0-9])?\$"
-
-	if [[ $mail =~ $rfc822 ]]; then
-		echo 1
-	else
-		echo 0
-	fi
-}
-#### CheckRFC822 SUBSET END ####
-
 #### IsInteger SUBSET ####
+# Function is busybox compatible since busybox ash does not understand direct regex, we use expr
 function IsInteger {
 	local value="${1}"
 
-	if [[ $value =~ ^[0-9]+$ ]]; then
-		echo 1
+	if type expr > /dev/null 2>&1; then
+		expr "$value" : "^[0-9]\+$" > /dev/null 2>&1
+		if [ $? -eq 0 ]; then
+			echo 1
+		else
+			echo 0
+		fi
 	else
-		echo 0
+		if [[ $value =~ ^[0-9]+$ ]]; then
+			echo 1
+		else
+			echo 0
+		fi
 	fi
 }
 #### IsInteger SUBSET END ####
@@ -1344,6 +1322,20 @@ function HumanToNumeric {
 	echo $value
 }
 #### HumanToNumeric SUBSET END ####
+
+#### CheckRFC822 SUBSET ####
+# Checks email address validity
+function CheckRFC822 {
+	local mail="${1}"
+	local rfc822="^[a-z0-9!#\$%&'*+/=?^_\`{|}~-]+(\.[a-z0-9!#$%&'*+/=?^_\`{|}~-]+)*@([a-z0-9]([a-z0-9-]*[a-z0-9])?\.)+[a-z0-9]([a-z0-9-]*[a-z0-9])?\$"
+
+	if [[ $mail =~ $rfc822 ]]; then
+		echo 1
+	else
+		echo 0
+	fi
+}
+#### CheckRFC822 SUBSET END ####
 
 #### UrlEncode SUBSET ####
 ## Modified version of https://gist.github.com/cdown/1163649
