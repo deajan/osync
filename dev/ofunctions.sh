@@ -3,14 +3,10 @@
 #### OFUNCTIONS MINI SUBSET ####
 
 #TODO: ExecTasks postponed arrays / files grow a lot. Consider having them "rolling"
-#done: add checkRFC function (and use it for --destination-mails)
-#done: ExecTasks still needs some better call argument list
-#done: ExecTasks sub function relocate
-#done: SendMail and SendEmail convert functions inverted, check on osync and obackup
 #command line arguments don't take -AaqV for example
 
 _OFUNCTIONS_VERSION=2.3.0-dev
-_OFUNCTIONS_BUILD=2018062301
+_OFUNCTIONS_BUILD=2018062501
 #### _OFUNCTIONS_BOOTSTRAP SUBSET ####
 _OFUNCTIONS_BOOTSTRAP=true
 #### _OFUNCTIONS_BOOTSTRAP SUBSET END ####
