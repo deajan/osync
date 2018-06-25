@@ -1,28 +1,39 @@
 RECENT CHANGES
 --------------
 
-dd Mmm YYYY: osync v1.2.3 release
-! Refactored time control and parallel execution functions into one single function
+dd Mmm YYYY: osync v1.3 release (for full changelog since v1.2 branch see all v1.2-beta/RC entries)
 
-dd Mmm YYYY: osync v1.2.2 release
+dd Mmm YYYY: osync v1.3-RC1 release
 
-! Added an option to log conflictual files
-! Presence of conflictual files can trigger a special mail
+dd Mmm YYYY: osync v1.3-beta release
+
+!(test) Added an option to log conflictual files
+!(test) Presence of conflictual files can trigger a special mail
+! New option 
 ! new option FORCE_CONFLICT_PREVALANCE
-
-dd Mmm YYYY: osync v1.2.1 release
-
+! Added OpenRC support (thanks to kozross)
 - Added --no-resume option in order to disable resuming execution on failure
 - Added basic performance profiler to debug version
 - Fixed an issue with filenames ending with spaces, their deletion not being propagated, and ACL / conflicts not being managed (still they got synced)
 - Fixed missing options passed to subprocess in daemon mode
 - Fixed bogus pgrep can lead to segfault 11 because of recursive KillChilds
 - Fixed osync deletion not working on systems with ssh banner enabled
+! Improved GetLocalOS and GetRemoteOS OS detection
 - Fixed GetRemoteOS missing GetConfFileValue preventing to get OS details from /etc/os-release
 - Fixed low severity security issue where log and run files could be read by other users
+! Merged Logger and QuickLogger for simplified usage
+! Fixed installer bug with QuickLogger
+! Fixed QuickLogger logic
+! Fixed inotifyway error in FreeBSD
 - Minor enhancements in installer / ofunctions
 	- Added --prefix option for installer
         - Installer path fixes
+- Refactored time control and parallel execution functions into one single function
+- Multiple portability fixes
+	- Fixed bogus runtime filenames on Busybox
+	- Fixed urlEncode function on BusyBox
+	! Fixed IsInteger, IsNumeric functions on BusyBox
+	! Fixed VerComp function on BusyBox
 
 25 Mar 2017: osync v1.2 release (for full changelog of v1.2 branch see all v1.2-beta/RC entries)
 
