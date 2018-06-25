@@ -9,14 +9,10 @@ IS_STABLE=no
 
 
 #TODO: ExecTasks postponed arrays / files grow a lot. Consider having them "rolling"
-#done: add checkRFC function (and use it for --destination-mails)
-#done: ExecTasks still needs some better call argument list
-#done: ExecTasks sub function relocate
-#done: SendMail and SendEmail convert functions inverted, check on osync and obackup
 #command line arguments don't take -AaqV for example
 
 _OFUNCTIONS_VERSION=2.3.0-dev
-_OFUNCTIONS_BUILD=2018031501
+_OFUNCTIONS_BUILD=2018062504
 _OFUNCTIONS_BOOTSTRAP=true
 
 ## BEGIN Generic bash functions written in 2013-2017 by Orsiris de Jong - http://www.netpower.fr - ozy@netpower.fr
@@ -83,9 +79,6 @@ fi
 
 SCRIPT_PID=$$
 
-# TODO: Check if %N works on MacOS
-TSTAMP=$(date '+%Y%m%dT%H%M%S.%N')
-
 LOCAL_USER=$(whoami)
 LOCAL_HOST=$(hostname)
 
@@ -113,6 +106,46 @@ else
 	RUN_DIR=.
 fi
 
+#### PoorMansRandomGenerator SUBSET ####
+# Get a random number on Windows BusyBox alike, also works on most Unixes
+function PoorMansRandomGenerator {
+	local digits="${1}"		# The number of digits to generate
+
+	local minimum=1
+	local maximum
+	local n=0
+	
+	if [ "$digits" == "" ]; then
+		digits=5
+	fi
+	
+	# Minimum already has a digit
+	for n in $(seq 1 $((digits-1))); do
+		minimum=$minimum"0"
+		maximum=$maximum"9"
+	done
+	maximum=$maximum"9"
+	
+	#n=0; while [ $n -lt $minimum ]; do n=$n$(dd if=/dev/urandom bs=100 count=1 2>/dev/null | tr -cd '0-9'); done; n=$(echo $n | sed -e 's/^0//')
+	# bs=19 since if real random strikes, having a 19 digits number is not supported
+	while [ $n -lt $minimum ] || [ $n -gt $maximum ]; do
+		if [ $n -lt $minimum ]; then
+			# Add numbers
+			n=$n$(dd if=/dev/urandom bs=19 count=1 2>/dev/null | tr -cd '0-9')
+			n=$(echo $n | sed -e 's/^0//')
+			if [ "$n" == "" ]; then
+				n=0
+			fi
+		elif [ $n -gt $maximum ]; then
+			n=$(echo $n | sed 's/.$//')
+		fi
+	done
+	echo $n
+}
+#### PoorMansRandomGenerator SUBSET END ####
+
+# Initial TSTMAP value before function declaration
+TSTAMP=$(date '+%Y%m%dT%H%M%S').$(PoorMansRandomGenerator 4)
 
 # Default alert attachment filename
 ALERT_LOG_FILE="$RUN_DIR/$PROGRAM.$SCRIPT_PID.$TSTAMP.last.log"
@@ -128,7 +161,6 @@ function Dummy {
 	sleep $SLEEP_TIME
 }
 
-#### Logger SUBSET ####
 
 # Array to string converter, see http://stackoverflow.com/questions/1527049/bash-join-elements-of-an-array
 # usage: joinString separaratorChar Array
@@ -144,8 +176,11 @@ function _Logger {
 
 	if [ "$logValue" != "" ]; then
 		echo -e "$logValue" >> "$LOG_FILE"
-		# Current log file
-		echo -e "$logValue" >> "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$SCRIPT_PID.$TSTAMP"
+
+		# Build current log file for alerts if we have a sufficient environment
+		if [ "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$SCRIPT_PID.$TSTAMP" != "" ]; then
+			echo -e "$logValue" >> "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$SCRIPT_PID.$TSTAMP"
+		fi
 	fi
 
 	if [ "$stdValue" != "" ] && [ "$_LOGGER_SILENT" != true ]; then
@@ -235,6 +270,7 @@ function RemoteLogger {
 # VERBOSE sent to stdout if _LOGGER_VERBOSE = true
 # ALWAYS is sent to stdout unless _LOGGER_SILENT = true
 # DEBUG & PARANOIA_DEBUG are only sent to stdout if _DEBUG=yes
+# SIMPLE is a wrapper for QuickLogger that does not use advanced functionality
 function Logger {
 	local value="${1}"		# Sentence to log (in double quotes)
 	local level="${2}"		# Log level
@@ -291,33 +327,16 @@ function Logger {
 			_Logger "$prefix$value" "$prefix\e[35m$value\e[0m"	#__WITH_PARANOIA_DEBUG
 			return							#__WITH_PARANOIA_DEBUG
 		fi								#__WITH_PARANOIA_DEBUG
+	elif [ "$level" == "SIMPLE" ]; then
+		if [ "$_LOGGER_SILENT" == true ]; then
+			_Logger "$preix$value"
+		else
+			_Logger "$preix$value" "$prefix$value"
+		fi
+		return
 	else
 		_Logger "\e[41mLogger function called without proper loglevel [$level].\e[0m" "\e[41mLogger function called without proper loglevel [$level].\e[0m" true
 		_Logger "Value was: $prefix$value" "Value was: $prefix$value" true
-	fi
-}
-#### Logger SUBSET END ####
-
-# QuickLogger subfunction, can be called directly
-function _QuickLogger {
-	local value="${1}"
-	local destination="${2}" # Destination: stdout, log, both
-
-	if ([ "$destination" == "log" ] || [ "$destination" == "both" ]); then
-		echo -e "$(date) - $value" >> "$LOG_FILE"
-	elif ([ "$destination" == "stdout" ] || [ "$destination" == "both" ]); then
-		echo -e "$value"
-	fi
-}
-
-# Generic quick logging function
-function QuickLogger {
-	local value="${1}"
-
-	if [ "$_LOGGER_SILENT" == true ]; then
-		_QuickLogger "$value" "log"
-	else
-		_QuickLogger "$value" "stdout"
 	fi
 }
 
@@ -333,7 +352,7 @@ function KillChilds {
 	fi
 
 	if kill -0 "$pid" > /dev/null 2>&1; then
-		# Warning: pgrep is not native on cygwin, have this checked in CheckEnvironment
+		#TODO: Warning: pgrep is not native on cygwin, have this checked in CheckEnvironment
 		if children="$(pgrep -P "$pid")"; then
 			if [[ "$pid" == *"$children"* ]]; then
 				Logger "Bogus pgrep implementation." "CRITICAL"
@@ -1000,11 +1019,11 @@ function ExecTasks {
 				else
 					# pid is dead, get its exit code from wait command
 					wait $pid
-					retval=$?
+					retval=$?	#TODO: do we use retval codes somehow ?? where
 					# Check for valid exit codes
 					if [ $(ArrayContains $retval "${validExitCodes[@]}") -eq 0 ]; then
 						if [ $noErrorLogsAtAll != true ]; then
-							Logger "${FUNCNAME[0]} called by [$id] finished monitoring pid [$pid] with exitcode [$retval]." "ERROR"
+							Logger "${FUNCNAME[0]} called by [$id] finished monitoring pid [$pid] with exitcode [$retval]." "DEBUG" #TODO: set this to debug in order to stop complaints
 							if [ "$functionMode" == "ParallelExec" ]; then
 								Logger "Command was [${commandsArrayPid[$pid]}]." "ERROR"
 							fi
@@ -1245,25 +1264,23 @@ function IsNumeric {
 	fi
 }
 
-# Checks email address validity
-function CheckRFC822 {
-	local mail="${1}"
-	local rfc822="^[a-z0-9!#\$%&'*+/=?^_\`{|}~-]+(\.[a-z0-9!#$%&'*+/=?^_\`{|}~-]+)*@([a-z0-9]([a-z0-9-]*[a-z0-9])?\.)+[a-z0-9]([a-z0-9-]*[a-z0-9])?\$"
-
-	if [[ $mail =~ $rfc822 ]]; then
-		echo 1
-	else
-		echo 0
-	fi
-}
-
+# Function is busybox compatible since busybox ash does not understand direct regex, we use expr
 function IsInteger {
 	local value="${1}"
 
-	if [[ $value =~ ^[0-9]+$ ]]; then
-		echo 1
+	if type expr > /dev/null 2>&1; then
+		expr "$value" : "^[0-9]\+$" > /dev/null 2>&1
+		if [ $? -eq 0 ]; then
+			echo 1
+		else
+			echo 0
+		fi
 	else
-		echo 0
+		if [[ $value =~ ^[0-9]+$ ]]; then
+			echo 1
+		else
+			echo 0
+		fi
 	fi
 }
 
@@ -1298,12 +1315,24 @@ function HumanToNumeric {
 	echo $value
 }
 
-## from https://gist.github.com/cdown/1163649
+# Checks email address validity
+function CheckRFC822 {
+	local mail="${1}"
+	local rfc822="^[a-z0-9!#\$%&'*+/=?^_\`{|}~-]+(\.[a-z0-9!#$%&'*+/=?^_\`{|}~-]+)*@([a-z0-9]([a-z0-9-]*[a-z0-9])?\.)+[a-z0-9]([a-z0-9-]*[a-z0-9])?\$"
+
+	if [[ $mail =~ $rfc822 ]]; then
+		echo 1
+	else
+		echo 0
+	fi
+}
+
+## Modified version of https://gist.github.com/cdown/1163649
 function UrlEncode {
 	local length="${#1}"
 
 	local LANG=C
-	for (( i = 0; i < length; i++ )); do
+	for i in $(seq 0 $((length-1))); do
 		local c="${1:i:1}"
 		case $c in
 			[a-zA-Z0-9.~_-])
@@ -1406,10 +1435,34 @@ function GetLocalOS {
 	if [ -f "/etc/os-release" ]; then
 		localOsName=$(GetConfFileValue "/etc/os-release" "NAME" true)
 		localOsVer=$(GetConfFileValue "/etc/os-release" "VERSION" true)
+	elif [ "$LOCAL_OS" == "BusyBox" ]; then
+		localOsVer=`ls --help 2>&1 | head -1 | cut -f2 -d' '`
+		localOsName="BusyBox"
 	fi
 
-	# Add a global variable for statistics in installer
-	LOCAL_OS_FULL="$localOsVar ($localOsName $localOsVer)"
+	# Get Host info for Windows
+	if [ "$LOCAL_OS" == "msys" ] || [ "$LOCAL_OS" == "BusyBox" ] || [ "$LOCAL_OS" == "Cygwin" ] || [ "$LOCAL_OS" == "WinNT10" ]; then localOsVar="$(uname -a)"
+		if [ "$PROGRAMW6432" != "" ]; then
+			LOCAL_OS_BITNESS=64
+			LOCAL_OS_FAMILY="Windows"
+		elif [ "$PROGRAMFILES" != "" ]; then
+			LOCAL_OS_BITNESS=32
+			LOCAL_OS_FAMILY="Windows"
+		# Case where running on BusyBox but no program files defined
+		elif [ "$LOCAL_OS" == "BusyBox" ]; then
+			LOCAL_OS_FAMILY="Unix"
+		fi
+	# Get Host info for Unix
+	else
+		LOCAL_OS_FAMILY="Unix"
+		if uname -m | grep '64' > /dev/null 2>&1; then
+			LOCAL_OS_BITNESS=64
+		else
+			LOCAL_OS_BITNESS=32
+		fi
+	fi
+
+	LOCAL_OS_FULL="$localOsVar ($localOsName $localOsVer) $LOCAL_OS_BITNESS-bit $LOCAL_OS_FAMILY"
 
 	if [ "$_OFUNCTIONS_VERSION" != "" ]; then
 		Logger "Local OS: [$LOCAL_OS_FULL]." "DEBUG"
@@ -1489,6 +1542,8 @@ function GetOs {
 	local localOsVar
 	local localOsName
 	local localOsVer
+	local localOsBitness
+	local localOsFamily
 
 	local osInfo="/etc/os-release"
 
@@ -1515,9 +1570,36 @@ function GetOs {
 		localOsName="${localOsName##*=}"
 		localOsVer=$(grep "^VERSION=" "$osInfo")
 		localOsVer="${localOsVer##*=}"
+	elif [ "$localOsVar" == "BusyBox" ]; then
+		localOsVer=`ls --help 2>&1 | head -1 | cut -f2 -d' '`
+		localOsName="BusyBox"
 	fi
 
-	echo "$localOsVar ($localOsName $localOsVer)"
+	# Get Host info for Windows
+	case $localOsVar in
+		*"MINGW32"*|*"MINGW64"*|*"MSYS"*|*"CYGWIN*"|*"Microsoft"*|*"WinNT10*")
+		if [ "$PROGRAMW6432" != "" ]; then
+			localOsBitness=64
+			localOsFamily="Windows"
+		elif [ "$PROGRAMFILES" != "" ]; then
+			localOsBitness=32
+			localOsFamily="Windows"
+		# Case where running on BusyBox but no program files defined
+		elif [ "$localOsVar" == "BusyBox" ]; then
+			localOsFamily="Unix"
+		fi
+		;;
+		*)
+		localOsFamily="Unix"
+		if uname -m | grep '64' > /dev/null 2>&1; then
+			localOsBitness=64
+		else
+			localOsBitness=32
+		fi
+		;;
+	esac
+
+	echo "$localOsVar ($localOsName $localOsVer) $localOsBitness-bit $localOsFamily"
 }
 
 GetOs
@@ -2358,8 +2440,11 @@ function _Logger {
 
 	if [ "$logValue" != "" ]; then
 		echo -e "$logValue" >> "$LOG_FILE"
-		# Current log file
-		echo -e "$logValue" >> "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$SCRIPT_PID.$TSTAMP"
+
+		# Build current log file for alerts if we have a sufficient environment
+		if [ "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$SCRIPT_PID.$TSTAMP" != "" ]; then
+			echo -e "$logValue" >> "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$SCRIPT_PID.$TSTAMP"
+		fi
 	fi
 
 	if [ "$stdValue" != "" ] && [ "$_LOGGER_SILENT" != true ]; then
