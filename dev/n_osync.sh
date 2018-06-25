@@ -8,8 +8,10 @@ PROGRAM="osync" # Rsync based two way sync engine with fault tolerance
 AUTHOR="(C) 2013-2017 by Orsiris de Jong"
 CONTACT="http://www.netpower.fr/osync - ozy@netpower.fr"
 PROGRAM_VERSION=1.2.5-dev
-PROGRAM_BUILD=2018062501
+PROGRAM_BUILD=2018062505
 IS_STABLE=no
+
+#TODO: tidy up ExecTasks comments
 
 
 ##### Execution order						#__WITH_PARANOIA_DEBUG
@@ -1480,6 +1482,35 @@ function deletionPropagation {
 	fi
 }
 
+function Initialize {
+	__CheckArguments 0 $# "$@"	#__WITH_PARANOIA_DEBUG
+
+	Logger "Initializing initiator and target file lists." "NOTICE"
+
+	treeList "${INITIATOR[$__replicaDir]}" "${INITIATOR[$__type]}" "${INITIATOR[$__replicaDir]}${INITIATOR[$__stateDir]}/${INITIATOR[$__type]}${INITIATOR[$__treeAfterFile]}" &
+	initiatorPid="$!"
+
+	treeList "${TARGET[$__replicaDir]}" "${TARGET[$__type]}" "${INITIATOR[$__replicaDir]}${INITIATOR[$__stateDir]}/${TARGET[$__type]}${INITIATOR[$__treeAfterFile]}" &
+	targetPid="$!"
+
+	ExecTasks "$initiatorPid;$targetPid" "${FUNCNAME[0]}" false 0 0 $SOFT_MAX_EXEC_TIME $HARD_MAX_EXEC_TIME false $SLEEP_TIME $KEEP_LOGGING
+	if [ $? -ne 0 ]; then
+		IFS=';' read -r -a pidArray <<< "$(eval echo \"\$WAIT_FOR_TASK_COMPLETION_${FUNCNAME[0]}\")"
+		initiatorFail=false
+		targetFail=false
+		for pid in "${pidArray[@]}"; do
+			pid=${pid%:*}
+			if [ "$pid" == "$initiatorPid" ]; then
+				Logger "Failed to create initialization files for initiator." "ERROR"
+			elif [ "$pid" == "$targetPid" ]; then
+				Logger "Failed to create initialization files for target." "ERROR"
+			fi
+		done
+		exit 1
+		resumeTarget="${SYNC_ACTION[8]}"
+	fi
+}
+
 ###### Sync function in 9 steps
 ######
 ###### Step 0a & 0b: Create current file list of replicas
@@ -2474,6 +2505,7 @@ function Usage {
 	echo "--force-unlock         Will override any existing active or dead locks on initiator and target replica"
 	echo "--on-changes           Will launch a sync task after a short wait period if there is some file activity on initiator replica. You should try daemon mode instead"
  	echo "--no-resume            Do not try to resume a failed run. By default, execution is resumed once"
+	echo "--initialize           Create file lists without actually synchronizing anything, this will help setup deletion detections before the first run"
 
 	echo ""
 	echo "[QUICKSYNC OPTIONS]"
@@ -2587,7 +2619,7 @@ sync_on_changes=false
 _NOLOCKS=false
 osync_cmd=$0
 _SUMMARY=false
-
+INITIALIZE="no"
 
 function GetCommandlineArguments {
 	local isFirstArgument=true
@@ -2684,6 +2716,10 @@ function GetCommandlineArguments {
 			ALERT_CONFLICTS="yes"
 			LOG_CONFLICTS="yes"
 			opts=$opts" --alert-conflicts"
+			;;
+			--initialize)
+			INITIALIZE="yes"
+			opts=$opts "--initialize"
 			;;
 			--no-prefix)
 			opts=$opts" --no-prefix"
@@ -2809,14 +2845,20 @@ else
 	fi
 	CheckReplicas
 	RunBeforeHook
-	Main
-	if [ $? -eq 0 ]; then
-		SoftDelete
-	fi
-	if [ $_SUMMARY == true ]; then
-		Summary
-	fi
-	if [ $LOG_CONFLICTS == "yes" ]; then
-		LogConflicts
+
+	if [ "$INITIALIZE" == "yes" ]; then
+		HandleLocks
+		Initialize
+	else
+		Main
+		if [ $? -eq 0 ]; then
+			SoftDelete
+		fi
+		if [ $_SUMMARY == true ]; then
+			Summary
+		fi
+		if [ $LOG_CONFLICTS == "yes" ]; then
+			LogConflicts
+		fi
 	fi
 fi
