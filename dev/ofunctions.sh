@@ -1450,10 +1450,34 @@ function GetLocalOS {
 	if [ -f "/etc/os-release" ]; then
 		localOsName=$(GetConfFileValue "/etc/os-release" "NAME" true)
 		localOsVer=$(GetConfFileValue "/etc/os-release" "VERSION" true)
+	elif [ "$LOCAL_OS" == "BusyBox" ]; then
+		localOsVer=`ls --help 2>&1 | head -1 | cut -f2 -d' '`
+		localOsName="BusyBox"
 	fi
 
-	# Add a global variable for statistics in installer
-	LOCAL_OS_FULL="$localOsVar ($localOsName $localOsVer)"
+	# Get Host info for Windows
+	if [ "$LOCAL_OS" == "msys" ] || [ "$LOCAL_OS" == "BusyBox" ] || [ "$LOCAL_OS" == "Cygwin" ] || [ "$LOCAL_OS" == "WinNT10" ]; then localOsVar="$(uname -a)"
+		if [ "$PROGRAMW6432" != "" ]; then
+			LOCAL_OS_BITNESS=64
+			LOCAL_OS_FAMILY="Windows"
+		elif [ "$PROGRAMFILES" != "" ]; then
+			LOCAL_OS_BITNESS=32
+			LOCAL_OS_FAMILY="Windows"
+		# Case where running on BusyBox but no program files defined
+		elif [ "$LOCAL_OS" == "BusyBox" ]; then
+			LOCAL_OS_FAMILY="Unix"
+		fi
+	# Get Host info for Unix
+	else
+		LOCAL_OS_FAMILY="Unix"
+		if uname -m | grep '64' > /dev/null 2>&1; then
+			LOCAL_OS_BITNESS=64
+		else
+			LOCAL_OS_BITNESS=32
+		fi
+	fi
+
+	LOCAL_OS_FULL="$localOsVar ($localOsName $localOsVer) $LOCAL_OS_BITNESS-bit $LOCAL_OS_FAMILY"
 
 	if [ "$_OFUNCTIONS_VERSION" != "" ]; then
 		Logger "Local OS: [$LOCAL_OS_FULL]." "DEBUG"
@@ -1535,6 +1559,8 @@ function GetOs {
 	local localOsVar
 	local localOsName
 	local localOsVer
+	local localOsBitness
+	local localOsFamily
 
 	local osInfo="/etc/os-release"
 
@@ -1561,9 +1587,36 @@ function GetOs {
 		localOsName="${localOsName##*=}"
 		localOsVer=$(grep "^VERSION=" "$osInfo")
 		localOsVer="${localOsVer##*=}"
+	elif [ "$localOsVar" == "BusyBox" ]; then
+		localOsVer=`ls --help 2>&1 | head -1 | cut -f2 -d' '`
+		localOsName="BusyBox"
 	fi
 
-	echo "$localOsVar ($localOsName $localOsVer)"
+	# Get Host info for Windows
+	case $localOsVar in
+		*"MINGW32"*|*"MINGW64"*|*"MSYS"*|*"CYGWIN*"|*"Microsoft"*|*"WinNT10*")
+		if [ "$PROGRAMW6432" != "" ]; then
+			localOsBitness=64
+			localOsFamily="Windows"
+		elif [ "$PROGRAMFILES" != "" ]; then
+			localOsBitness=32
+			localOsFamily="Windows"
+		# Case where running on BusyBox but no program files defined
+		elif [ "$localOsVar" == "BusyBox" ]; then
+			localOsFamily="Unix"
+		fi
+		;;
+		*)
+		localOsFamily="Unix"
+		if uname -m | grep '64' > /dev/null 2>&1; then
+			localOsBitness=64
+		else
+			localOsBitness=32
+		fi
+		;;
+	esac
+
+	echo "$localOsVar ($localOsName $localOsVer) $localOsBitness-bit $localOsFamily"
 }
 
 GetOs
