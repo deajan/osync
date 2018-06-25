@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-## MERGE 2018021901
+## MERGE 2018062501
 
 ## Merges ofunctions.sh and n_program.sh into program.sh
 ## Adds installer
@@ -33,7 +33,7 @@ function __PREPROCESSOR_Merge {
 	__PREPROCESSOR_CleanDebug "$PROGRAM"
 	rm -f tmp_$PROGRAM.sh
 	if [ $? != 0 ]; then
-		QuickLogger "Cannot remove tmp_$PROGRAM.sh"
+		Logger "Cannot remove tmp_$PROGRAM.sh" "SIMPLE"
 		exit 1
 	fi
 }
@@ -50,7 +50,7 @@ function __PREPROCESSOR_Constants {
 	'#### DEBUG SUBSET ####'
 	'#### TrapError SUBSET ####'
 	'#### RemoteLogger SUBSET ####'
-	'#### QuickLogger SUBSET ####'
+	'#### Logger SUBSET ####'
 	'#### GetLocalOS SUBSET ####'
 	'#### IsInteger SUBSET ####'
 	'#### UrlEncode SUBSET ####'
@@ -69,7 +69,7 @@ function __PREPROCESSOR_Unexpand {
 
 	unexpand "$source" > "$destination"
 	if [ $? != 0 ]; then
-		QuickLogger "Cannot unexpand [$source] to [$destination]."
+		Logger "Cannot unexpand [$source] to [$destination]." "SIMPLE"
 		exit 1
 	fi
 }
@@ -82,29 +82,29 @@ function __PREPROCESSOR_MergeSubset {
 
 	sed -n "/$subsetBegin/,/$subsetEnd/p" "$subsetFile" > "$subsetFile.$subsetBegin"
 	if [ $? != 0 ]; then
-		QuickLogger "Cannot sed subset [$subsetBegin -- $subsetEnd] in [$subsetFile]."
+		Logger "Cannot sed subset [$subsetBegin -- $subsetEnd] in [$subsetFile]." "SIMPLE"
 		exit 1
 	fi
 	sed "/include $subsetBegin/r $subsetFile.$subsetBegin" "$mergedFile" | grep -v -E "$subsetBegin\$|$subsetEnd\$" > "$mergedFile.tmp"
 	if [ $? != 0 ]; then
-		QuickLogger "Cannot add subset [$subsetBegin] to [$mergedFile]."
+		Logger "Cannot add subset [$subsetBegin] to [$mergedFile]." "SIMPLE"
 		exit 1
 	fi
 	rm -f "$subsetFile.$subsetBegin"
 	if [ $? != 0 ]; then
-		QuickLogger "Cannot remove temporary subset [$subsetFile.$subsetBegin]."
+		Logger "Cannot remove temporary subset [$subsetFile.$subsetBegin]." "SIMPLE"
 		exit 1
 	fi
 
 	rm -f "$mergedFile"
 	if [ $? != 0 ]; then
-		QuickLogger "Cannot remove merged original file [$mergedFile]."
+		Logger "Cannot remove merged original file [$mergedFile]." "SIMPLE"
 		exit 1
 	fi
 
 	mv "$mergedFile.tmp" "$mergedFile"
 	if [ $? != 0 ]; then
-		QuickLogger "Cannot move merged tmp file to original [$mergedFile]."
+		Logger "Cannot move merged tmp file to original [$mergedFile]." "SIMPLE"
 		exit 1
 	fi
 }
@@ -114,23 +114,23 @@ function __PREPROCESSOR_CleanDebug {
 
 	sed '/'$PARANOIA_DEBUG_BEGIN'/,/'$PARANOIA_DEBUG_END'/d' debug_$PROGRAM.sh | grep -v "$PARANOIA_DEBUG_LINE" > ../$PROGRAM.sh
 	if [ $? != 0 ]; then
-		QuickLogger "Cannot remove PARANOIA_DEBUG code from standard build."
+		Logger "Cannot remove PARANOIA_DEBUG code from standard build." "SIMPLE"
 		exit 1
 	fi
 
 	chmod +x "debug_$PROGRAM.sh"
 	if [ $? != 0 ]; then
-		QuickLogger "Cannot chmod debug_$PROGRAM.sh"
+		Logger "Cannot chmod debug_$PROGRAM.sh" "SIMPLE"
 		exit 1
 	else
-		QuickLogger "Prepared ./debug_$PROGRAM.sh"
+		Logger "Prepared ./debug_$PROGRAM.sh" "SIMPLE"
 	fi
 	chmod +x "../$PROGRAM.sh"
 	if [ $? != 0 ]; then
-		QuickLogger "Cannot chmod $PROGRAM.sh"
+		Logger "Cannot chmod $PROGRAM.sh" "SIMPLE"
 		exit 1
 	else
-		QuickLogger "Prepared ../$PROGRAM.sh"
+		Logger "Prepared ../$PROGRAM.sh" "SIMPLE"
 	fi
 }
 
@@ -139,7 +139,7 @@ function __PREPROCESSOR_CopyCommons {
 
 	sed "s/\[prgname\]/$PROGRAM/g" common_install.sh > ../install.sh
 	if [ $? != 0 ]; then
-		QuickLogger "Cannot assemble install."
+		Logger "Cannot assemble install." "SIMPLE"
 		exit 1
 	fi
 
@@ -149,33 +149,33 @@ function __PREPROCESSOR_CopyCommons {
 
 	#sed "s/\[version\]/$VERSION/g" ../tmp_install.sh > ../install.sh
 	#if [ $? != 0 ]; then
-	#	QuickLogger "Cannot change install version."
+	#	Logger "Cannot change install version." "SIMPLE"
 	#	exit 1
 	#fi
 	if [ -f "common_batch.sh" ]; then
 		sed "s/\[prgname\]/$PROGRAM/g" common_batch.sh > ../$PROGRAM-batch.sh
 		if [ $? != 0 ]; then
-			QuickLogger "Cannot assemble batch runner."
+			Logger "Cannot assemble batch runner." "SIMPLE"
 			exit 1
 		fi
 		chmod +x ../$PROGRAM-batch.sh
 		if [ $? != 0 ]; then
-			QuickLogger "Cannot chmod $PROGRAM-batch.sh"
+			Logger "Cannot chmod $PROGRAM-batch.sh" "SIMPLE"
 			exit 1
 		else
-			QuickLogger "Prepared ../$PROGRAM-batch.sh"
+			Logger "Prepared ../$PROGRAM-batch.sh" "SIMPLE"
 		fi
 	fi
 	chmod +x ../install.sh
 	if [ $? != 0 ]; then
-		QuickLogger "Cannot chmod install.sh"
+		Logger "Cannot chmod install.sh" "SIMPLE"
 		exit 1
 	else
-		QuickLogger "Prepared ../install.sh"
+		Logger "Prepared ../install.sh" "SIMPLE"
 	fi
 	rm -f ../tmp_install.sh
 	if [ $? != 0 ]; then
-		QuickLogger "Cannot chmod $PROGRAM.sh"
+		Logger "Cannot chmod $PROGRAM.sh" "SIMPLE"
 		exit 1
 	fi
 }
