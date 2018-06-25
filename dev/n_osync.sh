@@ -8,7 +8,7 @@ PROGRAM="osync" # Rsync based two way sync engine with fault tolerance
 AUTHOR="(C) 2013-2017 by Orsiris de Jong"
 CONTACT="http://www.netpower.fr/osync - ozy@netpower.fr"
 PROGRAM_VERSION=1.2.5-dev
-PROGRAM_BUILD=2018062505
+PROGRAM_BUILD=2018062506
 IS_STABLE=no
 
 #TODO: tidy up ExecTasks comments
@@ -2193,7 +2193,7 @@ function SoftDelete {
 	fi
 }
 
-function _SummaryFromFile {
+function _SummaryFromRsyncFile {
 	local replicaPath="${1}"
 	local summaryFile="${2}"
 	local direction="${3}"
@@ -2211,6 +2211,20 @@ function _SummaryFromFile {
 	fi
 }
 
+function _SummaryFromDeleteFile {
+	local replicaPath="${1}"
+	local summaryFile="${2}"
+	local direction="${3}"
+
+	__CheckArguments 3 $# "$@"	#__WITH_PARANOIA_DEBUG
+
+	if [ -f "$summaryFile" ]; then
+		while read -r file; do
+			Logger "$direction $replicaPath$file" "ALWAYS"
+		done < "$summaryFile"
+	fi
+}	
+
 function Summary {
 	__CheckArguments 0 $# "$@"	#__WITH_PARANOIA_DEBUG
 
@@ -2219,20 +2233,20 @@ function Summary {
 
 	Logger "Attrib updates: INITIATOR << >> TARGET" "ALWAYS"
 
-	_SummaryFromFile "${TARGET[$__replicaDir]}" "$RUN_DIR/$PROGRAM.attr-update.target.$SCRIPT_PID.$TSTAMP" "~ >>"
-	_SummaryFromFile "${INITIATOR[$__replicaDir]}" "$RUN_DIR/$PROGRAM.attr-update.initiator.$SCRIPT_PID.$TSTAMP" "~ <<"
+	_SummaryFromRsyncFile "${TARGET[$__replicaDir]}" "$RUN_DIR/$PROGRAM.attr-update.target.$SCRIPT_PID.$TSTAMP" "~ >>"
+	_SummaryFromRsyncFile "${INITIATOR[$__replicaDir]}" "$RUN_DIR/$PROGRAM.attr-update.initiator.$SCRIPT_PID.$TSTAMP" "~ <<"
 
 	Logger "File transfers: INITIATOR << >> TARGET (may include file ownership and timestamp attributes)" "ALWAYS"
-	_SummaryFromFile "${TARGET[$__replicaDir]}" "$RUN_DIR/$PROGRAM.update.target.$SCRIPT_PID.$TSTAMP" "+ >>"
-	_SummaryFromFile "${INITIATOR[$__replicaDir]}" "$RUN_DIR/$PROGRAM.update.initiator.$SCRIPT_PID.$TSTAMP" "+ <<"
+	_SummaryFromRsyncFile "${TARGET[$__replicaDir]}" "$RUN_DIR/$PROGRAM.update.target.$SCRIPT_PID.$TSTAMP" "+ >>"
+	_SummaryFromRsyncFile "${INITIATOR[$__replicaDir]}" "$RUN_DIR/$PROGRAM.update.initiator.$SCRIPT_PID.$TSTAMP" "+ <<"
 
 	Logger "File deletions: INITIATOR << >> TARGET" "ALWAYS"
 	if [ "$REMOTE_OPERATION" == "yes" ]; then
-		_SummaryFromFile "${TARGET[$__replicaDir]}" "${INITIATOR[$__replicaDir]}${INITIATOR[$__stateDir]}/target${TARGET[$__successDeletedListFile]}" "- >>"
+		_SummaryFromDeleteFile "${TARGET[$__replicaDir]}" "${INITIATOR[$__replicaDir]}${INITIATOR[$__stateDir]}/target${TARGET[$__successDeletedListFile]}" "- >>"
 	else
-		_SummaryFromFile "${TARGET[$__replicaDir]}" "$RUN_DIR/$PROGRAM.delete.target.$SCRIPT_PID.$TSTAMP" "- >>"
+		_SummaryFromDeleteFile "${TARGET[$__replicaDir]}" "$RUN_DIR/$PROGRAM.delete.target.$SCRIPT_PID.$TSTAMP" "- >>"
 	fi
-	_SummaryFromFile "${INITIATOR[$__replicaDir]}" "$RUN_DIR/$PROGRAM.delete.initiator.$SCRIPT_PID.$TSTAMP" "- <<"
+	_SummaryFromDeleteFile "${INITIATOR[$__replicaDir]}" "$RUN_DIR/$PROGRAM.delete.initiator.$SCRIPT_PID.$TSTAMP" "- <<"
 	)
 }
 
