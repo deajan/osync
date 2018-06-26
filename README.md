@@ -30,9 +30,10 @@ osync uses pidlocks to prevent multiple concurrent sync processes on/to the same
 You may launch concurrent sync processes on the same system but as long as the replicas to synchronize are different.
 Multiple osync tasks may be launched sequentially by osync osync-batch tool.
 
-Currently, it has been tested on CentOS 5.x, 6.x, 7.x, Fedora 22-25, Debian 6-8, Linux Mint 14-18, Ubuntu 12.04-12.10, FreeBSD 8.3-11, Gentoo, Mac OS X and pfSense 2.3x.
+Currently, it has been tested on CentOS 5.x, 6.x, 7.x, Fedora 22-25, Debian 6-8, Linux Mint 14-18, Ubuntu 12.04-12.10, FreeBSD 8.3-11, Mac OS X and pfSense 2.3.x.
 Microsoft Windows is supported via MSYS or Cygwin and now via Windows 10 bash.
-Android support works via busybox (tested on Termux).
+Android support works via Termux.
+Some users also have successfully used osync on Gentoo and created an openRC init scriptt for it.
 
 Installation
 ------------
@@ -157,18 +158,26 @@ BSD, MacOS X and Windows are not yet supported for this operation mode, unless y
 
 	# osync.sh /etc/osync/my_sync.conf --on-changes
 
-Osync file monitor mode may be run as system service with the osync-srv init script. Any configuration file found in /etc/osync will then create a osync daemon instance.
-You may run the install.sh script which should work in most cases or copy the files by hand (osync.sh to /usr/bin/local, osync-srv to /etc/init.d, sync.conf to /etc/osync).
+Osync file monitor mode may be run as system service with the osync-srv script.
+You may run the install.sh script which should work in most cases or copy the files by hand (osync.sh to /usr/bin/local, sync.conf to /etc/osync, osync-srv to /etc/init.d for initV, osync-srv@.service to /usr/lib/systemd/system for systemd, osync-srv-openrc to /etc/init.d/osync-srv-openrc for OpenRC).
+
+InitV specific instructions:
+
+	Any configuration file found in /etc/osync will create a osync daemon instance when service is launched on initV with:
 
 	$ service osync-srv start
 	$ chkconfig osync-srv on
 
 Systemd specific (one service per config file)
 
+	Launch service (one service per config file to launch) with:
 	$ systemctl start osync-srv@configfile.conf
 	$ systemctl enable osync-srv@configfile.conf
 
-OpenRC-specific instructions can be found in ``osync-srv-openrc``.
+OpenRC specific instructions (user contrib)
+
+	Launch service (one service per config file to launch) with:
+	$ rc-update add osync-srv.configfile default
 
 Security enhancements
 ---------------------

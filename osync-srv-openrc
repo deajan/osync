@@ -1,10 +1,8 @@
 #!/sbin/openrc-run
 #
 # PROGRAM="osync-srv"
-# AUTHOR="(C) Brian Evans 2018"
-# CONTACT="grknight@gentoo.org"
-# PROGRAM_BUILD=20180517
-#
+# SCRIPT_BUILD=2018051701
+# Script written by Brian Evans (grknight@gentoo.org) in 2018
 # How to use:
 # 
 # 0) Rename this to osync-srv, and place it in /etc/init.d.
