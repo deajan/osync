@@ -30,7 +30,7 @@ osync uses pidlocks to prevent multiple concurrent sync processes on/to the same
 You may launch concurrent sync processes on the same system but as long as the replicas to synchronize are different.
 Multiple osync tasks may be launched sequentially by osync osync-batch tool.
 
-Currently, it has been tested on CentOS 5.x, 6.x, 7.x, Fedora 22-25, Debian 6-8, Linux Mint 14-18, Ubuntu 12.04-12.10, FreeBSD 8.3-11, Mac OS X and pfSense 2.3x.
+Currently, it has been tested on CentOS 5.x, 6.x, 7.x, Fedora 22-25, Debian 6-8, Linux Mint 14-18, Ubuntu 12.04-12.10, FreeBSD 8.3-11, Gentoo, Mac OS X and pfSense 2.3x.
 Microsoft Windows is supported via MSYS or Cygwin and now via Windows 10 bash.
 Android support works via busybox (tested on Termux).
 
@@ -148,7 +148,7 @@ Having multiple conf files can then be run in a single cron command like
 
 Daemon mode
 -----------
-Additionnaly, you may run osync in monitor mode, which means it will perform a sync upon file operations on initiator replica.
+Additionaly, you may run osync in monitor mode, which means it will perform a sync upon file operations on initiator replica.
 This can be a drawback on functionnality versus scheduled mode because this mode only launches a sync task if there are file modifications on the initiator replica, without being able to monitor the target replica.
 Target replica changes are only synced when initiator replica changes occur, or when a given amount of time (default 600 seconds) passed without any changes on initiator replica.
 File monitor mode can also be launched as a daemon with an init script. Please read the documentation for more info.
@@ -167,6 +167,8 @@ Systemd specific (one service per config file)
 
 	$ systemctl start osync-srv@configfile.conf
 	$ systemctl enable osync-srv@configfile.conf
+
+OpenRC-specific instructions can be found in ``osync-srv-openrc``.
 
 Security enhancements
 ---------------------

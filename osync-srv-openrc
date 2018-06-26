@@ -1,0 +1,55 @@
+#!/sbin/openrc-run
+#
+# PROGRAM="osync-srv"
+# AUTHOR="(C) Brian Evans 2018"
+# CONTACT="grknight@gentoo.org"
+# PROGRAM_BUILD=20180517
+#
+# How to use:
+# 
+# 0) Rename this to osync-srv, and place it in /etc/init.d.
+# 1) Ensure that your config is located in /etc/osync, under some name with a
+# .conf extension.
+# 2) Ensure that osync.sh can be found in /usr/local/bin.                                                                                         
+# 3) Ensure that you have rsync and inotify-tools installed.                                                                                      
+# 4) Symlink this to a name with an extension equal to the basename of your                                                                       
+# config file.
+# 5) Add to the default runlevel under the symlinked name.                                                                                        
+#                                                                                                                                                 
+# Example:
+#                                                                                                                                                 
+# Suppose the config is located at /etc/osync/documents.conf. You then want to                                                                    
+# symlink as follows:
+#
+# # ln -s /etc/init.d/osync-srv /etc/init.d/osync-srv.documents
+# 
+# Then you can start the service as normal:
+#
+# # rc-update add osync-srv.documents default
+
+depend() {
+	use localmount chrony ntp-client
+}
+
+description="Two way directory sync daemon"
+command=/usr/local/bin/osync.sh
+conffile="${RC_SVCNAME#*.}.conf"
+cfgfile="/etc/osync/${conffile}"
+command_args="${cfgfile} --on-changes --errors-only"
+command_background="yes"
+pidfile="/var/run/${RC_SVCNAME}"
+stopsig=TERM
+
+start_pre() {
+	if [ "${conffile}" = ".conf" ]; then
+		eerror "${RC_SVCNAME} cannot be started directly. You must create"
+		eerror "symbolic links to it for the configuration you want to start"
+		eerror "osync on and add those to the appropriate runlevels."
+		return 1
+	fi
+
+	if ! [ -f "${cfgfile}" ]; then
+		eerror "Cannot find configuration file ${cfgfile}."
+		return 1
+	fi
+}
