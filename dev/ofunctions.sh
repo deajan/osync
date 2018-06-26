@@ -1,4 +1,4 @@
-#!/usr/bin/env bash
+$#!/usr/bin/env bash
 #### OFUNCTIONS FULL SUBSET ####
 #### OFUNCTIONS MINI SUBSET ####
 
@@ -6,7 +6,7 @@
 #command line arguments don't take -AaqV for example
 
 _OFUNCTIONS_VERSION=2.3.0-dev
-_OFUNCTIONS_BUILD=2018062504
+_OFUNCTIONS_BUILD=2018062601
 #### _OFUNCTIONS_BOOTSTRAP SUBSET ####
 _OFUNCTIONS_BOOTSTRAP=true
 #### _OFUNCTIONS_BOOTSTRAP SUBSET END ####
@@ -2042,7 +2042,7 @@ function InitLocalOSDependingSettings {
 	## Using mingw version of find instead of windows one
 	## Getting running processes is quite different
 	## Ping command is not the same
-	if [ "$LOCAL_OS" == "msys" ] || [ "$LOCAL_OS" == "Cygwin" ]; then
+	if [ "$LOCAL_OS" == "msys" ] || [ "$LOCAL_OS" == "Cygwin" ] || [ "$LOCAL_OS" == "Microsoft" ] || [ "$LOCAL_OS" == "WinNT10" ]; then
 		FIND_CMD=$(dirname $BASH)/find
 		PING_CMD='$SYSTEMROOT\system32\ping -n 2'
 
