@@ -1,4 +1,4 @@
-$#!/usr/bin/env bash
+#!/usr/bin/env bash
 #### OFUNCTIONS FULL SUBSET ####
 #### OFUNCTIONS MINI SUBSET ####
 
@@ -6,7 +6,7 @@ $#!/usr/bin/env bash
 #command line arguments don't take -AaqV for example
 
 _OFUNCTIONS_VERSION=2.3.0-dev
-_OFUNCTIONS_BUILD=2018062601
+_OFUNCTIONS_BUILD=2018062901
 #### _OFUNCTIONS_BOOTSTRAP SUBSET ####
 _OFUNCTIONS_BOOTSTRAP=true
 #### _OFUNCTIONS_BOOTSTRAP SUBSET END ####
