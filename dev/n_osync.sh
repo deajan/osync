@@ -5,9 +5,9 @@
 #Check dryruns with nosuffix mode for timestampList
 
 PROGRAM="osync" # Rsync based two way sync engine with fault tolerance
-AUTHOR="(C) 2013-2017 by Orsiris de Jong"
+AUTHOR="(C) 2013-2018 by Orsiris de Jong"
 CONTACT="http://www.netpower.fr/osync - ozy@netpower.fr"
-PROGRAM_VERSION=1.2.5-dev
+PROGRAM_VERSION=1.3.0-dev
 PROGRAM_BUILD=2018062506
 IS_STABLE=no
 
