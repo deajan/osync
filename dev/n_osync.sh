@@ -8,7 +8,7 @@ PROGRAM="osync" # Rsync based two way sync engine with fault tolerance
 AUTHOR="(C) 2013-2018 by Orsiris de Jong"
 CONTACT="http://www.netpower.fr/osync - ozy@netpower.fr"
 PROGRAM_VERSION=1.3.0-dev
-PROGRAM_BUILD=2018062506
+PROGRAM_BUILD=2018070101
 IS_STABLE=no
 
 #TODO: tidy up ExecTasks comments
@@ -2807,9 +2807,13 @@ if [ $_QUICK_SYNC -eq 2 ]; then
 	if [ $(IsInteger $MIN_WAIT) -ne 1 ]; then
 		MIN_WAIT=30
 	fi
-else
+# First character shouldn't be '-' when config file given
+elif [ "${1:0:1}" != "-" ]; then
 	ConfigFile="${1}"
 	LoadConfigFile "$ConfigFile"
+else
+	Logger "Wrong arguments given. Expecting a config file or initiator and target arguments." "CRITICAL"
+	exit 1
 fi
 
 if [ "$LOGFILE" == "" ]; then
