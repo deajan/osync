@@ -302,7 +302,9 @@ function test_Merge () {
 	assertEquals "Install failed" "0" $?
 
 	# Set osync version to stable while testing to avoid warning message
+	echo "SetConfFileValue \"$OSYNC_EXECUTABLE\" \"IS_STABLE\" \"yes\""
 	SetConfFileValue "$OSYNC_EXECUTABLE" "IS_STABLE" "yes"
+	echo "done"
 }
 
 function test_LargeFileSet () {
