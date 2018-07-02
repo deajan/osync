@@ -305,13 +305,13 @@ function test_Merge () {
 	# Set osync version to stable while testing to avoid warning message
 	# Don't use SetConfFileValue here since for whatever reason Travis does not like creating a sed temporary file in $FAKEROOT
 
-	#if [ "$TRAVIS_RUN" == true ]; then
-	#	$SUDO_CMD sed -i.tmp 's/^IS_STABLE=.*/IS_STABLE=yes/' "$OSYNC_EXECUTABLE"
-	#else
-	#	sed -i.tmp 's/^IS_STABLE=.*/IS_STABLE=yes/' "$OSYNC_EXECUTABLE"
-	#fi
-	#head -n 20 $OSYNC_EXECUTABLE
-	SetConfFileValue "$OSYNC_EXECUTABLE" "IS_STABLE" "yes"
+	if [ "$TRAVIS_RUN" == true ]; then
+		$SUDO_CMD sed -i.tmp 's/^IS_STABLE=.*/IS_STABLE=yes/' "$OSYNC_EXECUTABLE"
+	else
+		sed -i.tmp 's/^IS_STABLE=.*/IS_STABLE=yes/' "$OSYNC_EXECUTABLE"
+	fi
+	head -n 20 $OSYNC_EXECUTABLE
+	#SetConfFileValue "$OSYNC_EXECUTABLE" "IS_STABLE" "yes"
 
 
 	assertEquals "Install failed" "0" $?
