@@ -8,7 +8,7 @@ PROGRAM="osync" # Rsync based two way sync engine with fault tolerance
 AUTHOR="(C) 2013-2018 by Orsiris de Jong"
 CONTACT="http://www.netpower.fr/osync - ozy@netpower.fr"
 PROGRAM_VERSION=1.3.0-dev
-PROGRAM_BUILD=2018070101
+PROGRAM_BUILD=2018070201
 IS_STABLE=no
 
 #TODO: tidy up ExecTasks comments
@@ -2757,7 +2757,7 @@ function GetCommandlineArguments {
 			;;
 			--initialize)
 			INITIALIZE="yes"
-			opts=$opts "--initialize"
+			opts=$opts" --initialize"
 			;;
 			--no-prefix)
 			opts=$opts" --no-prefix"
