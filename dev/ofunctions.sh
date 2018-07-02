@@ -475,6 +475,12 @@ function SendAlert {
 # encryption can be set to tls, ssl or none
 # smtpUser and smtpPassword are optional
 # SendEmail "subject" "Body text" "receiver@example.com receiver2@otherdomain.com" "/path/to/attachment.file" "senderMail@example.com" "smtpServer.domain.tld" "smtpPort" "encryption" "smtpUser" "smtpPassword"
+
+# If text is received as attachment ATT00001.bin or noname, consider adding the following to /etc/mail.rc
+#set ttycharset=iso-8859-1
+#set sendcharsets=iso-8859-1
+#set encoding=8bit
+
 function SendEmail {
 	local subject="${1}"
 	local message="${2}"
