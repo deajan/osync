@@ -11,7 +11,7 @@ _OFUNCTIONS_BUILD=2018062901
 _OFUNCTIONS_BOOTSTRAP=true
 #### _OFUNCTIONS_BOOTSTRAP SUBSET END ####
 
-## BEGIN Generic bash functions written in 2013-2017 by Orsiris de Jong - http://www.netpower.fr - ozy@netpower.fr
+## BEGIN Generic and highly portable bash functions written in 2013-2018 by Orsiris de Jong - http://www.netpower.fr - ozy@netpower.fr
 
 ## To use in a program, define the following variables:
 ## PROGRAM=program-name
@@ -354,7 +354,6 @@ function KillChilds {
 	fi
 
 	if kill -0 "$pid" > /dev/null 2>&1; then
-		#TODO: Warning: pgrep is not native on cygwin, have this checked in CheckEnvironment
 		if children="$(pgrep -P "$pid")"; then
 			if [[ "$pid" == *"$children"* ]]; then
 				Logger "Bogus pgrep implementation." "CRITICAL"
