@@ -5,7 +5,7 @@
 
 ## On CYGWIN / MSYS, ACL and extended attributes aren't supported
 
-# osync test suite 2018070205
+# osync test suite 2018070206
 
 # 4 tests:
 # quicklocal
@@ -316,7 +316,7 @@ function test_Merge () {
 	assertEquals "Install failed" "0" $?
 }
 
-function nope_test_LargeFileSet () {
+function test_LargeFileSet () {
 	for i in "${osyncParameters[@]}"; do
 		cd "$OSYNC_DIR"
 
@@ -334,7 +334,7 @@ function nope_test_LargeFileSet () {
 	done
 }
 
-function nope_test_Exclusions () {
+function test_Exclusions () {
 	# Will sync except php files
 	# RSYNC_EXCLUDE_PATTERN="*.php" is set at runtime for quicksync and in config files for other runs
 
@@ -362,7 +362,7 @@ function nope_test_Exclusions () {
 	done
 }
 
-function nope_test_Deletetion () {
+function test_Deletetion () {
 	local iFile1="$INITIATOR_DIR/ific"
 	local iFile2="$INITIATOR_DIR/ifoc"
 	local tFile1="$TARGET_DIR/tfic"
@@ -406,7 +406,7 @@ function nope_test_Deletetion () {
 	done
 }
 
-function nope_test_deletion_failure () {
+function test_deletion_failure () {
 	if [ "$LOCAL_OS" == "WinNT10" ] || [ "$LOCAL_OS" == "msys" ] || [ "$LOCAL_OS" == "Cygwin" ]; then
 		echo "Skipping deletion failure test as Win10 does not have chattr  support."
 		return 0
@@ -473,7 +473,7 @@ function nope_test_deletion_failure () {
 	done
 }
 
-function nope_test_skip_deletion () {
+function test_skip_deletion () {
 	local modes
 
 	if [ "$OSYNC_MIN_VERSION" == "1" ]; then
@@ -549,7 +549,7 @@ function nope_test_skip_deletion () {
 	SetConfFileValue "$CONF_DIR/$REMOTE_CONF" "SKIP_DELETION" ""
 }
 
-function nope_test_handle_symlinks () {
+function test_handle_symlinks () {
 	if [ "$OSYNC_MIN_VERSION" == "1" ]; then
 		echo "Skipping symlink tests as osync v1.1x didn't handle this."
 		return 0
@@ -730,7 +730,7 @@ function nope_test_handle_symlinks () {
 	done
 }
 
-function nope_test_softdeletion_cleanup () {
+function test_softdeletion_cleanup () {
 	#declare -A files
 
 	files=()
@@ -807,7 +807,7 @@ function nope_test_softdeletion_cleanup () {
 
 }
 
-function nope_test_FileAttributePropagation () {
+function test_FileAttributePropagation () {
 
 	if [ "$TRAVIS_RUN" == true ]; then
 		echo "Skipping FileAttributePropagation tests as travis does not support getfacl / setfacl."
@@ -885,7 +885,7 @@ function nope_test_FileAttributePropagation () {
 	done
 }
 
-function nope_test_ConflictBackups () {
+function test_ConflictBackups () {
 	for i in "${osyncParameters[@]}"; do
 		cd "$OSYNC_DIR"
 		PrepareLocalDirs
@@ -921,7 +921,7 @@ function nope_test_ConflictBackups () {
 	done
 }
 
-function nope_test_MultipleConflictBackups () {
+function test_MultipleConflictBackups () {
 
 	local additionalParameters
 
@@ -983,7 +983,7 @@ function nope_test_MultipleConflictBackups () {
 	SetConfFileValue "$CONF_DIR/$REMOTE_CONF" "CONFLICT_BACKUP_MULTIPLE" "no"
 }
 
-function nope_test_Locking () {
+function test_Locking () {
 # local not running = resume
 # remote same instance_id = resume
 # remote different instance_id = stop
@@ -1100,7 +1100,7 @@ function test_ConflictDetetion () {
 		return 0
 	fi
 
-	for i in "${osyncParameters[0]}"; do
+	for i in "${osyncParameters[@]}"; do
 
 		cd "$OSYNC_DIR"
 		PrepareLocalDirs
@@ -1141,7 +1141,7 @@ function test_ConflictDetetion () {
 	done
 }
 
-function nope_test_WaitForTaskCompletion () {
+function test_WaitForTaskCompletion () {
 	local pids
 
 	# Tests compatible with v1.1 syntax
@@ -1235,7 +1235,7 @@ function nope_test_WaitForTaskCompletion () {
 	assertEquals "WaitForTaskCompletion test 5" "2" $?
 }
 
-function nope_test_ParallelExec () {
+function test_ParallelExec () {
 	if [ "$OSYNC_MIN_VERSION" == "1" ]; then
 		echo "Skipping ParallelExec test because osync v1.1 ofunctions don't have this function."
 		return 0
@@ -1296,7 +1296,7 @@ function nope_test_ParallelExec () {
 	assertNotEquals "ParallelExec full test 3" "0" $?
 }
 
-function nope_test_timedExecution () {
+function test_timedExecution () {
 	local arguments
 	local warnExitCode
 
@@ -1343,7 +1343,7 @@ function nope_test_timedExecution () {
 	done
 }
 
-function nope_test_UpgradeConfRun () {
+function test_UpgradeConfRun () {
 	if [ "$OSYNC_MIN_VERSION" == "1" ]; then
 		echo "Skipping Upgrade script test because no further dev will happen on this for v1.1"
 		return 0
@@ -1369,7 +1369,7 @@ function nope_test_UpgradeConfRun () {
 	rm -f "$CONF_DIR/$TMP_OLD_CONF.save"
 }
 
-function nope_test_DaemonMode () {
+function test_DaemonMode () {
 	if [ "$LOCAL_OS" == "WinNT10" ] || [ "$LOCAL_OS" == "msys" ] || [ "$LOCAL_OS" == "Cygwin" ]; then
 		echo "Skipping daemon mode test as [$LOCAL_OS] does not have inotifywait support."
 		return 0
@@ -1424,7 +1424,7 @@ function nope_test_DaemonMode () {
 
 }
 
-function nope_test_NoRemoteAccessTest () {
+function test_NoRemoteAccessTest () {
 	RemoveSSH
 
 	cd "$OSYNC_DIR"
