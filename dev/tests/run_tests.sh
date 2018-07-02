@@ -298,14 +298,16 @@ function test_Merge () {
 
 	cd "$OSYNC_DIR"
 
-	# Set osync version to stable while testing to avoid warning message
-	# Don't use SetConfFileValue here since for whatever reason Travis does not like creating a sed temporary file in $FAKEROOT
-	sed -i.tmp "s/IS_STABLE=*/IS_STABLE=yes" "$OSYNC_EXECUTABLE"
-	#SetConfFileValue "$OSYNC_EXECUTABLE" "IS_STABLE" "yes"
-
 	echo ""
 	echo "Installing osync to $FAKEROOT"
 	$SUDO_CMD ./install.sh --no-stats --prefix="$FAKEROOT"
+
+	# Set osync version to stable while testing to avoid warning message
+	# Don't use SetConfFileValue here since for whatever reason Travis does not like creating a sed temporary file in $FAKEROOT
+	sed -i.tmp "s/IS_STABLE=*/IS_STABLE=yes/" "$OSYNC_EXECUTABLE"
+	#SetConfFileValue "$OSYNC_EXECUTABLE" "IS_STABLE" "yes"
+
+
 	assertEquals "Install failed" "0" $?
 }
 
