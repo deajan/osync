@@ -1091,7 +1091,7 @@ function nope_test_Locking () {
 	SetConfFileValue "$CONF_DIR/$REMOTE_CONF" "FORCE_STRANGER_LOCK_RESUME" "no"
 }
 
-function test_ConflictDetetion () {
+function nope_test_ConflictDetetion () {
 	local result
 
 	# Tests compatible with v1.3+
