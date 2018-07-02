@@ -3,6 +3,7 @@
 
 #TODO: ExecTasks postponed arrays / files grow a lot. Consider having them "rolling"
 #TODO: command line arguments don't take -AaqV for example
+#TODO: Vercomp, IsNumeric, IsNumericExpand are not busybux ash compatible
 
 #### OFUNCTIONS FULL SUBSET ####
 #### OFUNCTIONS MINI SUBSET ####
