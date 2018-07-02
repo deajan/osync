@@ -1526,13 +1526,13 @@ function Initialize {
 ######
 ###### Step 0a & 0b: Create current file list of replicas
 ###### Step 1a & 1b: Create deleted file list of replicas
-###### Step 2a & 2b: Create ctime & mtime file list of replicas
+###### Step 2a & 2b: Create current ctime & mtime file list of replicas
 ###### Step 3a & 3b: Merge conflict file list
 ###### Step 4: Update file attributes
 ###### Step 5a & 5b: Update replicas
 ###### Step 6a & 6b: Propagate deletions on replicas
 ###### Step 7a & 7b: Create after run file list of replicas
-###### Step 8a & 8b: Create ctime & mtime file list of replicas
+###### Step 8a & 8b: Create after run  ctime & mtime file list of replicas
 
 function Sync {
 	__CheckArguments 0 $# "$@"	#__WITH_PARANOIA_DEBUG
