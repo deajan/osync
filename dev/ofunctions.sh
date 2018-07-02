@@ -237,7 +237,7 @@ function RemoteLogger {
 		fi
 		return
 	elif [ "$level" == "ALWAYS" ]; then
-		_Logger  "" "$prefix$value"
+		_Logger	 "" "$prefix$value"
 		return
 	elif [ "$level" == "DEBUG" ]; then
 		if [ "$_DEBUG" == "yes" ]; then
@@ -775,33 +775,33 @@ function ParallelExec {
 
 function ExecTasks {
 	# Mandatory arguments
-	local mainInput="${1}"                          # Contains list of pids / commands separated by semicolons or filepath to list of pids / commands
+	local mainInput="${1}"				# Contains list of pids / commands separated by semicolons or filepath to list of pids / commands
 
 	# Optional arguments
-	local id="${2:-base}"                           # Optional ID in order to identify global variables from this run (only bash variable names, no '-'). Global variables are WAIT_FOR_TASK_COMPLETION_$id and HARD_MAX_EXEC_TIME_REACHED_$id
-	local readFromFile="${3:-false}"                # Is mainInput / auxInput a semicolon separated list (true) or a filepath (false)
-	local softPerProcessTime="${4:-0}"              # Max time (in seconds) a pid or command can run before a warning is logged, unless set to 0
-	local hardPerProcessTime="${5:-0}"              # Max time (in seconds) a pid or command can run before the given command / pid is stopped, unless set to 0
-	local softMaxTime="${6:-0}"                     # Max time (in seconds) for the whole function to run before a warning is logged, unless set to 0
-	local hardMaxTime="${7:-0}"                     # Max time (in seconds) for the whole function to run before all pids / commands given are stopped, unless set to 0
-	local counting="${8:-true}"                     # Should softMaxTime and hardMaxTime be accounted since function begin (true) or since script begin (false)
-	local sleepTime="${9:-.5}"                      # Seconds between each state check. The shorter the value, the snappier ExecTasks will be, but as a tradeoff, more cpu power will be used (good values are between .05 and 1)
-	local keepLogging="${10:-1800}"                 # Every keepLogging seconds, an alive message is logged. Setting this value to zero disables any alive logging
-	local spinner="${11:-true}"                     # Show spinner (true) or do not show anything (false) while running
-	local noTimeErrorLog="${12:-false}"             # Log errors when reaching soft / hard execution times (false) or do not log errors on those triggers (true)
-	local noErrorLogsAtAll="${13:-false}"           # Do not log any errros at all (useful for recursive ExecTasks checks)
+	local id="${2:-base}"				# Optional ID in order to identify global variables from this run (only bash variable names, no '-'). Global variables are WAIT_FOR_TASK_COMPLETION_$id and HARD_MAX_EXEC_TIME_REACHED_$id
+	local readFromFile="${3:-false}"		# Is mainInput / auxInput a semicolon separated list (true) or a filepath (false)
+	local softPerProcessTime="${4:-0}"		# Max time (in seconds) a pid or command can run before a warning is logged, unless set to 0
+	local hardPerProcessTime="${5:-0}"		# Max time (in seconds) a pid or command can run before the given command / pid is stopped, unless set to 0
+	local softMaxTime="${6:-0}"			# Max time (in seconds) for the whole function to run before a warning is logged, unless set to 0
+	local hardMaxTime="${7:-0}"			# Max time (in seconds) for the whole function to run before all pids / commands given are stopped, unless set to 0
+	local counting="${8:-true}"			# Should softMaxTime and hardMaxTime be accounted since function begin (true) or since script begin (false)
+	local sleepTime="${9:-.5}"			# Seconds between each state check. The shorter the value, the snappier ExecTasks will be, but as a tradeoff, more cpu power will be used (good values are between .05 and 1)
+	local keepLogging="${10:-1800}"			# Every keepLogging seconds, an alive message is logged. Setting this value to zero disables any alive logging
+	local spinner="${11:-true}"			# Show spinner (true) or do not show anything (false) while running
+	local noTimeErrorLog="${12:-false}"		# Log errors when reaching soft / hard execution times (false) or do not log errors on those triggers (true)
+	local noErrorLogsAtAll="${13:-false}"		# Do not log any errros at all (useful for recursive ExecTasks checks)
 
 	# Parallelism specific arguments
-	local numberOfProcesses="${14:-0}"              # Number of simulanteous commands to run, given as mainInput. Set to 0 by default (WaitForTaskCompletion mode). Setting this value enables ParallelExec mode.
-	local auxInput="${15}"                          # Contains list of commands separated by semicolons or filepath fo list of commands. Exit code of those commands decide whether main commands will be executed or not
-	local maxPostponeRetries="${16:-3}"             # If a conditional command fails, how many times shall we try to postpone the associated main command. Set this to 0 to disable postponing
-	local minTimeBetweenRetries="${17:-300}"        # Time (in seconds) between postponed command retries
-	local validExitCodes="${18:-0}"                 # Semi colon separated list of valid main command exit codes which will not trigger errors
+	local numberOfProcesses="${14:-0}"		# Number of simulanteous commands to run, given as mainInput. Set to 0 by default (WaitForTaskCompletion mode). Setting this value enables ParallelExec mode.
+	local auxInput="${15}"				# Contains list of commands separated by semicolons or filepath fo list of commands. Exit code of those commands decide whether main commands will be executed or not
+	local maxPostponeRetries="${16:-3}"		# If a conditional command fails, how many times shall we try to postpone the associated main command. Set this to 0 to disable postponing
+	local minTimeBetweenRetries="${17:-300}"	# Time (in seconds) between postponed command retries
+	local validExitCodes="${18:-0}"			# Semi colon separated list of valid main command exit codes which will not trigger errors
 
 	local i
 
-	Logger "${FUNCNAME[0]} called by [${FUNCNAME[0]} < ${FUNCNAME[1]} < ${FUNCNAME[2]} < ${FUNCNAME[3]} < ${FUNCNAME[4]} ...]." "PARANOIA_DEBUG"     #__WITH_PARANOIA_DEBUG
-	__CheckArguments 1-18 $# "$@"                                                                                                                                          #__WITH_PARANOIA_DEBUG
+	Logger "${FUNCNAME[0]} called by [${FUNCNAME[0]} < ${FUNCNAME[1]} < ${FUNCNAME[2]} < ${FUNCNAME[3]} < ${FUNCNAME[4]} ...]." "PARANOIA_DEBUG"	 #__WITH_PARANOIA_DEBUG
+	__CheckArguments 1-18 $# "$@"																	       #__WITH_PARANOIA_DEBUG
 
 	# Since ExecTasks takes up to 17 arguments, do a quick preflight check in DEBUG mode
 	if [ "$_DEBUG" == "yes" ]; then
@@ -824,40 +824,40 @@ function ExecTasks {
 	IFS=';' read -r -a validExitCodes <<< "$validExitCodes"
 
 	# ParallelExec specific variables
-	local auxItemCount=0            # Number of conditional commands
-	local commandsArray=()          # Array containing commands
+	local auxItemCount=0		# Number of conditional commands
+	local commandsArray=()		# Array containing commands
 	local commandsConditionArray=() # Array containing conditional commands
-	local currentCommand            # Variable containing currently processed command
-	local currentCommandCondition   # Variable containing currently processed conditional command
-	local commandsArrayPid=()       # Array containing pids of commands currently run
-	local postponedRetryCount=0     # Number of current postponed commands retries
-	local postponedItemCount=0      # Number of commands that have been postponed (keep at least one in order to check once)
+	local currentCommand		# Variable containing currently processed command
+	local currentCommandCondition	# Variable containing currently processed conditional command
+	local commandsArrayPid=()	# Array containing pids of commands currently run
+	local postponedRetryCount=0	# Number of current postponed commands retries
+	local postponedItemCount=0	# Number of commands that have been postponed (keep at least one in order to check once)
 	local postponedCounter=0
-	local isPostponedCommand=false  # Is the current command from a postponed file ?
-	local postponedExecTime=0       # How much time has passed since last postponed condition was checked
-	local needsPostponing           # Does currentCommand need to be postponed
+	local isPostponedCommand=false	# Is the current command from a postponed file ?
+	local postponedExecTime=0	# How much time has passed since last postponed condition was checked
+	local needsPostponing		# Does currentCommand need to be postponed
 	local temp
 
 	# Common variables
-	local pid                       # Current pid working on
-	local pidState                  # State of the process
-	local mainItemCount=0           # number of given items (pids or commands)
-	local readFromFile              # Should we read pids / commands from a file (true)
+	local pid			# Current pid working on
+	local pidState			# State of the process
+	local mainItemCount=0		# number of given items (pids or commands)
+	local readFromFile		# Should we read pids / commands from a file (true)
 	local counter=0
-	local log_ttime=0               # local time instance for comparaison
+	local log_ttime=0		# local time instance for comparaison
 
-	local seconds_begin=$SECONDS    # Seconds since the beginning of the script
-	local exec_time=0               # Seconds since the beginning of this function
+	local seconds_begin=$SECONDS	# Seconds since the beginning of the script
+	local exec_time=0		# Seconds since the beginning of this function
 
-	local retval=0                  # return value of monitored pid process
-	local subRetval=0               # return value of condition commands
-	local errorcount=0              # Number of pids that finished with errors
-	local pidsArray                 # Array of currently running pids
-	local newPidsArray              # New array of currently running pids for next iteration
-	local pidsTimeArray             # Array containing execution begin time of pids
-	local executeCommand            # Boolean to check if currentCommand can be executed given a condition
+	local retval=0			# return value of monitored pid process
+	local subRetval=0		# return value of condition commands
+	local errorcount=0		# Number of pids that finished with errors
+	local pidsArray			# Array of currently running pids
+	local newPidsArray		# New array of currently running pids for next iteration
+	local pidsTimeArray		# Array containing execution begin time of pids
+	local executeCommand		# Boolean to check if currentCommand can be executed given a condition
 
-	local hasPids=false             # Are any valable pids given to function ?              #__WITH_PARANOIA_DEBUG
+	local hasPids=false		# Are any valable pids given to function ?		#__WITH_PARANOIA_DEBUG
 
 	local functionMode
 
@@ -910,7 +910,7 @@ function ExecTasks {
 		counter=$mainItemCount
 	fi
 
-	Logger "Running ${FUNCNAME[0]} as [$functionMode] for [$mainItemCount] mainItems and [$auxItemCount] auxItems." "PARANOIA_DEBUG"              #__WITH_PARANOIA_DEBUG
+	Logger "Running ${FUNCNAME[0]} as [$functionMode] for [$mainItemCount] mainItems and [$auxItemCount] auxItems." "PARANOIA_DEBUG"	      #__WITH_PARANOIA_DEBUG
 
 	# soft / hard execution time checks that needs to be a subfunction since it is called both from main loop and from parallelExec sub loop
 	function _ExecTasksTimeCheck {
@@ -1022,11 +1022,11 @@ function ExecTasks {
 				else
 					# pid is dead, get its exit code from wait command
 					wait $pid
-					retval=$?	#TODO: do we use retval codes somehow ?? where
+					retval=$?
 					# Check for valid exit codes
 					if [ $(ArrayContains $retval "${validExitCodes[@]}") -eq 0 ]; then
 						if [ $noErrorLogsAtAll != true ]; then
-							Logger "${FUNCNAME[0]} called by [$id] finished monitoring pid [$pid] with exitcode [$retval]." "DEBUG" #TODO: set this to debug in order to stop complaints
+							Logger "${FUNCNAME[0]} called by [$id] finished monitoring pid [$pid] with exitcode [$retval]." "DEBUG"
 							if [ "$functionMode" == "ParallelExec" ]; then
 								Logger "Command was [${commandsArrayPid[$pid]}]." "ERROR"
 							fi
@@ -1042,22 +1042,22 @@ function ExecTasks {
 						Logger "${FUNCNAME[0]} called by [$id] finished monitoring pid [$pid] with exitcode [$retval]." "DEBUG"
 					fi
 				fi
-				hasPids=true                                    ##__WITH_PARANOIA_DEBUG
+				hasPids=true					##__WITH_PARANOIA_DEBUG
 			fi
 		done
 
 		# hasPids can be false on last iteration in ParallelExec mode
-		if [ $hasPids == false ] && [ "$functionMode" = "WaitForTaskCompletion" ]; then                                 ##__WITH_PARANOIA_DEBUG
-			Logger "No valable pids given." "ERROR"                                                                 ##__WITH_PARANOIA_DEBUG
-		fi                                                                                                              ##__WITH_PARANOIA_DEBUG
+		if [ $hasPids == false ] && [ "$functionMode" = "WaitForTaskCompletion" ]; then					##__WITH_PARANOIA_DEBUG
+			Logger "No valable pids given." "ERROR"									##__WITH_PARANOIA_DEBUG
+		fi														##__WITH_PARANOIA_DEBUG
 		pidsArray=("${newPidsArray[@]}")
 
 		# Trivial wait time for bash to not eat up all CPU
 		sleep $sleepTime
 
-		if [ "$_PERF_PROFILER" == "yes" ]; then                         ##__WITH_PARANOIA_DEBUG
-			_PerfProfiler                                           ##__WITH_PARANOIA_DEBUG
-		fi                                                              ##__WITH_PARANOIA_DEBUG
+		if [ "$_PERF_PROFILER" == "yes" ]; then				##__WITH_PARANOIA_DEBUG
+			_PerfProfiler						##__WITH_PARANOIA_DEBUG
+		fi								##__WITH_PARANOIA_DEBUG
 
 	}
 
