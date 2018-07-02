@@ -1,17 +1,16 @@
 #!/usr/bin/env bash
-#### OFUNCTIONS FULL SUBSET ####
-#### OFUNCTIONS MINI SUBSET ####
+## Generic and highly portable bash functions written in 2013-2018 by Orsiris de Jong - http://www.netpower.fr - ozy@netpower.fr
 
 #TODO: ExecTasks postponed arrays / files grow a lot. Consider having them "rolling"
-#command line arguments don't take -AaqV for example
+#TODO: command line arguments don't take -AaqV for example
 
+#### OFUNCTIONS FULL SUBSET ####
+#### OFUNCTIONS MINI SUBSET ####
 _OFUNCTIONS_VERSION=2.3.0-dev
-_OFUNCTIONS_BUILD=2018062901
+_OFUNCTIONS_BUILD=2018070201
 #### _OFUNCTIONS_BOOTSTRAP SUBSET ####
 _OFUNCTIONS_BOOTSTRAP=true
 #### _OFUNCTIONS_BOOTSTRAP SUBSET END ####
-
-## BEGIN Generic and highly portable bash functions written in 2013-2018 by Orsiris de Jong - http://www.netpower.fr - ozy@netpower.fr
 
 ## To use in a program, define the following variables:
 ## PROGRAM=program-name
@@ -1629,6 +1628,9 @@ GetOs
 ENDSSH
 	if [ $? != 0 ]; then
 		Logger "Cannot connect to remote system [$REMOTE_HOST] port [$REMOTE_PORT]." "CRITICAL"
+		if [ -f "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$SCRIPT_PID.$TSTAMP" ]; then
+			Logger "$(cat "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$SCRIPT_PID.$TSTAMP")" "ERROR"
+		fi
 		exit 1
 	fi
 
