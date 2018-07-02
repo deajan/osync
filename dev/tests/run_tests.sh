@@ -5,7 +5,7 @@
 
 ## On CYGWIN / MSYS, ACL and extended attributes aren't supported
 
-# osync test suite 2018070202
+# osync test suite 2018070203
 
 # 4 tests:
 # quicklocal
@@ -304,7 +304,12 @@ function test_Merge () {
 
 	# Set osync version to stable while testing to avoid warning message
 	# Don't use SetConfFileValue here since for whatever reason Travis does not like creating a sed temporary file in $FAKEROOT
-	sed -i.tmp "s/IS_STABLE=*/IS_STABLE=yes/" "$OSYNC_EXECUTABLE"
+
+	if [ "$TRAVIS_RUN" == true ]; then
+		$SUDO_CMD sed -i.tmp "s/IS_STABLE=*/IS_STABLE=yes/" "$OSYNC_EXECUTABLE"
+	else
+		sed -i.tmp "s/IS_STABLE=*/IS_STABLE=yes/" "$OSYNC_EXECUTABLE"
+	fi
 	#SetConfFileValue "$OSYNC_EXECUTABLE" "IS_STABLE" "yes"
 
 
