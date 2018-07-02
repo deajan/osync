@@ -12,7 +12,7 @@ PROGRAM_BINARY=$PROGRAM".sh"
 PROGRAM_BATCH=$PROGRAM"-batch.sh"
 SSH_FILTER="ssh_filter.sh"
 
-SCRIPT_BUILD=2018062601
+SCRIPT_BUILD=2018070201
 
 ## osync / obackup / pmocr / zsnap install script
 ## Tested on RHEL / CentOS 6 & 7, Fedora 23, Debian 7 & 8, Mint 17 and FreeBSD 8, 10 and 11
@@ -271,7 +271,7 @@ function CopyServiceFiles {
 		Logger "Created [$SERVICE_NAME] service in [$SERVICE_DIR_INIT]." "SIMPLE"
 		Logger "Can be activated with [service $SERVICE_FILE_INIT start]." "SIMPLE"
 		Logger "Can be enabled on boot with [chkconfig $SERVICE_FILE_INIT on]." "SIMPLE"
-	elif ([ "$init" == "openrc" && [ -f "$SCRIPT_PATH/$SERVICE_FILE_OPENRC" ] && [ -d "$SERVICE_DIR_OPENRC" ]); then
+	elif ([ "$init" == "openrc" ] && [ -f "$SCRIPT_PATH/$SERVICE_FILE_OPENRC" ] && [ -d "$SERVICE_DIR_OPENRC" ]); then
 		# Rename service to usual service file
 		CopyFile "$SCRIPT_PATH" "$SERVICE_DIR_OPENRC" "$SERVICE_FILE_OPENRC" "$SERVICE_FILE_INIT" "755" "" "" true
 
