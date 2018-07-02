@@ -8,7 +8,7 @@
 #### OFUNCTIONS FULL SUBSET ####
 #### OFUNCTIONS MINI SUBSET ####
 _OFUNCTIONS_VERSION=2.3.0-dev
-_OFUNCTIONS_BUILD=2018070201
+_OFUNCTIONS_BUILD=2018070202
 #### _OFUNCTIONS_BOOTSTRAP SUBSET ####
 _OFUNCTIONS_BOOTSTRAP=true
 #### _OFUNCTIONS_BOOTSTRAP SUBSET END ####
@@ -503,11 +503,16 @@ function SendEmail {
 
 	local i
 
-	for i in "${destinationMails}"; do
-		if [ $(CheckRFC822 "$i") -ne 1 ]; then
-			Logger "Given email [$i] does not seem to be valid." "WARN"
-		fi
-	done
+	if [ "${destinationMails[@]}" != "" ]; then
+		for i in "${destinationMails[@]}"; do
+			if [ $(CheckRFC822 "$i") -ne 1 ]; then
+				Logger "Given email [$i] does not seem to be valid." "WARN"
+			fi
+		done
+	else
+		Logger "No valid email adresses given." "WARN"
+		return 1
+	fi
 
 	# Prior to sending an email, convert its body if needed
 	if [ "$MAIL_BODY_CHARSET" != "" ]; then
