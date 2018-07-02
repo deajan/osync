@@ -306,10 +306,11 @@ function test_Merge () {
 	# Don't use SetConfFileValue here since for whatever reason Travis does not like creating a sed temporary file in $FAKEROOT
 
 	if [ "$TRAVIS_RUN" == true ]; then
-		$SUDO_CMD sed -i.tmp "s/IS_STABLE=*/IS_STABLE=yes/" "$OSYNC_EXECUTABLE"
+		$SUDO_CMD sed -i.tmp 's/IS_STABLE=*/IS_STABLE=yes/' "$OSYNC_EXECUTABLE"
 	else
-		sed -i.tmp "s/IS_STABLE=*/IS_STABLE=yes/" "$OSYNC_EXECUTABLE"
+		sed -i.tmp 's/IS_STABLE=*/IS_STABLE=yes/' "$OSYNC_EXECUTABLE"
 	fi
+	head $OSYNC_EXECUTABLE
 	#SetConfFileValue "$OSYNC_EXECUTABLE" "IS_STABLE" "yes"
 
 
@@ -1100,7 +1101,7 @@ function test_ConflictDetetion () {
 		return 0
 	fi
 
-	for i in "${osyncParameters[0]}"; do
+	for i in "${osyncParameters[@]}"; do
 
 		cd "$OSYNC_DIR"
 		PrepareLocalDirs
