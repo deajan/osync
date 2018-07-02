@@ -5,7 +5,7 @@
 
 ## On CYGWIN / MSYS, ACL and extended attributes aren't supported
 
-# osync test suite 2018070204
+# osync test suite 2018070205
 
 # 4 tests:
 # quicklocal
@@ -310,7 +310,6 @@ function test_Merge () {
 	else
 		sed -i.tmp 's/^IS_STABLE=.*/IS_STABLE=yes/' "$OSYNC_EXECUTABLE"
 	fi
-	head -n 20 $OSYNC_EXECUTABLE
 	#SetConfFileValue "$OSYNC_EXECUTABLE" "IS_STABLE" "yes"
 
 
@@ -1091,7 +1090,7 @@ function nope_test_Locking () {
 	SetConfFileValue "$CONF_DIR/$REMOTE_CONF" "FORCE_STRANGER_LOCK_RESUME" "no"
 }
 
-function nope_test_ConflictDetetion () {
+function test_ConflictDetetion () {
 	local result
 
 	# Tests compatible with v1.3+
@@ -1101,7 +1100,7 @@ function nope_test_ConflictDetetion () {
 		return 0
 	fi
 
-	for i in "${osyncParameters[@]}"; do
+	for i in "${osyncParameters[0]}"; do
 
 		cd "$OSYNC_DIR"
 		PrepareLocalDirs
@@ -1122,9 +1121,9 @@ function nope_test_ConflictDetetion () {
     
 		echo "A" > "$INITIATOR_DIR/$FileA"
 		echo "B" > "$TARGET_DIR/$FileB"
-		echo "AA" > "$TARGET_DIR/$FileA"
 		echo "BB" > "$INITIATOR_DIR/$FileB"
-    
+		echo "AA" > "$TARGET_DIR/$FileA"
+
 		# Now run should return conflicts
     
 		REMOTE_HOST_PING=$RHOST_PING $OSYNC_EXECUTABLE $i --log-conflicts > "$FAKEROOT/output.log" 2>&1
@@ -1132,13 +1131,13 @@ function nope_test_ConflictDetetion () {
 		cat "$FAKEROOT/output.log"
 		assertEquals "Second run that should detect conflicts with parameters [$i]." "0" $result
     
-		grep "$INITIATOR_DIR/$FileA -- $TARGET_DIR/$FileB" "$TMP/output.log" 
+		grep "$INITIATOR_DIR/$FileA << >> $TARGET_DIR/$FileA" "$FAKEROOT/output.log" 
 		assertEquals "FileA conflict detect with parameters [$i]." "0" $?
     
-		grep "$INITIATOR_DIR/$FileB -- $TARGET_DIR/$FileB" "$TMP/output.log"
+		grep "$INITIATOR_DIR/$FileB << >> $TARGET_DIR/$FileB" "$FAKEROOT/output.log"
 		assertEquals "FileB conflict detect with parameters [$i]." "0" $?
 
-		# TODO: Missing test for conflict prevalance
+		# TODO: Missing test for conflict prevalance (once we have FORCE_CONFLICT_PREVALANCE
 	done
 }
 
