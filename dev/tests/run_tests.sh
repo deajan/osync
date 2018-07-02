@@ -5,7 +5,7 @@
 
 ## On CYGWIN / MSYS, ACL and extended attributes aren't supported
 
-# osync test suite 2018062901
+# osync test suite 2018070201
 
 # 4 tests:
 # quicklocal
@@ -266,7 +266,7 @@ function oneTimeSetUp () {
 
 function oneTimeTearDown () {
 	# Set osync version stable flag back to origin
-	#SetConfFileValue "$OSYNC_DIR/$OSYNC_EXECUTABLE" "IS_STABLE" "$OSYNC_IS_STABLE"
+	SetConfFileValue "$OSYNC_DIR/osync.sh" "IS_STABLE" "$OSYNC_IS_STABLE"
 
 	RemoveSSH
 
@@ -296,15 +296,14 @@ function test_Merge () {
 	assertEquals "Merging code" "0" $?
 
 	cd "$OSYNC_DIR"
+
+	# Set osync version to stable while testing to avoid warning message
+	SetConfFileValue "$OSYNC_DIR/osync.sh" "IS_STABLE" "yes"
+
 	echo ""
 	echo "Installing osync to $FAKEROOT"
 	$SUDO_CMD ./install.sh --no-stats --prefix="$FAKEROOT"
 	assertEquals "Install failed" "0" $?
-
-	# Set osync version to stable while testing to avoid warning message
-	echo "SetConfFileValue \"$OSYNC_EXECUTABLE\" \"IS_STABLE\" \"yes\""
-	SetConfFileValue "$OSYNC_EXECUTABLE" "IS_STABLE" "yes"
-	echo "done"
 }
 
 function test_LargeFileSet () {
