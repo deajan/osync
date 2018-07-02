@@ -137,7 +137,7 @@ function GetInit {
 			Logger "Detected initV." "SIMPLE"
 		fi
 	else
-		Logger "Can't detect initV or systemd. Service files won't be installed. You can still run $PROGRAM manually or via cron." "SIMPLE"
+		Logger "Can't detect initV, systemd or openRC. Service files won't be installed. You can still run $PROGRAM manually or via cron." "SIMPLE"
 		init="none"
 	fi
 }
@@ -259,7 +259,6 @@ function CopyServiceFiles {
 			CreateDir "$SERVICE_DIR_SYSTEMD_USER"
 			CopyFile "$SCRIPT_PATH" "$SERVICE_DIR_SYSTEMD_USER" "$SERVICE_FILE_SYSTEMD_USER" "$SERVICE_FILE_SYSTEMD_USER" "" "" "" true
 		fi
-
 		Logger "Created [$SERVICE_NAME] service in [$SERVICE_DIR_SYSTEMD_SYSTEM] and [$SERVICE_DIR_SYSTEMD_USER]." "SIMPLE"
 		Logger "Can be activated with [systemctl start SERVICE_NAME@instance.conf] where instance.conf is the name of the config file in $CONF_DIR." "SIMPLE"
 		Logger "Can be enabled on boot with [systemctl enable $SERVICE_NAME@instance.conf]." "SIMPLE"
@@ -278,7 +277,7 @@ function CopyServiceFiles {
 		Logger "Created [$SERVICE_NAME] service in [$SERVICE_DIR_OPENRC]." "SIMPLE"
 		Logger "Can be activated with [rc-update add $SERVICE_NAME.instance] where instance is a configuration file found in /etc/osync." "SIMPLE"
 	else
-		Logger "Cannot define what init style is in use on this system. Skipping service file installation." "SIMPLE"
+		Logger "Cannot properly find how to deal with init on this system. Skipping service file installation." "SIMPLE"
 	fi
 }
 
