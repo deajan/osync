@@ -8,7 +8,7 @@
 #### OFUNCTIONS FULL SUBSET ####
 #### OFUNCTIONS MINI SUBSET ####
 _OFUNCTIONS_VERSION=2.3.0-dev
-_OFUNCTIONS_BUILD=2018070202
+_OFUNCTIONS_BUILD=2018070301
 #### _OFUNCTIONS_BOOTSTRAP SUBSET ####
 _OFUNCTIONS_BOOTSTRAP=true
 #### _OFUNCTIONS_BOOTSTRAP SUBSET END ####
@@ -1255,6 +1255,13 @@ function EscapeSpaces {
 	local string="${1}" # String on which spaces will be escaped
 
 	echo "${string// /\\ }"
+}
+
+# Usage var=$(EscapeDoubleQuotes "$var") or var="$(EscapeDoubleQuotes "$var")"
+function EscapeDoubleQuotes {
+	local value="${1}"
+		
+	echo "${value//\"/\\\"}"
 }
 
 function IsNumericExpand {
