@@ -8,7 +8,7 @@
 #### OFUNCTIONS FULL SUBSET ####
 #### OFUNCTIONS MINI SUBSET ####
 _OFUNCTIONS_VERSION=2.3.0-dev
-_OFUNCTIONS_BUILD=2018070301
+_OFUNCTIONS_BUILD=2018070901
 #### _OFUNCTIONS_BOOTSTRAP SUBSET ####
 _OFUNCTIONS_BOOTSTRAP=true
 #### _OFUNCTIONS_BOOTSTRAP SUBSET END ####
@@ -215,7 +215,7 @@ function RemoteLogger {
 		fi
 		return
 	elif [ "$level" == "ERROR" ]; then
-		_Logger "" "$prefix\e[91m$value\e[0m" true
+		_Logger "" "$prefix\e[31m$value\e[0m" true
 		if [ $_DEBUG == "yes" ]; then
 			_Logger -e "" "[$retval] in [$(joinString , ${FUNCNAME[@]})] SP=$SCRIPT_PID P=$$" true
 		fi
