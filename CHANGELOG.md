@@ -24,7 +24,7 @@ dd Mmm YYYY: osync v1.3-beta release
 - Fixed GetRemoteOS missing GetConfFileValue preventing to get OS details from /etc/os-release
 - Fixed low severity security issue where log and run files could be read by other users
 - Merged Logger and QuickLogger for simplified usage
-! Fixed inotifyway error in FreeBSD (see #119)
+- Fixed inotifyway error in FreeBSD (see #119)
 - Minor enhancements in installer / ofunctions
 	- Added --prefix option for installer
         - Installer path fixes
@@ -37,6 +37,7 @@ dd Mmm YYYY: osync v1.3-beta release
 - Prevented non unique runtime filenames on some systems where no milliseconds exist
 	- Fixed bogus runtime filenames on Busybox
 - Upgraded shunit2 test framework to v2.1.8pre (git commit 07bb329)
+- Multiple smaller fixes and improvements
 
 25 Mar 2017: osync v1.2 release (for full changelog of v1.2 branch see all v1.2-beta/RC entries)
 
