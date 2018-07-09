@@ -8,7 +8,7 @@
 #### OFUNCTIONS FULL SUBSET ####
 #### OFUNCTIONS MINI SUBSET ####
 _OFUNCTIONS_VERSION=2.3.0-dev
-_OFUNCTIONS_BUILD=2018070901
+_OFUNCTIONS_BUILD=2018070902
 #### _OFUNCTIONS_BOOTSTRAP SUBSET ####
 _OFUNCTIONS_BOOTSTRAP=true
 #### _OFUNCTIONS_BOOTSTRAP SUBSET END ####
@@ -1358,6 +1358,8 @@ function CheckRFC822 {
 ## Modified version of https://gist.github.com/cdown/1163649
 function UrlEncode {
 	local length="${#1}"
+
+	local i
 
 	local LANG=C
 	for i in $(seq 0 $((length-1))); do
