@@ -5,13 +5,15 @@ dd Mmm YYYY: osync v1.3 release (for full changelog since v1.2 branch see all v1
 
 dd Mmm YYYY: osync v1.3-RC1 release
 
-dd Mmm YYYY: osync v1.3-beta release
+! New option --sync=bidir|initator2target|target2initiator #147
+! new option FORCE_CONFLICT_PREVALANCE which will always use Initiator or Target, regardless of best time
+! Vercomp function is now BusyBox compatible
+
+08 Aug 2018: osync v1.3-beta1 release
 
 - Added an option to log conflictual files
 	- Presence of conflictual files can trigger a special mail
-! New option --sync=bidir|initator2target|target2initiator #147
 - New option --initialize (see #141)
-! new option FORCE_CONFLICT_PREVALANCE which will always use Initiator or Target, regardless of best time
 - Added OpenRC support (thanks to kozross, see #140)
 - Added --no-resume option in order to disable resuming execution on failure
 - Added basic performance profiler to debug version
@@ -33,7 +35,6 @@ dd Mmm YYYY: osync v1.3-beta release
 - Multiple portability improvements
 	- UrlEncode function is now Busybox compatible
 	- IsInteger function is now Busybox compatible
-	! Vercomp function is now BusyBox compatible
 - Prevented non unique runtime filenames on some systems where no milliseconds exist
 	- Fixed bogus runtime filenames on Busybox
 - Upgraded shunit2 test framework to v2.1.8pre (git commit 07bb329)
