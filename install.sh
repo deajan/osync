@@ -12,7 +12,7 @@ PROGRAM_BINARY=$PROGRAM".sh"
 PROGRAM_BATCH=$PROGRAM"-batch.sh"
 SSH_FILTER="ssh_filter.sh"
 
-SCRIPT_BUILD=2018062601
+SCRIPT_BUILD=2018070201
 
 ## osync / obackup / pmocr / zsnap install script
 ## Tested on RHEL / CentOS 6 & 7, Fedora 23, Debian 7 & 8, Mint 17 and FreeBSD 8, 10 and 11
@@ -140,7 +140,7 @@ function RemoteLogger {
 		fi
 		return
 	elif [ "$level" == "ERROR" ]; then
-		_Logger "" "$prefix\e[91m$value\e[0m" true
+		_Logger "" "$prefix\e[31m$value\e[0m" true
 		if [ $_DEBUG == "yes" ]; then
 			_Logger -e "" "[$retval] in [$(joinString , ${FUNCNAME[@]})] SP=$SCRIPT_PID P=$$" true
 		fi
@@ -162,7 +162,7 @@ function RemoteLogger {
 		fi
 		return
 	elif [ "$level" == "ALWAYS" ]; then
-		_Logger  "" "$prefix$value"
+		_Logger	 "" "$prefix$value"
 		return
 	elif [ "$level" == "DEBUG" ]; then
 		if [ "$_DEBUG" == "yes" ]; then
@@ -268,6 +268,8 @@ function Logger {
 ## Modified version of https://gist.github.com/cdown/1163649
 function UrlEncode {
 	local length="${#1}"
+
+	local i
 
 	local LANG=C
 	for i in $(seq 0 $((length-1))); do
@@ -448,7 +450,7 @@ function GetInit {
 			Logger "Detected initV." "SIMPLE"
 		fi
 	else
-		Logger "Can't detect initV or systemd. Service files won't be installed. You can still run $PROGRAM manually or via cron." "SIMPLE"
+		Logger "Can't detect initV, systemd or openRC. Service files won't be installed. You can still run $PROGRAM manually or via cron." "SIMPLE"
 		init="none"
 	fi
 }
@@ -570,7 +572,6 @@ function CopyServiceFiles {
 			CreateDir "$SERVICE_DIR_SYSTEMD_USER"
 			CopyFile "$SCRIPT_PATH" "$SERVICE_DIR_SYSTEMD_USER" "$SERVICE_FILE_SYSTEMD_USER" "$SERVICE_FILE_SYSTEMD_USER" "" "" "" true
 		fi
-
 		Logger "Created [$SERVICE_NAME] service in [$SERVICE_DIR_SYSTEMD_SYSTEM] and [$SERVICE_DIR_SYSTEMD_USER]." "SIMPLE"
 		Logger "Can be activated with [systemctl start SERVICE_NAME@instance.conf] where instance.conf is the name of the config file in $CONF_DIR." "SIMPLE"
 		Logger "Can be enabled on boot with [systemctl enable $SERVICE_NAME@instance.conf]." "SIMPLE"
@@ -582,14 +583,14 @@ function CopyServiceFiles {
 		Logger "Created [$SERVICE_NAME] service in [$SERVICE_DIR_INIT]." "SIMPLE"
 		Logger "Can be activated with [service $SERVICE_FILE_INIT start]." "SIMPLE"
 		Logger "Can be enabled on boot with [chkconfig $SERVICE_FILE_INIT on]." "SIMPLE"
-	elif ([ "$init" == "openrc" && [ -f "$SCRIPT_PATH/$SERVICE_FILE_OPENRC" ] && [ -d "$SERVICE_DIR_OPENRC" ]); then
+	elif ([ "$init" == "openrc" ] && [ -f "$SCRIPT_PATH/$SERVICE_FILE_OPENRC" ] && [ -d "$SERVICE_DIR_OPENRC" ]); then
 		# Rename service to usual service file
 		CopyFile "$SCRIPT_PATH" "$SERVICE_DIR_OPENRC" "$SERVICE_FILE_OPENRC" "$SERVICE_FILE_INIT" "755" "" "" true
 
 		Logger "Created [$SERVICE_NAME] service in [$SERVICE_DIR_OPENRC]." "SIMPLE"
 		Logger "Can be activated with [rc-update add $SERVICE_NAME.instance] where instance is a configuration file found in /etc/osync." "SIMPLE"
 	else
-		Logger "Cannot define what init style is in use on this system. Skipping service file installation." "SIMPLE"
+		Logger "Cannot properly find how to deal with init on this system. Skipping service file installation." "SIMPLE"
 	fi
 }
 

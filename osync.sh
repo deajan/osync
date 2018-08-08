@@ -5,25 +5,16 @@
 #Check dryruns with nosuffix mode for timestampList
 
 PROGRAM="osync" # Rsync based two way sync engine with fault tolerance
-AUTHOR="(C) 2013-2017 by Orsiris de Jong"
+AUTHOR="(C) 2013-2018 by Orsiris de Jong"
 CONTACT="http://www.netpower.fr/osync - ozy@netpower.fr"
-PROGRAM_VERSION=1.2.5-dev
-PROGRAM_BUILD=2018062506
+PROGRAM_VERSION=1.3.0-beta1
+PROGRAM_BUILD=2018080801
 IS_STABLE=no
 
-#TODO: tidy up ExecTasks comments
 
-
-
-
-#TODO: ExecTasks postponed arrays / files grow a lot. Consider having them "rolling"
-#command line arguments don't take -AaqV for example
-
-_OFUNCTIONS_VERSION=2.3.0-dev
-_OFUNCTIONS_BUILD=2018062504
+_OFUNCTIONS_VERSION=2.3.0-beta1
+_OFUNCTIONS_BUILD=2018080801
 _OFUNCTIONS_BOOTSTRAP=true
-
-## BEGIN Generic bash functions written in 2013-2017 by Orsiris de Jong - http://www.netpower.fr - ozy@netpower.fr
 
 ## To use in a program, define the following variables:
 ## PROGRAM=program-name
@@ -33,8 +24,6 @@ _OFUNCTIONS_BOOTSTRAP=true
 ## _LOGGER_VERBOSE=true/false
 ## _LOGGER_ERR_ONLY=true/false
 ## _LOGGER_PREFIX="date"/"time"/""
-
-#TODO: global WAIT_FOR_TASK_COMPLETION_id instead of callerName has to be backported to ParallelExec and osync / obackup / pmocr ocde
 
 ## Logger sets {ERROR|WARN}_ALERT variable when called with critical / error / warn loglevel
 ## When called from subprocesses, variable of main process cannot be set. Status needs to be get via $RUN_DIR/$PROGRAM.Logger.{error|warn}.$SCRIPT_PID.$TSTAMP
@@ -218,7 +207,7 @@ function RemoteLogger {
 		fi
 		return
 	elif [ "$level" == "ERROR" ]; then
-		_Logger "" "$prefix\e[91m$value\e[0m" true
+		_Logger "" "$prefix\e[31m$value\e[0m" true
 		if [ $_DEBUG == "yes" ]; then
 			_Logger -e "" "[$retval] in [$(joinString , ${FUNCNAME[@]})] SP=$SCRIPT_PID P=$$" true
 		fi
@@ -240,7 +229,7 @@ function RemoteLogger {
 		fi
 		return
 	elif [ "$level" == "ALWAYS" ]; then
-		_Logger  "" "$prefix$value"
+		_Logger	 "" "$prefix$value"
 		return
 	elif [ "$level" == "DEBUG" ]; then
 		if [ "$_DEBUG" == "yes" ]; then
@@ -345,7 +334,6 @@ function KillChilds {
 	fi
 
 	if kill -0 "$pid" > /dev/null 2>&1; then
-		#TODO: Warning: pgrep is not native on cygwin, have this checked in CheckEnvironment
 		if children="$(pgrep -P "$pid")"; then
 			if [[ "$pid" == *"$children"* ]]; then
 				Logger "Bogus pgrep implementation." "CRITICAL"
@@ -464,6 +452,12 @@ function SendAlert {
 # encryption can be set to tls, ssl or none
 # smtpUser and smtpPassword are optional
 # SendEmail "subject" "Body text" "receiver@example.com receiver2@otherdomain.com" "/path/to/attachment.file" "senderMail@example.com" "smtpServer.domain.tld" "smtpPort" "encryption" "smtpUser" "smtpPassword"
+
+# If text is received as attachment ATT00001.bin or noname, consider adding the following to /etc/mail.rc
+#set ttycharset=iso-8859-1
+#set sendcharsets=iso-8859-1
+#set encoding=8bit
+
 function SendEmail {
 	local subject="${1}"
 	local message="${2}"
@@ -485,11 +479,16 @@ function SendEmail {
 
 	local i
 
-	for i in "${destinationMails}"; do
-		if [ $(CheckRFC822 "$i") -ne 1 ]; then
-			Logger "Given email [$i] does not seem to be valid." "WARN"
-		fi
-	done
+	if [ "${destinationMails[@]}" != "" ]; then
+		for i in "${destinationMails[@]}"; do
+			if [ $(CheckRFC822 "$i") -ne 1 ]; then
+				Logger "Given email [$i] does not seem to be valid." "WARN"
+			fi
+		done
+	else
+		Logger "No valid email adresses given." "WARN"
+		return 1
+	fi
 
 	# Prior to sending an email, convert its body if needed
 	if [ "$MAIL_BODY_CHARSET" != "" ]; then
@@ -744,28 +743,28 @@ function ParallelExec {
 
 function ExecTasks {
 	# Mandatory arguments
-	local mainInput="${1}"                          # Contains list of pids / commands separated by semicolons or filepath to list of pids / commands
+	local mainInput="${1}"				# Contains list of pids / commands separated by semicolons or filepath to list of pids / commands
 
 	# Optional arguments
-	local id="${2:-base}"                           # Optional ID in order to identify global variables from this run (only bash variable names, no '-'). Global variables are WAIT_FOR_TASK_COMPLETION_$id and HARD_MAX_EXEC_TIME_REACHED_$id
-	local readFromFile="${3:-false}"                # Is mainInput / auxInput a semicolon separated list (true) or a filepath (false)
-	local softPerProcessTime="${4:-0}"              # Max time (in seconds) a pid or command can run before a warning is logged, unless set to 0
-	local hardPerProcessTime="${5:-0}"              # Max time (in seconds) a pid or command can run before the given command / pid is stopped, unless set to 0
-	local softMaxTime="${6:-0}"                     # Max time (in seconds) for the whole function to run before a warning is logged, unless set to 0
-	local hardMaxTime="${7:-0}"                     # Max time (in seconds) for the whole function to run before all pids / commands given are stopped, unless set to 0
-	local counting="${8:-true}"                     # Should softMaxTime and hardMaxTime be accounted since function begin (true) or since script begin (false)
-	local sleepTime="${9:-.5}"                      # Seconds between each state check. The shorter the value, the snappier ExecTasks will be, but as a tradeoff, more cpu power will be used (good values are between .05 and 1)
-	local keepLogging="${10:-1800}"                 # Every keepLogging seconds, an alive message is logged. Setting this value to zero disables any alive logging
-	local spinner="${11:-true}"                     # Show spinner (true) or do not show anything (false) while running
-	local noTimeErrorLog="${12:-false}"             # Log errors when reaching soft / hard execution times (false) or do not log errors on those triggers (true)
-	local noErrorLogsAtAll="${13:-false}"           # Do not log any errros at all (useful for recursive ExecTasks checks)
+	local id="${2:-base}"				# Optional ID in order to identify global variables from this run (only bash variable names, no '-'). Global variables are WAIT_FOR_TASK_COMPLETION_$id and HARD_MAX_EXEC_TIME_REACHED_$id
+	local readFromFile="${3:-false}"		# Is mainInput / auxInput a semicolon separated list (true) or a filepath (false)
+	local softPerProcessTime="${4:-0}"		# Max time (in seconds) a pid or command can run before a warning is logged, unless set to 0
+	local hardPerProcessTime="${5:-0}"		# Max time (in seconds) a pid or command can run before the given command / pid is stopped, unless set to 0
+	local softMaxTime="${6:-0}"			# Max time (in seconds) for the whole function to run before a warning is logged, unless set to 0
+	local hardMaxTime="${7:-0}"			# Max time (in seconds) for the whole function to run before all pids / commands given are stopped, unless set to 0
+	local counting="${8:-true}"			# Should softMaxTime and hardMaxTime be accounted since function begin (true) or since script begin (false)
+	local sleepTime="${9:-.5}"			# Seconds between each state check. The shorter the value, the snappier ExecTasks will be, but as a tradeoff, more cpu power will be used (good values are between .05 and 1)
+	local keepLogging="${10:-1800}"			# Every keepLogging seconds, an alive message is logged. Setting this value to zero disables any alive logging
+	local spinner="${11:-true}"			# Show spinner (true) or do not show anything (false) while running
+	local noTimeErrorLog="${12:-false}"		# Log errors when reaching soft / hard execution times (false) or do not log errors on those triggers (true)
+	local noErrorLogsAtAll="${13:-false}"		# Do not log any errros at all (useful for recursive ExecTasks checks)
 
 	# Parallelism specific arguments
-	local numberOfProcesses="${14:-0}"              # Number of simulanteous commands to run, given as mainInput. Set to 0 by default (WaitForTaskCompletion mode). Setting this value enables ParallelExec mode.
-	local auxInput="${15}"                          # Contains list of commands separated by semicolons or filepath fo list of commands. Exit code of those commands decide whether main commands will be executed or not
-	local maxPostponeRetries="${16:-3}"             # If a conditional command fails, how many times shall we try to postpone the associated main command. Set this to 0 to disable postponing
-	local minTimeBetweenRetries="${17:-300}"        # Time (in seconds) between postponed command retries
-	local validExitCodes="${18:-0}"                 # Semi colon separated list of valid main command exit codes which will not trigger errors
+	local numberOfProcesses="${14:-0}"		# Number of simulanteous commands to run, given as mainInput. Set to 0 by default (WaitForTaskCompletion mode). Setting this value enables ParallelExec mode.
+	local auxInput="${15}"				# Contains list of commands separated by semicolons or filepath fo list of commands. Exit code of those commands decide whether main commands will be executed or not
+	local maxPostponeRetries="${16:-3}"		# If a conditional command fails, how many times shall we try to postpone the associated main command. Set this to 0 to disable postponing
+	local minTimeBetweenRetries="${17:-300}"	# Time (in seconds) between postponed command retries
+	local validExitCodes="${18:-0}"			# Semi colon separated list of valid main command exit codes which will not trigger errors
 
 	local i
 
@@ -791,38 +790,38 @@ function ExecTasks {
 	IFS=';' read -r -a validExitCodes <<< "$validExitCodes"
 
 	# ParallelExec specific variables
-	local auxItemCount=0            # Number of conditional commands
-	local commandsArray=()          # Array containing commands
+	local auxItemCount=0		# Number of conditional commands
+	local commandsArray=()		# Array containing commands
 	local commandsConditionArray=() # Array containing conditional commands
-	local currentCommand            # Variable containing currently processed command
-	local currentCommandCondition   # Variable containing currently processed conditional command
-	local commandsArrayPid=()       # Array containing pids of commands currently run
-	local postponedRetryCount=0     # Number of current postponed commands retries
-	local postponedItemCount=0      # Number of commands that have been postponed (keep at least one in order to check once)
+	local currentCommand		# Variable containing currently processed command
+	local currentCommandCondition	# Variable containing currently processed conditional command
+	local commandsArrayPid=()	# Array containing pids of commands currently run
+	local postponedRetryCount=0	# Number of current postponed commands retries
+	local postponedItemCount=0	# Number of commands that have been postponed (keep at least one in order to check once)
 	local postponedCounter=0
-	local isPostponedCommand=false  # Is the current command from a postponed file ?
-	local postponedExecTime=0       # How much time has passed since last postponed condition was checked
-	local needsPostponing           # Does currentCommand need to be postponed
+	local isPostponedCommand=false	# Is the current command from a postponed file ?
+	local postponedExecTime=0	# How much time has passed since last postponed condition was checked
+	local needsPostponing		# Does currentCommand need to be postponed
 	local temp
 
 	# Common variables
-	local pid                       # Current pid working on
-	local pidState                  # State of the process
-	local mainItemCount=0           # number of given items (pids or commands)
-	local readFromFile              # Should we read pids / commands from a file (true)
+	local pid			# Current pid working on
+	local pidState			# State of the process
+	local mainItemCount=0		# number of given items (pids or commands)
+	local readFromFile		# Should we read pids / commands from a file (true)
 	local counter=0
-	local log_ttime=0               # local time instance for comparaison
+	local log_ttime=0		# local time instance for comparaison
 
-	local seconds_begin=$SECONDS    # Seconds since the beginning of the script
-	local exec_time=0               # Seconds since the beginning of this function
+	local seconds_begin=$SECONDS	# Seconds since the beginning of the script
+	local exec_time=0		# Seconds since the beginning of this function
 
-	local retval=0                  # return value of monitored pid process
-	local subRetval=0               # return value of condition commands
-	local errorcount=0              # Number of pids that finished with errors
-	local pidsArray                 # Array of currently running pids
-	local newPidsArray              # New array of currently running pids for next iteration
-	local pidsTimeArray             # Array containing execution begin time of pids
-	local executeCommand            # Boolean to check if currentCommand can be executed given a condition
+	local retval=0			# return value of monitored pid process
+	local subRetval=0		# return value of condition commands
+	local errorcount=0		# Number of pids that finished with errors
+	local pidsArray			# Array of currently running pids
+	local newPidsArray		# New array of currently running pids for next iteration
+	local pidsTimeArray		# Array containing execution begin time of pids
+	local executeCommand		# Boolean to check if currentCommand can be executed given a condition
 
 
 	local functionMode
@@ -987,11 +986,11 @@ function ExecTasks {
 				else
 					# pid is dead, get its exit code from wait command
 					wait $pid
-					retval=$?	#TODO: do we use retval codes somehow ?? where
+					retval=$?
 					# Check for valid exit codes
 					if [ $(ArrayContains $retval "${validExitCodes[@]}") -eq 0 ]; then
 						if [ $noErrorLogsAtAll != true ]; then
-							Logger "${FUNCNAME[0]} called by [$id] finished monitoring pid [$pid] with exitcode [$retval]." "DEBUG" #TODO: set this to debug in order to stop complaints
+							Logger "${FUNCNAME[0]} called by [$id] finished monitoring pid [$pid] with exitcode [$retval]." "DEBUG"
 							if [ "$functionMode" == "ParallelExec" ]; then
 								Logger "Command was [${commandsArrayPid[$pid]}]." "ERROR"
 							fi
@@ -1202,6 +1201,13 @@ function EscapeSpaces {
 	echo "${string// /\\ }"
 }
 
+# Usage var=$(EscapeDoubleQuotes "$var") or var="$(EscapeDoubleQuotes "$var")"
+function EscapeDoubleQuotes {
+	local value="${1}"
+		
+	echo "${value//\"/\\\"}"
+}
+
 function IsNumericExpand {
 	eval "local value=\"${1}\"" # Needed eval so variable variables can be processed
 
@@ -1289,6 +1295,8 @@ function CheckRFC822 {
 ## Modified version of https://gist.github.com/cdown/1163649
 function UrlEncode {
 	local length="${#1}"
+
+	local i
 
 	local LANG=C
 	for i in $(seq 0 $((length-1))); do
@@ -1510,6 +1518,9 @@ GetOs
 ENDSSH
 	if [ $? != 0 ]; then
 		Logger "Cannot connect to remote system [$REMOTE_HOST] port [$REMOTE_PORT]." "CRITICAL"
+		if [ -f "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$SCRIPT_PID.$TSTAMP" ]; then
+			Logger "$(cat "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$SCRIPT_PID.$TSTAMP")" "ERROR"
+		fi
 		exit 1
 	fi
 
@@ -1912,7 +1923,7 @@ function InitLocalOSDependingSettings {
 	## Using mingw version of find instead of windows one
 	## Getting running processes is quite different
 	## Ping command is not the same
-	if [ "$LOCAL_OS" == "msys" ] || [ "$LOCAL_OS" == "Cygwin" ]; then
+	if [ "$LOCAL_OS" == "msys" ] || [ "$LOCAL_OS" == "Cygwin" ] || [ "$LOCAL_OS" == "Microsoft" ] || [ "$LOCAL_OS" == "WinNT10" ]; then
 		FIND_CMD=$(dirname $BASH)/find
 		PING_CMD='$SYSTEMROOT\system32\ping -n 2'
 
@@ -2169,7 +2180,7 @@ function WildcardFileExists () {
 	fi
 }
 
-# If using "include" statements, make sure the script does not get executed unless it's loaded by bootstrap
+# If using "include" statements, make sure the script does not get executed unless it's loaded by bootstrap.sh which will replace includes with actual code
 _OFUNCTIONS_BOOTSTRAP=true
 [ "$_OFUNCTIONS_BOOTSTRAP" != true ] && echo "Please use bootstrap.sh to load this dev version of $(basename $0)" && exit 1
 
@@ -2518,7 +2529,7 @@ function RemoteLogger {
 		fi
 		return
 	elif [ "$level" == "ERROR" ]; then
-		_Logger "" "$prefix\e[91m$value\e[0m" true
+		_Logger "" "$prefix\e[31m$value\e[0m" true
 		if [ $_DEBUG == "yes" ]; then
 			_Logger -e "" "[$retval] in [$(joinString , ${FUNCNAME[@]})] SP=$SCRIPT_PID P=$$" true
 		fi
@@ -2540,7 +2551,7 @@ function RemoteLogger {
 		fi
 		return
 	elif [ "$level" == "ALWAYS" ]; then
-		_Logger  "" "$prefix$value"
+		_Logger	 "" "$prefix$value"
 		return
 	elif [ "$level" == "DEBUG" ]; then
 		if [ "$_DEBUG" == "yes" ]; then
@@ -2632,9 +2643,7 @@ function CheckReplicas {
 		_CheckReplicasRemote "${TARGET[$__replicaDir]}" "${TARGET[$__type]}" &
 		pids="$pids;$!"
 	fi
-	##ExecTasks "$mainInput" "$id" $readFromFile $softPerProcessTime $hardPerProcessTime $softMaxTime $hardMaxTime $counting $sleepTime $keepLogging $spinner $noTimeErrorLog $noErrorLogsAtAll $numberOfProcesses $auxInput $maxPostponeRetries $minTimeBetweenRetries $validExitCodes
 	ExecTasks $pids "${FUNCNAME[0]}" false 0 0 720 1800 true $SLEEP_TIME $KEEP_LOGGING
-	#ExecTasks "${FUNCNAME[0]}" 0 0 720 1800 $SLEEP_TIME $KEEP_LOGGING true true false false 1 $pids
 	retval=$?
 	if [ $retval -ne 0 ]; then
 		Logger "Cancelling task." "CRITICAL" $retval
@@ -2846,7 +2855,7 @@ function RemoteLogger {
 		fi
 		return
 	elif [ "$level" == "ERROR" ]; then
-		_Logger "" "$prefix\e[91m$value\e[0m" true
+		_Logger "" "$prefix\e[31m$value\e[0m" true
 		if [ $_DEBUG == "yes" ]; then
 			_Logger -e "" "[$retval] in [$(joinString , ${FUNCNAME[@]})] SP=$SCRIPT_PID P=$$" true
 		fi
@@ -2868,7 +2877,7 @@ function RemoteLogger {
 		fi
 		return
 	elif [ "$level" == "ALWAYS" ]; then
-		_Logger  "" "$prefix$value"
+		_Logger	 "" "$prefix$value"
 		return
 	elif [ "$level" == "DEBUG" ]; then
 		if [ "$_DEBUG" == "yes" ]; then
@@ -3000,7 +3009,6 @@ function HandleLocks {
 		pids="$pids;$targetPid"
 	fi
 	ExecTasks $pids "${FUNCNAME[0]}" false 0 0 720 1800 true $SLEEP_TIME $KEEP_LOGGING
-	#ExecTasks "${FUNCNAME[0]}" 0 0 720 1800 $SLEEP_TIME $KEEP_LOGGING true true false false 1 $pids
 	retval=$?
 	if [ $retval -ne 0 ]; then
 		IFS=';' read -r -a pidArray <<< "$(eval echo \"\$WAIT_FOR_TASK_COMPLETION_${FUNCNAME[0]}\")"
@@ -3103,7 +3111,6 @@ function UnlockReplicas {
 
 	if [ "$pids" != "" ]; then
 		ExecTasks $pids "${FUNCNAME[0]}" false 0 0 720 1800 true $SLEEP_TIME $KEEP_LOGGING
-		#ExecTasks "${FUNCNAME[0]}" 0 0 720 1800 $SLEEP_TIME $KEEP_LOGGING true true false false 1 $pids
 	fi
 }
 
@@ -3388,13 +3395,12 @@ function conflictList {
 			return $retval
 		fi
 
-		join -j 1 -t ';' -o 1.1,1.2,1.3,2.2,2.3 "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.${INITIATOR[$__type]}.$SCRIPT_PID.$TSTAMP" "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.${TARGET[$__type]}.$SCRIPT_PID.$TSTAMP" > "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.comapre.$SCRIPT_PID.$TSTAMP"
+		join -j 1 -t ';' -o 1.1,1.2,1.3,2.2,2.3 "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.${INITIATOR[$__type]}.$SCRIPT_PID.$TSTAMP" "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.${TARGET[$__type]}.$SCRIPT_PID.$TSTAMP" > "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.compare.$SCRIPT_PID.$TSTAMP"
 		retval=$?
 		if [ $retval -ne 0 ]; then
 			Logger "Cannot create conflict list file." "ERROR"
 			return $retval
 		fi
-
 	fi
 }
 
@@ -3429,9 +3435,7 @@ function syncAttrs {
 	fi
 	Logger "RSYNC_CMD: $rsyncCmd" "DEBUG"
 	eval "$rsyncCmd"
-		##ExecTasks "$mainInput" "$id" $readFromFile $softPerProcessTime $hardPerProcessTime $softMaxTime $hardMaxTime $counting $sleepTime $keepLogging $spinner $noTimeErrorLog $noErrorLogsAtAll $numberOfProcesses $auxInput $maxPostponeRetries $minTimeBetweenRetries $validExitCodes
 		ExecTasks $! "${FUNCNAME[0]}" false 0 0 $SOFT_MAX_EXEC_TIME $HARD_MAX_EXEC_TIME false $SLEEP_TIME $KEEP_LOGGING
-		#ExecTasks "${FUNCNAME[0]}" 0 0 $SOFT_MAX_EXEC_TIME $HARD_MAX_EXEC_TIME $SLEEP_TIME $KEEP_LOGGING false true false false 1 $!
 	retval=$?
 
 	if [ $retval -ne 0 ] && [ $retval -ne 24 ]; then
@@ -3465,9 +3469,7 @@ function syncAttrs {
 		_getFileCtimeMtimeRemote "${TARGET[$__replicaDir]}" "${TARGET[$__type]}" "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}-cleaned.$SCRIPT_PID.$TSTAMP" "$RUN_DIR/$PROGRAM.ctime_mtime___.${TARGET[$__type]}.$SCRIPT_PID.$TSTAMP" &
 		pids="$pids;$!"
 	fi
-	##ExecTasks "$mainInput" "$id" $readFromFile $softPerProcessTime $hardPerProcessTime $softMaxTime $hardMaxTime $counting $sleepTime $keepLogging $spinner $noTimeErrorLog $noErrorLogsAtAll $numberOfProcesses $auxInput $maxPostponeRetries $minTimeBetweenRetries $validExitCodes
 	ExecTasks $pids "${FUNCNAME[0]}" false 0 0 $SOFT_MAX_EXEC_TIME $HARD_MAX_EXEC_TIME false $SLEEP_TIME $KEEP_LOGGING
-	#ExecTasks "${FUNCNAME[0]}" 0 0 $SOFT_MAX_EXEC_TIME $HARD_MAX_EXEC_TIME $SLEEP_TIME $KEEP_LOGGING false true false false 1 $pids
 	retval=$?
 	if [ $retval -ne 0 ]; then
 		Logger "Getting ctime attributes failed." "CRITICAL" $retval
@@ -3520,9 +3522,7 @@ function syncAttrs {
 
 	Logger "RSYNC_CMD: $rsyncCmd" "DEBUG"
 	eval "$rsyncCmd"
-	##ExecTasks "$mainInput" "$id" $readFromFile $softPerProcessTime $hardPerProcessTime $softMaxTime $hardMaxTime $counting $sleepTime $keepLogging $spinner $noTimeErrorLog $noErrorLogsAtAll $numberOfProcesses $auxInput $maxPostponeRetries $minTimeBetweenRetries $validExitCodes
 	ExecTasks $! "${FUNCNAME[0]}" false 0 0 $SOFT_MAX_EXEC_TIME $HARD_MAX_EXEC_TIME false $SLEEP_TIME $KEEP_LOGGING
-	#ExecTasks "${FUNCNAME[0]}" 0 0 $SOFT_MAX_EXEC_TIME $HARD_MAX_EXEC_TIME $SLEEP_TIME $KEEP_LOGGING false true false false 1 $!
 	retval=$?
 
 	if [ $retval -ne 0 ] && [ $retval -ne 24 ]; then
@@ -3808,7 +3808,7 @@ function RemoteLogger {
 		fi
 		return
 	elif [ "$level" == "ERROR" ]; then
-		_Logger "" "$prefix\e[91m$value\e[0m" true
+		_Logger "" "$prefix\e[31m$value\e[0m" true
 		if [ $_DEBUG == "yes" ]; then
 			_Logger -e "" "[$retval] in [$(joinString , ${FUNCNAME[@]})] SP=$SCRIPT_PID P=$$" true
 		fi
@@ -3830,7 +3830,7 @@ function RemoteLogger {
 		fi
 		return
 	elif [ "$level" == "ALWAYS" ]; then
-		_Logger  "" "$prefix$value"
+		_Logger	 "" "$prefix$value"
 		return
 	elif [ "$level" == "DEBUG" ]; then
 		if [ "$_DEBUG" == "yes" ]; then
@@ -4004,27 +4004,51 @@ function Initialize {
 		for pid in "${pidArray[@]}"; do
 			pid=${pid%:*}
 			if [ "$pid" == "$initiatorPid" ]; then
-				Logger "Failed to create initialization files for initiator." "ERROR"
+				Logger "Failed to create initialization treeList files for initiator." "ERROR"
 			elif [ "$pid" == "$targetPid" ]; then
-				Logger "Failed to create initialization files for target." "ERROR"
+				Logger "Failed to create initialization treeList files for target." "ERROR"
 			fi
 		done
 		exit 1
 		resumeTarget="${SYNC_ACTION[8]}"
 	fi
+
+	timestampList "${INITIATOR[$__replicaDir]}" "${INITIATOR[$__type]}" "${INITIATOR[$__replicaDir]}${INITIATOR[$__stateDir]}/${INITIATOR[$__type]}${INITIATOR[$__treeAfterFile]}" "${INITIATOR[$__replicaDir]}${INITIATOR[$__stateDir]}/${INITIATOR[$__type]}${INITIATOR[$__timestampAfterFile]}" &
+	initiatorPid="$!"
+
+	timestampList "${TARGET[$__replicaDir]}" "${TARGET[$__type]}" "${INITIATOR[$__replicaDir]}${INITIATOR[$__stateDir]}/${TARGET[$__type]}${TARGET[$__treeAfterFile]}" "${INITIATOR[$__replicaDir]}${INITIATOR[$__stateDir]}/${TARGET[$__type]}${INITIATOR[$__timestampAfterFile]}" &
+	targetPid="$!"
+
+	ExecTasks "$initiatorPid;$targetPid" "${FUNCNAME[0]}" false 0 0 $SOFT_MAX_EXEC_TIME $HARD_MAX_EXEC_TIME false $SLEEP_TIME $KEEP_LOGGING
+	if [ $? -ne 0 ]; then
+		IFS=';' read -r -a pidArray <<< "$(eval echo \"\$WAIT_FOR_TASK_COMPLETION_${FUNCNAME[0]}\")"
+		initiatorFail=false
+		targetFail=false
+		for pid in "${pidArray[@]}"; do
+			pid=${pid%:*}
+			if [ "$pid" == "$initiatorPid" ]; then
+				Logger "Failed to create initialization timestamp files for initiator." "ERROR"
+			elif [ "$pid" == "$targetPid" ]; then
+				Logger "Failed to create initialization timestamp files for target." "ERROR"
+			fi
+		done
+		exit 1
+		resumeTarget="${SYNC_ACTION[8]}"
+	fi
+
 }
 
 ###### Sync function in 9 steps
 ######
 ###### Step 0a & 0b: Create current file list of replicas
 ###### Step 1a & 1b: Create deleted file list of replicas
-###### Step 2a & 2b: Create ctime & mtime file list of replicas
+###### Step 2a & 2b: Create current ctime & mtime file list of replicas
 ###### Step 3a & 3b: Merge conflict file list
 ###### Step 4: Update file attributes
 ###### Step 5a & 5b: Update replicas
 ###### Step 6a & 6b: Propagate deletions on replicas
 ###### Step 7a & 7b: Create after run file list of replicas
-###### Step 8a & 8b: Create ctime & mtime file lost of replicas
+###### Step 8a & 8b: Create after run  ctime & mtime file list of replicas
 
 function Sync {
 
@@ -4101,9 +4125,7 @@ function Sync {
 			targetPid="$!"
 		fi
 
-		##ExecTasks "$mainInput" "$id" $readFromFile $softPerProcessTime $hardPerProcessTime $softMaxTime $hardMaxTime $counting $sleepTime $keepLogging $spinner $noTimeErrorLog $noErrorLogsAtAll $numberOfProcesses $auxInput $maxPostponeRetries $minTimeBetweenRetries $validExitCodes
 		ExecTasks "$initiatorPid;$targetPid" "${FUNCNAME[0]}" false 0 0 $SOFT_MAX_EXEC_TIME $HARD_MAX_EXEC_TIME false $SLEEP_TIME $KEEP_LOGGING
-		#ExecTasks "${FUNCNAME[0]}" 0 0 $SOFT_MAX_EXEC_TIME $HARD_MAX_EXEC_TIME $SLEEP_TIME $KEEP_LOGGING false true false false 1 "$initiatorPid;$targetPid"
 		if [ $? -ne 0 ]; then
 			IFS=';' read -r -a pidArray <<< "$(eval echo \"\$WAIT_FOR_TASK_COMPLETION_${FUNCNAME[0]}\")"
 			initiatorFail=false
@@ -4148,9 +4170,7 @@ function Sync {
 			targetPid="$!"
 		fi
 
-		##ExecTasks "$mainInput" "$id" $readFromFile $softPerProcessTime $hardPerProcessTime $softMaxTime $hardMaxTime $counting $sleepTime $keepLogging $spinner $noTimeErrorLog $noErrorLogsAtAll $numberOfProcesses $auxInput $maxPostponeRetries $minTimeBetweenRetries $validExitCodes
 		ExecTasks "$initiatorPid;$targetPid" "${FUNCNAME[0]}" false 0 0 $SOFT_MAX_EXEC_TIME $HARD_MAX_EXEC_TIME false $SLEEP_TIME $KEEP_LOGGING
-		#ExecTasks "${FUNCNAME[0]}" 0 0 $SOFT_MAX_EXEC_TIME $HARD_MAX_EXEC_TIME $SLEEP_TIME $KEEP_LOGGING false true false false 1 "$initiatorPid;$targetPid"
 		if [ $? -ne 0 ]; then
 			IFS=';' read -r -a pidArray <<< "$(eval echo \"\$WAIT_FOR_TASK_COMPLETION_${FUNCNAME[0]}\")"
 			initiatorFail=false
@@ -4199,9 +4219,7 @@ function Sync {
 				targetPid="$!"
 			fi
 
-			##ExecTasks "$mainInput" "$id" $readFromFile $softPerProcessTime $hardPerProcessTime $softMaxTime $hardMaxTime $counting $sleepTime $keepLogging $spinner $noTimeErrorLog $noErrorLogsAtAll $numberOfProcesses $auxInput $maxPostponeRetries $minTimeBetweenRetries $validExitCodes
 			ExecTasks "$initiatorPid;$targetPid" "${FUNCNAME[0]}" false 0 0 $SOFT_MAX_EXEC_TIME $HARD_MAX_EXEC_TIME false $SLEEP_TIME $KEEP_LOGGING
-			#ExecTasks "${FUNCNAME[0]}" 0 0 $SOFT_MAX_EXEC_TIME $HARD_MAX_EXEC_TIME $SLEEP_TIME $KEEP_LOGGING false true false false 1 "$initiatorPid;$targetPid"
 			if [ $? -ne 0 ]; then
 				IFS=';' read -r -a pidArray <<< "$(eval echo \"\$WAIT_FOR_TASK_COMPLETION_${FUNCNAME[0]}\")"
 				initiatorFail=false
@@ -4244,9 +4262,7 @@ function Sync {
 	if [ "$resumeInitiator" == "${SYNC_ACTION[3]}" ] || [ "$resumeTarget" == "${SYNC_ACTION[3]}" ]; then
 		if [ "$LOG_CONFLICTS" == "yes" ]; then
 			conflictList "${INITIATOR[$__timestampCurrentFile]}" "${INITIATOR[$__timestampAfterFileNoSuffix]}" "${INITIATOR[$__conflictListFile]}" &
-			##ExecTasks "$mainInput" "$id" $readFromFile $softPerProcessTime $hardPerProcessTime $softMaxTime $hardMaxTime $counting $sleepTime $keepLogging $spinner $noTimeErrorLog $noErrorLogsAtAll $numberOfProcesses $auxInput $maxPostponeRetries $minTimeBetweenRetries $validExitCodes
 			ExecTasks $! "${FUNCNAME[0]}" false 0 0 $SOFT_MAX_EXEC_TIME $HARD_MAX_EXEC_TIME false $SLEEP_TIME $KEEP_LOGGING
-			#ExecTasks "${FUNCNAME[0]}" 0 0 $SOFT_MAX_EXEC_TIME $HARD_MAX_EXEC_TIME $SLEEP_TIME $KEEP_LOGGING false true false false 1 $!
 			if [ $? -ne 0 ]; then
 				echo "${SYNC_ACTION[3]}" > "${INITIATOR[$__initiatorLastActionFile]}"
 				echo "${SYNC_ACTION[3]}" > "${INITIATOR[$__targetLastActionFile]}"
@@ -4270,9 +4286,7 @@ function Sync {
 	if [ "$resumeInitiator" == "${SYNC_ACTION[4]}" ] || [ "$resumeTarget" == "${SYNC_ACTION[4]}" ]; then
 		if [[ "$RSYNC_ATTR_ARGS" == *"-X"* ]] || [[ "$RSYNC_ATTR_ARGS" == *"-A"* ]]; then
 			syncAttrs "${INITIATOR[$__replicaDir]}" "$TARGET_SYNC_DIR" &
-			##ExecTasks "$mainInput" "$id" $readFromFile $softPerProcessTime $hardPerProcessTime $softMaxTime $hardMaxTime $counting $sleepTime $keepLogging $spinner $noTimeErrorLog $noErrorLogsAtAll $numberOfProcesses $auxInput $maxPostponeRetries $minTimeBetweenRetries $validExitCodes
 			ExecTasks $! "${FUNCNAME[0]}" false 0 0 $SOFT_MAX_EXEC_TIME $HARD_MAX_EXEC_TIME false $SLEEP_TIME $KEEP_LOGGING
-			#ExecTasks "${FUNCNAME[0]}" 0 0 $SOFT_MAX_EXEC_TIME $HARD_MAX_EXEC_TIME $SLEEP_TIME $KEEP_LOGGING false true false false 1 $!
 			if [ $? -ne 0 ]; then
 				echo "${SYNC_ACTION[4]}" > "${INITIATOR[$__initiatorLastActionFile]}"
 				echo "${SYNC_ACTION[4]}" > "${INITIATOR[$__targetLastActionFile]}"
@@ -4297,9 +4311,7 @@ function Sync {
 		if [ "$CONFLICT_PREVALANCE" == "${TARGET[$__type]}" ]; then
 			if [ "$resumeTarget" == "${SYNC_ACTION[5]}" ]; then
 				syncUpdate "${TARGET[$__type]}" "${INITIATOR[$__type]}" &
-				##ExecTasks "$mainInput" "$id" $readFromFile $softPerProcessTime $hardPerProcessTime $softMaxTime $hardMaxTime $counting $sleepTime $keepLogging $spinner $noTimeErrorLog $noErrorLogsAtAll $numberOfProcesses $auxInput $maxPostponeRetries $minTimeBetweenRetries $validExitCodes
 				ExecTasks $! "${FUNCNAME[0]}" false 0 0 $SOFT_MAX_EXEC_TIME $HARD_MAX_EXEC_TIME false $SLEEP_TIME $KEEP_LOGGING
-				#ExecTasks "${FUNCNAME[0]}" 0 0 $SOFT_MAX_EXEC_TIME $HARD_MAX_EXEC_TIME $SLEEP_TIME $KEEP_LOGGING false true false false 1 $!
 				if [ $? -ne 0 ]; then
 					echo "${SYNC_ACTION[5]}" > "${INITIATOR[$__targetLastActionFile]}"
 					resumeTarget="${SYNC_ACTION[5]}"
@@ -4311,9 +4323,7 @@ function Sync {
 			fi
 			if [ "$resumeInitiator" == "${SYNC_ACTION[5]}" ]; then
 				syncUpdate "${INITIATOR[$__type]}" "${TARGET[$__type]}" &
-				##ExecTasks "$mainInput" "$id" $readFromFile $softPerProcessTime $hardPerProcessTime $softMaxTime $hardMaxTime $counting $sleepTime $keepLogging $spinner $noTimeErrorLog $noErrorLogsAtAll $numberOfProcesses $auxInput $maxPostponeRetries $minTimeBetweenRetries $validExitCodes
 				ExecTasks $! "${FUNCNAME[0]}" false 0 0 $SOFT_MAX_EXEC_TIME $HARD_MAX_EXEC_TIME false $SLEEP_TIME $KEEP_LOGGING
-				#ExecTasks "${FUNCNAME[0]}" 0 0 $SOFT_MAX_EXEC_TIME $HARD_MAX_EXEC_TIME $SLEEP_TIME $KEEP_LOGGING false true false false 1 $!
 				if [ $? -ne 0 ]; then
 					echo "${SYNC_ACTION[5]}" > "${INITIATOR[$__initiatorLastActionFile]}"
 					resumeInitiator="${SYNC_ACTION[5]}"
@@ -4326,9 +4336,7 @@ function Sync {
 		else
 			if [ "$resumeInitiator" == "${SYNC_ACTION[5]}" ]; then
 				syncUpdate "${INITIATOR[$__type]}" "${TARGET[$__type]}" &
-				##ExecTasks "$mainInput" "$id" $readFromFile $softPerProcessTime $hardPerProcessTime $softMaxTime $hardMaxTime $counting $sleepTime $keepLogging $spinner $noTimeErrorLog $noErrorLogsAtAll $numberOfProcesses $auxInput $maxPostponeRetries $minTimeBetweenRetries $validExitCodes
 				ExecTasks $! "${FUNCNAME[0]}" false 0 0 $SOFT_MAX_EXEC_TIME $HARD_MAX_EXEC_TIME false $SLEEP_TIME $KEEP_LOGGING
-				#ExecTasks "${FUNCNAME[0]}" 0 0 $SOFT_MAX_EXEC_TIME $HARD_MAX_EXEC_TIME $SLEEP_TIME $KEEP_LOGGING false true false false 1 $!
 				if [ $? -ne 0 ]; then
 					echo "${SYNC_ACTION[5]}" > "${INITIATOR[$__initiatorLastActionFile]}"
 					resumeInitiator="${SYNC_ACTION[5]}"
@@ -4340,9 +4348,7 @@ function Sync {
 			fi
 			if [ "$resumeTarget" == "${SYNC_ACTION[5]}" ]; then
 				syncUpdate "${TARGET[$__type]}" "${INITIATOR[$__type]}" &
-				##ExecTasks "$mainInput" "$id" $readFromFile $softPerProcessTime $hardPerProcessTime $softMaxTime $hardMaxTime $counting $sleepTime $keepLogging $spinner $noTimeErrorLog $noErrorLogsAtAll $numberOfProcesses $auxInput $maxPostponeRetries $minTimeBetweenRetries $validExitCodes
 				ExecTasks $! "${FUNCNAME[0]}" false 0 0 $SOFT_MAX_EXEC_TIME $HARD_MAX_EXEC_TIME false $SLEEP_TIME $KEEP_LOGGING
-				#ExecTasks "${FUNCNAME[0]}" 0 0 $SOFT_MAX_EXEC_TIME $HARD_MAX_EXEC_TIME $SLEEP_TIME $KEEP_LOGGING false true false false 1 $!
 				if [ $? -ne 0 ]; then
 					echo "${SYNC_ACTION[5]}" > "${INITIATOR[$__targetLastActionFile]}"
 					resumeTarget="${SYNC_ACTION[5]}"
@@ -4367,9 +4373,7 @@ function Sync {
 			targetPid="$!"
 		fi
 
-		##ExecTasks "$mainInput" "$id" $readFromFile $softPerProcessTime $hardPerProcessTime $softMaxTime $hardMaxTime $counting $sleepTime $keepLogging $spinner $noTimeErrorLog $noErrorLogsAtAll $numberOfProcesses $auxInput $maxPostponeRetries $minTimeBetweenRetries $validExitCodes
 		ExecTasks "$initiatorPid;$targetPid" "${FUNCNAME[0]}" false 0 0 $SOFT_MAX_EXEC_TIME $HARD_MAX_EXEC_TIME false $SLEEP_TIME $KEEP_LOGGING
-		#ExecTasks "${FUNCNAME[0]}" 0 0 $SOFT_MAX_EXEC_TIME $HARD_MAX_EXEC_TIME $SLEEP_TIME $KEEP_LOGGING false true false false 1 "$initiatorPid;$targetPid"
 		if [ $? -ne 0 ]; then
 			IFS=';' read -r -a pidArray <<< "$(eval echo \"\$WAIT_FOR_TASK_COMPLETION_${FUNCNAME[0]}\")"
 			initiatorFail=false
@@ -4415,9 +4419,7 @@ function Sync {
 			targetPid="$!"
 		fi
 
-		##ExecTasks "$mainInput" "$id" $readFromFile $softPerProcessTime $hardPerProcessTime $softMaxTime $hardMaxTime $counting $sleepTime $keepLogging $spinner $noTimeErrorLog $noErrorLogsAtAll $numberOfProcesses $auxInput $maxPostponeRetries $minTimeBetweenRetries $validExitCodes
 		ExecTasks "$initiatorPid;$targetPid" "${FUNCNAME[0]}" false 0 0 $SOFT_MAX_EXEC_TIME $HARD_MAX_EXEC_TIME false $SLEEP_TIME $KEEP_LOGGING
-		#ExecTasks "${FUNCNAME[0]}" 0 0 $SOFT_MAX_EXEC_TIME $HARD_MAX_EXEC_TIME $SLEEP_TIME $KEEP_LOGGING false true false false 1 "$initiatorPid;$targetPid"
 		if [ $? -ne 0 ]; then
 			IFS=';' read -r -a pidArray <<< "$(eval echo \"\$WAIT_FOR_TASK_COMPLETION_${FUNCNAME[0]}\")"
 			initiatorFail=false
@@ -4466,9 +4468,7 @@ function Sync {
 				targetPid="$!"
 			fi
 
-			##ExecTasks "$mainInput" "$id" $readFromFile $softPerProcessTime $hardPerProcessTime $softMaxTime $hardMaxTime $counting $sleepTime $keepLogging $spinner $noTimeErrorLog $noErrorLogsAtAll $numberOfProcesses $auxInput $maxPostponeRetries $minTimeBetweenRetries $validExitCodes
 			ExecTasks "$initiatorPid;$targetPid" "${FUNCNAME[0]}" false 0 0 $SOFT_MAX_EXEC_TIME $HARD_MAX_EXEC_TIME false $SLEEP_TIME $KEEP_LOGGING
-			#ExecTasks "${FUNCNAME[0]}" 0 0 $SOFT_MAX_EXEC_TIME $HARD_MAX_EXEC_TIME $SLEEP_TIME $KEEP_LOGGING false true false false 1 "$initiatorPid;$targetPid"
 			if [ $? -ne 0 ]; then
 				IFS=';' read -r -a pidArray <<< "$(eval echo \"\$WAIT_FOR_TASK_COMPLETION_${FUNCNAME[0]}\")"
 				initiatorFail=false
@@ -4716,7 +4716,7 @@ function RemoteLogger {
 		fi
 		return
 	elif [ "$level" == "ERROR" ]; then
-		_Logger "" "$prefix\e[91m$value\e[0m" true
+		_Logger "" "$prefix\e[31m$value\e[0m" true
 		if [ $_DEBUG == "yes" ]; then
 			_Logger -e "" "[$retval] in [$(joinString , ${FUNCNAME[@]})] SP=$SCRIPT_PID P=$$" true
 		fi
@@ -4738,7 +4738,7 @@ function RemoteLogger {
 		fi
 		return
 	elif [ "$level" == "ALWAYS" ]; then
-		_Logger  "" "$prefix$value"
+		_Logger	 "" "$prefix$value"
 		return
 	elif [ "$level" == "DEBUG" ]; then
 		if [ "$_DEBUG" == "yes" ]; then
@@ -4817,9 +4817,7 @@ function SoftDelete {
 			_SoftDeleteRemote "${TARGET[$__type]}" "${TARGET[$__replicaDir]}${TARGET[$__backupDir]}" $CONFLICT_BACKUP_DAYS "conflict backup" &
 			pids="$pids;$!"
 		fi
-		##ExecTasks "$mainInput" "$id" $readFromFile $softPerProcessTime $hardPerProcessTime $softMaxTime $hardMaxTime $counting $sleepTime $keepLogging $spinner $noTimeErrorLog $noErrorLogsAtAll $numberOfProcesses $auxInput $maxPostponeRetries $minTimeBetweenRetries $validExitCodes
 		ExecTasks $pids "${FUNCNAME[0]}" false 0 0 $SOFT_MAX_EXEC_TIME $HARD_MAX_EXEC_TIME false $SLEEP_TIME $KEEP_LOGGING
-		#ExecTasks "${FUNCNAME[0]}" 0 0 $SOFT_MAX_EXEC_TIME $HARD_MAX_EXEC_TIME $SLEEP_TIME $KEEP_LOGGING false true false false 1 "$pids"
 		if [ $? -ne 0 ] && [ "$(eval echo \"\$HARD_MAX_EXEC_TIME_REACHED_${FUNCNAME[0]}\")" == true ]; then
 			exit 1
 		fi
@@ -4837,9 +4835,7 @@ function SoftDelete {
 			_SoftDeleteRemote "${TARGET[$__type]}" "${TARGET[$__replicaDir]}${TARGET[$__deleteDir]}" $SOFT_DELETE_DAYS "softdelete" &
 			pids="$pids;$!"
 		fi
-		##ExecTasks "$mainInput" "$id" $readFromFile $softPerProcessTime $hardPerProcessTime $softMaxTime $hardMaxTime $counting $sleepTime $keepLogging $spinner $noTimeErrorLog $noErrorLogsAtAll $numberOfProcesses $auxInput $maxPostponeRetries $minTimeBetweenRetries $validExitCodes
 		ExecTasks $pids "${FUNCNAME[0]}" false 0 0 $SOFT_MAX_EXEC_TIME $HARD_MAX_EXEC_TIME false $SLEEP_TIME $KEEP_LOGGING
-		#ExecTasks "${FUNCNAME[0]}" 0 0 $SOFT_MAX_EXEC_TIME $HARD_MAX_EXEC_TIME $SLEEP_TIME $KEEP_LOGGING false true false false 1 "$pids"
 		if [ $? -ne 0 ] && [ "$(eval echo \"\$HARD_MAX_EXEC_TIME_REACHED_${FUNCNAME[0]}\")" == true ]; then
 			exit 1
 		fi
@@ -4906,28 +4902,27 @@ function LogConflicts {
 	local body
 
 	# We keep this in a separate if check because of the subshell used for Logger with _LOGGER_PREFIX
-	if [ -f "$RUN_DIR/$PROGRAM.conflictList.comapre.$SCRIPT_PID.$TSTAMP" ]; then
+	if [ -f "$RUN_DIR/$PROGRAM.conflictList.compare.$SCRIPT_PID.$TSTAMP" ]; then
 		Logger "File conflicts: INITIATOR << >> TARGET" "ALWAYS"
 	fi
 
 	(
 	_LOGGER_PREFIX=""
-	if [ -f "$RUN_DIR/$PROGRAM.conflictList.comapre.$SCRIPT_PID.$TSTAMP" ]; then
+	if [ -f "$RUN_DIR/$PROGRAM.conflictList.compare.$SCRIPT_PID.$TSTAMP" ]; then
 		echo "" > "${INITIATOR[$__replicaDir]}${INITIATOR[$__stateDir]}/${INITIATOR[$__conflictListFile]}"
 		while read -r line; do
-			echo "${INITIATOR[$__replicaDir]}$(echo $line | awk -F';' '{print $1}') -- ${TARGET[$__replicaDir]}$(echo $line | awk -F';' '{print $1}')" >> "${INITIATOR[$__replicaDir]}${INITIATOR[$__stateDir]}/${INITIATOR[$__conflictListFile]}"
-		done < "$RUN_DIR/$PROGRAM.conflictList.comapre.$SCRIPT_PID.$TSTAMP"
+			echo "${INITIATOR[$__replicaDir]}$(echo $line | awk -F';' '{print $1}') << >> ${TARGET[$__replicaDir]}$(echo $line | awk -F';' '{print $1}')" >> "${INITIATOR[$__replicaDir]}${INITIATOR[$__stateDir]}/${INITIATOR[$__conflictListFile]}"
+		done < "$RUN_DIR/$PROGRAM.conflictList.compare.$SCRIPT_PID.$TSTAMP"
 
 		Logger "$(cat ${INITIATOR[$__replicaDir]}${INITIATOR[$__stateDir]}/${INITIATOR[$__conflictListFile]})" "ALWAYS"
-
-		if [ "$ALERT_CONFLICTS" == "yes" ] && [ -s "$RUN_DIR/$PROGRAM.conflictList.comapre.$SCRIPT_PID.$TSTAMP" ]; then
-			subject="Conflictual files found in [$INSTANCE_ID]"
-			body="List of conflictual files:"$'\n'"$(cat ${INITIATOR[$__replicaDir]}${INITIATOR[$__stateDir]}/${INITIATOR[$__conflictListFile]})"
-
-			SendEmail "$subject" "$body" "$DESTINATION_MAILS" "" "$SENDER_MAIL" "$SMTP_SERVER" "$SMTP_PORT" "$SMTP_ENCRYPTION" "$SMTP_USER" "$SMTP_PASSWORD"
-		fi
 	fi
 	)
+	if [ "$ALERT_CONFLICTS" == "yes" ] && [ -s "$RUN_DIR/$PROGRAM.conflictList.compare.$SCRIPT_PID.$TSTAMP" ]; then
+		subject="Conflictual files found in [$INSTANCE_ID]"
+		body="List of conflictual files:"$'\n'"$(cat ${INITIATOR[$__replicaDir]}${INITIATOR[$__stateDir]}/${INITIATOR[$__conflictListFile]})"
+
+		SendEmail "$subject" "$body" "$DESTINATION_MAILS" "" "$SENDER_MAIL" "$SMTP_SERVER" "$SMTP_PORT" "$SMTP_ENCRYPTION" "$SMTP_USER" "$SMTP_PASSWORD"
+	fi
 }
 
 function Init {
@@ -5223,12 +5218,14 @@ function SyncOnChanges {
 
 		Logger "#### Monitoring now." "NOTICE"
 		if [ "$LOCAL_OS" == "MacOSX" ]; then
-			fswatch $RSYNC_PATTERNS $RSYNC_PARTIAL_EXCLUDE --exclude "$OSYNC_DIR" -1 "$INITIATOR_SYNC_DIR" > /dev/null &
+			fswatch $RSYNC_PATTERNS --exclude "$OSYNC_DIR" -1 "$INITIATOR_SYNC_DIR" > /dev/null &
 			# Mac fswatch doesn't have timeout switch, replacing wait $! with WaitForTaskCompletion without warning nor spinner and increased SLEEP_TIME to avoid cpu hogging. This sims wait $! with timeout
 			ExecTasks $! "MonitorMacOSXWait" false 0 0 0 $MAX_WAIT true 1 0
-			#ExecTasks "MonitorMacOSXWait" 0 0 0 $MAX_WAIT 1 0 true false true false $!
+		elif [ "$LOCAL_OS" "BSD" ]; then
+			# BSD version of inotifywait does not support multiple --exclude statements
+			inotifywait --exclude "$OSYNC_DIR" -qq -r -e create -e modify -e delete -e move -e attrib --timeout "$MAX_WAIT" "$INITIATOR_SYNC_DIR" &
 		else
-			inotifywait $RSYNC_PATTERNS $RSYNC_PARTIAL_EXCLUDE --exclude "$OSYNC_DIR" -qq -r -e create -e modify -e delete -e move -e attrib --timeout "$MAX_WAIT" "$INITIATOR_SYNC_DIR" &
+			inotifywait $RSYNC_PATTERNS --exclude "$OSYNC_DIR" -qq -r -e create -e modify -e delete -e move -e attrib --timeout "$MAX_WAIT" "$INITIATOR_SYNC_DIR" &
 			wait $!
 		fi
 		retval=$?
@@ -5378,7 +5375,7 @@ function GetCommandlineArguments {
 			;;
 			--initialize)
 			INITIALIZE="yes"
-			opts=$opts "--initialize"
+			opts=$opts" --initialize"
 			;;
 			--no-prefix)
 			opts=$opts" --no-prefix"
@@ -5452,9 +5449,13 @@ if [ $_QUICK_SYNC -eq 2 ]; then
 	if [ $(IsInteger $MIN_WAIT) -ne 1 ]; then
 		MIN_WAIT=30
 	fi
-else
+# First character shouldn't be '-' when config file given
+elif [ "${1:0:1}" != "-" ]; then
 	ConfigFile="${1}"
 	LoadConfigFile "$ConfigFile"
+else
+	Logger "Wrong arguments given. Expecting a config file or initiator and target arguments." "CRITICAL"
+	exit 1
 fi
 
 if [ "$LOGFILE" == "" ]; then
