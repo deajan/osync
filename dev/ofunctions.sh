@@ -278,7 +278,7 @@ function Logger {
 	if [ "$_LOGGER_PREFIX" == "time" ]; then
 		prefix="TIME: $SECONDS - "
 	elif [ "$_LOGGER_PREFIX" == "date" ]; then
-		prefix="$(date) - "
+		prefix="$(date '+%Y-%m-%d %H:%M:%S') - "
 	else
 		prefix=""
 	fi
