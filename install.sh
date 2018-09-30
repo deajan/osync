@@ -2,8 +2,6 @@
 
 ## Installer script suitable for osync / obackup / pmocr
 
-_OFUNCTIONS_BOOTSTRAP=true
-
 PROGRAM=osync
 
 PROGRAM_VERSION=$(grep "PROGRAM_VERSION=" $PROGRAM.sh)
@@ -12,11 +10,14 @@ PROGRAM_BINARY=$PROGRAM".sh"
 PROGRAM_BATCH=$PROGRAM"-batch.sh"
 SSH_FILTER="ssh_filter.sh"
 
-SCRIPT_BUILD=2018070201
+SCRIPT_BUILD=2018090301
+INSTANCE_ID="installer-$SCRIPT_BUILD"
 
 ## osync / obackup / pmocr / zsnap install script
 ## Tested on RHEL / CentOS 6 & 7, Fedora 23, Debian 7 & 8, Mint 17 and FreeBSD 8, 10 and 11
 ## Please adapt this to fit your distro needs
+
+_OFUNCTIONS_BOOTSTRAP=true
 
 # Get current install.sh path from http://stackoverflow.com/a/246128/2635443
 SCRIPT_PATH="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
@@ -205,7 +206,7 @@ function Logger {
 	if [ "$_LOGGER_PREFIX" == "time" ]; then
 		prefix="TIME: $SECONDS - "
 	elif [ "$_LOGGER_PREFIX" == "date" ]; then
-		prefix="$(date) - "
+		prefix="$(date '+%Y-%m-%d %H:%M:%S') - "
 	else
 		prefix=""
 	fi
@@ -656,6 +657,26 @@ function Usage {
 	echo "--prefix=/path    Use prefix to install path."
 	exit 127
 }
+
+############################## Script entry point
+
+if [ "$LOGFILE" == "" ]; then
+        if [ -w /var/log ]; then
+                LOG_FILE="/var/log/$PROGRAM.$INSTANCE_ID.log"
+        elif ([ "$HOME" != "" ] && [ -w "$HOME" ]); then
+                LOG_FILE="$HOME/$PROGRAM.$INSTANCE_ID.log"
+        else
+                LOG_FILE="./$PROGRAM.$INSTANCE_ID.log"
+        fi
+else
+        LOG_FILE="$LOGFILE"
+fi
+if [ ! -w "$(dirname $LOG_FILE)" ]; then
+        echo "Cannot write to log [$(dirname $LOG_FILE)]."
+else
+        Logger "Script begin, logging to [$LOG_FILE]." "DEBUG"
+fi
+
 
 GetLocalOS
 SetLocalOSSettings
