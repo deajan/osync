@@ -8,7 +8,7 @@ PROGRAM="osync" # Rsync based two way sync engine with fault tolerance
 AUTHOR="(C) 2013-2018 by Orsiris de Jong"
 CONTACT="http://www.netpower.fr/osync - ozy@netpower.fr"
 PROGRAM_VERSION=1.3.0-beta1
-PROGRAM_BUILD=2018093001
+PROGRAM_BUILD=2018093002
 IS_STABLE=no
 
 ##### Execution order						#__WITH_PARANOIA_DEBUG
@@ -268,7 +268,7 @@ function _CheckReplicasRemote {
 
 $SSH_CMD env _REMOTE_TOKEN="$_REMOTE_TOKEN" \
 env _DEBUG="'$_DEBUG'" env _PARANOIA_DEBUG="'$_PARANOIA_DEBUG'" env _LOGGER_SILENT="'$_LOGGER_SILENT'" env _LOGGER_VERBOSE="'$_LOGGER_VERBOSE'" env _LOGGER_PREFIX="'$_LOGGER_PREFIX'" env _LOGGER_ERR_ONLY="'$_LOGGER_ERR_ONLY'" \
-env PROGRAM="'$PROGRAM'" env SCRIPT_PID="'$SCRIPT_PID'" TSTAMP="'$TSTAMP'" \
+env PROGRAM="'$PROGRAM'" env SCRIPT_PID="'$SCRIPT_PID'" env TSTAMP="'$TSTAMP'" \
 env replicaPath="'$replicaPath'" env CREATE_DIRS="'$CREATE_DIRS'" env DF_CMD="'$DF_CMD'" env MINIMUM_SPACE="'$MINIMUM_SPACE'" \
 env LC_ALL=C $COMMAND_SUDO' bash -s' << 'ENDSSH' > "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$replicaType.$SCRIPT_PID.$TSTAMP" 2>&1
 include #### DEBUG SUBSET ####
@@ -454,7 +454,7 @@ function _HandleLocksRemote {
 # passing initiatorRunningPids as litteral string (has to be run through eval to be an array again)
 $SSH_CMD env _REMOTE_TOKEN="$_REMOTE_TOKEN" \
 env _DEBUG="'$_DEBUG'" env _PARANOIA_DEBUG="'$_PARANOIA_DEBUG'" env _LOGGER_SILENT="'$_LOGGER_SILENT'" env _LOGGER_VERBOSE="'$_LOGGER_VERBOSE'" env _LOGGER_PREFIX="'$_LOGGER_PREFIX'" env _LOGGER_ERR_ONLY="'$_LOGGER_ERR_ONLY'" \
-env PROGRAM="'$PROGRAM'" env SCRIPT_PID="'$SCRIPT_PID'" TSTAMP="'$TSTAMP'" \
+env PROGRAM="'$PROGRAM'" env SCRIPT_PID="'$SCRIPT_PID'" env TSTAMP="'$TSTAMP'" \
 env replicaStateDir="'$replicaStateDir'" env initiatorRunningPidsFlat="\"(${initiatorRunningPids[@]})\"" env lockfile="'$lockfile'" env replicaType="'$replicaType'" env overwrite="'$overwrite'" \
 env INSTANCE_ID="'$INSTANCE_ID'" env FORCE_STRANGER_LOCK_RESUME="'$FORCE_STRANGER_LOCK_RESUME'" \
 env LC_ALL=C $COMMAND_SUDO' bash -s' << 'ENDSSH' > "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$replicaType.$SCRIPT_PID.$TSTAMP" 2>&1
@@ -648,7 +648,7 @@ function _UnlockReplicasRemote {
 
 $SSH_CMD env _REMOTE_TOKEN="$_REMOTE_TOKEN" \
 env _DEBUG="'$_DEBUG'" env _PARANOIA_DEBUG="'$_PARANOIA_DEBUG'" env _LOGGER_SILENT="'$_LOGGER_SILENT'" env _LOGGER_VERBOSE="'$_LOGGER_VERBOSE'" env _LOGGER_PREFIX="'$_LOGGER_PREFIX'" env _LOGGER_ERR_ONLY="'$_LOGGER_ERR_ONLY'" \
-env PROGRAM="'$PROGRAM'" env SCRIPT_PID="'$SCRIPT_PID'" TSTAMP="'$TSTAMP'" env lockfile="'$lockfile'" \
+env PROGRAM="'$PROGRAM'" env SCRIPT_PID="'$SCRIPT_PID'" env TSTAMP="'$TSTAMP'" env lockfile="'$lockfile'" \
 env LC_ALL=C $COMMAND_SUDO' bash -s' << 'ENDSSH' > "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$replicaType.$SCRIPT_PID.$TSTAMP" 2>&1
 if [ -f "$lockfile" ]; then
 	rm -f "$lockfile"
@@ -862,7 +862,7 @@ function _getFileCtimeMtimeRemote {
 
 $SSH_CMD env _REMOTE_TOKEN="$_REMOTE_TOKEN" \
 env _DEBUG="'$_DEBUG'" env _PARANOIA_DEBUG="'$_PARANOIA_DEBUG'" env _LOGGER_SILENT="'$_LOGGER_SILENT'" env _LOGGER_VERBOSE="'$_LOGGER_VERBOSE'" env _LOGGER_PREFIX="'$_LOGGER_PREFIX'" env _LOGGER_ERR_ONLY="'$_LOGGER_ERR_ONLY'" \
-env PROGRAM="'$PROGRAM'" env SCRIPT_PID="'$SCRIPT_PID'" TSTAMP="'$TSTAMP'" \
+env PROGRAM="'$PROGRAM'" env SCRIPT_PID="'$SCRIPT_PID'" env TSTAMP="'$TSTAMP'" \
 env replicaPath="'$replicaPath'" env replicaType="'$replicaType'" env REMOTE_STAT_CTIME_MTIME_CMD="'$REMOTE_STAT_CTIME_MTIME_CMD'" \
 env LC_ALL=C $COMMAND_SUDO' bash -s' << 'ENDSSH' > "$RUN_DIR/$PROGRAM.ctime_mtime.$replicaType.$SCRIPT_PID.$TSTAMP"
 	while IFS='' read -r file; do $REMOTE_STAT_CTIME_MTIME_CMD "$replicaPath$file"; done < ".$PROGRAM.ctime_mtime.$replicaType.$SCRIPT_PID.$TSTAMP"
@@ -1315,7 +1315,7 @@ function _deleteRemote {
 
 $SSH_CMD env _REMOTE_TOKEN="$_REMOTE_TOKEN" \
 env _DEBUG="'$_DEBUG'" env _PARANOIA_DEBUG="'$_PARANOIA_DEBUG'" env _LOGGER_SILENT="'$_LOGGER_SILENT'" env _LOGGER_VERBOSE="'$_LOGGER_VERBOSE'" env _LOGGER_PREFIX="'$_LOGGER_PREFIX'" env _LOGGER_ERR_ONLY="'$_LOGGER_ERR_ONLY'" \
-env PROGRAM="'$PROGRAM'" env SCRIPT_PID="'$SCRIPT_PID'" TSTAMP="'$TSTAMP'" \
+env PROGRAM="'$PROGRAM'" env SCRIPT_PID="'$SCRIPT_PID'" env TSTAMP="'$TSTAMP'" \
 env sync_on_changes=$sync_on_changes env _DRYRUN="'$_DRYRUN'" \
 env FILE_LIST="'$(EscapeSpaces "${TARGET[$__replicaDir]}${TARGET[$__stateDir]}/$deletionListFromReplica${INITIATOR[$__deletedListFile]}")'" env REPLICA_DIR="'$(EscapeSpaces "$replicaDir")'" env SOFT_DELETE="'$SOFT_DELETE'" \
 env DELETION_DIR="'$(EscapeSpaces "$deletionDir")'" env FAILED_DELETE_LIST="'$failedDeleteList'" env SUCCESS_DELETE_LIST="'$successDeleteList'" \
@@ -2074,7 +2074,7 @@ function _SoftDeleteRemote {
 
 $SSH_CMD env _REMOTE_TOKEN="$_REMOTE_TOKEN" \
 env _DEBUG="'$_DEBUG'" env _PARANOIA_DEBUG="'$_PARANOIA_DEBUG'" env _LOGGER_SILENT="'$_LOGGER_SILENT'" env _LOGGER_VERBOSE="'$_LOGGER_VERBOSE'" env _LOGGER_PREFIX="'$_LOGGER_PREFIX'" env _LOGGER_ERR_ONLY="'$_LOGGER_ERR_ONLY'" \
-env PROGRAM="'$PROGRAM'" env SCRIPT_PID="'$SCRIPT_PID'" TSTAMP="'$TSTAMP'" \
+env PROGRAM="'$PROGRAM'" env SCRIPT_PID="'$SCRIPT_PID'" env TSTAMP="'$TSTAMP'" \
 env _DRYRUN="'$_DRYRUN'" env replicaType="'$replicaType'" env replicaDeletionPath="'$replicaDeletionPath'" env changeTime="'$changeTime'" env REMOTE_FIND_CMD="'$REMOTE_FIND_CMD'" \
 env LC_ALL=C $COMMAND_SUDO' bash -s' << 'ENDSSH' > "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$replicaType.$SCRIPT_PID.$TSTAMP" 2>&1
 include #### DEBUG SUBSET ####
@@ -2173,6 +2173,27 @@ function SoftDelete {
 			exit 1
 		fi
 	fi
+}
+
+function TriggerInitiatorRun {
+	__CheckArguments 0 $# "$@"	#__WITH_PARANOIA_DEBUG
+
+$SSH_REVERSE_CMD env _REMOTE_TOKEN="$_REMOTE_TOKEN" \
+env _DEBUG="'$_DEBUG'" env _PARANOIA_DEBUG="'$_PARANOIA_DEBUG'" env _LOGGER_SILENT="'$_LOGGER_SILENT'" env _LOGGER_VERBOSE="'$_LOGGER_VERBOSE'" env _LOGGER_PREFIX="'$_LOGGER_PREFIX'" env _LOGGER_ERR_ONLY="'$_LOGGER_ERR_ONLY'" \
+env PROGRAM="'$PROGRAM'" env SCRIPT_PID="'$SCRIPT_PID'" env TSTAMP="'$TSTAMP'" \
+env INSTANCE_ID="'$INSTANCE_ID'" env PUSH_FILE="'$(EscapeEspaces "${INITIATOR[$__updateTriggerFile]}")'" \
+env LC_ALL=C $COMMAND_SUDO' bash -s' << 'ENDSSH' > "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$SCRIPT_PID.$TSTAMP" 2> "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.error.$SCRIPT_PID.$TSTAMP"
+
+	echo "$INSTANCE_ID $(date '+%Y%m%dT%H%M%S.%N')" >> "$PUSH_FILE"
+ENDSSH
+	if [ -s "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.error.$SCRIPT_PID.$TSTAMP" ] || [ $? -ne 0 ]; then
+		(
+		_LOGGER_PREFIX="RR"
+		Logger "$(cat "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.error.$SCRIPT_PID.$TSTAMP")" "ERROR"
+		)
+		return 1
+	fi
+	return 0
 }
 
 function _SummaryFromRsyncFile {
@@ -2520,8 +2541,11 @@ function Usage {
 }
 
 function SyncOnChanges {
-	__CheckArguments 0 $# "$@"	#__WITH_PARANOIA_DEBUG
+	local isTargetHelper="${1:-false}"		# Is this service supposed to be run as target helper ?
 
+	__CheckArguments 1 $# "$@"	#__WITH_PARANOIA_DEBUG
+
+	local watchDirectory
 	local cmd
 	local retval
 
@@ -2537,36 +2561,53 @@ function SyncOnChanges {
 		fi
 	fi
 
-	if [ ! -d "$INITIATOR_SYNC_DIR" ]; then
-		Logger "Initiator directory [$INITIATOR_SYNC_DIR] does not exist. Cannot monitor." "CRITICAL"
-		exit 1
-	fi
-
-	Logger "#### Running $PROGRAM in file monitor mode." "NOTICE"
+	if [ $isTargetHelper == false ]; then
+		if [ ! -d "$INITIATOR_SYNC_DIR" ]; then
+			Logger "Initiator directory [$INITIATOR_SYNC_DIR] does not exist. Cannot monitor." "CRITICAL"
+			exit 1
+		fi
+	Logger "#### Running $PROGRAM in initiator file monitor mode." "NOTICE"
+	else
+		if [ ! -d "$TARGET_SYNC_DIR" ]; then
+			Logger "Target directory [$TARGET_SYNC_DIR] does not exist. Cannot monitor." "CRITICAL"
+			exit 1
+		fi
+	Logger "#### Running $PROGRAM in target helper file monitor mode." "NOTICE"
+	fi		
 
 	while true; do
-		if [ "$ConfigFile" != "" ]; then
-			cmd='bash '$osync_cmd' "'$ConfigFile'" '$opts
+		if [ $isTargetHelper == false ]; then
+			if [ "$ConfigFile" != "" ]; then
+				cmd='bash '$osync_cmd' "'$ConfigFile'" '$opts
+			else
+				cmd='bash '$osync_cmd' '$opts
+			fi
+			Logger "Daemon cmd: $cmd" "DEBUG"
+			eval "$cmd"
+			retval=$?
+			if [ $retval -ne 0 ] && [ $retval != 2 ]; then
+				Logger "$PROGRAM child exited with error." "ERROR" $retval
+			fi
+
+			watchDirectory="$INITIATOR_SYNC_DIR"
 		else
-			cmd='bash '$osync_cmd' '$opts
+			# Notify initiator about target changes
+			
+			TriggerInitiatorRun
+			watchDirectory="$TARGET_SYNC_DIR"
 		fi
-		Logger "Daemon cmd: $cmd" "DEBUG"
-		eval "$cmd"
-		retval=$?
-		if [ $retval -ne 0 ] && [ $retval != 2 ]; then
-			Logger "osync child exited with error." "ERROR" $retval
-		fi
+			
 
 		Logger "#### Monitoring now." "NOTICE"
 		if [ "$LOCAL_OS" == "MacOSX" ]; then
-			fswatch $RSYNC_PATTERNS --exclude "$OSYNC_DIR" -1 "$INITIATOR_SYNC_DIR" > /dev/null &
+			fswatch $RSYNC_PATTERNS --exclude "$OSYNC_DIR" -1 "$watchDirectory" > /dev/null &
 			# Mac fswatch doesn't have timeout switch, replacing wait $! with WaitForTaskCompletion without warning nor spinner and increased SLEEP_TIME to avoid cpu hogging. This sims wait $! with timeout
 			ExecTasks $! "MonitorMacOSXWait" false 0 0 0 $MAX_WAIT true 1 0
-		elif [ "$LOCAL_OS" "BSD" ]; then
+		elif [ "$LOCAL_OS" == "BSD" ]; then
 			# BSD version of inotifywait does not support multiple --exclude statements
-			inotifywait --exclude "$OSYNC_DIR" -qq -r -e create -e modify -e delete -e move -e attrib --timeout "$MAX_WAIT" "$INITIATOR_SYNC_DIR" &
+			inotifywait --exclude "$OSYNC_DIR" -qq -r -e create -e modify -e delete -e move -e attrib --timeout "$MAX_WAIT" "$watchDirectory" &
 		else
-			inotifywait $RSYNC_PATTERNS --exclude "$OSYNC_DIR" -qq -r -e create -e modify -e delete -e move -e attrib --timeout "$MAX_WAIT" "$INITIATOR_SYNC_DIR" &
+			inotifywait $RSYNC_PATTERNS --exclude "$OSYNC_DIR" -qq -r -e create -e modify -e delete -e move -e attrib --timeout "$MAX_WAIT" "$watchDirectory" &
 			wait $!
 		fi
 		retval=$?
@@ -2836,7 +2877,7 @@ Logger "$DRY_WARNING$DATE - $PROGRAM $PROGRAM_VERSION script begin." "ALWAYS"
 Logger "-------------------------------------------------------------" "NOTICE"
 Logger "Sync task [$INSTANCE_ID] launched as $LOCAL_USER@$LOCAL_HOST (PID $SCRIPT_PID)" "NOTICE"
 if [ $sync_on_changes == true ]; then
-	SyncOnChanges
+	SyncOnChanges false
 else
 	GetRemoteOS
 	InitRemoteOSDependingSettings
