@@ -13,7 +13,7 @@ IS_STABLE=no
 
 
 _OFUNCTIONS_VERSION=2.3.0-RC1
-_OFUNCTIONS_BUILD=2018093002
+_OFUNCTIONS_BUILD=2018093003
 _OFUNCTIONS_BOOTSTRAP=true
 
 ## To use in a program, define the following variables:
@@ -2057,8 +2057,9 @@ function InitRemoteOSDependingSettings {
 	# Set compression options again after we know what remote OS we are dealing with
 	SetCompression
 
-	RSYNC_DEFAULT_ARGS="-r $RSYNC_DEFAULT_ARGS"
+	# Set recursive options
 	RSYNC_DEFAULT_NONRECURSIVE_ARGS="-d $RSYNC_DEFAULT_ARGS"
+	RSYNC_DEFAULT_ARGS="-r $RSYNC_DEFAULT_ARGS"
 }
 
 ## IFS debug function
