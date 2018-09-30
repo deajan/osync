@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-## MERGE 2018062501
+## MERGE 2018093001
 
 ## Merges ofunctions.sh and n_program.sh into program.sh
 ## Adds installer
@@ -185,7 +185,6 @@ if [ "$(basename $0)" == "merge.sh" ]; then
 	if [ "$1" == "osync" ]; then
 
 		__PREPROCESSOR_Merge osync
-		__PREPROCESSOR_Merge osync_target_helper
 		__PREPROCESSOR_CopyCommons osync
 	elif [ "$1" == "obackup" ]; then
 		__PREPROCESSOR_Merge obackup

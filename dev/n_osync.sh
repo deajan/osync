@@ -4,11 +4,13 @@
 #TODO check if _getCtimeMtime | sort removal needs to be backported
 #Check dryruns with nosuffix mode for timestampList
 
+#WIP: initiator can be passed as ssh uri in target helper mode
+
 PROGRAM="osync" # Rsync based two way sync engine with fault tolerance
 AUTHOR="(C) 2013-2018 by Orsiris de Jong"
 CONTACT="http://www.netpower.fr/osync - ozy@netpower.fr"
 PROGRAM_VERSION=1.3.0-beta1
-PROGRAM_BUILD=2018093002
+PROGRAM_BUILD=2018093003
 IS_STABLE=no
 
 ##### Execution order						#__WITH_PARANOIA_DEBUG
@@ -1316,7 +1318,7 @@ function _deleteRemote {
 $SSH_CMD env _REMOTE_TOKEN="$_REMOTE_TOKEN" \
 env _DEBUG="'$_DEBUG'" env _PARANOIA_DEBUG="'$_PARANOIA_DEBUG'" env _LOGGER_SILENT="'$_LOGGER_SILENT'" env _LOGGER_VERBOSE="'$_LOGGER_VERBOSE'" env _LOGGER_PREFIX="'$_LOGGER_PREFIX'" env _LOGGER_ERR_ONLY="'$_LOGGER_ERR_ONLY'" \
 env PROGRAM="'$PROGRAM'" env SCRIPT_PID="'$SCRIPT_PID'" env TSTAMP="'$TSTAMP'" \
-env sync_on_changes=$sync_on_changes env _DRYRUN="'$_DRYRUN'" \
+env _DRYRUN="'$_DRYRUN'" \
 env FILE_LIST="'$(EscapeSpaces "${TARGET[$__replicaDir]}${TARGET[$__stateDir]}/$deletionListFromReplica${INITIATOR[$__deletedListFile]}")'" env REPLICA_DIR="'$(EscapeSpaces "$replicaDir")'" env SOFT_DELETE="'$SOFT_DELETE'" \
 env DELETION_DIR="'$(EscapeSpaces "$deletionDir")'" env FAILED_DELETE_LIST="'$failedDeleteList'" env SUCCESS_DELETE_LIST="'$successDeleteList'" \
 env LC_ALL=C $COMMAND_SUDO' bash -s' << 'ENDSSH' >> "$RUN_DIR/$PROGRAM.remote_deletion.$SCRIPT_PID.$TSTAMP" 2>&1
@@ -2175,7 +2177,22 @@ function SoftDelete {
 	fi
 }
 
-function TriggerInitiatorRun {
+function _TriggerInitiatorRunLocal {
+	__CheckArguments 0 $# "$@"	#__WITH_PARANOIA_DEBUG
+
+	local PUSH_FILE
+
+	"PUSH_FILE=${INITIATOR[$__updateTriggerFile]}"
+
+	echo "$INSTANCE_ID $(date '+%Y%m%dT%H%M%S.%N')" >> "$PUSH_FILE" 2> "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.error.$SCRIPT_PID.$TSTAMP"
+	if [ -s "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.error.$SCRIPT_PID.$TSTAMP" ] || [ $? -ne 0 ]; then
+		Logger "$(cat "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.error.$SCRIPT_PID.$TSTAMP")" "ERROR"
+		return 1
+	fi
+	return 0
+}	
+
+function _TriggerInitiatorRunRemote {
 	__CheckArguments 0 $# "$@"	#__WITH_PARANOIA_DEBUG
 
 $SSH_REVERSE_CMD env _REMOTE_TOKEN="$_REMOTE_TOKEN" \
@@ -2194,6 +2211,16 @@ ENDSSH
 		return 1
 	fi
 	return 0
+}
+
+function TriggerInitiatorRun {
+	__CheckArguments 0 $# "$@"	#__WITH_PARANOIA_DEBUG
+
+	if [ "$REMOTE_OPERATION" != "no" ]; then
+		_TriggerInitiatorRunRemote
+	else
+		_TriggerInitiatorRunLocal
+	fi
 }
 
 function _SummaryFromRsyncFile {
@@ -2291,7 +2318,7 @@ function Init {
 	set -o errtrace
 
 	# Do not use exit and quit traps if osync runs in monitor mode
-	if [ $sync_on_changes == false ]; then
+	if [ $_SYNC_ON_CHANGES == false ]; then
 		trap TrapStop INT HUP TERM QUIT
 		trap TrapQuit EXIT
 	else
@@ -2520,6 +2547,7 @@ function Usage {
 	echo "--no-maxtime           Disables any soft and hard execution time checks"
 	echo "--force-unlock         Will override any existing active or dead locks on initiator and target replica"
 	echo "--on-changes           Will launch a sync task after a short wait period if there is some file activity on initiator replica. You should try daemon mode instead"
+	echo "--on-changes-target    Will trigger ansync task on initiator if initiator runs daemon mode. You should call this with the osync-target-helper service"
  	echo "--no-resume            Do not try to resume a failed run. By default, execution is resumed once"
 	echo "--initialize           Create file lists without actually synchronizing anything, this will help setup deletion detections before the first run"
 
@@ -2653,7 +2681,7 @@ WARN_ALERT=false
 SOFT_STOP=2
 # Number of given replicas in command line
 _QUICK_SYNC=0
-sync_on_changes=false
+_SYNC_ON_CHANGES=false
 _NOLOCKS=false
 osync_cmd=$0
 _SUMMARY=false
@@ -2727,7 +2755,12 @@ function GetCommandlineArguments {
 			SKIP_DELETION=${i##*=}
 			;;
 			--on-changes)
-			sync_on_changes=true
+			_SYNC_ON_CHANGES=initiator
+			_NOLOCKS=true
+			_LOGGER_PREFIX="date"
+			;;
+			--on-changes-target)
+			_SYNC_ON_CHANGES=target
 			_NOLOCKS=true
 			_LOGGER_PREFIX="date"
 			;;
@@ -2876,8 +2909,10 @@ Logger "-------------------------------------------------------------" "NOTICE"
 Logger "$DRY_WARNING$DATE - $PROGRAM $PROGRAM_VERSION script begin." "ALWAYS"
 Logger "-------------------------------------------------------------" "NOTICE"
 Logger "Sync task [$INSTANCE_ID] launched as $LOCAL_USER@$LOCAL_HOST (PID $SCRIPT_PID)" "NOTICE"
-if [ $sync_on_changes == true ]; then
+if [ $_SYNC_ON_CHANGES == "initiator" ]; then
 	SyncOnChanges false
+elif [ $_SYNC_ON_CHANGES == "target" ]; then
+	SyncOnChanges true
 else
 	GetRemoteOS
 	InitRemoteOSDependingSettings

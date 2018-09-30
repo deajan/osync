@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-## dev pre-processor bootstrap rev 2018062501
+## dev pre-processor bootstrap rev 2018093001
 ## Yeah !!! A really tech sounding name... In fact it's just include emulation in bash
 
 function Usage {
@@ -8,7 +8,7 @@ function Usage {
 	echo "Creates and executes $0.tmp.sh"
 	echo "Usage:"
 	echo ""
-	echo "$0 --program=osync|osync_target_helper|obackup|pmocr [options to pass to program]"
+	echo "$0 --program=osync|obackup|pmocr [options to pass to program]"
 	echo "Can also be run with BASHVERBOSE=yes environment variable in order  to prefix program with bash -x"
 }
 
