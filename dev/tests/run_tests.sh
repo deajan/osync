@@ -1395,6 +1395,7 @@ function test_DaemonMode () {
 		$OSYNC_EXECUTABLE "$CONF_DIR/$LOCAL_CONF" --on-changes &
 		pid=$!
 
+		#TODO: Lower that value when dispatecher is written
 		# Trivial value of 2xMIN_WAIT from config files
 		echo "Sleeping for 120s"
 		sleep 120

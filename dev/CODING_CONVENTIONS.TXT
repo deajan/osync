@@ -197,15 +197,6 @@ Quoting happens outside the function call.
 
 echo "$(myStringFunction $myStringVar)"
 
-++++++ Finding code errors
-
-Use shellcheck.net now and then (ignore SC2086 in our case)
-
-Use a low tech approach to find uneven number of quotes per line
-
-tr -cd "'\n" < my_bash_file.sh | awk 'length%2==1 {print NR, $0}'
-tr -cd "\"\n" < my_bash_file.sh | awk 'length%2==1 {print NR, $0}'
-
 ++++++ ofunctions
 
 As obackup and osync share alot of common functions, ofunctions.sh will host all shared code.
@@ -258,3 +249,16 @@ When launching the program with 'bash -x', add SLEEP_TIME=1 so wait functions wo
 Ex:
 
 SLEEP_TIME=1 bash -x ./program.sh
+
+++++++ Finding code errors
+
+Before every release, shellcheck must be run
+Also a grep -Eri "TODO|WIP" osync/* must be run in order to find potential release blockers
+
+Use shellcheck.net now and then (ignore SC2086 in our case)
+
+Use a low tech approach to find uneven number of quotes per line
+
+tr -cd "'\n" < my_bash_file.sh | awk 'length%2==1 {print NR, $0}'
+tr -cd "\"\n" < my_bash_file.sh | awk 'length%2==1 {print NR, $0}'
+
