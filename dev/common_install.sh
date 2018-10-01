@@ -99,6 +99,7 @@ include #### Logger SUBSET ####
 include #### UrlEncode SUBSET ####
 include #### GetLocalOS SUBSET ####
 include #### GetConfFileValue SUBSET ####
+include #### CleanUp SUBSET ####
 
 function SetLocalOSSettings {
 	USER=root
