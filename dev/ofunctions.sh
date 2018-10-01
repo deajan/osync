@@ -8,7 +8,7 @@
 #### OFUNCTIONS FULL SUBSET ####
 #### OFUNCTIONS MINI SUBSET ####
 _OFUNCTIONS_VERSION=2.3.0-RC1
-_OFUNCTIONS_BUILD=2018100104
+_OFUNCTIONS_BUILD=2018100105
 #### _OFUNCTIONS_BOOTSTRAP SUBSET ####
 _OFUNCTIONS_BOOTSTRAP=true
 #### _OFUNCTIONS_BOOTSTRAP SUBSET END ####
@@ -1864,9 +1864,9 @@ function RsyncPatternsAdd {
 			rest="${rest#*$PATH_SEPARATOR_CHAR}"
 		fi
 			if [ "$RSYNC_PATTERNS" == "" ]; then
-			RSYNC_PATTERNS="--"$patternType"=\"$str\""
+			RSYNC_PATTERNS="--$patternType=\"$str\""
 		else
-			RSYNC_PATTERNS="$RSYNC_PATTERNS --"$patternType"=\"$str\""
+			RSYNC_PATTERNS="$RSYNC_PATTERNS --$patternType=\"$str\""
 		fi
 	done
 	set +f
@@ -1883,7 +1883,7 @@ function RsyncPatternsFromAdd {
 	fi
 
 	if [ -e "$patternFrom" ]; then
-		RSYNC_PATTERNS="$RSYNC_PATTERNS --"$patternType"-from=\"$patternFrom\""
+		RSYNC_PATTERNS="$RSYNC_PATTERNS --$patternType-from=\"$patternFrom\""
 	fi
 }
 
