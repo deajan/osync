@@ -7,7 +7,7 @@ PROGRAM="osync" # Rsync based two way sync engine with fault tolerance
 AUTHOR="(C) 2013-2018 by Orsiris de Jong"
 CONTACT="http://www.netpower.fr/osync - ozy@netpower.fr"
 PROGRAM_VERSION=1.3.0-beta1
-PROGRAM_BUILD=2018100104
+PROGRAM_BUILD=2018100105
 IS_STABLE=no
 
 ##### Execution order						#__WITH_PARANOIA_DEBUG
@@ -2205,10 +2205,10 @@ function _TriggerInitiatorRunLocal {
 function _TriggerInitiatorRunRemote {
 	__CheckArguments 0 $# "$@"	#__WITH_PARANOIA_DEBUG
 
-$SSH_REVERSE_CMD env _REMOTE_TOKEN="$_REMOTE_TOKEN" \
+$SSH_CMD env _REMOTE_TOKEN="$_REMOTE_TOKEN" \
 env _DEBUG="'$_DEBUG'" env _PARANOIA_DEBUG="'$_PARANOIA_DEBUG'" env _LOGGER_SILENT="'$_LOGGER_SILENT'" env _LOGGER_VERBOSE="'$_LOGGER_VERBOSE'" env _LOGGER_PREFIX="'$_LOGGER_PREFIX'" env _LOGGER_ERR_ONLY="'$_LOGGER_ERR_ONLY'" \
 env PROGRAM="'$PROGRAM'" env SCRIPT_PID="'$SCRIPT_PID'" env TSTAMP="'$TSTAMP'" \
-env INSTANCE_ID="'$INSTANCE_ID'" env PUSH_FILE="'$(EscapeEspaces "${INITIATOR[$__updateTriggerFile]}")'" \
+env INSTANCE_ID="'$INSTANCE_ID'" env PUSH_FILE="'$(EscapeSpaces "${INITIATOR[$__updateTriggerFile]}")'" \
 env LC_ALL=C $COMMAND_SUDO' bash -s' << 'ENDSSH' > "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$SCRIPT_PID.$TSTAMP" 2> "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.error.$SCRIPT_PID.$TSTAMP"
 
 	echo "$INSTANCE_ID#$(date '+%Y%m%dT%H%M%S.%N')" >> "$PUSH_FILE"
@@ -2682,7 +2682,7 @@ function SyncOnChanges {
 			# BSD version of inotifywait does not support multiple --exclude statements
 			inotifywait --exclude "$OSYNC_DIR" -qq -r -e create -e modify -e delete -e move -e attrib --timeout "$MAX_WAIT" "$watchDirectory" &
 		else
-			inotifywait $RSYNC_PATTERNS --exclude "$OSYNC_DIR" -qq -r -e create -e modify -e delete -e move -e attrib --timeout "$MAX_WAIT" "$watchDirectory" &
+			inotifywait --exclude "$OSYNC_DIR" $RSYNC_PATTERNS -qq -r -e create -e modify -e delete -e move -e attrib --timeout "$MAX_WAIT" "$watchDirectory" &
 			wait $!
 		fi
 		retval=$?
