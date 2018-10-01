@@ -10,7 +10,7 @@ PROGRAM="osync" # Rsync based two way sync engine with fault tolerance
 AUTHOR="(C) 2013-2018 by Orsiris de Jong"
 CONTACT="http://www.netpower.fr/osync - ozy@netpower.fr"
 PROGRAM_VERSION=1.3.0-beta1
-PROGRAM_BUILD=2018100101
+PROGRAM_BUILD=2018100102
 IS_STABLE=no
 
 ##### Execution order						#__WITH_PARANOIA_DEBUG
@@ -2363,6 +2363,38 @@ function Init {
 
 		# remove everything before first '/'
 		TARGET_SYNC_DIR=${hosturiandpath#*/}
+	elif [ "${INITIATOR_SYNC_DIR:0:6}" == "ssh://" ]; then
+		REMOTE_OPERATION="yes"
+
+		# remove leadng 'ssh://'
+		uri=${INITIATOR_SYNC_DIR#ssh://*}
+		if [[ "$uri" == *"@"* ]]; then
+			# remove everything after '@'
+			REMOTE_USER=${uri%@*}
+		else
+			REMOTE_USER=$LOCAL_USER
+		fi
+
+		if [ "$SSH_RSA_PRIVATE_KEY" == "" ]; then
+			if [ ! -f "$SSH_PASSWORD_FILE" ]; then
+				# Assume that there might exist a standard rsa key
+				SSH_RSA_PRIVATE_KEY=~/.ssh/id_rsa
+			fi
+		fi
+
+		# remove everything before '@'
+		hosturiandpath=${uri#*@}
+		# remove everything after first '/'
+		hosturi=${hosturiandpath%%/*}
+		if [[ "$hosturi" == *":"* ]]; then
+			REMOTE_PORT=${hosturi##*:}
+		else
+			REMOTE_PORT=22
+		fi
+		REMOTE_HOST=${hosturi%%:*}
+
+		# remove everything before first '/'
+		INITIATOR_SYNC_DIR=${hosturiandpath#*/}
 	else
 		REMOTE_OPERATION="no"
 	fi
