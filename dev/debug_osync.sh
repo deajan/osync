@@ -1,16 +1,13 @@
 #!/usr/bin/env bash
 
 #TODO treeList, deleteList, _getFileCtimeMtime, conflictList should be called without having statedir informed. Just give the full path ?
-#TODO check if _getCtimeMtime | sort removal needs to be backported
 #Check dryruns with nosuffix mode for timestampList
-
-#WIP: initiator can be passed as ssh uri in target helper mode
 
 PROGRAM="osync" # Rsync based two way sync engine with fault tolerance
 AUTHOR="(C) 2013-2018 by Orsiris de Jong"
 CONTACT="http://www.netpower.fr/osync - ozy@netpower.fr"
 PROGRAM_VERSION=1.3.0-beta1
-PROGRAM_BUILD=2018100101
+PROGRAM_BUILD=2018100105
 IS_STABLE=no
 
 ##### Execution order						#__WITH_PARANOIA_DEBUG
@@ -44,7 +41,7 @@ IS_STABLE=no
 #	CleanUp					no		#__WITH_PARANOIA_DEBUG
 
 _OFUNCTIONS_VERSION=2.3.0-RC1
-_OFUNCTIONS_BUILD=2018093004
+_OFUNCTIONS_BUILD=2018100102
 _OFUNCTIONS_BOOTSTRAP=true
 
 ## To use in a program, define the following variables:
@@ -137,38 +134,17 @@ fi
 #### PoorMansRandomGenerator SUBSET ####
 # Get a random number on Windows BusyBox alike, also works on most Unixes
 function PoorMansRandomGenerator {
-	local digits="${1}"		# The number of digits to generate
+        local digits="${1}" # The number of digits to generate
+        local number
 
-	local minimum=1
-	local maximum
-	local n=0
-	
-	if [ "$digits" == "" ]; then
-		digits=5
-	fi
-	
-	# Minimum already has a digit
-	for n in $(seq 1 $((digits-1))); do
-		minimum=$minimum"0"
-		maximum=$maximum"9"
-	done
-	maximum=$maximum"9"
-	
-	#n=0; while [ $n -lt $minimum ]; do n=$n$(dd if=/dev/urandom bs=100 count=1 2>/dev/null | tr -cd '0-9'); done; n=$(echo $n | sed -e 's/^0//')
-	# bs=19 since if real random strikes, having a 19 digits number is not supported
-	while [ $n -lt $minimum ] || [ $n -gt $maximum ]; do
-		if [ $n -lt $minimum ]; then
-			# Add numbers
-			n=$n$(dd if=/dev/urandom bs=19 count=1 2>/dev/null | tr -cd '0-9')
-			n=$(echo $n | sed -e 's/^0//')
-			if [ "$n" == "" ]; then
-				n=0
-			fi
-		elif [ $n -gt $maximum ]; then
-			n=$(echo $n | sed 's/.$//')
-		fi
-	done
-	echo $n
+        # Some read bytes can't be used, se we read twice the number of required bytes
+        dd if=/dev/urandom bs=$digits count=2 | while read -r -n1 char; do
+                number=$number$(printf "%d" "'$char")
+                if [ ${#number} -ge $digits ]; then
+                        echo ${number:0:$digits}
+                        break;
+                fi
+        done
 }
 #### PoorMansRandomGenerator SUBSET END ####
 
@@ -2007,12 +1983,14 @@ function PostInit {
 	# Define remote commands
 	if [ -f "$SSH_RSA_PRIVATE_KEY" ]; then
 		SSH_CMD="$(type -p ssh) $SSH_COMP -q -i $SSH_RSA_PRIVATE_KEY $SSH_OPTS $REMOTE_USER@$REMOTE_HOST -p $REMOTE_PORT"
-		SSH_REVERSE_CMD="$(type -p ssh) $SSH_COMP -q -i $INITIATOR_SSH_RSA_PRIVATE_KEY $SSH_OPTS $INITIATOR_REMOTE_USER@$INITIATOR_REMOTE_HOST -p $INITIATOR_REMOTE_PORT"
+		#WIP
+		#SSH_REVERSE_CMD="$(type -p ssh) $SSH_COMP -q -i $INITIATOR_SSH_RSA_PRIVATE_KEY $SSH_OPTS $INITIATOR_REMOTE_USER@$INITIATOR_REMOTE_HOST -p $INITIATOR_REMOTE_PORT"
 		SCP_CMD="$(type -p scp) $SSH_COMP -q -i $SSH_RSA_PRIVATE_KEY -P $REMOTE_PORT"
 		RSYNC_SSH_CMD="$(type -p ssh) $SSH_COMP -q -i $SSH_RSA_PRIVATE_KEY $SSH_OPTS -p $REMOTE_PORT"
 	elif [ -f "$SSH_PASSWORD_FILE" ]; then
 		SSH_CMD="$(type -p sshpass) -f $SSH_PASSWORD_FILE $(type -p ssh) $SSH_COMP -q $SSH_OPTS $REMOTE_USER@$REMOTE_HOST -p $REMOTE_PORT"
-		SSH_REVERSE_CMD="$(type -p sshpass) -f $INITIATOR_SSH_PASSWORD_FILE $(type -p ssh) $SSH_COMP -q $SSH_OPTS $INITIATOR_REMOTE_USER@$INITIATOR_REMOTE_HOST -p $INITIATOR_REMOTE_PORT"
+		#WIP
+		#SSH_REVERSE_CMD="$(type -p sshpass) -f $INITIATOR_SSH_PASSWORD_FILE $(type -p ssh) $SSH_COMP -q $SSH_OPTS $INITIATOR_REMOTE_USER@$INITIATOR_REMOTE_HOST -p $INITIATOR_REMOTE_PORT"
 		SCP_CMD="$(type -p sshpass) -f $SSH_PASSWORD_FILE $(type -p scp) $SSH_COMP -q -P $REMOTE_PORT"
 		RSYNC_SSH_CMD="$(type -p sshpass) -f $SSH_PASSWORD_FILE $(type -p ssh) $SSH_COMP -q $SSH_OPTS -p $REMOTE_PORT"
 	else
@@ -2448,17 +2426,27 @@ function CheckEnvironment {
 
 # Only gets checked in config file mode where all values should be present
 function CheckCurrentConfig {
-	__CheckArguments 0 $# "$@"    #__WITH_PARANOIA_DEBUG
+	local fullCheck="${1:-true}"
+
+	__CheckArguments 1 $# "$@"    #__WITH_PARANOIA_DEBUG
+
+	# Full check is for initiator driven runs
+	if [ $fullCheck == true ]; then
+		declare -a yes_no_vars=(CREATE_DIRS SUDO_EXEC SSH_COMPRESSION SSH_IGNORE_KNOWN_HOSTS REMOTE_HOST_PING PRESERVE_PERMISSIONS PRESERVE_OWNER PRESERVE_GROUP PRESERVE_EXECUTABILITY PRESERVE_ACL PRESERVE_XATTR COPY_SYMLINKS KEEP_DIRLINKS PRESERVE_HARDLINKS CHECKSUM RSYNC_COMPRESS CONFLICT_BACKUP CONFLICT_BACKUP_MULTIPLE SOFT_DELETE RESUME_SYNC FORCE_STRANGER_LOCK_RESUME PARTIAL DELTA_COPIES STOP_ON_CMD_ERROR RUN_AFTER_CMD_ON_ERROR)
+		declare -a num_vars=(MINIMUM_SPACE BANDWIDTH SOFT_MAX_EXEC_TIME HARD_MAX_EXEC_TIME KEEP_LOGGING MIN_WAIT MAX_WAIT CONFLICT_BACKUP_DAYS SOFT_DELETE_DAYS RESUME_TRY MAX_EXEC_TIME_PER_CMD_BEFORE MAX_EXEC_TIME_PER_CMD_AFTER)
+	# target-helper runs need less configuration
+	else
+		declare -a yes_no_vars=(SUDO_EXEC SSH_COMPRESSION SSH_IGNORE_KNOWN_HOSTS REMOTE_HOST_PING STOP_ON_CMD_ERROR RUN_AFTER_CMD_ON_ERROR)
+		declare -a num_vars=(KEEP_LOGGING MIN_WAIT MAX_WAIT)
+	fi
 
 	# Check all variables that should contain "yes" or "no"
-	declare -a yes_no_vars=(CREATE_DIRS SUDO_EXEC SSH_COMPRESSION SSH_IGNORE_KNOWN_HOSTS REMOTE_HOST_PING PRESERVE_PERMISSIONS PRESERVE_OWNER PRESERVE_GROUP PRESERVE_EXECUTABILITY PRESERVE_ACL PRESERVE_XATTR COPY_SYMLINKS KEEP_DIRLINKS PRESERVE_HARDLINKS CHECKSUM RSYNC_COMPRESS CONFLICT_BACKUP CONFLICT_BACKUP_MULTIPLE SOFT_DELETE RESUME_SYNC FORCE_STRANGER_LOCK_RESUME PARTIAL DELTA_COPIES STOP_ON_CMD_ERROR RUN_AFTER_CMD_ON_ERROR)
 	for i in "${yes_no_vars[@]}"; do
 		test="if [ \"\$$i\" != \"yes\" ] && [ \"\$$i\" != \"no\" ]; then Logger \"Bogus $i value [\$$i] defined in config file. Correct your config file or update it using the update script if using and old version.\" \"CRITICAL\"; exit 1; fi"
 		eval "$test"
 	done
 
 	# Check all variables that should contain a numerical value >= 0
-	declare -a num_vars=(MINIMUM_SPACE BANDWIDTH SOFT_MAX_EXEC_TIME HARD_MAX_EXEC_TIME KEEP_LOGGING MIN_WAIT MAX_WAIT CONFLICT_BACKUP_DAYS SOFT_DELETE_DAYS RESUME_TRY MAX_EXEC_TIME_PER_CMD_BEFORE MAX_EXEC_TIME_PER_CMD_AFTER)
 	for i in "${num_vars[@]}"; do
 		test="if [ $(IsNumericExpand \"\$$i\") -eq 0 ]; then Logger \"Bogus $i value [\$$i] defined in config file. Correct your config file or update it using the update script if using and old version.\" \"CRITICAL\"; exit 1; fi"
 		eval "$test"
@@ -5070,12 +5058,15 @@ function _TriggerInitiatorRunLocal {
 
 	local PUSH_FILE
 
-	"PUSH_FILE=${INITIATOR[$__updateTriggerFile]}"
+	PUSH_FILE="${INITIATOR[$__updateTriggerFile]}"
 
-	echo "$INSTANCE_ID $(date '+%Y%m%dT%H%M%S.%N')" >> "$PUSH_FILE" 2> "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.error.$SCRIPT_PID.$TSTAMP"
-	if [ -s "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.error.$SCRIPT_PID.$TSTAMP" ] || [ $? -ne 0 ]; then
+	echo "$INSTANCE_ID#$(date '+%Y%m%dT%H%M%S.%N')" >> "$PUSH_FILE" 2> "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.error.$SCRIPT_PID.$TSTAMP"
+	if [ $? -ne 0 ]; then
+		Logger "Could not notify local initiator of file changes." "ERROR"
 		Logger "$(cat "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.error.$SCRIPT_PID.$TSTAMP")" "ERROR"
 		return 1
+	else
+		Logger "Initiator of instance [$INSTANCE_ID] should be notified of file changes now." "NOTICE"
 	fi
 	return 0
 }	
@@ -5083,20 +5074,24 @@ function _TriggerInitiatorRunLocal {
 function _TriggerInitiatorRunRemote {
 	__CheckArguments 0 $# "$@"	#__WITH_PARANOIA_DEBUG
 
-$SSH_REVERSE_CMD env _REMOTE_TOKEN="$_REMOTE_TOKEN" \
+$SSH_CMD env _REMOTE_TOKEN="$_REMOTE_TOKEN" \
 env _DEBUG="'$_DEBUG'" env _PARANOIA_DEBUG="'$_PARANOIA_DEBUG'" env _LOGGER_SILENT="'$_LOGGER_SILENT'" env _LOGGER_VERBOSE="'$_LOGGER_VERBOSE'" env _LOGGER_PREFIX="'$_LOGGER_PREFIX'" env _LOGGER_ERR_ONLY="'$_LOGGER_ERR_ONLY'" \
 env PROGRAM="'$PROGRAM'" env SCRIPT_PID="'$SCRIPT_PID'" env TSTAMP="'$TSTAMP'" \
-env INSTANCE_ID="'$INSTANCE_ID'" env PUSH_FILE="'$(EscapeEspaces "${INITIATOR[$__updateTriggerFile]}")'" \
+env INSTANCE_ID="'$INSTANCE_ID'" env PUSH_FILE="'$(EscapeSpaces "${INITIATOR[$__updateTriggerFile]}")'" \
 env LC_ALL=C $COMMAND_SUDO' bash -s' << 'ENDSSH' > "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$SCRIPT_PID.$TSTAMP" 2> "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.error.$SCRIPT_PID.$TSTAMP"
 
-	echo "$INSTANCE_ID $(date '+%Y%m%dT%H%M%S.%N')" >> "$PUSH_FILE"
+	echo "$INSTANCE_ID#$(date '+%Y%m%dT%H%M%S.%N')" >> "$PUSH_FILE"
 ENDSSH
-	if [ -s "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.error.$SCRIPT_PID.$TSTAMP" ] || [ $? -ne 0 ]; then
+	if [ $? -ne 0 ]; then
+		Logger "Could not notifiy remote initiator of file changes." "ERROR"
+		Logger "SSH_CMD [$SSH_CMD]" "DEBUG"
 		(
 		_LOGGER_PREFIX="RR"
 		Logger "$(cat "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.error.$SCRIPT_PID.$TSTAMP")" "ERROR"
 		)
 		return 1
+	else
+		Logger "Initiator of instance [$INSTANCE_ID] should be notified of file changes now." "NOTICE"
 	fi
 	return 0
 }
@@ -5206,7 +5201,7 @@ function Init {
 	set -o errtrace
 
 	# Do not use exit and quit traps if osync runs in monitor mode
-	if [ $_SYNC_ON_CHANGES == false ]; then
+	if [ $_SYNC_ON_CHANGES == "no" ]; then
 		trap TrapStop INT HUP TERM QUIT
 		trap TrapQuit EXIT
 	else
@@ -5251,6 +5246,38 @@ function Init {
 
 		# remove everything before first '/'
 		TARGET_SYNC_DIR=${hosturiandpath#*/}
+	elif [ "${INITIATOR_SYNC_DIR:0:6}" == "ssh://" ]; then
+		REMOTE_OPERATION="yes"
+
+		# remove leadng 'ssh://'
+		uri=${INITIATOR_SYNC_DIR#ssh://*}
+		if [[ "$uri" == *"@"* ]]; then
+			# remove everything after '@'
+			REMOTE_USER=${uri%@*}
+		else
+			REMOTE_USER=$LOCAL_USER
+		fi
+
+		if [ "$SSH_RSA_PRIVATE_KEY" == "" ]; then
+			if [ ! -f "$SSH_PASSWORD_FILE" ]; then
+				# Assume that there might exist a standard rsa key
+				SSH_RSA_PRIVATE_KEY=~/.ssh/id_rsa
+			fi
+		fi
+
+		# remove everything before '@'
+		hosturiandpath=${uri#*@}
+		# remove everything after first '/'
+		hosturi=${hosturiandpath%%/*}
+		if [[ "$hosturi" == *":"* ]]; then
+			REMOTE_PORT=${hosturi##*:}
+		else
+			REMOTE_PORT=22
+		fi
+		REMOTE_HOST=${hosturi%%:*}
+
+		# remove everything before first '/'
+		INITIATOR_SYNC_DIR=${hosturiandpath#*/}
 	else
 		REMOTE_OPERATION="no"
 	fi
@@ -5280,6 +5307,8 @@ function Init {
 	local partialDir="_partial"
 	local lastAction="last-action"
 	local resumeCount="resume-count"
+	local pushFile=".osync-update.push"
+
 	if [ "$_DRYRUN" == true ]; then
 		local drySuffix="-dry"
 	else
@@ -5330,7 +5359,7 @@ function Init {
 	INITIATOR[$__timestampAfterFile]="-timestamps-after-$INSTANCE_ID$drySuffix"
 	INITIATOR[$__timestampAfterFileNoSuffix]="-timestamps-after-$INSTANCE_ID"
 	INITIATOR[$__conflictListFile]="conflicts-$INSTANCE_ID$drySuffix"
-	INITIATOR[$__updateTriggerFile]="$INITIATOR_SYNC_DIR$OSYNC_DIR/.osync-update.push"
+	INITIATOR[$__updateTriggerFile]="$INITIATOR_SYNC_DIR$pushFile"
 
 	TARGET=()
 	TARGET[$__type]='target'
@@ -5353,7 +5382,7 @@ function Init {
 	TARGET[$__timestampAfterFile]="-timestamps-after-$INSTANCE_ID$drySuffix"
 	TARGET[$__timestampAfterFileNoSuffix]="-timestamps-after-$INSTANCE_ID"
 	TARGET[$__conflictListFile]="conflicts-$INSTANCE_ID$drySuffix"
-	TARGET[$__updateTriggerFile]="$TARGET_SYNC_DIR$OSYNC_DIR/.osync-update.push"
+	TARGET[$__updateTriggerFile]="$TARGET_SYNC_DIR$pushFile"
 
 	PARTIAL_DIR="${INITIATOR[$__partialDir]}"
 
@@ -5369,7 +5398,9 @@ function Init {
 	fi
 
 	## Add Rsync include / exclude patterns
-	RsyncPatterns
+	if [ "$_SYNC_ON_CHANGES" != "target" ]; then
+		RsyncPatterns
+	fi
 
 	## Conflict options
 	if [ "$CONFLICT_BACKUP" != "no" ]; then
@@ -5523,7 +5554,7 @@ function SyncOnChanges {
 			# BSD version of inotifywait does not support multiple --exclude statements
 			inotifywait --exclude "$OSYNC_DIR" -qq -r -e create -e modify -e delete -e move -e attrib --timeout "$MAX_WAIT" "$watchDirectory" &
 		else
-			inotifywait $RSYNC_PATTERNS --exclude "$OSYNC_DIR" -qq -r -e create -e modify -e delete -e move -e attrib --timeout "$MAX_WAIT" "$watchDirectory" &
+			inotifywait --exclude "$OSYNC_DIR" $RSYNC_PATTERNS -qq -r -e create -e modify -e delete -e move -e attrib --timeout "$MAX_WAIT" "$watchDirectory" &
 			wait $!
 		fi
 		retval=$?
@@ -5569,7 +5600,7 @@ WARN_ALERT=false
 SOFT_STOP=2
 # Number of given replicas in command line
 _QUICK_SYNC=0
-_SYNC_ON_CHANGES=false
+_SYNC_ON_CHANGES="no"
 _NOLOCKS=false
 osync_cmd=$0
 _SUMMARY=false
@@ -5643,12 +5674,12 @@ function GetCommandlineArguments {
 			SKIP_DELETION=${i##*=}
 			;;
 			--on-changes)
-			_SYNC_ON_CHANGES=initiator
+			_SYNC_ON_CHANGES="initiator"
 			_NOLOCKS=true
 			_LOGGER_PREFIX="date"
 			;;
 			--on-changes-target)
-			_SYNC_ON_CHANGES=target
+			_SYNC_ON_CHANGES="target"
 			_NOLOCKS=true
 			_LOGGER_PREFIX="date"
 			;;
@@ -5789,7 +5820,11 @@ Init
 CheckEnvironment
 PostInit
 if [ $_QUICK_SYNC -lt 2 ]; then
-	CheckCurrentConfig
+	if [ "$_SYNC_ON_CHANGES" == "no" ]; then
+		CheckCurrentConfig true
+	else
+		CheckCurrentConfig false
+	fi
 fi
 CheckCurrentConfigAll
 DATE=$(date)
@@ -5797,9 +5832,9 @@ Logger "-------------------------------------------------------------" "NOTICE"
 Logger "$DRY_WARNING$DATE - $PROGRAM $PROGRAM_VERSION script begin." "ALWAYS"
 Logger "-------------------------------------------------------------" "NOTICE"
 Logger "Sync task [$INSTANCE_ID] launched as $LOCAL_USER@$LOCAL_HOST (PID $SCRIPT_PID)" "NOTICE"
-if [ $_SYNC_ON_CHANGES == "initiator" ]; then
+if [ "$_SYNC_ON_CHANGES" == "initiator" ]; then
 	SyncOnChanges false
-elif [ $_SYNC_ON_CHANGES == "target" ]; then
+elif [ "$_SYNC_ON_CHANGES" == "target" ]; then
 	SyncOnChanges true
 else
 	GetRemoteOS
