@@ -2,12 +2,12 @@
 
 ###### osync - Rsync based two way sync engine with fault tolerance
 ###### (C) 2013-2018 by Orsiris de Jong (www.netpower.fr)
-###### v1.3x target helper config file rev 2017060501
+###### v1.3x target helper config file rev 2018100101
 
 ## ---------- GENERAL OPTIONS
 
 ## Sync job identification
-INSTANCE_ID="sync_test"
+INSTANCE_ID="target_test"
 
 ## Directories to synchronize.
 ## Initiator is the system osync runs on. The initiator directory must be a local path.
@@ -18,10 +18,10 @@ INITIATOR_SYNC_DIR="/home/git/osync/dir1"
 TARGET_SYNC_DIR="/home/git/osync/dir2"
 
 ## If the target system is remote, you can specify a RSA key (please use full path). If not defined, the default ~/.ssh/id_rsa will be used. See documentation for further information.
-INITIATOR_SSH_RSA_PRIVATE_KEY="/home/backupuser/.ssh/id_rsa"
+SSH_RSA_PRIVATE_KEY="/home/backupuser/.ssh/id_rsa"
 
 ## Alternatively, you may specify an SSH password file (less secure). Needs sshpass utility installed.
-INITIATOR_SSH_PASSWORD_FILE=""
+SSH_PASSWORD_FILE=""
 
 ## When using ssh filter, you must specify a remote token matching the one setup in authorized_keys
 _REMOTE_TOKEN=SomeAlphaNumericToken9
