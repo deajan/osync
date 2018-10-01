@@ -2,12 +2,14 @@
 
 #TODO treeList, deleteList, _getFileCtimeMtime, conflictList should be called without having statedir informed. Just give the full path ?
 #Check dryruns with nosuffix mode for timestampList
+#WIP: currently TRAVIS_RUN debug lines in n_osync and run_tests for conflictLog
+
 
 PROGRAM="osync" # Rsync based two way sync engine with fault tolerance
 AUTHOR="(C) 2013-2018 by Orsiris de Jong"
 CONTACT="http://www.netpower.fr/osync - ozy@netpower.fr"
 PROGRAM_VERSION=1.3.0-beta1
-PROGRAM_BUILD=2018100105
+PROGRAM_BUILD=2018100106
 IS_STABLE=no
 
 ##### Execution order						#__WITH_PARANOIA_DEBUG
@@ -990,6 +992,15 @@ function conflictList {
 
 		join -j 1 -t ';' -o 1.1,1.2,1.3,2.2,2.3 "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.${INITIATOR[$__type]}.$SCRIPT_PID.$TSTAMP" "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.${TARGET[$__type]}.$SCRIPT_PID.$TSTAMP" > "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.compare.$SCRIPT_PID.$TSTAMP"
 		retval=$?
+
+		#WIP
+		if [ $TRAVIS_RUN == true ]; then
+			echo "conflictList debug retval=$retval"
+			cat "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.${INITIATOR[$__type]}.$SCRIPT_PID.$TSTAMP"
+			cat "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.${TARGET[$__type]}.$SCRIPT_PID.$TSTAMP"
+			cat "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.compare.$SCRIPT_PID.$TSTAMP"
+		fi
+
 		if [ $retval -ne 0 ]; then
 			Logger "Cannot create conflict list file." "ERROR"
 			return $retval
@@ -2215,6 +2226,7 @@ env LC_ALL=C $COMMAND_SUDO' bash -s' << 'ENDSSH' > "$RUN_DIR/$PROGRAM.${FUNCNAME
 ENDSSH
 	if [ $? -ne 0 ]; then
 		Logger "Could not notifiy remote initiator of file changes." "ERROR"
+		Logger "SSH_CMD [$SSH_CMD]" "DEBUG"
 		(
 		_LOGGER_PREFIX="RR"
 		Logger "$(cat "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.error.$SCRIPT_PID.$TSTAMP")" "ERROR"
@@ -2299,6 +2311,12 @@ function LogConflicts {
 	local subject
 	local body
 
+	#WIP
+	if [ $TRAVIS_RUN == true ]; then
+		cat "$RUN_DIR/$PROGRAM.conflictList.compare.$SCRIPT_PID.$TSTAMP"
+	fi
+
+
 	# We keep this in a separate if check because of the subshell used for Logger with _LOGGER_PREFIX
 	if [ -f "$RUN_DIR/$PROGRAM.conflictList.compare.$SCRIPT_PID.$TSTAMP" ]; then
 		Logger "File conflicts: INITIATOR << >> TARGET" "ALWAYS"
@@ -2306,6 +2324,7 @@ function LogConflicts {
 
 	(
 	_LOGGER_PREFIX=""
+
 	if [ -f "$RUN_DIR/$PROGRAM.conflictList.compare.$SCRIPT_PID.$TSTAMP" ]; then
 		echo "" > "${INITIATOR[$__replicaDir]}${INITIATOR[$__stateDir]}/${INITIATOR[$__conflictListFile]}"
 		while read -r line; do
@@ -2528,7 +2547,9 @@ function Init {
 	fi
 
 	## Add Rsync include / exclude patterns
-	RsyncPatterns
+	if [ "$_SYNC_ON_CHANGES" != "target" ]; then
+		RsyncPatterns
+	fi
 
 	## Conflict options
 	if [ "$CONFLICT_BACKUP" != "no" ]; then
