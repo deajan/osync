@@ -1,10 +1,7 @@
 #!/usr/bin/env bash
 
 #TODO treeList, deleteList, _getFileCtimeMtime, conflictList should be called without having statedir informed. Just give the full path ?
-#TODO check if _getCtimeMtime | sort removal needs to be backported
 #Check dryruns with nosuffix mode for timestampList
-
-#WIP: initiator can be passed as ssh uri in target helper mode
 
 PROGRAM="osync" # Rsync based two way sync engine with fault tolerance
 AUTHOR="(C) 2013-2018 by Orsiris de Jong"
@@ -2192,12 +2189,15 @@ function _TriggerInitiatorRunLocal {
 
 	local PUSH_FILE
 
-	"PUSH_FILE=${INITIATOR[$__updateTriggerFile]}"
+	PUSH_FILE="${INITIATOR[$__updateTriggerFile]}"
 
-	echo "$INSTANCE_ID $(date '+%Y%m%dT%H%M%S.%N')" >> "$PUSH_FILE" 2> "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.error.$SCRIPT_PID.$TSTAMP"
-	if [ -s "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.error.$SCRIPT_PID.$TSTAMP" ] || [ $? -ne 0 ]; then
+	echo "$INSTANCE_ID#$(date '+%Y%m%dT%H%M%S.%N')" >> "$PUSH_FILE" 2> "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.error.$SCRIPT_PID.$TSTAMP"
+	if [ $? -ne 0 ]; then
+		Logger "Could not notify local initiator of file changes." "ERROR"
 		Logger "$(cat "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.error.$SCRIPT_PID.$TSTAMP")" "ERROR"
 		return 1
+	else
+		Logger "Initiator of instance [$INSTANCE_ID] should be notified of file changes now." "NOTICE"
 	fi
 	return 0
 }	
@@ -2211,14 +2211,17 @@ env PROGRAM="'$PROGRAM'" env SCRIPT_PID="'$SCRIPT_PID'" env TSTAMP="'$TSTAMP'" \
 env INSTANCE_ID="'$INSTANCE_ID'" env PUSH_FILE="'$(EscapeEspaces "${INITIATOR[$__updateTriggerFile]}")'" \
 env LC_ALL=C $COMMAND_SUDO' bash -s' << 'ENDSSH' > "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$SCRIPT_PID.$TSTAMP" 2> "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.error.$SCRIPT_PID.$TSTAMP"
 
-	echo "$INSTANCE_ID $(date '+%Y%m%dT%H%M%S.%N')" >> "$PUSH_FILE"
+	echo "$INSTANCE_ID#$(date '+%Y%m%dT%H%M%S.%N')" >> "$PUSH_FILE"
 ENDSSH
-	if [ -s "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.error.$SCRIPT_PID.$TSTAMP" ] || [ $? -ne 0 ]; then
+	if [ $? -ne 0 ]; then
+		Logger "Could not notifiy remote initiator of file changes." "ERROR"
 		(
 		_LOGGER_PREFIX="RR"
 		Logger "$(cat "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.error.$SCRIPT_PID.$TSTAMP")" "ERROR"
 		)
 		return 1
+	else
+		Logger "Initiator of instance [$INSTANCE_ID] should be notified of file changes now." "NOTICE"
 	fi
 	return 0
 }
@@ -2434,6 +2437,8 @@ function Init {
 	local partialDir="_partial"
 	local lastAction="last-action"
 	local resumeCount="resume-count"
+	local pushFile=".osync-update.push"
+
 	if [ "$_DRYRUN" == true ]; then
 		local drySuffix="-dry"
 	else
@@ -2484,7 +2489,7 @@ function Init {
 	INITIATOR[$__timestampAfterFile]="-timestamps-after-$INSTANCE_ID$drySuffix"
 	INITIATOR[$__timestampAfterFileNoSuffix]="-timestamps-after-$INSTANCE_ID"
 	INITIATOR[$__conflictListFile]="conflicts-$INSTANCE_ID$drySuffix"
-	INITIATOR[$__updateTriggerFile]="$INITIATOR_SYNC_DIR$OSYNC_DIR/.osync-update.push"
+	INITIATOR[$__updateTriggerFile]="$INITIATOR_SYNC_DIR$pushFile"
 
 	TARGET=()
 	TARGET[$__type]='target'
@@ -2507,7 +2512,7 @@ function Init {
 	TARGET[$__timestampAfterFile]="-timestamps-after-$INSTANCE_ID$drySuffix"
 	TARGET[$__timestampAfterFileNoSuffix]="-timestamps-after-$INSTANCE_ID"
 	TARGET[$__conflictListFile]="conflicts-$INSTANCE_ID$drySuffix"
-	TARGET[$__updateTriggerFile]="$TARGET_SYNC_DIR$OSYNC_DIR/.osync-update.push"
+	TARGET[$__updateTriggerFile]="$TARGET_SYNC_DIR$pushFile"
 
 	PARTIAL_DIR="${INITIATOR[$__partialDir]}"
 
