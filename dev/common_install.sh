@@ -10,7 +10,7 @@ PROGRAM_BINARY=$PROGRAM".sh"
 PROGRAM_BATCH=$PROGRAM"-batch.sh"
 SSH_FILTER="ssh_filter.sh"
 
-SCRIPT_BUILD=2018090302
+SCRIPT_BUILD=2018090303
 INSTANCE_ID="installer-$SCRIPT_BUILD"
 
 ## osync / obackup / pmocr / zsnap install script
@@ -94,6 +94,12 @@ elif [ -w /var/tmp ]; then
 else
 	RUN_DIR=.
 fi
+
+SCRIPT_PID=$$
+
+include #### PoorMansRandomGenerator ####
+
+TSTAMP=$(date '+%Y%m%dT%H%M%S').$(PoorMansRandomGenerator 4)
 
 include #### Logger SUBSET ####
 include #### UrlEncode SUBSET ####
@@ -376,17 +382,6 @@ function TrapQuit {
 
 trap TrapQuit TERM EXIT HUP QUIT
 
-if [ "$LOGFILE" == "" ]; then
-        if [ -w /var/log ]; then
-                LOG_FILE="/var/log/$PROGRAM.$INSTANCE_ID.log"
-        elif ([ "$HOME" != "" ] && [ -w "$HOME" ]); then
-                LOG_FILE="$HOME/$PROGRAM.$INSTANCE_ID.log"
-        else
-                LOG_FILE="./$PROGRAM.$INSTANCE_ID.log"
-        fi
-else
-        LOG_FILE="$LOGFILE"
-fi
 if [ ! -w "$(dirname $LOG_FILE)" ]; then
         echo "Cannot write to log [$(dirname $LOG_FILE)]."
 else
