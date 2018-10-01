@@ -5,7 +5,7 @@
 
 ## On CYGWIN / MSYS, ACL and extended attributes aren't supported
 
-# osync test suite 2018070206
+# osync test suite 2018100101
 
 # 4 tests:
 # quicklocal
@@ -1131,6 +1131,11 @@ function test_ConflictDetetion () {
 		cat "$FAKEROOT/output.log"
 		assertEquals "Second run that should detect conflicts with parameters [$i]." "0" $result
     
+		if [ $TRAVIS_RUN == true ]; then
+			echo "Travis Debug output"
+			cat "$FAKEROOT/output.log"
+		fi
+
 		grep "$INITIATOR_DIR/$FileA << >> $TARGET_DIR/$FileA" "$FAKEROOT/output.log" 
 		assertEquals "FileA conflict detect with parameters [$i]." "0" $?
     
