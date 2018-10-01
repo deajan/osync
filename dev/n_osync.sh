@@ -10,7 +10,7 @@ PROGRAM="osync" # Rsync based two way sync engine with fault tolerance
 AUTHOR="(C) 2013-2018 by Orsiris de Jong"
 CONTACT="http://www.netpower.fr/osync - ozy@netpower.fr"
 PROGRAM_VERSION=1.3.0-beta1
-PROGRAM_BUILD=2018100102
+PROGRAM_BUILD=2018100103
 IS_STABLE=no
 
 ##### Execution order						#__WITH_PARANOIA_DEBUG
@@ -2318,7 +2318,7 @@ function Init {
 	set -o errtrace
 
 	# Do not use exit and quit traps if osync runs in monitor mode
-	if [ $_SYNC_ON_CHANGES == false ]; then
+	if [ $_SYNC_ON_CHANGES == "no" ]; then
 		trap TrapStop INT HUP TERM QUIT
 		trap TrapQuit EXIT
 	else
@@ -2713,7 +2713,7 @@ WARN_ALERT=false
 SOFT_STOP=2
 # Number of given replicas in command line
 _QUICK_SYNC=0
-_SYNC_ON_CHANGES=false
+_SYNC_ON_CHANGES="no"
 _NOLOCKS=false
 osync_cmd=$0
 _SUMMARY=false
@@ -2787,12 +2787,12 @@ function GetCommandlineArguments {
 			SKIP_DELETION=${i##*=}
 			;;
 			--on-changes)
-			_SYNC_ON_CHANGES=initiator
+			_SYNC_ON_CHANGES="initiator"
 			_NOLOCKS=true
 			_LOGGER_PREFIX="date"
 			;;
 			--on-changes-target)
-			_SYNC_ON_CHANGES=target
+			_SYNC_ON_CHANGES="target"
 			_NOLOCKS=true
 			_LOGGER_PREFIX="date"
 			;;
