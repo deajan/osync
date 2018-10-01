@@ -10,7 +10,7 @@ PROGRAM="osync" # Rsync based two way sync engine with fault tolerance
 AUTHOR="(C) 2013-2018 by Orsiris de Jong"
 CONTACT="http://www.netpower.fr/osync - ozy@netpower.fr"
 PROGRAM_VERSION=1.3.0-beta1
-PROGRAM_BUILD=2018093003
+PROGRAM_BUILD=2018100101
 IS_STABLE=no
 
 ##### Execution order						#__WITH_PARANOIA_DEBUG
@@ -2579,7 +2579,7 @@ function SyncOnChanges {
 
 	if [ "$LOCAL_OS" == "MacOSX" ]; then
 		if ! type fswatch > /dev/null 2>&1 ; then
-			Logger "No inotifywait command found. Cannot monitor changes." "CRITICAL"
+			Logger "No fswatch command found. Cannot monitor changes." "CRITICAL"
 			exit 1
 		fi
 	else
@@ -2629,7 +2629,7 @@ function SyncOnChanges {
 		Logger "#### Monitoring now." "NOTICE"
 		if [ "$LOCAL_OS" == "MacOSX" ]; then
 			fswatch $RSYNC_PATTERNS --exclude "$OSYNC_DIR" -1 "$watchDirectory" > /dev/null &
-			# Mac fswatch doesn't have timeout switch, replacing wait $! with WaitForTaskCompletion without warning nor spinner and increased SLEEP_TIME to avoid cpu hogging. This sims wait $! with timeout
+			# Mac fswatch doesn't have timeout switch, replacing wait $! with WaitForTaskCompletion without warning nor spinner and increased SLEEP_TIME to avoid cpu hogging. This simulates wait $! with timeout
 			ExecTasks $! "MonitorMacOSXWait" false 0 0 0 $MAX_WAIT true 1 0
 		elif [ "$LOCAL_OS" == "BSD" ]; then
 			# BSD version of inotifywait does not support multiple --exclude statements
