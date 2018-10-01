@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
 SUBPROGRAM=[prgname]
 PROGRAM="$SUBPROGRAM-batch" # Batch program to run osync / obackup instances sequentially and rerun failed ones
-AUTHOR="(L) 2013-2017 by Orsiris de Jong"
+AUTHOR="(L) 2013-2018 by Orsiris de Jong"
 CONTACT="http://www.netpower.fr - ozy@netpower.fr"
-PROGRAM_BUILD=2016120401
+PROGRAM_BUILD=2018100101
 
 ## Runs an osync /obackup instance for every conf file found
 ## If an instance fails, run it again if time permits
@@ -24,6 +24,15 @@ if [ -w /var/log ]; then
 	LOG_FILE=/var/log/$SUBPROGRAM-batch.log
 else
 	LOG_FILE=./$SUBPROGRAM-batch.log
+fi
+
+## Default directory where to store temporary run files
+if [ -w /tmp ]; then
+	RUN_DIR=/tmp
+elif [ -w /var/tmp ]; then
+	RUN_DIR=/var/tmp
+else
+	RUN_DIR=.
 fi
 
 # No need to edit under this line ##############################################################
