@@ -10,7 +10,7 @@ PROGRAM_BINARY=$PROGRAM".sh"
 PROGRAM_BATCH=$PROGRAM"-batch.sh"
 SSH_FILTER="ssh_filter.sh"
 
-SCRIPT_BUILD=2018090301
+SCRIPT_BUILD=2018090302
 INSTANCE_ID="installer-$SCRIPT_BUILD"
 
 ## osync / obackup / pmocr / zsnap install script
@@ -355,7 +355,26 @@ function Usage {
 	exit 127
 }
 
+function TrapQuit {
+	local exitcode=0
+
+	# Get ERROR / WARN alert flags from subprocesses that call Logger
+	if [ -f "$RUN_DIR/$PROGRAM.Logger.warn.$SCRIPT_PID.$TSTAMP" ]; then
+		WARN_ALERT=true
+		exitcode=2
+	fi
+	if [ -f "$RUN_DIR/$PROGRAM.Logger.error.$SCRIPT_PID.$TSTAMP" ]; then
+		ERROR_ALERT=true
+		exitcode=1
+	fi
+
+	CleanUp
+	exit $exitcode
+}
+
 ############################## Script entry point
+
+trap TrapQuit TERM EXIT HUP QUIT
 
 if [ "$LOGFILE" == "" ]; then
         if [ -w /var/log ]; then
