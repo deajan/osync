@@ -1,0 +1,11 @@
+[Unit]
+Description=A robust two way (bidirectional) file sync script based on rsync with fault tolerance
+After=time-sync.target local-fs.target network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+ExecStart=/usr/local/bin/osync.sh /etc/osync/%i --on-changes-target --silent
+SuccessExitStatus=0 2
+[Install]
+WantedBy=multi-user.target

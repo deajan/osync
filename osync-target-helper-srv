@@ -1,0 +1,139 @@
+#!/usr/bin/env bash
+#
+# osync-srv Two way directory sync daemon
+#
+# chkconfig: - 90 99
+# description: monitors a local directory and syncs to a local or remote \
+#              directory on file changes
+# processname: /usr/local/bin/osync.sh
+# config: /etc/osync/*.conf
+# pidfile: /var/run/osync
+
+### BEGIN INIT INFO
+# Provides:		osync-target-helper-srv
+# Required-Start:	$local_fs $time
+# Required-Stop:	$local_fs $time
+# Default-Start:	2 3 4 5
+# Default-Stop:		0 1 6
+# Short-Description:	osync-target-helpder daemon
+# Description:		Two way directory sync daemon
+### END INIT INFO
+
+prog=osync
+progexec=osync.sh
+progpath=/usr/local/bin
+confdir=/etc/osync
+pidfile=/var/run/$prog-target-helper
+SCRIPT_BUILD=2018100101
+
+if [ ! -f $progpath/$progexec ] && [ ! -f $progexec ]; then
+	echo "Cannot find $prog executable in $progpath nor in local path."
+	exit 1
+fi
+
+if [ ! -w $(dirname $pidfile) ]; then
+	pidfile=./$prog
+fi
+
+start() {
+	if ! ls "$confdir/"*.conf > /dev/null 2>&1; then
+		echo "Cannot find any configuration files in $confdir."
+		exit 1
+	fi
+
+	errno=0
+
+	for cfgfile in "$confdir/"*.conf
+	do
+		if [ -f $progpath/$progexec ]; then
+			$progpath/$progexec $cfgfile --on-changes-target --errors-only > /dev/null 2>&1 &
+		else
+			echo "Cannot find $prog executable in $progpath"
+			exit 1
+		fi
+
+		pid=$!
+		retval=$?
+
+		if [ $? == 0 ]; then
+			echo $pid > "$pidfile-$(basename $cfgfile)"
+			echo "$prog successfully started for configuration file $cfgfile"
+		else
+			echo "Cannot start $prog for configuration file $cfgfile"
+			errno=1
+		fi
+	done
+
+	exit $errno
+}
+
+stop() {
+	if [ ! -f $pidfile-* ]; then
+		echo "No running $prog instances found."
+		exit 1
+	fi
+
+	for pfile in $pidfile-*
+	do
+		if ps -p$(cat $pfile) > /dev/null 2>&1
+		then
+			kill -TERM $(cat $pfile)
+			if [ $? == 0 ]; then
+				rm -f $pfile
+				echo "$prog instance $(basename $pfile) stopped."
+			else
+				echo "Cannot stop $prog instance $(basename $pfile)"
+			fi
+		else
+			rm -f $pfile
+			echo "$prog instance $pfile (pid $(cat $pfile)) is dead but pidfile exists."
+		fi
+	done
+}
+
+status() {
+	if [ ! -f $pidfile-* ]; then
+		echo "Cannot find any running $prog instance."
+		exit 1
+	fi
+
+	errno=0
+
+	for pfile in $pidfile-*
+	do
+		if ps -p$(cat $pfile) > /dev/null 2>&1
+		then
+			echo "$prog instance $(basename $pfile) is running (pid $(cat $pfile))"
+		else
+			echo "$prog instance $pfile (pid $(cat $pfile)) is dead but pidfile exists."
+			errno=1
+		fi
+	done
+
+	exit $errno
+}
+
+case "$1" in
+	start)
+	start
+	;;
+	stop)
+	stop
+	;;
+	restart)
+	stop
+	start
+	;;
+	status)
+	status
+	;;
+	condrestart|try-restart)
+	status || exit 0
+	restart
+	;;
+	*)
+	echo "Usage: $0 {start|stop|restart|status}"
+	;;
+esac
+
+exit 0

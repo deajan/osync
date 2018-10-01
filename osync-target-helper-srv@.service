@@ -1,0 +1,13 @@
+[Unit]
+Description=osync - Target helper service
+After=time-sync.target local-fs.target network-online.target
+Requires=time-sync.target local-fs.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+ExecStart=/usr/local/bin/osync.sh /etc/osync/%i --on-changes-target --errors-only
+SuccessExitStatus=0 2
+
+[Install]
+WantedBy=multi-user.target
