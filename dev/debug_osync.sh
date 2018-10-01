@@ -41,7 +41,7 @@ IS_STABLE=no
 #	CleanUp					no		#__WITH_PARANOIA_DEBUG
 
 _OFUNCTIONS_VERSION=2.3.0-RC1
-_OFUNCTIONS_BUILD=2018100102
+_OFUNCTIONS_BUILD=2018100103
 _OFUNCTIONS_BOOTSTRAP=true
 
 ## To use in a program, define the following variables:
@@ -138,7 +138,7 @@ function PoorMansRandomGenerator {
         local number
 
         # Some read bytes can't be used, se we read twice the number of required bytes
-        dd if=/dev/urandom bs=$digits count=2 | while read -r -n1 char; do
+        dd if=/dev/urandom bs=$digits count=2 2> /dev/null | while read -r -n1 char; do
                 number=$number$(printf "%d" "'$char")
                 if [ ${#number} -ge $digits ]; then
                         echo ${number:0:$digits}
