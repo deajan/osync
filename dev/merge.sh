@@ -185,7 +185,6 @@ function __PREPROCESSOR_CopyCommons {
 # If sourced don't do anything
 if [ "$(basename $0)" == "merge.sh" ]; then
 	if [ "$1" == "osync" ]; then
-
 		__PREPROCESSOR_Merge osync
 		__PREPROCESSOR_CopyCommons osync
 	elif [ "$1" == "obackup" ]; then
