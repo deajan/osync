@@ -2208,7 +2208,7 @@ function VerComp () {
 		return 1
 	fi
 
-	if [[ $1 == $2 ]]
+	if [[ "$1" == "$2" ]]
 		then
 			echo 0
 		return
