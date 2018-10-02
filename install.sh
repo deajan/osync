@@ -10,83 +10,113 @@ PROGRAM_BINARY=$PROGRAM".sh"
 PROGRAM_BATCH=$PROGRAM"-batch.sh"
 SSH_FILTER="ssh_filter.sh"
 
-SCRIPT_BUILD=2018090301
+SCRIPT_BUILD=2018100201
 INSTANCE_ID="installer-$SCRIPT_BUILD"
 
 ## osync / obackup / pmocr / zsnap install script
 ## Tested on RHEL / CentOS 6 & 7, Fedora 23, Debian 7 & 8, Mint 17 and FreeBSD 8, 10 and 11
 ## Please adapt this to fit your distro needs
 
+_OFUNCTIONS_VERSION=2.3.0-RC2
+_OFUNCTIONS_BUILD=2018100204
 _OFUNCTIONS_BOOTSTRAP=true
 
-# Get current install.sh path from http://stackoverflow.com/a/246128/2635443
-SCRIPT_PATH="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
+if ! type "$BASH" > /dev/null; then
+	echo "Please run this script only with bash shell. Tested on bash >= 3.2"
+	exit 127
+fi
 
+## Correct output of sort command (language agnostic sorting)
+export LC_ALL=C
+
+## Default umask for file creation
+umask 0077
+
+# Standard alert mail body
+MAIL_ALERT_MSG="Execution of $PROGRAM instance $INSTANCE_ID on $(date) has warnings/errors."
+
+# Environment variables that can be overriden by programs
+_DRYRUN=false
 _LOGGER_SILENT=false
-_STATS=1
-ACTION="install"
-FAKEROOT=""
+_LOGGER_VERBOSE=false
+_LOGGER_ERR_ONLY=false
+_LOGGER_PREFIX="date"
+if [ "$KEEP_LOGGING" == "" ]; then
+	KEEP_LOGGING=1801
+fi
 
-function GetCommandlineArguments {
-        for i in "$@"; do
-                case $i in
-			--prefix=*)
-                        FAKEROOT="${i##*=}"
-                        ;;
-			--silent)
-			_LOGGER_SILENT=true
-			;;
-			--no-stats)
-			_STATS=0
-			;;
-			--remove)
-			ACTION="uninstall"
-			;;
-			--help|-h|-?)
-			Usage
-			;;
-                        *)
-			Logger "Unknown option '$i'" "SIMPLE"
-			Usage
-			exit
-                        ;;
-                esac
-	done
+# Initial error status, logging 'WARN', 'ERROR' or 'CRITICAL' will enable alerts flags
+ERROR_ALERT=false
+WARN_ALERT=false
+
+
+## allow debugging from command line with _DEBUG=yes
+if [ ! "$_DEBUG" == "yes" ]; then
+	_DEBUG=no
+	_LOGGER_VERBOSE=false
+else
+	trap 'TrapError ${LINENO} $?' ERR
+	_LOGGER_VERBOSE=true
+fi
+
+if [ "$SLEEP_TIME" == "" ]; then # Leave the possibity to set SLEEP_TIME as environment variable when runinng with bash -x in order to avoid spamming console
+	SLEEP_TIME=.05
+fi
+
+SCRIPT_PID=$$
+
+LOCAL_USER=$(whoami)
+LOCAL_HOST=$(hostname)
+
+if [ "$PROGRAM" == "" ]; then
+	PROGRAM="ofunctions"
+fi
+
+## Default log file until config file is loaded
+if [ -w /var/log ]; then
+	LOG_FILE="/var/log/$PROGRAM.log"
+elif ([ "$HOME" != "" ] && [ -w "$HOME" ]); then
+	LOG_FILE="$HOME/$PROGRAM.log"
+elif [ -w . ]; then
+	LOG_FILE="./$PROGRAM.log"
+else
+	LOG_FILE="/tmp/$PROGRAM.log"
+fi
+
+## Default directory where to store temporary run files
+if [ -w /tmp ]; then
+	RUN_DIR=/tmp
+elif [ -w /var/tmp ]; then
+	RUN_DIR=/var/tmp
+else
+	RUN_DIR=.
+fi
+
+# Get a random number on Windows BusyBox alike, also works on most Unixes
+function PoorMansRandomGenerator {
+        local digits="${1}" # The number of digits to generate
+        local number
+
+        # Some read bytes can't be used, se we read twice the number of required bytes
+        dd if=/dev/urandom bs=$digits count=2 2> /dev/null | while read -r -n1 char; do
+                number=$number$(printf "%d" "'$char")
+                if [ ${#number} -ge $digits ]; then
+                        echo ${number:0:$digits}
+                        break;
+                fi
+        done
 }
 
-GetCommandlineArguments "$@"
+# Initial TSTMAP value before function declaration
+TSTAMP=$(date '+%Y%m%dT%H%M%S').$(PoorMansRandomGenerator 4)
 
-CONF_DIR=$FAKEROOT/etc/$PROGRAM
-BIN_DIR="$FAKEROOT/usr/local/bin"
-SERVICE_DIR_INIT=$FAKEROOT/etc/init.d
-# Should be /usr/lib/systemd/system, but /lib/systemd/system exists on debian & rhel / fedora
-SERVICE_DIR_SYSTEMD_SYSTEM=$FAKEROOT/lib/systemd/system
-SERVICE_DIR_SYSTEMD_USER=$FAKEROOT/etc/systemd/user
-SERVICE_DIR_OPENRC=$FAKEROOT/etc/init.d
+# Default alert attachment filename
+ALERT_LOG_FILE="$RUN_DIR/$PROGRAM.$SCRIPT_PID.$TSTAMP.last.log"
 
-if [ "$PROGRAM" == "osync" ]; then
-	SERVICE_NAME="osync-srv"
-elif [ "$PROGRAM" == "pmocr" ]; then
-	SERVICE_NAME="pmocr-srv"
-fi
+# Set error exit code if a piped command fails
+set -o pipefail
+set -o errtrace
 
-SERVICE_FILE_INIT="$SERVICE_NAME"
-SERVICE_FILE_SYSTEMD_SYSTEM="$SERVICE_NAME@.service"
-SERVICE_FILE_SYSTEMD_USER="$SERVICE_NAME@.service.user"
-SERVICE_FILE_OPENRC="$SERVICE_NAME-openrc"
-
-## Generic code
-
-## Default log file
-if [ -w "$FAKEROOT/var/log" ]; then
-	LOG_FILE="$FAKEROOT/var/log/$PROGRAM-install.log"
-elif ([ "$HOME" != "" ] && [ -w "$HOME" ]); then
-	LOG_FILE="$HOME/$PROGRAM-install.log"
-else
-	LOG_FILE="./$PROGRAM-install.log"
-fi
-
-#### RemoteLogger SUBSET ####
 
 # Array to string converter, see http://stackoverflow.com/questions/1527049/bash-join-elements-of-an-array
 # usage: joinString separaratorChar Array
@@ -170,17 +200,11 @@ function RemoteLogger {
 			_Logger "" "$prefix$value"
 			return
 		fi
-	elif [ "$level" == "PARANOIA_DEBUG" ]; then				#__WITH_PARANOIA_DEBUG
-		if [ "$_PARANOIA_DEBUG" == "yes" ]; then			#__WITH_PARANOIA_DEBUG
-			_Logger "" "$prefix\e[35m$value\e[0m"			#__WITH_PARANOIA_DEBUG
-			return							#__WITH_PARANOIA_DEBUG
-		fi								#__WITH_PARANOIA_DEBUG
 	else
 		_Logger "" "\e[41mLogger function called without proper loglevel [$level].\e[0m" true
 		_Logger "" "Value was: $prefix$value" true
 	fi
 }
-#### RemoteLogger SUBSET END ####
 
 # General log function with log levels:
 
@@ -249,11 +273,6 @@ function Logger {
 			_Logger "$prefix$value" "$prefix$value"
 			return
 		fi
-	elif [ "$level" == "PARANOIA_DEBUG" ]; then				#__WITH_PARANOIA_DEBUG
-		if [ "$_PARANOIA_DEBUG" == "yes" ]; then			#__WITH_PARANOIA_DEBUG
-			_Logger "$prefix$value" "$prefix\e[35m$value\e[0m"	#__WITH_PARANOIA_DEBUG
-			return							#__WITH_PARANOIA_DEBUG
-		fi								#__WITH_PARANOIA_DEBUG
 	elif [ "$level" == "SIMPLE" ]; then
 		if [ "$_LOGGER_SILENT" == true ]; then
 			_Logger "$preix$value"
@@ -266,6 +285,167 @@ function Logger {
 		_Logger "Value was: $prefix$value" "Value was: $prefix$value" true
 	fi
 }
+
+# Portable child (and grandchild) kill function tester under Linux, BSD and MacOS X
+function KillChilds {
+	local pid="${1}" # Parent pid to kill childs
+	local self="${2:-false}" # Should parent be killed too ?
+
+	# Paranoid checks, we can safely assume that $pid should not be 0 nor 1
+	if [ $(IsInteger "$pid") -eq 0 ] || [ "$pid" == "" ] || [ "$pid" == "0" ] || [ "$pid" == "1" ]; then
+		Logger "Bogus pid given [$pid]." "CRITICAL"
+		return 1
+	fi
+
+	if kill -0 "$pid" > /dev/null 2>&1; then
+		if children="$(pgrep -P "$pid")"; then
+			if [[ "$pid" == *"$children"* ]]; then
+				Logger "Bogus pgrep implementation." "CRITICAL"
+				children="${children/$pid/}"
+			fi
+			for child in $children; do
+				KillChilds "$child" true
+			done
+		fi
+	fi
+
+	# Try to kill nicely, if not, wait 15 seconds to let Trap actions happen before killing
+	if [ "$self" == true ]; then
+		# We need to check for pid again because it may have disappeared after recursive function call
+		if kill -0 "$pid" > /dev/null 2>&1; then
+			kill -s TERM "$pid"
+			Logger "Sent SIGTERM to process [$pid]." "DEBUG"
+			if [ $? != 0 ]; then
+				sleep 15
+				Logger "Sending SIGTERM to process [$pid] failed." "DEBUG"
+				kill -9 "$pid"
+				if [ $? != 0 ]; then
+					Logger "Sending SIGKILL to process [$pid] failed." "DEBUG"
+					return 1
+				fi	# Simplify the return 0 logic here
+			else
+				return 0
+			fi
+		else
+			return 0
+		fi
+	else
+		return 0
+	fi
+}
+
+function KillAllChilds {
+	local pids="${1}" # List of parent pids to kill separated by semi-colon
+	local self="${2:-false}" # Should parent be killed too ?
+
+
+	local errorcount=0
+
+	IFS=';' read -a pidsArray <<< "$pids"
+	for pid in "${pidsArray[@]}"; do
+		KillChilds $pid $self
+		if [ $? != 0 ]; then
+			errorcount=$((errorcount+1))
+			fi
+	done
+	return $errorcount
+}
+
+function CleanUp {
+
+	if [ "$_DEBUG" != "yes" ]; then
+		rm -f "$RUN_DIR/$PROGRAM."*".$SCRIPT_PID.$TSTAMP"
+		# Fix for sed -i requiring backup extension for BSD & Mac (see all sed -i statements)
+		rm -f "$RUN_DIR/$PROGRAM."*".$SCRIPT_PID.$TSTAMP.tmp"
+	fi
+}
+
+function GenericTrapQuit {
+	local exitcode=0
+
+	# Get ERROR / WARN alert flags from subprocesses that call Logger
+	if [ -f "$RUN_DIR/$PROGRAM.Logger.warn.$SCRIPT_PID.$TSTAMP" ]; then
+		WARN_ALERT=true
+		exitcode=2
+	fi
+	if [ -f "$RUN_DIR/$PROGRAM.Logger.error.$SCRIPT_PID.$TSTAMP" ]; then
+		ERROR_ALERT=true
+		exitcode=1
+	fi
+
+	CleanUp
+	exit $exitcode
+}
+
+
+
+# Get current install.sh path from http://stackoverflow.com/a/246128/2635443
+SCRIPT_PATH="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
+
+_LOGGER_SILENT=false
+_STATS=1
+ACTION="install"
+FAKEROOT=""
+
+function GetCommandlineArguments {
+        for i in "$@"; do
+                case $i in
+			--prefix=*)
+                        FAKEROOT="${i##*=}"
+                        ;;
+			--silent)
+			_LOGGER_SILENT=true
+			;;
+			--no-stats)
+			_STATS=0
+			;;
+			--remove)
+			ACTION="uninstall"
+			;;
+			--help|-h|-?)
+			Usage
+			;;
+                        *)
+			Logger "Unknown option '$i'" "SIMPLE"
+			Usage
+			exit
+                        ;;
+                esac
+	done
+}
+
+GetCommandlineArguments "$@"
+
+CONF_DIR=$FAKEROOT/etc/$PROGRAM
+BIN_DIR="$FAKEROOT/usr/local/bin"
+SERVICE_DIR_INIT=$FAKEROOT/etc/init.d
+# Should be /usr/lib/systemd/system, but /lib/systemd/system exists on debian & rhel / fedora
+SERVICE_DIR_SYSTEMD_SYSTEM=$FAKEROOT/lib/systemd/system
+SERVICE_DIR_SYSTEMD_USER=$FAKEROOT/etc/systemd/user
+SERVICE_DIR_OPENRC=$FAKEROOT/etc/init.d
+
+if [ "$PROGRAM" == "osync" ]; then
+	SERVICE_NAME="osync-srv"
+elif [ "$PROGRAM" == "pmocr" ]; then
+	SERVICE_NAME="pmocr-srv"
+fi
+
+SERVICE_FILE_INIT="$SERVICE_NAME"
+SERVICE_FILE_SYSTEMD_SYSTEM="$SERVICE_NAME@.service"
+SERVICE_FILE_SYSTEMD_USER="$SERVICE_NAME@.service.user"
+SERVICE_FILE_OPENRC="$SERVICE_NAME-openrc"
+
+## Generic code
+
+## Default log file
+if [ -w "$FAKEROOT/var/log" ]; then
+	LOG_FILE="$FAKEROOT/var/log/$PROGRAM-install.log"
+elif ([ "$HOME" != "" ] && [ -w "$HOME" ]); then
+	LOG_FILE="$HOME/$PROGRAM-install.log"
+else
+	LOG_FILE="./$PROGRAM-install.log"
+fi
+
 ## Modified version of https://gist.github.com/cdown/1163649
 function UrlEncode {
 	local length="${#1}"
@@ -658,19 +838,27 @@ function Usage {
 	exit 127
 }
 
+function TrapQuit {
+	local exitcode=0
+
+	# Get ERROR / WARN alert flags from subprocesses that call Logger
+	if [ -f "$RUN_DIR/$PROGRAM.Logger.warn.$SCRIPT_PID.$TSTAMP" ]; then
+		WARN_ALERT=true
+		exitcode=2
+	fi
+	if [ -f "$RUN_DIR/$PROGRAM.Logger.error.$SCRIPT_PID.$TSTAMP" ]; then
+		ERROR_ALERT=true
+		exitcode=1
+	fi
+
+	CleanUp
+	exit $exitcode
+}
+
 ############################## Script entry point
 
-if [ "$LOGFILE" == "" ]; then
-        if [ -w /var/log ]; then
-                LOG_FILE="/var/log/$PROGRAM.$INSTANCE_ID.log"
-        elif ([ "$HOME" != "" ] && [ -w "$HOME" ]); then
-                LOG_FILE="$HOME/$PROGRAM.$INSTANCE_ID.log"
-        else
-                LOG_FILE="./$PROGRAM.$INSTANCE_ID.log"
-        fi
-else
-        LOG_FILE="$LOGFILE"
-fi
+trap TrapQuit TERM EXIT HUP QUIT
+
 if [ ! -w "$(dirname $LOG_FILE)" ]; then
         echo "Cannot write to log [$(dirname $LOG_FILE)]."
 else

@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
 SUBPROGRAM=osync
 PROGRAM="$SUBPROGRAM-batch" # Batch program to run osync / obackup instances sequentially and rerun failed ones
-AUTHOR="(L) 2013-2017 by Orsiris de Jong"
+AUTHOR="(L) 2013-2018 by Orsiris de Jong"
 CONTACT="http://www.netpower.fr - ozy@netpower.fr"
-PROGRAM_BUILD=2016120401
+PROGRAM_BUILD=2018100101
 
 ## Runs an osync /obackup instance for every conf file found
 ## If an instance fails, run it again if time permits
@@ -26,34 +26,185 @@ else
 	LOG_FILE=./$SUBPROGRAM-batch.log
 fi
 
+## Default directory where to store temporary run files
+if [ -w /tmp ]; then
+	RUN_DIR=/tmp
+elif [ -w /var/tmp ]; then
+	RUN_DIR=/var/tmp
+else
+	RUN_DIR=.
+fi
+
 # No need to edit under this line ##############################################################
 
-function _logger {
-	local value="${1}" # What to log
-	echo -e "$value" >> "$LOG_FILE"
+#### RemoteLogger SUBSET ####
+
+# Array to string converter, see http://stackoverflow.com/questions/1527049/bash-join-elements-of-an-array
+# usage: joinString separaratorChar Array
+function joinString {
+	local IFS="$1"; shift; echo "$*";
 }
 
-function Logger {
-	local value="${1}" # What to log
-	local level="${2}" # Log level: DEBUG, NOTICE, WARN, ERROR, CRITIAL
+# Sub function of Logger
+function _Logger {
+	local logValue="${1}"		# Log to file
+	local stdValue="${2}"		# Log to screeen
+	local toStdErr="${3:-false}"	# Log to stderr instead of stdout
 
-	prefix="$(date) - "
+	if [ "$logValue" != "" ]; then
+		echo -e "$logValue" >> "$LOG_FILE"
+
+		# Build current log file for alerts if we have a sufficient environment
+		if [ "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$SCRIPT_PID.$TSTAMP" != "" ]; then
+			echo -e "$logValue" >> "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$SCRIPT_PID.$TSTAMP"
+		fi
+	fi
+
+	if [ "$stdValue" != "" ] && [ "$_LOGGER_SILENT" != true ]; then
+		if [ $toStdErr == true ]; then
+			# Force stderr color in subshell
+			(>&2 echo -e "$stdValue")
+
+		else
+			echo -e "$stdValue"
+		fi
+	fi
+}
+
+# Remote logger similar to below Logger, without log to file and alert flags
+function RemoteLogger {
+	local value="${1}"		# Sentence to log (in double quotes)
+	local level="${2}"		# Log level
+	local retval="${3:-undef}"	# optional return value of command
+
+	if [ "$_LOGGER_PREFIX" == "time" ]; then
+		prefix="TIME: $SECONDS - "
+	elif [ "$_LOGGER_PREFIX" == "date" ]; then
+		prefix="R $(date) - "
+	else
+		prefix=""
+	fi
 
 	if [ "$level" == "CRITICAL" ]; then
-		_logger "$prefix\e[41m$value\e[0m"
+		_Logger "" "$prefix\e[1;33;41m$value\e[0m" true
+		if [ $_DEBUG == "yes" ]; then
+			_Logger -e "" "[$retval] in [$(joinString , ${FUNCNAME[@]})] SP=$SCRIPT_PID P=$$" true
+		fi
+		return
 	elif [ "$level" == "ERROR" ]; then
-		_logger "$prefix\e[91m$value\e[0m"
+		_Logger "" "$prefix\e[31m$value\e[0m" true
+		if [ $_DEBUG == "yes" ]; then
+			_Logger -e "" "[$retval] in [$(joinString , ${FUNCNAME[@]})] SP=$SCRIPT_PID P=$$" true
+		fi
+		return
 	elif [ "$level" == "WARN" ]; then
-		_logger "$prefix\e[93m$value\e[0m"
+		_Logger "" "$prefix\e[33m$value\e[0m" true
+		if [ $_DEBUG == "yes" ]; then
+			_Logger -e "" "[$retval] in [$(joinString , ${FUNCNAME[@]})] SP=$SCRIPT_PID P=$$" true
+		fi
+		return
 	elif [ "$level" == "NOTICE" ]; then
-		_logger "$prefix$value"
+		if [ $_LOGGER_ERR_ONLY != true ]; then
+			_Logger "" "$prefix$value"
+		fi
+		return
+	elif [ "$level" == "VERBOSE" ]; then
+		if [ $_LOGGER_VERBOSE == true ]; then
+			_Logger "" "$prefix$value"
+		fi
+		return
+	elif [ "$level" == "ALWAYS" ]; then
+		_Logger	 "" "$prefix$value"
+		return
 	elif [ "$level" == "DEBUG" ]; then
-		if [ "$DEBUG" == "yes" ]; then
-			_logger "$prefix$value"
+		if [ "$_DEBUG" == "yes" ]; then
+			_Logger "" "$prefix$value"
+			return
 		fi
 	else
-		_logger "\e[41mLogger function called without proper loglevel.\e[0m"
-		_logger "$prefix$value"
+		_Logger "" "\e[41mLogger function called without proper loglevel [$level].\e[0m" true
+		_Logger "" "Value was: $prefix$value" true
+	fi
+}
+#### RemoteLogger SUBSET END ####
+
+# General log function with log levels:
+
+# Environment variables
+# _LOGGER_SILENT: Disables any output to stdout & stderr
+# _LOGGER_ERR_ONLY: Disables any output to stdout except for ALWAYS loglevel
+# _LOGGER_VERBOSE: Allows VERBOSE loglevel messages to be sent to stdout
+
+# Loglevels
+# Except for VERBOSE, all loglevels are ALWAYS sent to log file
+
+# CRITICAL, ERROR, WARN sent to stderr, color depending on level, level also logged
+# NOTICE sent to stdout
+# VERBOSE sent to stdout if _LOGGER_VERBOSE = true
+# ALWAYS is sent to stdout unless _LOGGER_SILENT = true
+# DEBUG & PARANOIA_DEBUG are only sent to stdout if _DEBUG=yes
+# SIMPLE is a wrapper for QuickLogger that does not use advanced functionality
+function Logger {
+	local value="${1}"		# Sentence to log (in double quotes)
+	local level="${2}"		# Log level
+	local retval="${3:-undef}"	# optional return value of command
+
+	if [ "$_LOGGER_PREFIX" == "time" ]; then
+		prefix="TIME: $SECONDS - "
+	elif [ "$_LOGGER_PREFIX" == "date" ]; then
+		prefix="$(date '+%Y-%m-%d %H:%M:%S') - "
+	else
+		prefix=""
+	fi
+
+	## Obfuscate _REMOTE_TOKEN in logs (for ssh_filter usage only in osync and obackup)
+	value="${value/env _REMOTE_TOKEN=$_REMOTE_TOKEN/__(o_O)__}"
+	value="${value/env _REMOTE_TOKEN=\$_REMOTE_TOKEN/__(o_O)__}"
+
+	if [ "$level" == "CRITICAL" ]; then
+		_Logger "$prefix($level):$value" "$prefix\e[1;33;41m$value\e[0m" true
+		ERROR_ALERT=true
+		# ERROR_ALERT / WARN_ALERT is not set in main when Logger is called from a subprocess. Need to keep this flag.
+		echo -e "[$retval] in [$(joinString , ${FUNCNAME[@]})] SP=$SCRIPT_PID P=$$\n$prefix($level):$value" >> "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.error.$SCRIPT_PID.$TSTAMP"
+		return
+	elif [ "$level" == "ERROR" ]; then
+		_Logger "$prefix($level):$value" "$prefix\e[91m$value\e[0m" true
+		ERROR_ALERT=true
+		echo -e "[$retval] in [$(joinString , ${FUNCNAME[@]})] SP=$SCRIPT_PID P=$$\n$prefix($level):$value" >> "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.error.$SCRIPT_PID.$TSTAMP"
+		return
+	elif [ "$level" == "WARN" ]; then
+		_Logger "$prefix($level):$value" "$prefix\e[33m$value\e[0m" true
+		WARN_ALERT=true
+		echo -e "[$retval] in [$(joinString , ${FUNCNAME[@]})] SP=$SCRIPT_PID P=$$\n$prefix($level):$value" >> "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.warn.$SCRIPT_PID.$TSTAMP"
+		return
+	elif [ "$level" == "NOTICE" ]; then
+		if [ "$_LOGGER_ERR_ONLY" != true ]; then
+			_Logger "$prefix$value" "$prefix$value"
+		fi
+		return
+	elif [ "$level" == "VERBOSE" ]; then
+		if [ $_LOGGER_VERBOSE == true ]; then
+			_Logger "$prefix($level):$value" "$prefix$value"
+		fi
+		return
+	elif [ "$level" == "ALWAYS" ]; then
+		_Logger "$prefix$value" "$prefix$value"
+		return
+	elif [ "$level" == "DEBUG" ]; then
+		if [ "$_DEBUG" == "yes" ]; then
+			_Logger "$prefix$value" "$prefix$value"
+			return
+		fi
+	elif [ "$level" == "SIMPLE" ]; then
+		if [ "$_LOGGER_SILENT" == true ]; then
+			_Logger "$preix$value"
+		else
+			_Logger "$preix$value" "$prefix$value"
+		fi
+		return
+	else
+		_Logger "\e[41mLogger function called without proper loglevel [$level].\e[0m" "\e[41mLogger function called without proper loglevel [$level].\e[0m" true
+		_Logger "Value was: $prefix$value" "Value was: $prefix$value" true
 	fi
 }
 

@@ -2,12 +2,14 @@
 
 #TODO treeList, deleteList, _getFileCtimeMtime, conflictList should be called without having statedir informed. Just give the full path ?
 #Check dryruns with nosuffix mode for timestampList
+#WIP: currently TRAVIS_RUN debug lines in n_osync and run_tests for conflictLog
+
 
 PROGRAM="osync" # Rsync based two way sync engine with fault tolerance
 AUTHOR="(C) 2013-2018 by Orsiris de Jong"
 CONTACT="http://www.netpower.fr/osync - ozy@netpower.fr"
 PROGRAM_VERSION=1.3.0-beta1
-PROGRAM_BUILD=2018100105
+PROGRAM_BUILD=2018100106
 IS_STABLE=no
 
 ##### Execution order						#__WITH_PARANOIA_DEBUG
@@ -40,21 +42,9 @@ IS_STABLE=no
 #	UnlockReplicas				yes		#__WITH_PARANOIA_DEBUG
 #	CleanUp					no		#__WITH_PARANOIA_DEBUG
 
-_OFUNCTIONS_VERSION=2.3.0-RC1
-_OFUNCTIONS_BUILD=2018100103
+_OFUNCTIONS_VERSION=2.3.0-RC2
+_OFUNCTIONS_BUILD=2018100204
 _OFUNCTIONS_BOOTSTRAP=true
-
-## To use in a program, define the following variables:
-## PROGRAM=program-name
-## INSTANCE_ID=program-instance-name
-## _DEBUG=yes/no
-## _LOGGER_SILENT=true/false
-## _LOGGER_VERBOSE=true/false
-## _LOGGER_ERR_ONLY=true/false
-## _LOGGER_PREFIX="date"/"time"/""
-
-## Logger sets {ERROR|WARN}_ALERT variable when called with critical / error / warn loglevel
-## When called from subprocesses, variable of main process cannot be set. Status needs to be get via $RUN_DIR/$PROGRAM.Logger.{error|warn}.$SCRIPT_PID.$TSTAMP
 
 if ! type "$BASH" > /dev/null; then
 	echo "Please run this script only with bash shell. Tested on bash >= 3.2"
@@ -131,7 +121,6 @@ else
 	RUN_DIR=.
 fi
 
-#### PoorMansRandomGenerator SUBSET ####
 # Get a random number on Windows BusyBox alike, also works on most Unixes
 function PoorMansRandomGenerator {
         local digits="${1}" # The number of digits to generate
@@ -146,7 +135,6 @@ function PoorMansRandomGenerator {
                 fi
         done
 }
-#### PoorMansRandomGenerator SUBSET END ####
 
 # Initial TSTMAP value before function declaration
 TSTAMP=$(date '+%Y%m%dT%H%M%S').$(PoorMansRandomGenerator 4)
@@ -157,13 +145,6 @@ ALERT_LOG_FILE="$RUN_DIR/$PROGRAM.$SCRIPT_PID.$TSTAMP.last.log"
 # Set error exit code if a piped command fails
 set -o pipefail
 set -o errtrace
-
-
-function Dummy {
-	__CheckArguments 0 $# "$@"	#__WITH_PARANOIA_DEBUG
-
-	sleep $SLEEP_TIME
-}
 
 
 # Array to string converter, see http://stackoverflow.com/questions/1527049/bash-join-elements-of-an-array
@@ -410,6 +391,35 @@ function KillAllChilds {
 	done
 	return $errorcount
 }
+
+function CleanUp {
+	__CheckArguments 0 $# "$@"	#__WITH_PARANOIA_DEBUG
+
+	if [ "$_DEBUG" != "yes" ]; then
+		rm -f "$RUN_DIR/$PROGRAM."*".$SCRIPT_PID.$TSTAMP"
+		# Fix for sed -i requiring backup extension for BSD & Mac (see all sed -i statements)
+		rm -f "$RUN_DIR/$PROGRAM."*".$SCRIPT_PID.$TSTAMP.tmp"
+	fi
+}
+
+function GenericTrapQuit {
+	local exitcode=0
+
+	# Get ERROR / WARN alert flags from subprocesses that call Logger
+	if [ -f "$RUN_DIR/$PROGRAM.Logger.warn.$SCRIPT_PID.$TSTAMP" ]; then
+		WARN_ALERT=true
+		exitcode=2
+	fi
+	if [ -f "$RUN_DIR/$PROGRAM.Logger.error.$SCRIPT_PID.$TSTAMP" ]; then
+		ERROR_ALERT=true
+		exitcode=1
+	fi
+
+	CleanUp
+	exit $exitcode
+}
+
+
 
 # osync/obackup/pmocr script specific mail alert function, use SendEmail function for generic mail sending
 function SendAlert {
@@ -1216,16 +1226,6 @@ function ExecTasks {
 	fi
 }
 
-function CleanUp {
-	__CheckArguments 0 $# "$@"	#__WITH_PARANOIA_DEBUG
-
-	if [ "$_DEBUG" != "yes" ]; then
-		rm -f "$RUN_DIR/$PROGRAM."*".$SCRIPT_PID.$TSTAMP"
-		# Fix for sed -i requiring backup extension for BSD & Mac (see all sed -i statements)
-		rm -f "$RUN_DIR/$PROGRAM."*".$SCRIPT_PID.$TSTAMP.tmp"
-	fi
-}
-
 # Usage: var=$(StripSingleQuotes "$var")
 function StripSingleQuotes {
 	local string="${1}"
@@ -1264,25 +1264,35 @@ function EscapeDoubleQuotes {
 	echo "${value//\"/\\\"}"
 }
 
-function IsNumericExpand {
-	eval "local value=\"${1}\"" # Needed eval so variable variables can be processed
-
-	if [[ $value =~ ^-?[0-9]+([.][0-9]+)?$ ]]; then
-		echo 1
-	else
-		echo 0
-	fi
-}
-
 # Usage [ $(IsNumeric $var) -eq 1 ]
 function IsNumeric {
 	local value="${1}"
 
-	if [[ $value =~ ^[0-9]+([.][0-9]+)?$ ]]; then
-		echo 1
+	if type expr > /dev/null 2>&1; then
+		expr "$value" : "^[-+]\?[0-9]*\.\?[0-9]\+$" > /dev/null 2>&1
+		if [ $? -eq 0 ]; then
+			echo 1
+		else
+			echo 0
+		fi
 	else
-		echo 0
+		if [[ $value =~ ^[-+]?[0-9]+([.][0-9]+)?$ ]]; then
+			echo 1
+		else
+			echo 0
+		fi
 	fi
+}
+
+function IsNumericExpand {
+	eval "local value=\"${1}\"" # Needed eval so variable variables can be processed
+
+	echo $(IsNumeric "$value")
+	#	if [[ $value =~ ^-?[0-9]+([.][0-9]+)?$ ]]; then
+	#	echo 1
+	#else
+	#	echo 0
+	#fi
 }
 
 # Function is busybox compatible since busybox ash does not understand direct regex, we use expr
@@ -1874,9 +1884,9 @@ function RsyncPatternsAdd {
 			rest="${rest#*$PATH_SEPARATOR_CHAR}"
 		fi
 			if [ "$RSYNC_PATTERNS" == "" ]; then
-			RSYNC_PATTERNS="--"$patternType"=\"$str\""
+			RSYNC_PATTERNS="--$patternType=\"$str\""
 		else
-			RSYNC_PATTERNS="$RSYNC_PATTERNS --"$patternType"=\"$str\""
+			RSYNC_PATTERNS="$RSYNC_PATTERNS --$patternType=\"$str\""
 		fi
 	done
 	set +f
@@ -1893,7 +1903,7 @@ function RsyncPatternsFromAdd {
 	fi
 
 	if [ -e "$patternFrom" ]; then
-		RSYNC_PATTERNS="$RSYNC_PATTERNS --"$patternType"-from=\"$patternFrom\""
+		RSYNC_PATTERNS="$RSYNC_PATTERNS --$patternType-from=\"$patternFrom\""
 	fi
 }
 
@@ -1983,14 +1993,10 @@ function PostInit {
 	# Define remote commands
 	if [ -f "$SSH_RSA_PRIVATE_KEY" ]; then
 		SSH_CMD="$(type -p ssh) $SSH_COMP -q -i $SSH_RSA_PRIVATE_KEY $SSH_OPTS $REMOTE_USER@$REMOTE_HOST -p $REMOTE_PORT"
-		#WIP
-		#SSH_REVERSE_CMD="$(type -p ssh) $SSH_COMP -q -i $INITIATOR_SSH_RSA_PRIVATE_KEY $SSH_OPTS $INITIATOR_REMOTE_USER@$INITIATOR_REMOTE_HOST -p $INITIATOR_REMOTE_PORT"
 		SCP_CMD="$(type -p scp) $SSH_COMP -q -i $SSH_RSA_PRIVATE_KEY -P $REMOTE_PORT"
 		RSYNC_SSH_CMD="$(type -p ssh) $SSH_COMP -q -i $SSH_RSA_PRIVATE_KEY $SSH_OPTS -p $REMOTE_PORT"
 	elif [ -f "$SSH_PASSWORD_FILE" ]; then
 		SSH_CMD="$(type -p sshpass) -f $SSH_PASSWORD_FILE $(type -p ssh) $SSH_COMP -q $SSH_OPTS $REMOTE_USER@$REMOTE_HOST -p $REMOTE_PORT"
-		#WIP
-		#SSH_REVERSE_CMD="$(type -p sshpass) -f $INITIATOR_SSH_PASSWORD_FILE $(type -p ssh) $SSH_COMP -q $SSH_OPTS $INITIATOR_REMOTE_USER@$INITIATOR_REMOTE_HOST -p $INITIATOR_REMOTE_PORT"
 		SCP_CMD="$(type -p sshpass) -f $SSH_PASSWORD_FILE $(type -p scp) $SSH_COMP -q -P $REMOTE_PORT"
 		RSYNC_SSH_CMD="$(type -p sshpass) -f $SSH_PASSWORD_FILE $(type -p ssh) $SSH_COMP -q $SSH_OPTS -p $REMOTE_PORT"
 	else
@@ -2221,7 +2227,7 @@ function VerComp () {
 		return 1
 	fi
 
-	if [[ $1 == $2 ]]
+	if [[ "$1" == "$2" ]]
 		then
 			echo 0
 		return
@@ -3580,6 +3586,15 @@ function conflictList {
 
 		join -j 1 -t ';' -o 1.1,1.2,1.3,2.2,2.3 "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.${INITIATOR[$__type]}.$SCRIPT_PID.$TSTAMP" "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.${TARGET[$__type]}.$SCRIPT_PID.$TSTAMP" > "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.compare.$SCRIPT_PID.$TSTAMP"
 		retval=$?
+
+		#WIP
+		if [ $TRAVIS_RUN == true ]; then
+			echo "conflictList debug retval=$retval"
+			cat "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.${INITIATOR[$__type]}.$SCRIPT_PID.$TSTAMP"
+			cat "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.${TARGET[$__type]}.$SCRIPT_PID.$TSTAMP"
+			cat "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.compare.$SCRIPT_PID.$TSTAMP"
+		fi
+
 		if [ $retval -ne 0 ]; then
 			Logger "Cannot create conflict list file." "ERROR"
 			return $retval
@@ -5169,6 +5184,12 @@ function LogConflicts {
 	local subject
 	local body
 
+	#WIP
+	if [ $TRAVIS_RUN == true ]; then
+		cat "$RUN_DIR/$PROGRAM.conflictList.compare.$SCRIPT_PID.$TSTAMP"
+	fi
+
+
 	# We keep this in a separate if check because of the subshell used for Logger with _LOGGER_PREFIX
 	if [ -f "$RUN_DIR/$PROGRAM.conflictList.compare.$SCRIPT_PID.$TSTAMP" ]; then
 		Logger "File conflicts: INITIATOR << >> TARGET" "ALWAYS"
@@ -5176,6 +5197,7 @@ function LogConflicts {
 
 	(
 	_LOGGER_PREFIX=""
+
 	if [ -f "$RUN_DIR/$PROGRAM.conflictList.compare.$SCRIPT_PID.$TSTAMP" ]; then
 		echo "" > "${INITIATOR[$__replicaDir]}${INITIATOR[$__stateDir]}/${INITIATOR[$__conflictListFile]}"
 		while read -r line; do

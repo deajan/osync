@@ -2,17 +2,19 @@
 
 #TODO treeList, deleteList, _getFileCtimeMtime, conflictList should be called without having statedir informed. Just give the full path ?
 #Check dryruns with nosuffix mode for timestampList
+#WIP: currently TRAVIS_RUN debug lines in n_osync and run_tests for conflictLog
+
 
 PROGRAM="osync" # Rsync based two way sync engine with fault tolerance
 AUTHOR="(C) 2013-2018 by Orsiris de Jong"
 CONTACT="http://www.netpower.fr/osync - ozy@netpower.fr"
 PROGRAM_VERSION=1.3.0-beta1
-PROGRAM_BUILD=2018100105
+PROGRAM_BUILD=2018100106
 IS_STABLE=no
 
 
 _OFUNCTIONS_VERSION=2.3.0-RC1
-_OFUNCTIONS_BUILD=2018100103
+_OFUNCTIONS_BUILD=2018100105
 _OFUNCTIONS_BOOTSTRAP=true
 
 ## To use in a program, define the following variables:
@@ -98,7 +100,6 @@ else
 	RUN_DIR=.
 fi
 
-#### PoorMansRandomGenerator SUBSET ####
 # Get a random number on Windows BusyBox alike, also works on most Unixes
 function PoorMansRandomGenerator {
         local digits="${1}" # The number of digits to generate
@@ -113,7 +114,6 @@ function PoorMansRandomGenerator {
                 fi
         done
 }
-#### PoorMansRandomGenerator SUBSET END ####
 
 # Initial TSTMAP value before function declaration
 TSTAMP=$(date '+%Y%m%dT%H%M%S').$(PoorMansRandomGenerator 4)
@@ -1729,9 +1729,9 @@ function RsyncPatternsAdd {
 			rest="${rest#*$PATH_SEPARATOR_CHAR}"
 		fi
 			if [ "$RSYNC_PATTERNS" == "" ]; then
-			RSYNC_PATTERNS="--"$patternType"=\"$str\""
+			RSYNC_PATTERNS="--$patternType=\"$str\""
 		else
-			RSYNC_PATTERNS="$RSYNC_PATTERNS --"$patternType"=\"$str\""
+			RSYNC_PATTERNS="$RSYNC_PATTERNS --$patternType=\"$str\""
 		fi
 	done
 	set +f
@@ -1747,7 +1747,7 @@ function RsyncPatternsFromAdd {
 	fi
 
 	if [ -e "$patternFrom" ]; then
-		RSYNC_PATTERNS="$RSYNC_PATTERNS --"$patternType"-from=\"$patternFrom\""
+		RSYNC_PATTERNS="$RSYNC_PATTERNS --$patternType-from=\"$patternFrom\""
 	fi
 }
 
@@ -1834,14 +1834,10 @@ function PostInit {
 	# Define remote commands
 	if [ -f "$SSH_RSA_PRIVATE_KEY" ]; then
 		SSH_CMD="$(type -p ssh) $SSH_COMP -q -i $SSH_RSA_PRIVATE_KEY $SSH_OPTS $REMOTE_USER@$REMOTE_HOST -p $REMOTE_PORT"
-		#WIP
-		#SSH_REVERSE_CMD="$(type -p ssh) $SSH_COMP -q -i $INITIATOR_SSH_RSA_PRIVATE_KEY $SSH_OPTS $INITIATOR_REMOTE_USER@$INITIATOR_REMOTE_HOST -p $INITIATOR_REMOTE_PORT"
 		SCP_CMD="$(type -p scp) $SSH_COMP -q -i $SSH_RSA_PRIVATE_KEY -P $REMOTE_PORT"
 		RSYNC_SSH_CMD="$(type -p ssh) $SSH_COMP -q -i $SSH_RSA_PRIVATE_KEY $SSH_OPTS -p $REMOTE_PORT"
 	elif [ -f "$SSH_PASSWORD_FILE" ]; then
 		SSH_CMD="$(type -p sshpass) -f $SSH_PASSWORD_FILE $(type -p ssh) $SSH_COMP -q $SSH_OPTS $REMOTE_USER@$REMOTE_HOST -p $REMOTE_PORT"
-		#WIP
-		#SSH_REVERSE_CMD="$(type -p sshpass) -f $INITIATOR_SSH_PASSWORD_FILE $(type -p ssh) $SSH_COMP -q $SSH_OPTS $INITIATOR_REMOTE_USER@$INITIATOR_REMOTE_HOST -p $INITIATOR_REMOTE_PORT"
 		SCP_CMD="$(type -p sshpass) -f $SSH_PASSWORD_FILE $(type -p scp) $SSH_COMP -q -P $REMOTE_PORT"
 		RSYNC_SSH_CMD="$(type -p sshpass) -f $SSH_PASSWORD_FILE $(type -p ssh) $SSH_COMP -q $SSH_OPTS -p $REMOTE_PORT"
 	else
@@ -2070,7 +2066,7 @@ function VerComp () {
 		return 1
 	fi
 
-	if [[ $1 == $2 ]]
+	if [[ "$1" == "$2" ]]
 		then
 			echo 0
 		return
@@ -3393,6 +3389,15 @@ function conflictList {
 
 		join -j 1 -t ';' -o 1.1,1.2,1.3,2.2,2.3 "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.${INITIATOR[$__type]}.$SCRIPT_PID.$TSTAMP" "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.${TARGET[$__type]}.$SCRIPT_PID.$TSTAMP" > "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.compare.$SCRIPT_PID.$TSTAMP"
 		retval=$?
+
+		#WIP
+		if [ $TRAVIS_RUN == true ]; then
+			echo "conflictList debug retval=$retval"
+			cat "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.${INITIATOR[$__type]}.$SCRIPT_PID.$TSTAMP"
+			cat "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.${TARGET[$__type]}.$SCRIPT_PID.$TSTAMP"
+			cat "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.compare.$SCRIPT_PID.$TSTAMP"
+		fi
+
 		if [ $retval -ne 0 ]; then
 			Logger "Cannot create conflict list file." "ERROR"
 			return $retval
@@ -4947,6 +4952,12 @@ function LogConflicts {
 	local subject
 	local body
 
+	#WIP
+	if [ $TRAVIS_RUN == true ]; then
+		cat "$RUN_DIR/$PROGRAM.conflictList.compare.$SCRIPT_PID.$TSTAMP"
+	fi
+
+
 	# We keep this in a separate if check because of the subshell used for Logger with _LOGGER_PREFIX
 	if [ -f "$RUN_DIR/$PROGRAM.conflictList.compare.$SCRIPT_PID.$TSTAMP" ]; then
 		Logger "File conflicts: INITIATOR << >> TARGET" "ALWAYS"
@@ -4954,6 +4965,7 @@ function LogConflicts {
 
 	(
 	_LOGGER_PREFIX=""
+
 	if [ -f "$RUN_DIR/$PROGRAM.conflictList.compare.$SCRIPT_PID.$TSTAMP" ]; then
 		echo "" > "${INITIATOR[$__replicaDir]}${INITIATOR[$__stateDir]}/${INITIATOR[$__conflictListFile]}"
 		while read -r line; do
