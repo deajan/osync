@@ -13,21 +13,9 @@ PROGRAM_BUILD=2018100106
 IS_STABLE=no
 
 
-_OFUNCTIONS_VERSION=2.3.0-RC1
-_OFUNCTIONS_BUILD=2018100105
+_OFUNCTIONS_VERSION=2.3.0-RC2
+_OFUNCTIONS_BUILD=2018100204
 _OFUNCTIONS_BOOTSTRAP=true
-
-## To use in a program, define the following variables:
-## PROGRAM=program-name
-## INSTANCE_ID=program-instance-name
-## _DEBUG=yes/no
-## _LOGGER_SILENT=true/false
-## _LOGGER_VERBOSE=true/false
-## _LOGGER_ERR_ONLY=true/false
-## _LOGGER_PREFIX="date"/"time"/""
-
-## Logger sets {ERROR|WARN}_ALERT variable when called with critical / error / warn loglevel
-## When called from subprocesses, variable of main process cannot be set. Status needs to be get via $RUN_DIR/$PROGRAM.Logger.{error|warn}.$SCRIPT_PID.$TSTAMP
 
 if ! type "$BASH" > /dev/null; then
 	echo "Please run this script only with bash shell. Tested on bash >= 3.2"
@@ -100,7 +88,31 @@ else
 	RUN_DIR=.
 fi
 
-# Get a random number on Windows BusyBox alike, also works on most Unixes
+# Get a random number on Windows BusyBox alike, also works on most Unixes that have dd, if dd is not found, then return $RANDOM
+function PoorMansRandomGenerator {
+	local digits="${1}" # The number of digits to generate
+	local number
+	local isFirst=true
+
+	if type dd >/dev/null 2>&1; then
+
+		# Some read bytes can't be used, se we read twice the number of required bytes
+		dd if=/dev/urandom bs=$digits count=2 2> /dev/null | while read -r -n1 char; do
+			if [ $isFirst == false ] || [ $(printf "%d" "'$char") != "0" ]; then
+				number=$number$(printf "%d" "'$char")
+				isFirst=false
+			fi
+			if [ ${#number} -ge $digits ]; then
+				echo ${number:0:$digits}
+				break;
+			fi
+		done
+	elif [ "$RANDOM" -ne 0 ]; then
+		 echo $RANDOM
+	else
+		Logger "Cannot generate random number." "ERROR"
+	fi
+}
 function PoorMansRandomGenerator {
         local digits="${1}" # The number of digits to generate
         local number
@@ -124,12 +136,6 @@ ALERT_LOG_FILE="$RUN_DIR/$PROGRAM.$SCRIPT_PID.$TSTAMP.last.log"
 # Set error exit code if a piped command fails
 set -o pipefail
 set -o errtrace
-
-
-function Dummy {
-
-	sleep $SLEEP_TIME
-}
 
 
 # Array to string converter, see http://stackoverflow.com/questions/1527049/bash-join-elements-of-an-array
@@ -364,6 +370,34 @@ function KillAllChilds {
 	done
 	return $errorcount
 }
+
+function CleanUp {
+
+	if [ "$_DEBUG" != "yes" ]; then
+		rm -f "$RUN_DIR/$PROGRAM."*".$SCRIPT_PID.$TSTAMP"
+		# Fix for sed -i requiring backup extension for BSD & Mac (see all sed -i statements)
+		rm -f "$RUN_DIR/$PROGRAM."*".$SCRIPT_PID.$TSTAMP.tmp"
+	fi
+}
+
+function GenericTrapQuit {
+	local exitcode=0
+
+	# Get ERROR / WARN alert flags from subprocesses that call Logger
+	if [ -f "$RUN_DIR/$PROGRAM.Logger.warn.$SCRIPT_PID.$TSTAMP" ]; then
+		WARN_ALERT=true
+		exitcode=2
+	fi
+	if [ -f "$RUN_DIR/$PROGRAM.Logger.error.$SCRIPT_PID.$TSTAMP" ]; then
+		ERROR_ALERT=true
+		exitcode=1
+	fi
+
+	CleanUp
+	exit $exitcode
+}
+
+
 
 # osync/obackup/pmocr script specific mail alert function, use SendEmail function for generic mail sending
 function SendAlert {
@@ -1139,15 +1173,6 @@ function ExecTasks {
 	fi
 }
 
-function CleanUp {
-
-	if [ "$_DEBUG" != "yes" ]; then
-		rm -f "$RUN_DIR/$PROGRAM."*".$SCRIPT_PID.$TSTAMP"
-		# Fix for sed -i requiring backup extension for BSD & Mac (see all sed -i statements)
-		rm -f "$RUN_DIR/$PROGRAM."*".$SCRIPT_PID.$TSTAMP.tmp"
-	fi
-}
-
 # Usage: var=$(StripSingleQuotes "$var")
 function StripSingleQuotes {
 	local string="${1}"
@@ -1186,25 +1211,35 @@ function EscapeDoubleQuotes {
 	echo "${value//\"/\\\"}"
 }
 
-function IsNumericExpand {
-	eval "local value=\"${1}\"" # Needed eval so variable variables can be processed
-
-	if [[ $value =~ ^-?[0-9]+([.][0-9]+)?$ ]]; then
-		echo 1
-	else
-		echo 0
-	fi
-}
-
 # Usage [ $(IsNumeric $var) -eq 1 ]
 function IsNumeric {
 	local value="${1}"
 
-	if [[ $value =~ ^[0-9]+([.][0-9]+)?$ ]]; then
-		echo 1
+	if type expr > /dev/null 2>&1; then
+		expr "$value" : "^[-+]\?[0-9]*\.\?[0-9]\+$" > /dev/null 2>&1
+		if [ $? -eq 0 ]; then
+			echo 1
+		else
+			echo 0
+		fi
 	else
-		echo 0
+		if [[ $value =~ ^[-+]?[0-9]+([.][0-9]+)?$ ]]; then
+			echo 1
+		else
+			echo 0
+		fi
 	fi
+}
+
+function IsNumericExpand {
+	eval "local value=\"${1}\"" # Needed eval so variable variables can be processed
+
+	echo $(IsNumeric "$value")
+	#	if [[ $value =~ ^-?[0-9]+([.][0-9]+)?$ ]]; then
+	#	echo 1
+	#else
+	#	echo 0
+	#fi
 }
 
 # Function is busybox compatible since busybox ash does not understand direct regex, we use expr

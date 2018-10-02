@@ -92,7 +92,31 @@ else
 	RUN_DIR=.
 fi
 
-# Get a random number on Windows BusyBox alike, also works on most Unixes
+# Get a random number on Windows BusyBox alike, also works on most Unixes that have dd, if dd is not found, then return $RANDOM
+function PoorMansRandomGenerator {
+	local digits="${1}" # The number of digits to generate
+	local number
+	local isFirst=true
+
+	if type dd >/dev/null 2>&1; then
+
+		# Some read bytes can't be used, se we read twice the number of required bytes
+		dd if=/dev/urandom bs=$digits count=2 2> /dev/null | while read -r -n1 char; do
+			if [ $isFirst == false ] || [ $(printf "%d" "'$char") != "0" ]; then
+				number=$number$(printf "%d" "'$char")
+				isFirst=false
+			fi
+			if [ ${#number} -ge $digits ]; then
+				echo ${number:0:$digits}
+				break;
+			fi
+		done
+	elif [ "$RANDOM" -ne 0 ]; then
+		 echo $RANDOM
+	else
+		Logger "Cannot generate random number." "ERROR"
+	fi
+}
 function PoorMansRandomGenerator {
         local digits="${1}" # The number of digits to generate
         local number
