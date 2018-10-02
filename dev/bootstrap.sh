@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-## dev pre-processor bootstrap rev 2018093001
+## dev pre-processor bootstrap rev 2018100201
 ## Yeah !!! A really tech sounding name... In fact it's just include emulation in bash
 
 function Usage {
@@ -44,7 +44,7 @@ else
 	__PREPROCESSOR_Constants
 
 	if [ ! -f "$__PREPROCESSOR_PROGRAM_EXEC" ]; then
-		echo "Cannot find file [n_$bootstrapProgram.sh]."
+		echo "Cannot find file $__PREPROCESSOR_PROGRAM executable [n_$bootstrapProgram.sh]."
 		exit 1
 	fi
 fi
