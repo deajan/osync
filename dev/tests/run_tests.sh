@@ -339,6 +339,14 @@ function test_LargeFileSet () {
 
 		#WIP
 		echo "ls -alh \"$OSYNC_EXECUTABLE\""
+		echo "---------------------------"
+
+		ls -lah $FAKEROOT
+		ls -lah $FAKEROOT/usr
+		ls -lah $FAKEROOT/usr/local
+		ls -lah $FAKEROOT/usr/local/bin
+	
+		echo "---------------------------"
 		ls -alh "$OSYNC_EXECUTABLE"
 		"$OSYNC_EXECUTABLE"
 		$SUDO_CMD $OSYNC_EXECUTABLE
