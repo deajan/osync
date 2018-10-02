@@ -3,16 +3,6 @@
 
 #TODO: ExecTasks postponed arrays / files grow a lot. Consider having them "rolling"
 #TODO: command line arguments don't take -AaqV for example
-#TODO: Vercomp, IsNumeric, IsNumericExpand are not busybux ash compatible
-
-#### OFUNCTIONS FULL SUBSET ####
-#### OFUNCTIONS MINI SUBSET ####
-#### OFUNCTIONS MICRO SUBSET ####
-_OFUNCTIONS_VERSION=2.3.0-RC2
-_OFUNCTIONS_BUILD=2018100202
-#### _OFUNCTIONS_BOOTSTRAP SUBSET ####
-_OFUNCTIONS_BOOTSTRAP=true
-#### _OFUNCTIONS_BOOTSTRAP SUBSET END ####
 
 ####################################################################################################################################################################
 ## To use in a program, define the following variables:
@@ -28,11 +18,23 @@ _OFUNCTIONS_BOOTSTRAP=true
 ## Also, set the following trap in order to clean temporary files
 ## trap GenericTrapQuit TERM EXIT HUP QUIT
 
+## Then simply source ofunctions with
+## source "./ofunctions.sh"
+
 ## Why use GenericTrapQuit in order to catch exitcode ?
 ## Logger sets {ERROR|WARN}_ALERT variable when called with critical / error / warn loglevel
 ## When called from subprocesses, variable of main process cannot be set. Status needs to be get via $RUN_DIR/$PROGRAM.Logger.{error|warn}.$SCRIPT_PID.$TSTAMP
 
 ####################################################################################################################################################################
+
+#### OFUNCTIONS FULL SUBSET ####
+#### OFUNCTIONS MINI SUBSET ####
+#### OFUNCTIONS MICRO SUBSET ####
+_OFUNCTIONS_VERSION=2.3.0-RC2
+_OFUNCTIONS_BUILD=2018100204
+#### _OFUNCTIONS_BOOTSTRAP SUBSET ####
+_OFUNCTIONS_BOOTSTRAP=true
+#### _OFUNCTIONS_BOOTSTRAP SUBSET END ####
 
 if ! type "$BASH" > /dev/null; then
 	echo "Please run this script only with bash shell. Tested on bash >= 3.2"
@@ -1265,25 +1267,35 @@ function EscapeDoubleQuotes {
 	echo "${value//\"/\\\"}"
 }
 
-function IsNumericExpand {
-	eval "local value=\"${1}\"" # Needed eval so variable variables can be processed
-
-	if [[ $value =~ ^-?[0-9]+([.][0-9]+)?$ ]]; then
-		echo 1
-	else
-		echo 0
-	fi
-}
-
 # Usage [ $(IsNumeric $var) -eq 1 ]
 function IsNumeric {
 	local value="${1}"
 
-	if [[ $value =~ ^[0-9]+([.][0-9]+)?$ ]]; then
-		echo 1
+	if type expr > /dev/null 2>&1; then
+		expr "$value" : ""^[-+]\?[0-9]*\.\?[0-9]\+$" > /dev/null 2>&1
+		if [ $? -eq 0 ]; then
+			echo 1
+		else
+			echo 0
+		fi
 	else
-		echo 0
+		if [[ $value =~ ^[-+]?[0-9]+([.][0-9]+)?$ ]]; then
+			echo 1
+		else
+			echo 0
+		fi
 	fi
+}
+
+function IsNumericExpand {
+	eval "local value=\"${1}\"" # Needed eval so variable variables can be processed
+
+	echo $(IsNumeric "$value")
+	#	if [[ $value =~ ^-?[0-9]+([.][0-9]+)?$ ]]; then
+	#	echo 1
+	#else
+	#	echo 0
+	#fi
 }
 
 #### IsInteger SUBSET ####
