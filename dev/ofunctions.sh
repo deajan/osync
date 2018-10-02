@@ -8,8 +8,8 @@
 #### OFUNCTIONS FULL SUBSET ####
 #### OFUNCTIONS MINI SUBSET ####
 #### OFUNCTIONS MICRO SUBSET ####
-_OFUNCTIONS_VERSION=2.3.0-RC1
-_OFUNCTIONS_BUILD=2018100201
+_OFUNCTIONS_VERSION=2.3.0-RC2
+_OFUNCTIONS_BUILD=2018100202
 #### _OFUNCTIONS_BOOTSTRAP SUBSET ####
 _OFUNCTIONS_BOOTSTRAP=true
 #### _OFUNCTIONS_BOOTSTRAP SUBSET END ####
@@ -137,13 +137,6 @@ ALERT_LOG_FILE="$RUN_DIR/$PROGRAM.$SCRIPT_PID.$TSTAMP.last.log"
 # Set error exit code if a piped command fails
 set -o pipefail
 set -o errtrace
-
-
-function Dummy {
-	__CheckArguments 0 $# "$@"	#__WITH_PARANOIA_DEBUG
-
-	sleep $SLEEP_TIME
-}
 
 #### Logger SUBSET ####
 #### RemoteLogger SUBSET ####
