@@ -10,7 +10,7 @@ PROGRAM_BINARY=$PROGRAM".sh"
 PROGRAM_BATCH=$PROGRAM"-batch.sh"
 SSH_FILTER="ssh_filter.sh"
 
-SCRIPT_BUILD=2018100204
+SCRIPT_BUILD=2018100205
 INSTANCE_ID="installer-$SCRIPT_BUILD"
 
 ## osync / obackup / pmocr / zsnap install script
@@ -87,7 +87,6 @@ else
 fi
 
 include #### UrlEncode SUBSET ####
-include #### IsInteger SUBSET ####
 include #### GetLocalOS SUBSET ####
 include #### GetConfFileValue SUBSET ####
 
@@ -159,8 +158,8 @@ function CreateDir {
 		fi
 	fi
 
-	if [ "$(IsNumeric $dirMod)" -eq 0 ]; then
-		chmod -R "$fileMod" "$dir"
+	if [ "$(IsInteger $dirMod)" -eq 1 ]; then
+		chmod -R "$dirMod" "$dir"
 		if [ $? != 0 ]; then
 			Logger "Cannot set directory permissions of [$dir] to [$dirMod]." "SIMPLE"
 			exit 1
@@ -170,12 +169,13 @@ function CreateDir {
 	elif [ "$fileMod" != "" ]; then
 		Logger "Bogus filemod [$fileMod] for [$destPath] given." "SIMPLE"
 	fi
-		if [ "$dirUser" != "" ]; then
+
+	if [ "$dirUser" != "" ]; then
 		userGroup="$dirUser"
-			if [ "$dirGroup" != "" ]; then
+		if [ "$dirGroup" != "" ]; then
 			userGroup="$userGroup"":$dirGroup"
 		fi
-			chown "$userGroup" "$dir"
+		chown "$userGroup" "$dir"
 		if [ $? != 0 ]; then
 			Logger "Could not set directory ownership on [$dir] to [$userGroup]." "SIMPLE"
 			exit 1
@@ -214,7 +214,7 @@ function CopyFile {
 		exit 1
 	else
 		Logger "Copied [$sourcePath/$sourceFileName] to [$destPath/$destFileName]." "SIMPLE"
-		if [ "$(IsNumeric $fileMod)" -eq 0 ]; then
+		if [ "$(IsInteger $fileMod)" -eq 1 ]; then
 			chmod "$fileMod" "$destPath/$destFileName"
 			if [ $? != 0 ]; then
 				Logger "Cannot set file permissions of [$destPath/$destFileName] to [$fileMod]." "SIMPLE"
