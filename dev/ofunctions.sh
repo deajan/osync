@@ -1272,7 +1272,7 @@ function IsNumeric {
 	local value="${1}"
 
 	if type expr > /dev/null 2>&1; then
-		expr "$value" : ""^[-+]\?[0-9]*\.\?[0-9]\+$" > /dev/null 2>&1
+		expr "$value" : "^[-+]\?[0-9]*\.\?[0-9]\+$" > /dev/null 2>&1
 		if [ $? -eq 0 ]; then
 			echo 1
 		else
