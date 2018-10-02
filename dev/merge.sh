@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-## MERGE 2018100202
+## MERGE 2018100203
 
 ## Merges ofunctions.sh and n_program.sh into program.sh
 ## Adds installer
@@ -15,9 +15,14 @@ function Usage {
 }
 
 function __PREPROCESSOR_Merge {
-	local PROGRAM="$1"
+	local nPROGRAM="$1"
 
-	VERSION=$(grep "PROGRAM_VERSION=" n_$PROGRAM.sh)
+	if [ -f "$nPROGRAM" ]; then
+		Logger "$nPROGRAM is not found in local path." "CRITICAL"
+		exit 1
+	fi
+
+	VERSION=$(grep "PROGRAM_VERSION=" n_$nPROGRAM.sh)
 	VERSION=${VERSION#*=}
 	__PREPROCESSOR_Constants
 
@@ -27,16 +32,16 @@ function __PREPROCESSOR_Merge {
 		exit 1
 	fi
 
-	__PREPROCESSOR_Unexpand "n_$PROGRAM.sh" "debug_$PROGRAM.sh"
+	__PREPROCESSOR_Unexpand "n_$nPROGRAM.sh" "debug_$nPROGRAM.sh"
 
 	for subset in "${__PREPROCESSOR_SUBSETS[@]}"; do
-		__PREPROCESSOR_MergeSubset "$subset" "${subset//SUBSET/SUBSET END}" "ofunctions.sh" "debug_$PROGRAM.sh"
+		__PREPROCESSOR_MergeSubset "$subset" "${subset//SUBSET/SUBSET END}" "ofunctions.sh" "debug_$nPROGRAM.sh"
 	done
 
-	__PREPROCESSOR_CleanDebug "debug_$PROGRAM.sh" "$PROGRAM.sh"
-	rm -f tmp_$PROGRAM.sh
+	__PREPROCESSOR_CleanDebug "debug_$nPROGRAM.sh" "$nPROGRAM.sh"
+	rm -f tmp_$nPROGRAM.sh
 	if [ $? != 0 ]; then
-		Logger "Cannot remove tmp_$PROGRAM.sh" "SIMPLE"
+		Logger "Cannot remove tmp_$nPROGRAM.sh" "SIMPLE"
 		exit 1
 	fi
 }
@@ -152,9 +157,9 @@ function __PREPROCESSOR_CleanDebug {
 }
 
 function __PREPROCESSOR_CopyCommons {
-	local PROGRAM="$1"
+	local nPROGRAM="$1"
 
-	sed "s/\[prgname\]/$PROGRAM/g" common_install.sh > ../install.sh
+	sed "s/\[prgname\]/$nPROGRAM/g" common_install.sh > ../install.sh
 	if [ $? != 0 ]; then
 		Logger "Cannot assemble install." "SIMPLE"
 		exit 1
@@ -173,28 +178,24 @@ function __PREPROCESSOR_CopyCommons {
 	#fi
 
 	if [ -f "common_batch.sh" ]; then
-		sed "s/\[prgname\]/$PROGRAM/g" common_batch.sh > ../$PROGRAM-batch.sh
+		sed "s/\[prgname\]/$nPROGRAM/g" common_batch.sh > ../$nPROGRAM-batch.sh
 		if [ $? != 0 ]; then
 			Logger "Cannot assemble batch runner." "SIMPLE"
 			exit 1
 		fi
 
 		for subset in "${__PREPROCESSOR_SUBSETS[@]}"; do
-			__PREPROCESSOR_MergeSubset "$subset" "${subset//SUBSET/SUBSET END}" "ofunctions.sh" "../$PROGRAM-batch.sh"
+			__PREPROCESSOR_MergeSubset "$subset" "${subset//SUBSET/SUBSET END}" "ofunctions.sh" "../$nPROGRAM-batch.sh"
 		done
 
-		__PREPROCESSOR_CleanDebug "../$PROGRAM-batch.sh"
+		__PREPROCESSOR_CleanDebug "../$nPROGRAM-batch.sh"
 	fi
-
-	#rm -f ../tmp_install.sh
-	#if [ $? != 0 ]; then
-	#	Logger "Cannot chmod $PROGRAM.sh" "SIMPLE"
-	#	exit 1
-	#fi
 }
 
 # If sourced don't do anything
 if [ "$(basename $0)" == "merge.sh" ]; then
+	trap GenericTrapQuit TERM EXIT HUP QUIT
+
 	if [ "$1" == "osync" ]; then
 		__PREPROCESSOR_Merge osync
 		__PREPROCESSOR_CopyCommons osync
