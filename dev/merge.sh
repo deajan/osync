@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-## MERGE 2018100102
+## MERGE 2018100201
 
 ## Merges ofunctions.sh and n_program.sh into program.sh
 ## Adds installer
@@ -160,6 +160,11 @@ function __PREPROCESSOR_CopyCommons {
 			Logger "Cannot assemble batch runner." "SIMPLE"
 			exit 1
 		fi
+
+		for subset in "${__PREPROCESSOR_SUBSETS[@]}"; do
+			__PREPROCESSOR_MergeSubset "$subset" "${subset//SUBSET/SUBSET END}" "ofunctions.sh" "../$PROGRAM-batch.sh"
+		done
+
 		chmod +x ../$PROGRAM-batch.sh
 		if [ $? != 0 ]; then
 			Logger "Cannot chmod $PROGRAM-batch.sh" "SIMPLE"
