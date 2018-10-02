@@ -317,9 +317,6 @@ function test_Merge () {
 	# Don't use SetConfFileValue here since for whatever reason Travis does not like creating a sed temporary file in $FAKEROOT
 
 	if [ "$TRAVIS_RUN" == true ]; then
-		echo "$SUDO_CMD ls -lah \"/$FAKEROOT/usr/local/bin\""
-		$SUDO_CMD ls -lah "/$FAKEROOT/usr/local/bin"
-		
 		$SUDO_CMD sed -i.tmp 's/^IS_STABLE=.*/IS_STABLE=yes/' "$OSYNC_EXECUTABLE"
 	else
 		sed -i.tmp 's/^IS_STABLE=.*/IS_STABLE=yes/' "$OSYNC_EXECUTABLE"
@@ -336,20 +333,6 @@ function test_LargeFileSet () {
 
 		PrepareLocalDirs
 		DownloadLargeFileSet "$INITIATOR_DIR"
-
-		#WIP
-		echo "ls -alh \"$OSYNC_EXECUTABLE\""
-		echo "---------------------------"
-
-		ls -lah $FAKEROOT
-		ls -lah $FAKEROOT/usr
-		ls -lah $FAKEROOT/usr/local
-		ls -lah $FAKEROOT/usr/local/bin
-	
-		echo "---------------------------"
-		ls -alh "$OSYNC_EXECUTABLE"
-		"$OSYNC_EXECUTABLE"
-		$SUDO_CMD $OSYNC_EXECUTABLE
 
 		REMOTE_HOST_PING=$RHOST_PING $OSYNC_EXECUTABLE $i
 		assertEquals "LargeFileSet test with parameters [$i]." "0" $?
