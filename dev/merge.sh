@@ -30,7 +30,7 @@ function __PREPROCESSOR_Merge {
 		__PREPROCESSOR_MergeSubset "$subset" "${subset//SUBSET/SUBSET END}" "ofunctions.sh" "debug_$PROGRAM.sh"
 	done
 
-	__PREPROCESSOR_CleanDebug "$PROGRAM"
+	__PREPROCESSOR_CleanDebug "debug_$PROGRAM.sh" "$PROGRAM.sh"
 	rm -f tmp_$PROGRAM.sh
 	if [ $? != 0 ]; then
 		Logger "Cannot remove tmp_$PROGRAM.sh" "SIMPLE"
@@ -112,27 +112,35 @@ function __PREPROCESSOR_MergeSubset {
 }
 
 function __PREPROCESSOR_CleanDebug {
-	local PROGRAM="$1"
+	local source="${1}"
+	local destination="${2:-$PROGRAM.merge}"
 
-	sed '/'$PARANOIA_DEBUG_BEGIN'/,/'$PARANOIA_DEBUG_END'/d' debug_$PROGRAM.sh | grep -v "$PARANOIA_DEBUG_LINE" > ../$PROGRAM.sh
+	sed '/'$PARANOIA_DEBUG_BEGIN'/,/'$PARANOIA_DEBUG_END'/d' "$source" | grep -v "$PARANOIA_DEBUG_LINE" > "$destination.tmp"
 	if [ $? != 0 ]; then
 		Logger "Cannot remove PARANOIA_DEBUG code from standard build." "SIMPLE"
 		exit 1
+	else
+		mv -f "$destination.tmp" "$destination"
+		if [ $? -ne 0 ]; then
+			Logger "Cannot move [$destination.tmp] to [$destination]." "SIMPLE"
+			exit 1
+		fi
 	fi
 
-	chmod +x "debug_$PROGRAM.sh"
+	chmod +x "$source"
 	if [ $? != 0 ]; then
-		Logger "Cannot chmod debug_$PROGRAM.sh" "SIMPLE"
+		Logger "Cannot chmod [$source]." "SIMPLE"
 		exit 1
 	else
-		Logger "Prepared ./debug_$PROGRAM.sh" "SIMPLE"
+		Logger "Prepared [$source]." "SIMPLE"
 	fi
-	chmod +x "../$PROGRAM.sh"
+
+	chmod +x "$destination"
 	if [ $? != 0 ]; then
-		Logger "Cannot chmod $PROGRAM.sh" "SIMPLE"
+		Logger "Cannot chmod [$destination]." "SIMPLE"
 		exit 1
 	else
-		Logger "Prepared ../$PROGRAM.sh" "SIMPLE"
+		Logger "Prepared [$destination]." "SIMPLE"
 	fi
 }
 
@@ -149,11 +157,14 @@ function __PREPROCESSOR_CopyCommons {
 		__PREPROCESSOR_MergeSubset "$subset" "${subset//SUBSET/SUBSET END}" "ofunctions.sh" "../install.sh"
 	done
 
+	__PREPROCESSOR_CleanDebug "../install.sh"
+
 	#sed "s/\[version\]/$VERSION/g" ../tmp_install.sh > ../install.sh
 	#if [ $? != 0 ]; then
 	#	Logger "Cannot change install version." "SIMPLE"
 	#	exit 1
 	#fi
+
 	if [ -f "common_batch.sh" ]; then
 		sed "s/\[prgname\]/$PROGRAM/g" common_batch.sh > ../$PROGRAM-batch.sh
 		if [ $? != 0 ]; then
@@ -165,26 +176,14 @@ function __PREPROCESSOR_CopyCommons {
 			__PREPROCESSOR_MergeSubset "$subset" "${subset//SUBSET/SUBSET END}" "ofunctions.sh" "../$PROGRAM-batch.sh"
 		done
 
-		chmod +x ../$PROGRAM-batch.sh
-		if [ $? != 0 ]; then
-			Logger "Cannot chmod $PROGRAM-batch.sh" "SIMPLE"
-			exit 1
-		else
-			Logger "Prepared ../$PROGRAM-batch.sh" "SIMPLE"
-		fi
+		__PREPROCESSOR_CleanDebug "../$PROGRAM-batch.sh"
 	fi
-	chmod +x ../install.sh
-	if [ $? != 0 ]; then
-		Logger "Cannot chmod install.sh" "SIMPLE"
-		exit 1
-	else
-		Logger "Prepared ../install.sh" "SIMPLE"
-	fi
-	rm -f ../tmp_install.sh
-	if [ $? != 0 ]; then
-		Logger "Cannot chmod $PROGRAM.sh" "SIMPLE"
-		exit 1
-	fi
+
+	#rm -f ../tmp_install.sh
+	#if [ $? != 0 ]; then
+	#	Logger "Cannot chmod $PROGRAM.sh" "SIMPLE"
+	#	exit 1
+	#fi
 }
 
 # If sourced don't do anything
