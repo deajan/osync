@@ -347,6 +347,28 @@ function Logger {
 }
 #### Logger SUBSET END ####
 
+#### IsInteger SUBSET ####
+# Function is busybox compatible since busybox ash does not understand direct regex, we use expr
+function IsInteger {
+	local value="${1}"
+
+	if type expr > /dev/null 2>&1; then
+		expr "$value" : "^[0-9]\+$" > /dev/null 2>&1
+		if [ $? -eq 0 ]; then
+			echo 1
+		else
+			echo 0
+		fi
+	else
+		if [[ $value =~ ^[0-9]+$ ]]; then
+			echo 1
+		else
+			echo 0
+		fi
+	fi
+}
+#### IsInteger SUBSET END ####
+
 # Portable child (and grandchild) kill function tester under Linux, BSD and MacOS X
 function KillChilds {
 	local pid="${1}" # Parent pid to kill childs
@@ -1316,28 +1338,6 @@ function IsNumericExpand {
 
 	echo $(IsNumeric "$value")
 }
-
-#### IsInteger SUBSET ####
-# Function is busybox compatible since busybox ash does not understand direct regex, we use expr
-function IsInteger {
-	local value="${1}"
-
-	if type expr > /dev/null 2>&1; then
-		expr "$value" : "^[0-9]\+$" > /dev/null 2>&1
-		if [ $? -eq 0 ]; then
-			echo 1
-		else
-			echo 0
-		fi
-	else
-		if [[ $value =~ ^[0-9]+$ ]]; then
-			echo 1
-		else
-			echo 0
-		fi
-	fi
-}
-#### IsInteger SUBSET END ####
 
 #### HumanToNumeric SUBSET ####
 # Converts human readable sizes into integer kilobyte sizes
