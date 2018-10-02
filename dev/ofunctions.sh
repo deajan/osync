@@ -31,7 +31,7 @@
 #### OFUNCTIONS MINI SUBSET ####
 #### OFUNCTIONS MICRO SUBSET ####
 _OFUNCTIONS_VERSION=2.3.0-RC2
-_OFUNCTIONS_BUILD=2018100204
+_OFUNCTIONS_BUILD=2018100205
 #### _OFUNCTIONS_BOOTSTRAP SUBSET ####
 _OFUNCTIONS_BOOTSTRAP=true
 #### _OFUNCTIONS_BOOTSTRAP SUBSET END ####
@@ -1315,11 +1315,6 @@ function IsNumericExpand {
 	eval "local value=\"${1}\"" # Needed eval so variable variables can be processed
 
 	echo $(IsNumeric "$value")
-	#	if [[ $value =~ ^-?[0-9]+([.][0-9]+)?$ ]]; then
-	#	echo 1
-	#else
-	#	echo 0
-	#fi
 }
 
 #### IsInteger SUBSET ####
