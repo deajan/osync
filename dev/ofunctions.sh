@@ -116,9 +116,9 @@ fi
 #### PoorMansRandomGenerator SUBSET ####
 # Get a random number on Windows BusyBox alike, also works on most Unixes that have dd, if dd is not found, then return $RANDOM
 function PoorMansRandomGenerator {
-        local digits="${1}" # The number of digits to generate
-        local number
-        local isFirst=true
+	local digits="${1}" # The number of digits to generate
+	local number
+	local isFirst=true
 
 	if type dd >/dev/null 2>&1; then
 
