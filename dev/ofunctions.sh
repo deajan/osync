@@ -7,13 +7,16 @@
 
 #### OFUNCTIONS FULL SUBSET ####
 #### OFUNCTIONS MINI SUBSET ####
+#### OFUNCTIONS MICRO SUBSET ####
 _OFUNCTIONS_VERSION=2.3.0-RC1
-_OFUNCTIONS_BUILD=2018100105
+_OFUNCTIONS_BUILD=2018100201
 #### _OFUNCTIONS_BOOTSTRAP SUBSET ####
 _OFUNCTIONS_BOOTSTRAP=true
 #### _OFUNCTIONS_BOOTSTRAP SUBSET END ####
 
+####################################################################################################################################################################
 ## To use in a program, define the following variables:
+
 ## PROGRAM=program-name
 ## INSTANCE_ID=program-instance-name
 ## _DEBUG=yes/no
@@ -22,8 +25,14 @@ _OFUNCTIONS_BOOTSTRAP=true
 ## _LOGGER_ERR_ONLY=true/false
 ## _LOGGER_PREFIX="date"/"time"/""
 
+## Also, set the following trap in order to clean temporary files
+## trap GenericTrapQuit TERM EXIT HUP QUIT
+
+## Why use GenericTrapQuit in order to catch exitcode ?
 ## Logger sets {ERROR|WARN}_ALERT variable when called with critical / error / warn loglevel
 ## When called from subprocesses, variable of main process cannot be set. Status needs to be get via $RUN_DIR/$PROGRAM.Logger.{error|warn}.$SCRIPT_PID.$TSTAMP
+
+####################################################################################################################################################################
 
 if ! type "$BASH" > /dev/null; then
 	echo "Please run this script only with bash shell. Tested on bash >= 3.2"
@@ -385,6 +394,38 @@ function KillAllChilds {
 	done
 	return $errorcount
 }
+
+#### CleanUp SUBSET ####
+function CleanUp {
+	__CheckArguments 0 $# "$@"	#__WITH_PARANOIA_DEBUG
+
+	if [ "$_DEBUG" != "yes" ]; then
+		rm -f "$RUN_DIR/$PROGRAM."*".$SCRIPT_PID.$TSTAMP"
+		# Fix for sed -i requiring backup extension for BSD & Mac (see all sed -i statements)
+		rm -f "$RUN_DIR/$PROGRAM."*".$SCRIPT_PID.$TSTAMP.tmp"
+	fi
+}
+#### CleanUp SUBSET END ####
+
+function GenericTrapQuit {
+	local exitcode=0
+
+	# Get ERROR / WARN alert flags from subprocesses that call Logger
+	if [ -f "$RUN_DIR/$PROGRAM.Logger.warn.$SCRIPT_PID.$TSTAMP" ]; then
+		WARN_ALERT=true
+		exitcode=2
+	fi
+	if [ -f "$RUN_DIR/$PROGRAM.Logger.error.$SCRIPT_PID.$TSTAMP" ]; then
+		ERROR_ALERT=true
+		exitcode=1
+	fi
+
+	CleanUp
+	exit $exitcode
+}
+
+
+#### OFUNCTIONS MICRO SUBSET END ####
 
 # osync/obackup/pmocr script specific mail alert function, use SendEmail function for generic mail sending
 function SendAlert {
@@ -1190,16 +1231,6 @@ function ExecTasks {
 		return $retval
 	else
 		return $errorcount
-	fi
-}
-
-function CleanUp {
-	__CheckArguments 0 $# "$@"	#__WITH_PARANOIA_DEBUG
-
-	if [ "$_DEBUG" != "yes" ]; then
-		rm -f "$RUN_DIR/$PROGRAM."*".$SCRIPT_PID.$TSTAMP"
-		# Fix for sed -i requiring backup extension for BSD & Mac (see all sed -i statements)
-		rm -f "$RUN_DIR/$PROGRAM."*".$SCRIPT_PID.$TSTAMP.tmp"
 	fi
 }
 
