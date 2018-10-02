@@ -1,5 +1,10 @@
 #!/usr/bin/env bash
 
+# Allows the following environment variables
+# TRAVIS_RUN=[true|false]
+# SSH_PORT=22
+# SKIP_REMOTE=[true|false]
+
 ## On Mac OSX, this needs to be run as root in order to use sudo without password
 ## From current terminal run sudo -s in order to get a new terminal as root
 
@@ -35,6 +40,10 @@
 # on BSD, remount UFS with ACL support using mount -o acls /
 # setfacl needs double ':' to be compatible with both linux and BSD
 # setfacl -m o::rwx file
+
+if [ "$SKIP_REMOTE" = "" ]; then
+	SKIP_REMOTE=false
+fi
 
 # drupal servers are often unreachable for whetever reason or give 0 bytes files
 #LARGE_FILESET_URL="http://ftp.drupal.org/files/projects/drupal-8.2.2.tar.gz"
@@ -215,7 +224,7 @@ function oneTimeSetUp () {
 	osyncDaemonParameters[$__local]="$CONF_DIR/$LOCAL_CONF --on-changes"
 
   # Do not check remote config on msys or cygwin since we don't have a local SSH server
-	if [ "$LOCAL_OS" != "msys" ] && [ "$LOCAL_OS" != "Cygwin" ]; then
+	if [ "$LOCAL_OS" != "msys" ] && [ "$LOCAL_OS" != "Cygwin" ] && [ $SKIP_REMOTE != true ]; then
 		osyncParameters[$__quickRemote]="--initiator=$INITIATOR_DIR --target=ssh://localhost:$SSH_PORT/$TARGET_DIR --rsakey=${HOME}/.ssh/id_rsa_local --instance-id=quickremote --remote-token=SomeAlphaNumericToken9"
 		osyncParameters[$__confRemote]="$CONF_DIR/$REMOTE_CONF"
 
@@ -269,7 +278,9 @@ function oneTimeTearDown () {
 	# Set osync version stable flag back to origin
 	#SetConfFileValue "$OSYNC_DIR/osync.sh" "IS_STABLE" "$OSYNC_IS_STABLE"
 
-	RemoveSSH
+	if [ "$SKIP_REMOTE" != true ]; then
+		RemoveSSH
+	fi
 
 	#TODO: uncomment this when dev is done
 	#rm -rf "$OSYNC_TESTS_DIR"
@@ -306,7 +317,9 @@ function test_Merge () {
 	# Don't use SetConfFileValue here since for whatever reason Travis does not like creating a sed temporary file in $FAKEROOT
 
 	if [ "$TRAVIS_RUN" == true ]; then
-		$SUDO_CMD ls -lah /$FAKEROOT/usr/local/bin
+		echo "$SUDO_CMD ls -lah \"/$FAKEROOT/usr/local/bin\""
+		$SUDO_CMD ls -lah "/$FAKEROOT/usr/local/bin"
+		
 		$SUDO_CMD sed -i.tmp 's/^IS_STABLE=.*/IS_STABLE=yes/' "$OSYNC_EXECUTABLE"
 	else
 		sed -i.tmp 's/^IS_STABLE=.*/IS_STABLE=yes/' "$OSYNC_EXECUTABLE"
@@ -323,6 +336,12 @@ function test_LargeFileSet () {
 
 		PrepareLocalDirs
 		DownloadLargeFileSet "$INITIATOR_DIR"
+
+		#WIP
+		echo "ls -alh \"$OSYNC_EXECUTABLE\""
+		ls -alh "$OSYNC_EXECUTABLE"
+		"$OSYNC_EXECUTABLE"
+		$SUDO_CMD $OSYNC_EXECUTABLE
 
 		REMOTE_HOST_PING=$RHOST_PING $OSYNC_EXECUTABLE $i
 		assertEquals "LargeFileSet test with parameters [$i]." "0" $?
