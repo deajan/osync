@@ -389,7 +389,7 @@ else
 	if [ "$PROGRAM" == "osync" ] || [ "$PROGRAM" == "pmocr" ]; then
 		CopyServiceFiles
 	fi
-	Logger "$PROGRAM installed. Use with $BIN_DIR/$PROGRAM" "SIMPLE"
+	Logger "$PROGRAM installed. Use with $BIN_DIR/$PROGRAM_BINARY" "SIMPLE"
 	if [ "$PROGRAM" == "osync" ] || [ "$PROGRAM" == "obackup" ]; then
 		echo ""
 		Logger "If connecting remotely, consider setup ssh filter to enhance security." "SIMPLE"
