@@ -37,34 +37,7 @@ fi
 
 # No need to edit under this line ##############################################################
 
-function _logger {
-	local value="${1}" # What to log
-	echo -e "$value" >> "$LOG_FILE"
-}
-
-function Logger {
-	local value="${1}" # What to log
-	local level="${2}" # Log level: DEBUG, NOTICE, WARN, ERROR, CRITIAL
-
-	prefix="$(date) - "
-
-	if [ "$level" == "CRITICAL" ]; then
-		_logger "$prefix\e[41m$value\e[0m"
-	elif [ "$level" == "ERROR" ]; then
-		_logger "$prefix\e[91m$value\e[0m"
-	elif [ "$level" == "WARN" ]; then
-		_logger "$prefix\e[93m$value\e[0m"
-	elif [ "$level" == "NOTICE" ]; then
-		_logger "$prefix$value"
-	elif [ "$level" == "DEBUG" ]; then
-		if [ "$DEBUG" == "yes" ]; then
-			_logger "$prefix$value"
-		fi
-	else
-		_logger "\e[41mLogger function called without proper loglevel.\e[0m"
-		_logger "$prefix$value"
-	fi
-}
+include #### Logger SUBSET ####
 
 function CheckEnvironment {
 	## osync / obackup executable full path can be set here if it cannot be found on the system
