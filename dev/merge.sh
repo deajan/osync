@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-## MERGE 2018100203
+## MERGE 2018100204
 
 ## Merges ofunctions.sh and n_program.sh into program.sh
 ## Adds installer
@@ -25,12 +25,6 @@ function __PREPROCESSOR_Merge {
 	VERSION=$(grep "PROGRAM_VERSION=" n_$nPROGRAM.sh)
 	VERSION=${VERSION#*=}
 	__PREPROCESSOR_Constants
-
-	source "ofunctions.sh"
-	if [ $? != 0 ]; then
-		echo "Please run $0 in dev directory with ofunctions.sh"
-		exit 1
-	fi
 
 	__PREPROCESSOR_Unexpand "n_$nPROGRAM.sh" "debug_$nPROGRAM.sh"
 
@@ -194,6 +188,11 @@ function __PREPROCESSOR_CopyCommons {
 
 # If sourced don't do anything
 if [ "$(basename $0)" == "merge.sh" ]; then
+	source "./ofunctions.sh"
+	if [ $? != 0 ]; then
+		echo "Please run $0 in dev directory with ofunctions.sh"
+		exit 1
+	fi
 	trap GenericTrapQuit TERM EXIT HUP QUIT
 
 	if [ "$1" == "osync" ]; then
