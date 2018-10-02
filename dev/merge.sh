@@ -32,12 +32,7 @@ function __PREPROCESSOR_Merge {
 		__PREPROCESSOR_MergeSubset "$subset" "${subset//SUBSET/SUBSET END}" "ofunctions.sh" "debug_$nPROGRAM.sh"
 	done
 
-	__PREPROCESSOR_CleanDebug "debug_$nPROGRAM.sh" "$nPROGRAM.sh"
-	rm -f tmp_$nPROGRAM.sh
-	if [ $? != 0 ]; then
-		Logger "Cannot remove tmp_$nPROGRAM.sh" "SIMPLE"
-		exit 1
-	fi
+	__PREPROCESSOR_CleanDebug "debug_$nPROGRAM.sh" "../$nPROGRAM.sh"
 }
 
 function __PREPROCESSOR_Constants {
@@ -164,12 +159,6 @@ function __PREPROCESSOR_CopyCommons {
 	done
 
 	__PREPROCESSOR_CleanDebug "../install.sh"
-
-	#sed "s/\[version\]/$VERSION/g" ../tmp_install.sh > ../install.sh
-	#if [ $? != 0 ]; then
-	#	Logger "Cannot change install version." "SIMPLE"
-	#	exit 1
-	#fi
 
 	if [ -f "common_batch.sh" ]; then
 		sed "s/\[prgname\]/$nPROGRAM/g" common_batch.sh > ../$nPROGRAM-batch.sh
