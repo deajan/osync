@@ -1,0 +1,15 @@
+## Releases require the following
+
+- Documentation must be up to date
+- grep -Eri "TODO|WIP" osync/* must be run in order to find potential release blockers
+- packaging files must be updated (RHEL / Arch)
+- Before every release, shellcheck must be run
+	- ./shellcheck.sh -e SC2034 -e SC2068 ofunctions.sh
+	- ./shellcheck.sh n_osync.sh
+	- ./shellcheck.sh ../install.sh
+	- ./shellcheck.sh ../osync-batch.sh
+	- ./shellcheck.sh ../ssh_filter.sh
+- Arch repo must be updated
+- Source must be put to download on www.netpower.fr/osync
+- Tests must be run against all supported operating systems
+
