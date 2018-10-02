@@ -9,7 +9,7 @@ PROGRAM="osync" # Rsync based two way sync engine with fault tolerance
 AUTHOR="(C) 2013-2018 by Orsiris de Jong"
 CONTACT="http://www.netpower.fr/osync - ozy@netpower.fr"
 PROGRAM_VERSION=1.3.0-beta1
-PROGRAM_BUILD=2018100106
+PROGRAM_BUILD=2018100201
 IS_STABLE=no
 
 ##### Execution order						#__WITH_PARANOIA_DEBUG
@@ -4780,10 +4780,10 @@ function _SoftDeleteLocal {
 		done < "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.deleteList.$replicaType.$SCRIPT_PID.$TSTAMP"
 
 		$FIND_CMD "$replicaDeletionPath" -type d -empty -ctime +"$changeTime" > "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.deleteList.$replicaType.$SCRIPT_PID.$TSTAMP" 2>> "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.deleteErrors.$replicaType.$SCRIPT_PID.$TSTAMP"
-		while IFS='' read -r file; do
+		while IFS='' read -r directory; do
 			Logger "On $replicaType will delete empty directory [$file]" "VERBOSE"
 			if [ $_DRYRUN == false ]; then
-				rm -f "$file" >> "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.deleteErrors.$replicaType.$SCRIPT_PID.$TSTAMP" 2>&1
+				rm -df "$directory" >> "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.deleteErrors.$replicaType.$SCRIPT_PID.$TSTAMP" 2>&1
 			fi
 		done < "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.deleteList.$replicaType.$SCRIPT_PID.$TSTAMP"
 
@@ -5010,10 +5010,10 @@ if [ -d "$replicaDeletionPath" ]; then
 		done < "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.deleteList.$replicaType.$SCRIPT_PID.$TSTAMP"
 
 		$REMOTE_FIND_CMD "$replicaDeletionPath" -type d -empty -ctime +"$changeTime" > "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.deleteList.$replicaType.$SCRIPT_PID.$TSTAMP" 2>> "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.deleteErrors.$replicaType.$SCRIPT_PID.$TSTAMP"
-		while IFS='' read -r file; do
+		while IFS='' read -r directory; do
 			RemoteLogger "On $replicaType will delete empty directory [$file]" "VERBOSE"
 			if [ $_DRYRUN == false ]; then
-				rm -f "$file" >> "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.deleteErrors.$replicaType.$SCRIPT_PID.$TSTAMP" 2>&1
+				rm -df "$directory" >> "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.deleteErrors.$replicaType.$SCRIPT_PID.$TSTAMP" 2>&1
 			fi
 		done < "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.deleteList.$replicaType.$SCRIPT_PID.$TSTAMP"
 
