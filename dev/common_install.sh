@@ -17,7 +17,7 @@ INSTANCE_ID="installer-$SCRIPT_BUILD"
 ## Tested on RHEL / CentOS 6 & 7, Fedora 23, Debian 7 & 8, Mint 17 and FreeBSD 8, 10 and 11
 ## Please adapt this to fit your distro needs
 
-include #### _OFUNCTIONS_BOOTSTRAP SUBSET ####
+include #### OFUNCTIONS MICRO SUBSET ####
 
 # Get current install.sh path from http://stackoverflow.com/a/246128/2635443
 SCRIPT_PATH="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
@@ -86,26 +86,9 @@ else
 	LOG_FILE="./$PROGRAM-install.log"
 fi
 
-## Default directory where to store temporary run files
-if [ -w /tmp ]; then
-	RUN_DIR=/tmp
-elif [ -w /var/tmp ]; then
-	RUN_DIR=/var/tmp
-else
-	RUN_DIR=.
-fi
-
-SCRIPT_PID=$$
-
-include #### PoorMansRandomGenerator SUBSET ####
-
-TSTAMP=$(date '+%Y%m%dT%H%M%S').$(PoorMansRandomGenerator 4)
-
-include #### Logger SUBSET ####
 include #### UrlEncode SUBSET ####
 include #### GetLocalOS SUBSET ####
 include #### GetConfFileValue SUBSET ####
-include #### CleanUp SUBSET ####
 
 function SetLocalOSSettings {
 	USER=root
