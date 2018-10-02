@@ -10,7 +10,7 @@ PROGRAM_BINARY=$PROGRAM".sh"
 PROGRAM_BATCH=$PROGRAM"-batch.sh"
 SSH_FILTER="ssh_filter.sh"
 
-SCRIPT_BUILD=2018100201
+SCRIPT_BUILD=2018100203
 INSTANCE_ID="installer-$SCRIPT_BUILD"
 
 ## osync / obackup / pmocr / zsnap install script
@@ -144,6 +144,9 @@ function GetInit {
 
 function CreateDir {
 	local dir="${1}"
+	local dirMod="${2}"
+	local dirUser="${3}"
+	local dirGroup="${4}"
 
 	if [ ! -d "$dir" ]; then
 		mkdir -p "$dir"
@@ -152,6 +155,31 @@ function CreateDir {
 		else
 			Logger "Cannot create directory [$dir]." "SIMPLE"
 			exit 1
+		fi
+	fi
+
+	if [ "$(IsNumeric $dirMod)" -eq 0 ]; then
+		chmod -R "$fileMod" "$dir"
+		if [ $? != 0 ]; then
+			Logger "Cannot set directory permissions of [$dir] to [$dirMod]." "SIMPLE"
+			exit 1
+		else
+			Logger "Set directory permissions to [$dirMod] on [$dir]." "SIMPLE"
+		fi
+	elif [ "$fileMod" != "" ]; then
+		Logger "Bogus filemod [$fileMod] for [$destPath] given." "SIMPLE"
+	fi
+		if [ "$dirUser" != "" ]; then
+		userGroup="$dirUser"
+			if [ "$dirGroup" != "" ]; then
+			userGroup="$userGroup"":$dirGroup"
+		fi
+			chown "$userGroup" "$dir"
+		if [ $? != 0 ]; then
+			Logger "Could not set directory ownership on [$dir] to [$userGroup]." "SIMPLE"
+			exit 1
+		else
+			Logger "Set file ownership on [$dir] to [$userGroup]." "SIMPLE"
 		fi
 	fi
 }
@@ -185,7 +213,7 @@ function CopyFile {
 		exit 1
 	else
 		Logger "Copied [$sourcePath/$sourceFileName] to [$destPath/$destFileName]." "SIMPLE"
-		if [ "$fileMod" != "" ]; then
+		if [ "$(IsNumeric $fileMod)" -eq 0 ]; then
 			chmod "$fileMod" "$destPath/$destFileName"
 			if [ $? != 0 ]; then
 				Logger "Cannot set file permissions of [$destPath/$destFileName] to [$fileMod]." "SIMPLE"
@@ -193,6 +221,8 @@ function CopyFile {
 			else
 				Logger "Set file permissions to [$fileMod] on [$destPath/$destFileName]." "SIMPLE"
 			fi
+		elif [ "$fileMod" != "" ]; then
+			Logger "Bogus filemod [$fileMod] for [$destPath] given." "SIMPLE"
 		fi
 
 		if [ "$fileUser" != "" ]; then
@@ -383,7 +413,7 @@ if [ "$ACTION" == "uninstall" ]; then
 	Logger "$PROGRAM uninstalled." "SIMPLE"
 else
 	CreateDir "$CONF_DIR"
-	CreateDir "$BIN_DIR"
+	CreateDir "$BIN_DIR" 755
 	CopyExampleFiles
 	CopyProgram
 	if [ "$PROGRAM" == "osync" ] || [ "$PROGRAM" == "pmocr" ]; then
