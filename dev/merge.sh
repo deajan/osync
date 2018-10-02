@@ -5,6 +5,9 @@
 ## Merges ofunctions.sh and n_program.sh into program.sh
 ## Adds installer
 
+PROGRAM=merge
+INSTANCE_ID=dev
+
 function Usage {
 	echo "Merges ofunctions.sh and n_program.sh into debug_program.sh and ../program.sh"
 	echo "Usage"
@@ -46,6 +49,7 @@ function __PREPROCESSOR_Constants {
 	__PREPROCESSOR_SUBSETS=(
 	'#### OFUNCTIONS FULL SUBSET ####'
 	'#### OFUNCTIONS MINI SUBSET ####'
+	'#### OFUNCTIONS MICRO SUBSET ####'
 	'#### PoorMansRandomGenerator SUBSET ####'
 	'#### _OFUNCTIONS_BOOTSTRAP SUBSET ####'
 	'#### DEBUG SUBSET ####'
@@ -113,7 +117,7 @@ function __PREPROCESSOR_MergeSubset {
 
 function __PREPROCESSOR_CleanDebug {
 	local source="${1}"
-	local destination="${2:-$PROGRAM.merge}"
+	local destination="${2:-$source}"
 
 	sed '/'$PARANOIA_DEBUG_BEGIN'/,/'$PARANOIA_DEBUG_END'/d' "$source" | grep -v "$PARANOIA_DEBUG_LINE" > "$destination.tmp"
 	if [ $? != 0 ]; then
@@ -135,12 +139,15 @@ function __PREPROCESSOR_CleanDebug {
 		Logger "Prepared [$source]." "SIMPLE"
 	fi
 
-	chmod +x "$destination"
-	if [ $? != 0 ]; then
-		Logger "Cannot chmod [$destination]." "SIMPLE"
-		exit 1
-	else
-		Logger "Prepared [$destination]." "SIMPLE"
+	if [ "$source" != "$destination" ]; then
+
+		chmod +x "$destination"
+		if [ $? != 0 ]; then
+			Logger "Cannot chmod [$destination]." "SIMPLE"
+			exit 1
+		else
+			Logger "Prepared [$destination]." "SIMPLE"
+		fi
 	fi
 }
 
