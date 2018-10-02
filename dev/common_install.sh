@@ -10,7 +10,7 @@ PROGRAM_BINARY=$PROGRAM".sh"
 PROGRAM_BATCH=$PROGRAM"-batch.sh"
 SSH_FILTER="ssh_filter.sh"
 
-SCRIPT_BUILD=2018100205
+SCRIPT_BUILD=2018100206
 INSTANCE_ID="installer-$SCRIPT_BUILD"
 
 ## osync / obackup / pmocr / zsnap install script
@@ -144,30 +144,23 @@ function GetInit {
 
 function CreateDir {
 	local dir="${1}"
-	local dirMod="${2}"
+	local dirMask="${2}"
 	local dirUser="${3}"
 	local dirGroup="${4}"
 
 	if [ ! -d "$dir" ]; then
+		(
+		if [ $(IsInteger $dirMask) -eq 1 ]; then
+			umask $dirMask
+		fi
 		mkdir -p "$dir"
+		)
 		if [ $? == 0 ]; then
 			Logger "Created directory [$dir]." "SIMPLE"
 		else
 			Logger "Cannot create directory [$dir]." "SIMPLE"
 			exit 1
 		fi
-	fi
-
-	if [ "$(IsInteger $dirMod)" -eq 1 ]; then
-		chmod -R "$dirMod" "$dir"
-		if [ $? != 0 ]; then
-			Logger "Cannot set directory permissions of [$dir] to [$dirMod]." "SIMPLE"
-			exit 1
-		else
-			Logger "Set directory permissions to [$dirMod] on [$dir]." "SIMPLE"
-		fi
-	elif [ "$fileMod" != "" ]; then
-		Logger "Bogus filemod [$fileMod] for [$destPath] given." "SIMPLE"
 	fi
 
 	if [ "$dirUser" != "" ]; then
@@ -402,6 +395,8 @@ else
         Logger "Script begin, logging to [$LOG_FILE]." "DEBUG"
 fi
 
+# Set default umask
+umask 0022
 
 GetLocalOS
 SetLocalOSSettings
@@ -414,7 +409,7 @@ if [ "$ACTION" == "uninstall" ]; then
 	Logger "$PROGRAM uninstalled." "SIMPLE"
 else
 	CreateDir "$CONF_DIR"
-	CreateDir "$BIN_DIR" 755
+	CreateDir "$BIN_DIR"
 	CopyExampleFiles
 	CopyProgram
 	if [ "$PROGRAM" == "osync" ] || [ "$PROGRAM" == "pmocr" ]; then
