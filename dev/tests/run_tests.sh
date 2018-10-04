@@ -1139,16 +1139,10 @@ function test_ConflictDetetion () {
 
 		# Now run should return conflicts
     
-		REMOTE_HOST_PING=$RHOST_PING $OSYNC_EXECUTABLE $i --log-conflicts > "$FAKEROOT/output.log" 2>&1
+		REMOTE_HOST_PING=$RHOST_PING $OSYNC_EXECUTABLE $i --log-conflicts
 		result=$?
-		cat "$FAKEROOT/output.log"
 		assertEquals "Second run that should detect conflicts with parameters [$i]." "0" $result
     
-		if [ $TRAVIS_RUN == true ]; then
-			echo "Travis Debug output"
-			cat "$FAKEROOT/output.log"
-		fi
-
 		grep "$INITIATOR_DIR/$FileA << >> $TARGET_DIR/$FileA" "$FAKEROOT/output.log" 
 		assertEquals "FileA conflict detect with parameters [$i]." "0" $?
     
