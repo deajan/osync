@@ -1139,10 +1139,12 @@ function test_ConflictDetetion () {
 
 		# Now run should return conflicts
     
-		REMOTE_HOST_PING=$RHOST_PING $OSYNC_EXECUTABLE $i --log-conflicts
+		REMOTE_HOST_PING=$RHOST_PING $OSYNC_EXECUTABLE $i --log-conflicts > "$FAKEROOT/output.log" 2>&1
 		result=$?
 		assertEquals "Second run that should detect conflicts with parameters [$i]." "0" $result
     
+		cat "$FAKEROOT/output.log"
+
 		grep "$INITIATOR_DIR/$FileA << >> $TARGET_DIR/$FileA" "$FAKEROOT/output.log" 
 		assertEquals "FileA conflict detect with parameters [$i]." "0" $?
     
