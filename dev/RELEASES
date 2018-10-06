@@ -1,7 +1,7 @@
 ## Releases require the following
 
 - Documentation must be up to date
-- grep -Eri "TODO|WIP" osync/* must be run in order to find potential release blockers
+- grep -Eri "TODO|WIP" osync/* must be run in order to find potential release blockers, including in unit tests and config files
 - packaging files must be updated (RHEL / Arch)
 - Before every release, shellcheck must be run
 	- ./shellcheck.sh -e SC2034 -e SC2068 ofunctions.sh
