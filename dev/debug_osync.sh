@@ -9,7 +9,7 @@ PROGRAM="osync" # Rsync based two way sync engine with fault tolerance
 AUTHOR="(C) 2013-2018 by Orsiris de Jong"
 CONTACT="http://www.netpower.fr/osync - ozy@netpower.fr"
 PROGRAM_VERSION=1.3.0-beta1
-PROGRAM_BUILD=2018100201
+PROGRAM_BUILD=2018100202
 IS_STABLE=no
 
 ##### Execution order						#__WITH_PARANOIA_DEBUG
@@ -43,7 +43,7 @@ IS_STABLE=no
 #	CleanUp					no		#__WITH_PARANOIA_DEBUG
 
 _OFUNCTIONS_VERSION=2.3.0-RC2
-_OFUNCTIONS_BUILD=2018100204
+_OFUNCTIONS_BUILD=2018100205
 _OFUNCTIONS_BOOTSTRAP=true
 
 if ! type "$BASH" > /dev/null; then
@@ -346,6 +346,26 @@ function Logger {
 	else
 		_Logger "\e[41mLogger function called without proper loglevel [$level].\e[0m" "\e[41mLogger function called without proper loglevel [$level].\e[0m" true
 		_Logger "Value was: $prefix$value" "Value was: $prefix$value" true
+	fi
+}
+
+# Function is busybox compatible since busybox ash does not understand direct regex, we use expr
+function IsInteger {
+	local value="${1}"
+
+	if type expr > /dev/null 2>&1; then
+		expr "$value" : "^[0-9]\+$" > /dev/null 2>&1
+		if [ $? -eq 0 ]; then
+			echo 1
+		else
+			echo 0
+		fi
+	else
+		if [[ $value =~ ^[0-9]+$ ]]; then
+			echo 1
+		else
+			echo 0
+		fi
 	fi
 }
 
@@ -1312,31 +1332,6 @@ function IsNumericExpand {
 	eval "local value=\"${1}\"" # Needed eval so variable variables can be processed
 
 	echo $(IsNumeric "$value")
-	#	if [[ $value =~ ^-?[0-9]+([.][0-9]+)?$ ]]; then
-	#	echo 1
-	#else
-	#	echo 0
-	#fi
-}
-
-# Function is busybox compatible since busybox ash does not understand direct regex, we use expr
-function IsInteger {
-	local value="${1}"
-
-	if type expr > /dev/null 2>&1; then
-		expr "$value" : "^[0-9]\+$" > /dev/null 2>&1
-		if [ $? -eq 0 ]; then
-			echo 1
-		else
-			echo 0
-		fi
-	else
-		if [[ $value =~ ^[0-9]+$ ]]; then
-			echo 1
-		else
-			echo 0
-		fi
-	fi
 }
 
 # Converts human readable sizes into integer kilobyte sizes
@@ -3612,7 +3607,7 @@ function conflictList {
 		retval=$?
 
 		#WIP
-		if [ $TRAVIS_RUN == true ]; then
+		if [ "$TRAVIS_RUN" == true ]; then
 			echo "conflictList debug retval=$retval"
 			cat "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.${INITIATOR[$__type]}.$SCRIPT_PID.$TSTAMP"
 			cat "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.${TARGET[$__type]}.$SCRIPT_PID.$TSTAMP"
@@ -5209,7 +5204,7 @@ function LogConflicts {
 	local body
 
 	#WIP
-	if [ $TRAVIS_RUN == true ]; then
+	if [ "$TRAVIS_RUN" == true ]; then
 		cat "$RUN_DIR/$PROGRAM.conflictList.compare.$SCRIPT_PID.$TSTAMP"
 	fi
 
