@@ -173,8 +173,6 @@ function oneTimeSetUp () {
 
 	source "$DEV_DIR/ofunctions.sh"
 
-	_DEBUG=yes
-
 	# Fix default umask because of ACL test that expects 0022 when creating test files
 	umask 0022
 
@@ -216,7 +214,7 @@ function oneTimeSetUp () {
 
 	osyncParameters=()
 	osyncParameters[$__quickLocal]="--initiator=$INITIATOR_DIR --target=$TARGET_DIR --instance-id=quicklocal"
-	osyncParameters[$__confLocal]="$CONF_DIR/$LOCAL_CONF"
+	#osyncParameters[$__confLocal]="$CONF_DIR/$LOCAL_CONF"
 
 	osyncDaemonParameters=()
 
@@ -308,6 +306,10 @@ function test_Merge () {
 	cd "$DEV_DIR"
 	./merge.sh osync
 	assertEquals "Merging code" "0" $?
+
+	#WIP use debug code
+	alias cp=cp
+	cp "$DEV_DIR/debug_osync.sh" "$OSYNC_DIR/osync.sh"
 
 	cd "$OSYNC_DIR"
 
@@ -1127,7 +1129,8 @@ function test_ConflictDetetion () {
 		touch "$TARGET_DIR/$FileA"
 
 		# Initializing treeList
-		REMOTE_HOST_PING=$RHOST_PING $OSYNC_EXECUTABLE $i --initialize
+		#WIP: temporary removed --initialize for log conflict diags
+		REMOTE_HOST_PING=$RHOST_PING _PARANOIA_DEBUG=yes bash -x $OSYNC_EXECUTABLE $i --initialize > "$FAKEROOT/output1.log" 2>&1
 		assertEquals "Initialization run with parameters [$i]." "0" $?
     
 		# Now modifying files on both sides
@@ -1139,19 +1142,21 @@ function test_ConflictDetetion () {
 
 		# Now run should return conflicts
     
-		REMOTE_HOST_PING=$RHOST_PING $OSYNC_EXECUTABLE $i --log-conflicts > "$FAKEROOT/output.log" 2>&1
+		REMOTE_HOST_PING=$RHOST_PING _PARANOIA_DEBUG=yes bash -x $OSYNC_EXECUTABLE $i --log-conflicts > "$FAKEROOT/output2.log" 2>&1
 		result=$?
 		assertEquals "Second run that should detect conflicts with parameters [$i]." "0" $result
     
-		cat "$FAKEROOT/output.log"
+		#WIP
+		#cat "$FAKEROOT/output.log"
 
-		grep "$INITIATOR_DIR/$FileA << >> $TARGET_DIR/$FileA" "$FAKEROOT/output.log" 
+		#WIP TODO change output.log from output2.log for debug reasons
+		grep "$INITIATOR_DIR/$FileA << >> $TARGET_DIR/$FileA" "$FAKEROOT/output2.log" 
 		assertEquals "FileA conflict detect with parameters [$i]." "0" $?
     
-		grep "$INITIATOR_DIR/$FileB << >> $TARGET_DIR/$FileB" "$FAKEROOT/output.log"
+		grep "$INITIATOR_DIR/$FileB << >> $TARGET_DIR/$FileB" "$FAKEROOT/output2.log"
 		assertEquals "FileB conflict detect with parameters [$i]." "0" $?
 
-		# TODO: Missing test for conflict prevalance (once we have FORCE_CONFLICT_PREVALANCE
+		#TODO: Missing test for conflict prevalance (once we have FORCE_CONFLICT_PREVALANCE
 	done
 }
 
