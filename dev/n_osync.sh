@@ -9,7 +9,7 @@ PROGRAM="osync" # Rsync based two way sync engine with fault tolerance
 AUTHOR="(C) 2013-2018 by Orsiris de Jong"
 CONTACT="http://www.netpower.fr/osync - ozy@netpower.fr"
 PROGRAM_VERSION=1.3.0-beta1
-PROGRAM_BUILD=2018100702
+PROGRAM_BUILD=2018100703
 IS_STABLE=no
 
 ##### Execution order						#__WITH_PARANOIA_DEBUG
@@ -825,17 +825,20 @@ function _getFileCtimeMtimeLocal {
 
 	local retval
 
-	echo -n "" > "$RUN_DIR/$PROGRAM.ctime_mtime.$replicaType.$SCRIPT_PID.$TSTAMP"
-	while IFS='' read -r file; do $STAT_CTIME_MTIME_CMD "$replicaPath$file" >> "$RUN_DIR/$PROGRAM.ctime_mtime.$replicaType.$SCRIPT_PID.$TSTAMP"; done < "$fileList"
+	echo -n "" > "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$replicaType.$SCRIPT_PID.$TSTAMP"
+
+	while IFS='' read -r file; do
+		$STAT_CTIME_MTIME_CMD "$replicaPath$file" >> "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$replicaType.$SCRIPT_PID.$TSTAMP"
+	done < "$fileList"
 	retval=$?
 	if [ $retval -ne 0 ]; then
 		Logger "Getting file attributes failed [$retval] on $replicaType. Stopping execution." "CRITICAL" $retval
-		if [ -f "$RUN_DIR/$PROGRAM.ctime_mtime.$replicaType.$SCRIPT_PID.$TSTAMP" ]; then
-			Logger "Command output:\n$(cat $RUN_DIR/$PROGRAM.ctime_mtime.$replicaType.$SCRIPT_PID.$TSTAMP)" "WARN"
+		if [ -s "$RUN_DIR/$PROGRAM.ctime_mtime.$replicaType.$SCRIPT_PID.$TSTAMP" ]; then
+			Logger "Command output:\n$(cat $RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$replicaType.$SCRIPT_PID.$TSTAMP)" "WARN"
 		fi
 		return $retval
 	else
-		cat "$RUN_DIR/$PROGRAM.ctime_mtime.$replicaType.$SCRIPT_PID.$TSTAMP" | sort > "$timestampFile"
+		cat "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$replicaType.$SCRIPT_PID.$TSTAMP" | sort > "$timestampFile"
 		retval=$?
 		return $retval
 	fi
@@ -853,15 +856,16 @@ function _getFileCtimeMtimeRemote {
 	local retval
 	local cmd
 
-	cmd='cat "'$fileList'" | '$SSH_CMD' "env LC_ALL=C env _REMOTE_TOKEN=$_REMOTE_TOKEN cat > \".$PROGRAM.ctime_mtime.$replicaType.$SCRIPT_PID.$TSTAMP\""'
+	cmd='cat "'$fileList'" | '$SSH_CMD' "env LC_ALL=C env _REMOTE_TOKEN=$_REMOTE_TOKEN cat > \".$PROGRAM._getFileCtimeMtimeRemote.Sent.$replicaType.$SCRIPT_PID.$TSTAMP\"" > "$PROGRAM.${FUNCNAME[0].$replicaType.$SCRIPT_PID_$TSTAMP"'
 	Logger "Launching command [$cmd]." "DEBUG"
-	eval "$cmd"
+	eval "$cmd" &
+	ExecTasks $! "${FUNCNAME[0]}" false 0 0 $SOFT_MAX_EXEC_TIME $HARD_MAX_EXEC_TIME false $SLEEP_TIME $KEEP_LOGGING
 	retval=$?
 	if [ $retval -ne 0 ]; then
 		Logger "Sending ctime required file list failed with [$retval] on $replicaType. Stopping execution." "CRITICAL" $retval
 		_LOGGER_SILENT=true Logger "Command was [$cmd]." "WARN"
-		if [ -f "$RUN_DIR/$PROGRAM.ctime_mtime.$replicaType.$SCRIPT_PID.$TSTAMP" ]; then
-			Logger "Command output:\n$(cat $RUN_DIR/$PROGRAM.ctime_mtime.$replicaType.$SCRIPT_PID.$TSTAMP)" "WARN"
+		if [ -s "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$replicaType.$SCRIPT_PID.$TSTAMP" ]; then
+			Logger "Command output:\n$(cat $RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$replicaType.$SCRIPT_PID.$TSTAMP)" "WARN"
 		fi
 		return $retval
 	fi
@@ -871,28 +875,32 @@ $SSH_CMD env _REMOTE_TOKEN="$_REMOTE_TOKEN" \
 env _DEBUG="'$_DEBUG'" env _PARANOIA_DEBUG="'$_PARANOIA_DEBUG'" env _LOGGER_SILENT="'$_LOGGER_SILENT'" env _LOGGER_VERBOSE="'$_LOGGER_VERBOSE'" env _LOGGER_PREFIX="'$_LOGGER_PREFIX'" env _LOGGER_ERR_ONLY="'$_LOGGER_ERR_ONLY'" \
 env PROGRAM="'$PROGRAM'" env SCRIPT_PID="'$SCRIPT_PID'" env TSTAMP="'$TSTAMP'" \
 env replicaPath="'$replicaPath'" env replicaType="'$replicaType'" env REMOTE_STAT_CTIME_MTIME_CMD="'$REMOTE_STAT_CTIME_MTIME_CMD'" \
-env LC_ALL=C $COMMAND_SUDO' bash -s' << 'ENDSSH' > "$RUN_DIR/$PROGRAM.ctime_mtime.$replicaType.$SCRIPT_PID.$TSTAMP"
-	while IFS='' read -r file; do $REMOTE_STAT_CTIME_MTIME_CMD "$replicaPath$file"; done < ".$PROGRAM.ctime_mtime.$replicaType.$SCRIPT_PID.$TSTAMP"
-		if [ -f ".$PROGRAM.ctime_mtime.$replicaType.$SCRIPT_PID.$TSTAMP" ]; then
-			rm -f ".$PROGRAM.ctime_mtime.$replicaType.$SCRIPT_PID.$TSTAMP"
-		fi
+env LC_ALL=C $COMMAND_SUDO' bash -s' << 'ENDSSH' > "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$replicaType.$SCRIPT_PID.$TSTAMP"
+
+	while IFS='' read -r file; do
+		$REMOTE_STAT_CTIME_MTIME_CMD "$replicaPath$file"
+	done < ".$PROGRAM.._getFileCtimeMtimeRemote.Sent.$replicaType.$SCRIPT_PID.$TSTAMP"
+
+	if [ -f ".$PROGRAM.._getFileCtimeMtimeRemote.Sent.$replicaType.$SCRIPT_PID.$TSTAMP" ]; then
+		rm -f ".$PROGRAM.._getFileCtimeMtimeRemote.Sent.$replicaType.$SCRIPT_PID.$TSTAMP"
+	fi
 ENDSSH
 	retval=$?
 	if [ $retval -ne 0 ]; then
 		Logger "Getting file attributes failed [$retval] on $replicaType. Stopping execution." "CRITICAL" $retval
-		if [ -f "$RUN_DIR/$PROGRAM.ctime_mtime.$replicaType.$SCRIPT_PID.$TSTAMP" ]; then
-			Logger "Command output:\n$(cat $RUN_DIR/$PROGRAM.ctime_mtime.$replicaType.$SCRIPT_PID.$TSTAMP)" "WARN"
+		if [ -s "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$replicaType.$SCRIPT_PID.$TSTAMP" ]; then
+			Logger "Command output:\n$(cat $RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$replicaType.$SCRIPT_PID.$TSTAMP)" "WARN"
 		fi
 		return $retval
 	else
 		# Ugly fix for csh in FreeBSD 11 that adds leading and trailing '\"'
-		sed -i.tmp -e 's/^\\"//' -e 's/\\"$//' "$RUN_DIR/$PROGRAM.ctime_mtime.$replicaType.$SCRIPT_PID.$TSTAMP"
+		sed -i.tmp -e 's/^\\"//' -e 's/\\"$//' "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$replicaType.$SCRIPT_PID.$TSTAMP"
 		retval=$?
 		if [ $retval -ne 0 ]; then
 			Logger "Cannot fix FreeBSD 11 remote csh syntax." "ERROR"
 			return $retval
 		fi
-		cat "$RUN_DIR/$PROGRAM.ctime_mtime.$replicaType.$SCRIPT_PID.$TSTAMP" | sort > "$timestampFile"
+		cat "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$replicaType.$SCRIPT_PID.$TSTAMP" | sort > "$timestampFile"
 		if [ $retval -ne 0 ]; then
 			Logger "Cannot create timestamp file for $replicaType." "ERROR"
 			return $retval
@@ -1549,7 +1557,7 @@ function Initialize {
 ###### Step 5a & 5b: Update replicas
 ###### Step 6a & 6b: Propagate deletions on replicas
 ###### Step 7a & 7b: Create after run file list of replicas
-###### Step 8a & 8b: Create after run  ctime & mtime file list of replicas
+###### Step 8a & 8b: Create after run ctime & mtime file list of replicas
 
 function Sync {
 	__CheckArguments 0 $# "$@"	#__WITH_PARANOIA_DEBUG
