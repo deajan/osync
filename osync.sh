@@ -9,7 +9,7 @@ PROGRAM="osync" # Rsync based two way sync engine with fault tolerance
 AUTHOR="(C) 2013-2018 by Orsiris de Jong"
 CONTACT="http://www.netpower.fr/osync - ozy@netpower.fr"
 PROGRAM_VERSION=1.3.0-beta1
-PROGRAM_BUILD=2018100701
+PROGRAM_BUILD=2018100703
 IS_STABLE=no
 
 
@@ -2646,8 +2646,9 @@ ENDSSH
 
 function CheckReplicas {
 
+	local initiatorPid
+	local targetPid
 	local retval
-	local pids
 
 	if [ "$REMOTE_OPERATION" != "yes" ]; then
 		if [ "${INITIATOR[$__replicaDir]}" == "${TARGET[$__replicaDir]}" ]; then
@@ -2657,15 +2658,15 @@ function CheckReplicas {
 	fi
 
 	_CheckReplicasLocal "${INITIATOR[$__replicaDir]}" "${INITIATOR[$__type]}" &
-	pids="$!"
+	initiatorPid=$!
 	if [ "$REMOTE_OPERATION" != "yes" ]; then
 		_CheckReplicasLocal "${TARGET[$__replicaDir]}" "${TARGET[$__type]}" &
-		pids="$pids;$!"
+		targetPid=$!
 	else
 		_CheckReplicasRemote "${TARGET[$__replicaDir]}" "${TARGET[$__type]}" &
-		pids="$pids;$!"
+		targetPid=$!
 	fi
-	ExecTasks $pids "${FUNCNAME[0]}" false 0 0 720 1800 true $SLEEP_TIME $KEEP_LOGGING
+	ExecTasks "$initiatorPid;$targetPid" "${FUNCNAME[0]}" false 0 0 720 1800 true $SLEEP_TIME $KEEP_LOGGING
 	retval=$?
 	if [ $retval -ne 0 ]; then
 		Logger "Cancelling task." "CRITICAL" $retval
@@ -3000,7 +3001,6 @@ ENDSSH
 function HandleLocks {
 
 	local retval
-	local pids
 	local initiatorPid
 	local targetPid
 	local overwrite=false
@@ -3020,17 +3020,14 @@ function HandleLocks {
 
 	_HandleLocksLocal "${INITIATOR[$__replicaDir]}${INITIATOR[$__stateDir]}" "${INITIATOR[$__lockFile]}" "${INITIATOR[$__type]}" $overwrite &
 	initiatorPid=$!
-	pids="$initiatorPid"
 	if [ "$REMOTE_OPERATION" != "yes" ]; then
 		_HandleLocksLocal "${TARGET[$__replicaDir]}${TARGET[$__stateDir]}" "${TARGET[$__lockFile]}" "${TARGET[$__type]}" $overwrite &
 		targetPid=$!
-		pids="$pids;$targetPid"
 	else
 		_HandleLocksRemote "${TARGET[$__replicaDir]}${TARGET[$__stateDir]}" "${TARGET[$__lockFile]}" "${TARGET[$__type]}" $overwrite &
 		targetPid=$!
-		pids="$pids;$targetPid"
 	fi
-	ExecTasks $pids "${FUNCNAME[0]}" false 0 0 720 1800 true $SLEEP_TIME $KEEP_LOGGING
+	ExecTasks "$initiatorPid;$targetPid" "${FUNCNAME[0]}" false 0 0 720 1800 true $SLEEP_TIME $KEEP_LOGGING
 	retval=$?
 	if [ $retval -ne 0 ]; then
 		IFS=';' read -r -a pidArray <<< "$(eval echo \"\$WAIT_FOR_TASK_COMPLETION_${FUNCNAME[0]}\")"
@@ -3110,7 +3107,8 @@ ENDSSH
 
 function UnlockReplicas {
 
-	local pids
+	local initiatorPid
+	local targetPid
 
 	if [ $_NOLOCKS == true ]; then
 		return 0
@@ -3118,22 +3116,20 @@ function UnlockReplicas {
 
 	if [ $INITIATOR_LOCK_FILE_EXISTS == true ]; then
 		_UnlockReplicasLocal "${INITIATOR[$__lockFile]}" "${INITIATOR[$__type]}" &
-		pids="$!"
+		initiatorPid=$!
 	fi
 
 	if [ $TARGET_LOCK_FILE_EXISTS == true ]; then
 		if [ "$REMOTE_OPERATION" != "yes" ]; then
 			_UnlockReplicasLocal "${TARGET[$__lockFile]}" "${TARGET[$__type]}" &
-			pids="$pids;$!"
+			targetPid=$!
 		else
 			_UnlockReplicasRemote "${TARGET[$__lockFile]}" "${TARGET[$__type]}" &
-			pids="$pids;$!"
+			targetPid=$!
 		fi
 	fi
 
-	if [ "$pids" != "" ]; then
-		ExecTasks $pids "${FUNCNAME[0]}" false 0 0 720 1800 true $SLEEP_TIME $KEEP_LOGGING
-	fi
+	ExecTasks "$initiatorPid;$targetPid" "${FUNCNAME[0]}" false 0 0 720 1800 true $SLEEP_TIME $KEEP_LOGGING
 }
 
 ###### Sync core functions
@@ -3259,17 +3255,20 @@ function _getFileCtimeMtimeLocal {
 
 	local retval
 
-	echo -n "" > "$RUN_DIR/$PROGRAM.ctime_mtime.$replicaType.$SCRIPT_PID.$TSTAMP"
-	while IFS='' read -r file; do $STAT_CTIME_MTIME_CMD "$replicaPath$file" >> "$RUN_DIR/$PROGRAM.ctime_mtime.$replicaType.$SCRIPT_PID.$TSTAMP"; done < "$fileList"
+	echo -n "" > "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$replicaType.$SCRIPT_PID.$TSTAMP"
+
+	while IFS='' read -r file; do
+		$STAT_CTIME_MTIME_CMD "$replicaPath$file" >> "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$replicaType.$SCRIPT_PID.$TSTAMP"
+	done < "$fileList"
 	retval=$?
 	if [ $retval -ne 0 ]; then
 		Logger "Getting file attributes failed [$retval] on $replicaType. Stopping execution." "CRITICAL" $retval
-		if [ -f "$RUN_DIR/$PROGRAM.ctime_mtime.$replicaType.$SCRIPT_PID.$TSTAMP" ]; then
-			Logger "Command output:\n$(cat $RUN_DIR/$PROGRAM.ctime_mtime.$replicaType.$SCRIPT_PID.$TSTAMP)" "WARN"
+		if [ -s "$RUN_DIR/$PROGRAM.ctime_mtime.$replicaType.$SCRIPT_PID.$TSTAMP" ]; then
+			Logger "Command output:\n$(cat $RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$replicaType.$SCRIPT_PID.$TSTAMP)" "WARN"
 		fi
 		return $retval
 	else
-		cat "$RUN_DIR/$PROGRAM.ctime_mtime.$replicaType.$SCRIPT_PID.$TSTAMP" | sort > "$timestampFile"
+		cat "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$replicaType.$SCRIPT_PID.$TSTAMP" | sort > "$timestampFile"
 		retval=$?
 		return $retval
 	fi
@@ -3286,15 +3285,16 @@ function _getFileCtimeMtimeRemote {
 	local retval
 	local cmd
 
-	cmd='cat "'$fileList'" | '$SSH_CMD' "env LC_ALL=C env _REMOTE_TOKEN=$_REMOTE_TOKEN cat > \".$PROGRAM.ctime_mtime.$replicaType.$SCRIPT_PID.$TSTAMP\""'
+	cmd='cat "'$fileList'" | '$SSH_CMD' "env LC_ALL=C env _REMOTE_TOKEN=$_REMOTE_TOKEN cat > \".$PROGRAM._getFileCtimeMtimeRemote.Sent.$replicaType.$SCRIPT_PID.$TSTAMP\"" > "$PROGRAM.${FUNCNAME[0].$replicaType.$SCRIPT_PID_$TSTAMP"'
 	Logger "Launching command [$cmd]." "DEBUG"
-	eval "$cmd"
+	eval "$cmd" &
+	ExecTasks $! "${FUNCNAME[0]}" false 0 0 $SOFT_MAX_EXEC_TIME $HARD_MAX_EXEC_TIME false $SLEEP_TIME $KEEP_LOGGING
 	retval=$?
 	if [ $retval -ne 0 ]; then
 		Logger "Sending ctime required file list failed with [$retval] on $replicaType. Stopping execution." "CRITICAL" $retval
 		_LOGGER_SILENT=true Logger "Command was [$cmd]." "WARN"
-		if [ -f "$RUN_DIR/$PROGRAM.ctime_mtime.$replicaType.$SCRIPT_PID.$TSTAMP" ]; then
-			Logger "Command output:\n$(cat $RUN_DIR/$PROGRAM.ctime_mtime.$replicaType.$SCRIPT_PID.$TSTAMP)" "WARN"
+		if [ -s "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$replicaType.$SCRIPT_PID.$TSTAMP" ]; then
+			Logger "Command output:\n$(cat $RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$replicaType.$SCRIPT_PID.$TSTAMP)" "WARN"
 		fi
 		return $retval
 	fi
@@ -3304,28 +3304,32 @@ $SSH_CMD env _REMOTE_TOKEN="$_REMOTE_TOKEN" \
 env _DEBUG="'$_DEBUG'" env _PARANOIA_DEBUG="'$_PARANOIA_DEBUG'" env _LOGGER_SILENT="'$_LOGGER_SILENT'" env _LOGGER_VERBOSE="'$_LOGGER_VERBOSE'" env _LOGGER_PREFIX="'$_LOGGER_PREFIX'" env _LOGGER_ERR_ONLY="'$_LOGGER_ERR_ONLY'" \
 env PROGRAM="'$PROGRAM'" env SCRIPT_PID="'$SCRIPT_PID'" env TSTAMP="'$TSTAMP'" \
 env replicaPath="'$replicaPath'" env replicaType="'$replicaType'" env REMOTE_STAT_CTIME_MTIME_CMD="'$REMOTE_STAT_CTIME_MTIME_CMD'" \
-env LC_ALL=C $COMMAND_SUDO' bash -s' << 'ENDSSH' > "$RUN_DIR/$PROGRAM.ctime_mtime.$replicaType.$SCRIPT_PID.$TSTAMP"
-	while IFS='' read -r file; do $REMOTE_STAT_CTIME_MTIME_CMD "$replicaPath$file"; done < ".$PROGRAM.ctime_mtime.$replicaType.$SCRIPT_PID.$TSTAMP"
-		if [ -f ".$PROGRAM.ctime_mtime.$replicaType.$SCRIPT_PID.$TSTAMP" ]; then
-			rm -f ".$PROGRAM.ctime_mtime.$replicaType.$SCRIPT_PID.$TSTAMP"
-		fi
+env LC_ALL=C $COMMAND_SUDO' bash -s' << 'ENDSSH' > "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$replicaType.$SCRIPT_PID.$TSTAMP"
+
+	while IFS='' read -r file; do
+		$REMOTE_STAT_CTIME_MTIME_CMD "$replicaPath$file"
+	done < ".$PROGRAM.._getFileCtimeMtimeRemote.Sent.$replicaType.$SCRIPT_PID.$TSTAMP"
+
+	if [ -f ".$PROGRAM.._getFileCtimeMtimeRemote.Sent.$replicaType.$SCRIPT_PID.$TSTAMP" ]; then
+		rm -f ".$PROGRAM.._getFileCtimeMtimeRemote.Sent.$replicaType.$SCRIPT_PID.$TSTAMP"
+	fi
 ENDSSH
 	retval=$?
 	if [ $retval -ne 0 ]; then
 		Logger "Getting file attributes failed [$retval] on $replicaType. Stopping execution." "CRITICAL" $retval
-		if [ -f "$RUN_DIR/$PROGRAM.ctime_mtime.$replicaType.$SCRIPT_PID.$TSTAMP" ]; then
-			Logger "Command output:\n$(cat $RUN_DIR/$PROGRAM.ctime_mtime.$replicaType.$SCRIPT_PID.$TSTAMP)" "WARN"
+		if [ -s "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$replicaType.$SCRIPT_PID.$TSTAMP" ]; then
+			Logger "Command output:\n$(cat $RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$replicaType.$SCRIPT_PID.$TSTAMP)" "WARN"
 		fi
 		return $retval
 	else
 		# Ugly fix for csh in FreeBSD 11 that adds leading and trailing '\"'
-		sed -i.tmp -e 's/^\\"//' -e 's/\\"$//' "$RUN_DIR/$PROGRAM.ctime_mtime.$replicaType.$SCRIPT_PID.$TSTAMP"
+		sed -i.tmp -e 's/^\\"//' -e 's/\\"$//' "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$replicaType.$SCRIPT_PID.$TSTAMP"
 		retval=$?
 		if [ $retval -ne 0 ]; then
 			Logger "Cannot fix FreeBSD 11 remote csh syntax." "ERROR"
 			return $retval
 		fi
-		cat "$RUN_DIR/$PROGRAM.ctime_mtime.$replicaType.$SCRIPT_PID.$TSTAMP" | sort > "$timestampFile"
+		cat "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$replicaType.$SCRIPT_PID.$TSTAMP" | sort > "$timestampFile"
 		if [ $retval -ne 0 ]; then
 			Logger "Cannot create timestamp file for $replicaType." "ERROR"
 			return $retval
@@ -3439,6 +3443,10 @@ function syncAttrs {
 	local initiatorReplica="${1}"
 	local targetReplica="${2}"
 
+
+	local initiatorPid
+	local targetPid
+
 	local rsyncCmd
 	local retval
 
@@ -3488,17 +3496,17 @@ function syncAttrs {
 
 	Logger "Getting ctimes for pending files on initiator." "NOTICE"
 	_getFileCtimeMtimeLocal "${INITIATOR[$__replicaDir]}" "${INITIATOR[$__type]}" "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}-cleaned.$SCRIPT_PID.$TSTAMP" "$RUN_DIR/$PROGRAM.ctime_mtime___.${INITIATOR[$__type]}.$SCRIPT_PID.$TSTAMP" &
-	pids="$!"
+	initiatorPid=$!
 
 	Logger "Getting ctimes for pending files on target." "NOTICE"
 	if [ "$REMOTE_OPERATION" != "yes" ]; then
 		_getFileCtimeMtimeLocal "${TARGET[$__replicaDir]}" "${TARGET[$__type]}" "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}-cleaned.$SCRIPT_PID.$TSTAMP" "$RUN_DIR/$PROGRAM.ctime_mtime___.${TARGET[$__type]}.$SCRIPT_PID.$TSTAMP" &
-		pids="$pids;$!"
+		targetPid=$!
 	else
 		_getFileCtimeMtimeRemote "${TARGET[$__replicaDir]}" "${TARGET[$__type]}" "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}-cleaned.$SCRIPT_PID.$TSTAMP" "$RUN_DIR/$PROGRAM.ctime_mtime___.${TARGET[$__type]}.$SCRIPT_PID.$TSTAMP" &
-		pids="$pids;$!"
+		targetPid=$!
 	fi
-	ExecTasks $pids "${FUNCNAME[0]}" false 0 0 $SOFT_MAX_EXEC_TIME $HARD_MAX_EXEC_TIME false $SLEEP_TIME $KEEP_LOGGING
+	ExecTasks "$initiatorPid;$targetPid" "${FUNCNAME[0]}" false 0 0 $SOFT_MAX_EXEC_TIME $HARD_MAX_EXEC_TIME false $SLEEP_TIME $KEEP_LOGGING
 	retval=$?
 	if [ $retval -ne 0 ]; then
 		Logger "Getting ctime attributes failed." "CRITICAL" $retval
@@ -4020,10 +4028,10 @@ function Initialize {
 	Logger "Initializing initiator and target file lists." "NOTICE"
 
 	treeList "${INITIATOR[$__replicaDir]}" "${INITIATOR[$__type]}" "${INITIATOR[$__replicaDir]}${INITIATOR[$__stateDir]}/${INITIATOR[$__type]}${INITIATOR[$__treeAfterFile]}" &
-	initiatorPid="$!"
+	initiatorPid=$!
 
 	treeList "${TARGET[$__replicaDir]}" "${TARGET[$__type]}" "${INITIATOR[$__replicaDir]}${INITIATOR[$__stateDir]}/${TARGET[$__type]}${INITIATOR[$__treeAfterFile]}" &
-	targetPid="$!"
+	targetPid=$!
 
 	ExecTasks "$initiatorPid;$targetPid" "${FUNCNAME[0]}" false 0 0 $SOFT_MAX_EXEC_TIME $HARD_MAX_EXEC_TIME false $SLEEP_TIME $KEEP_LOGGING
 	if [ $? -ne 0 ]; then
@@ -4043,10 +4051,10 @@ function Initialize {
 	fi
 
 	timestampList "${INITIATOR[$__replicaDir]}" "${INITIATOR[$__type]}" "${INITIATOR[$__replicaDir]}${INITIATOR[$__stateDir]}/${INITIATOR[$__type]}${INITIATOR[$__treeAfterFile]}" "${INITIATOR[$__replicaDir]}${INITIATOR[$__stateDir]}/${INITIATOR[$__type]}${INITIATOR[$__timestampAfterFile]}" &
-	initiatorPid="$!"
+	initiatorPid=$!
 
 	timestampList "${TARGET[$__replicaDir]}" "${TARGET[$__type]}" "${INITIATOR[$__replicaDir]}${INITIATOR[$__stateDir]}/${TARGET[$__type]}${TARGET[$__treeAfterFile]}" "${INITIATOR[$__replicaDir]}${INITIATOR[$__stateDir]}/${TARGET[$__type]}${INITIATOR[$__timestampAfterFile]}" &
-	targetPid="$!"
+	targetPid=$!
 
 	ExecTasks "$initiatorPid;$targetPid" "${FUNCNAME[0]}" false 0 0 $SOFT_MAX_EXEC_TIME $HARD_MAX_EXEC_TIME false $SLEEP_TIME $KEEP_LOGGING
 	if [ $? -ne 0 ]; then
@@ -4077,7 +4085,7 @@ function Initialize {
 ###### Step 5a & 5b: Update replicas
 ###### Step 6a & 6b: Propagate deletions on replicas
 ###### Step 7a & 7b: Create after run file list of replicas
-###### Step 8a & 8b: Create after run  ctime & mtime file list of replicas
+###### Step 8a & 8b: Create after run ctime & mtime file list of replicas
 
 function Sync {
 
@@ -4146,12 +4154,12 @@ function Sync {
 	if [ "$resumeInitiator" == "none" ] || [ "$resumeTarget" == "none" ] || [ "$resumeInitiator" == "${SYNC_ACTION[0]}" ] || [ "$resumeTarget" == "${SYNC_ACTION[0]}" ]; then
 		if [ "$resumeInitiator" == "none" ] || [ "$resumeInitiator" == "${SYNC_ACTION[0]}" ]; then
 			treeList "${INITIATOR[$__replicaDir]}" "${INITIATOR[$__type]}" "${INITIATOR[$__replicaDir]}${INITIATOR[$__stateDir]}/${INITIATOR[$__type]}${INITIATOR[$__treeCurrentFile]}" &
-			initiatorPid="$!"
+			initiatorPid=$!
 		fi
 
 		if [ "$resumeTarget" == "none" ] || [ "$resumeTarget" == "${SYNC_ACTION[0]}" ]; then
 			treeList "${TARGET[$__replicaDir]}" "${TARGET[$__type]}" "${INITIATOR[$__replicaDir]}${INITIATOR[$__stateDir]}/${TARGET[$__type]}${INITIATOR[$__treeCurrentFile]}" &
-			targetPid="$!"
+			targetPid=$!
 		fi
 
 		ExecTasks "$initiatorPid;$targetPid" "${FUNCNAME[0]}" false 0 0 $SOFT_MAX_EXEC_TIME $HARD_MAX_EXEC_TIME false $SLEEP_TIME $KEEP_LOGGING
@@ -4191,12 +4199,12 @@ function Sync {
 	if [ "$resumeInitiator" == "${SYNC_ACTION[1]}" ] || [ "$resumeTarget" == "${SYNC_ACTION[1]}" ]; then
 		if [ "$resumeInitiator" == "${SYNC_ACTION[1]}" ]; then
 			deleteList "${INITIATOR[$__type]}" &
-			initiatorPid="$!"
+			initiatorPid=$!
 		fi
 
 		if [ "$resumeTarget" == "${SYNC_ACTION[1]}" ]; then
 			deleteList "${TARGET[$__type]}" &
-			targetPid="$!"
+			targetPid=$!
 		fi
 
 		ExecTasks "$initiatorPid;$targetPid" "${FUNCNAME[0]}" false 0 0 $SOFT_MAX_EXEC_TIME $HARD_MAX_EXEC_TIME false $SLEEP_TIME $KEEP_LOGGING
@@ -4240,12 +4248,12 @@ function Sync {
 
 			if [ "$resumeInitiator" == "${SYNC_ACTION[2]}" ]; then
 				timestampList "${INITIATOR[$__replicaDir]}" "${INITIATOR[$__type]}" "${INITIATOR[$__replicaDir]}${INITIATOR[$__stateDir]}/${INITIATOR[$__type]}${INITIATOR[$__treeCurrentFile]}" "${INITIATOR[$__replicaDir]}${INITIATOR[$__stateDir]}/${INITIATOR[$__type]}${INITIATOR[$__timestampCurrentFile]}" &
-				initiatorPid="$!"
+				initiatorPid=$!
 			fi
 
 			if [ "$resumeTarget" == "${SYNC_ACTION[2]}" ]; then
 				timestampList "${TARGET[$__replicaDir]}" "${TARGET[$__type]}" "${INITIATOR[$__replicaDir]}${INITIATOR[$__stateDir]}/${TARGET[$__type]}${TARGET[$__treeCurrentFile]}" "${INITIATOR[$__replicaDir]}${INITIATOR[$__stateDir]}/${TARGET[$__type]}${TARGET[$__timestampCurrentFile]}" &
-				targetPid="$!"
+				targetPid=$!
 			fi
 
 			ExecTasks "$initiatorPid;$targetPid" "${FUNCNAME[0]}" false 0 0 $SOFT_MAX_EXEC_TIME $HARD_MAX_EXEC_TIME false $SLEEP_TIME $KEEP_LOGGING
@@ -4394,12 +4402,12 @@ function Sync {
 	if [ "$resumeInitiator" == "${SYNC_ACTION[6]}" ] || [ "$resumeTarget" == "${SYNC_ACTION[6]}" ]; then
 		if [ "$resumeInitiator" == "${SYNC_ACTION[6]}" ]; then
 			deletionPropagation "${INITIATOR[$__type]}" &
-			initiatorPid="$!"
+			initiatorPid=$!
 		fi
 
 		if [ "$resumeTarget" == "${SYNC_ACTION[6]}" ]; then
 			deletionPropagation "${TARGET[$__type]}" &
-			targetPid="$!"
+			targetPid=$!
 		fi
 
 		ExecTasks "$initiatorPid;$targetPid" "${FUNCNAME[0]}" false 0 0 $SOFT_MAX_EXEC_TIME $HARD_MAX_EXEC_TIME false $SLEEP_TIME $KEEP_LOGGING
@@ -4440,12 +4448,12 @@ function Sync {
 	if [ "$resumeInitiator" == "${SYNC_ACTION[7]}" ] || [ "$resumeTarget" == "${SYNC_ACTION[7]}" ]; then
 		if [ "$resumeInitiator" == "${SYNC_ACTION[7]}" ]; then
 			treeList "${INITIATOR[$__replicaDir]}" "${INITIATOR[$__type]}" "${INITIATOR[$__replicaDir]}${INITIATOR[$__stateDir]}/${INITIATOR[$__type]}${INITIATOR[$__treeAfterFile]}" &
-			initiatorPid="$!"
+			initiatorPid=$!
 		fi
 
 		if [ "$resumeTarget" == "${SYNC_ACTION[7]}" ]; then
 			treeList "${TARGET[$__replicaDir]}" "${TARGET[$__type]}" "${INITIATOR[$__replicaDir]}${INITIATOR[$__stateDir]}/${TARGET[$__type]}${INITIATOR[$__treeAfterFile]}" &
-			targetPid="$!"
+			targetPid=$!
 		fi
 
 		ExecTasks "$initiatorPid;$targetPid" "${FUNCNAME[0]}" false 0 0 $SOFT_MAX_EXEC_TIME $HARD_MAX_EXEC_TIME false $SLEEP_TIME $KEEP_LOGGING
@@ -4489,12 +4497,12 @@ function Sync {
 
 			if [ "$resumeInitiator" == "${SYNC_ACTION[8]}" ]; then
 				timestampList "${INITIATOR[$__replicaDir]}" "${INITIATOR[$__type]}" "${INITIATOR[$__replicaDir]}${INITIATOR[$__stateDir]}/${INITIATOR[$__type]}${INITIATOR[$__treeAfterFile]}" "${INITIATOR[$__replicaDir]}${INITIATOR[$__stateDir]}/${INITIATOR[$__type]}${INITIATOR[$__timestampAfterFile]}" &
-				initiatorPid="$!"
+				initiatorPid=$!
 			fi
 
 			if [ "$resumeTarget" == "${SYNC_ACTION[8]}" ]; then
 				timestampList "${TARGET[$__replicaDir]}" "${TARGET[$__type]}" "${INITIATOR[$__replicaDir]}${INITIATOR[$__stateDir]}/${TARGET[$__type]}${TARGET[$__treeAfterFile]}" "${INITIATOR[$__replicaDir]}${INITIATOR[$__stateDir]}/${TARGET[$__type]}${TARGET[$__timestampAfterFile]}" &
-				targetPid="$!"
+				targetPid=$!
 			fi
 
 			ExecTasks "$initiatorPid;$targetPid" "${FUNCNAME[0]}" false 0 0 $SOFT_MAX_EXEC_TIME $HARD_MAX_EXEC_TIME false $SLEEP_TIME $KEEP_LOGGING
@@ -4832,21 +4840,22 @@ ENDSSH
 
 function SoftDelete {
 
-	local pids
+	local initiatorPid
+	local targetPid
 
 	if [ "$CONFLICT_BACKUP" != "no" ] && [ $CONFLICT_BACKUP_DAYS -ne 0 ]; then
 		Logger "Running conflict backup cleanup." "NOTICE"
 
 		_SoftDeleteLocal "${INITIATOR[$__type]}" "${INITIATOR[$__replicaDir]}${INITIATOR[$__backupDir]}" $CONFLICT_BACKUP_DAYS "conflict backup" &
-		pids="$!"
+		initiatorPid=$!
 		if [ "$REMOTE_OPERATION" != "yes" ]; then
 			_SoftDeleteLocal "${TARGET[$__type]}" "${TARGET[$__replicaDir]}${TARGET[$__backupDir]}" $CONFLICT_BACKUP_DAYS "conflict backup" &
-			pids="$pids;$!"
+			targetPid=$!
 		else
 			_SoftDeleteRemote "${TARGET[$__type]}" "${TARGET[$__replicaDir]}${TARGET[$__backupDir]}" $CONFLICT_BACKUP_DAYS "conflict backup" &
-			pids="$pids;$!"
+			targetPid=$!
 		fi
-		ExecTasks $pids "${FUNCNAME[0]}" false 0 0 $SOFT_MAX_EXEC_TIME $HARD_MAX_EXEC_TIME false $SLEEP_TIME $KEEP_LOGGING
+		ExecTasks "$initiatorPid;$targetPid" "${FUNCNAME[0]}" false 0 0 $SOFT_MAX_EXEC_TIME $HARD_MAX_EXEC_TIME false $SLEEP_TIME $KEEP_LOGGING
 		if [ $? -ne 0 ] && [ "$(eval echo \"\$HARD_MAX_EXEC_TIME_REACHED_${FUNCNAME[0]}\")" == true ]; then
 			exit 1
 		fi
@@ -4856,15 +4865,15 @@ function SoftDelete {
 		Logger "Running soft deletion cleanup." "NOTICE"
 
 		_SoftDeleteLocal "${INITIATOR[$__type]}" "${INITIATOR[$__replicaDir]}${INITIATOR[$__deleteDir]}" $SOFT_DELETE_DAYS "softdelete" &
-		pids="$!"
+		initiatorPid=$!
 		if [ "$REMOTE_OPERATION" != "yes" ]; then
 			_SoftDeleteLocal "${TARGET[$__type]}" "${TARGET[$__replicaDir]}${TARGET[$__deleteDir]}" $SOFT_DELETE_DAYS "softdelete" &
-			pids="$pids;$!"
+			targetPid=$!
 		else
 			_SoftDeleteRemote "${TARGET[$__type]}" "${TARGET[$__replicaDir]}${TARGET[$__deleteDir]}" $SOFT_DELETE_DAYS "softdelete" &
-			pids="$pids;$!"
+			targetPid=$!
 		fi
-		ExecTasks $pids "${FUNCNAME[0]}" false 0 0 $SOFT_MAX_EXEC_TIME $HARD_MAX_EXEC_TIME false $SLEEP_TIME $KEEP_LOGGING
+		ExecTasks "$initiatorPid;$targetPid" "${FUNCNAME[0]}" false 0 0 $SOFT_MAX_EXEC_TIME $HARD_MAX_EXEC_TIME false $SLEEP_TIME $KEEP_LOGGING
 		if [ $? -ne 0 ] && [ "$(eval echo \"\$HARD_MAX_EXEC_TIME_REACHED_${FUNCNAME[0]}\")" == true ]; then
 			exit 1
 		fi
