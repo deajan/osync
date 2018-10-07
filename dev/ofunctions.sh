@@ -31,7 +31,7 @@
 #### OFUNCTIONS MINI SUBSET ####
 #### OFUNCTIONS MICRO SUBSET ####
 _OFUNCTIONS_VERSION=2.3.0-RC2
-_OFUNCTIONS_BUILD=2018100205
+_OFUNCTIONS_BUILD=2018100701
 #### _OFUNCTIONS_BOOTSTRAP SUBSET ####
 _OFUNCTIONS_BOOTSTRAP=true
 #### _OFUNCTIONS_BOOTSTRAP SUBSET END ####
@@ -155,7 +155,7 @@ function PoorMansRandomGenerator {
 #### PoorMansRandomGenerator SUBSET END ####
 
 # Initial TSTMAP value before function declaration
-TSTAMP=$(date '+%Y%m%dT%H%M%S').$(PoorMansRandomGenerator 4)
+TSTAMP=$(date '+%Y%m%dT%H%M%S').$(PoorMansRandomGenerator 5
 
 # Default alert attachment filename
 ALERT_LOG_FILE="$RUN_DIR/$PROGRAM.$SCRIPT_PID.$TSTAMP.last.log"
