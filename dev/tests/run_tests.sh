@@ -210,7 +210,7 @@ function oneTimeSetUp () {
 
 	osyncParameters=()
 	osyncParameters[$__quickLocal]="--initiator=$INITIATOR_DIR --target=$TARGET_DIR --instance-id=quicklocal"
-	#osyncParameters[$__confLocal]="$CONF_DIR/$LOCAL_CONF"
+	osyncParameters[$__confLocal]="$CONF_DIR/$LOCAL_CONF"
 
 	osyncDaemonParameters=()
 
@@ -1125,9 +1125,10 @@ function test_ConflictDetetion () {
 		touch "$TARGET_DIR/$FileA"
 
 		# Initializing treeList
-		REMOTE_HOST_PING=$RHOST_PING _PARANOIA_DEBUG=yes $OSYNC_EXECUTABLE $i --initialize > "$FAKEROOT/output1.log" 2>&1
+		SLEEP_TIME=1 REMOTE_HOST_PING=$RHOST_PING _PARANOIA_DEBUG=yes $OSYNC_EXECUTABLE $i --initialize > "$FAKEROOT/output1.log" 2>&1
+		cat "$FAKEROOT/output1.log"
 		assertEquals "Initialization run with parameters [$i]." "0" $?
-    
+
 		# Now modifying files on both sides
     
 		echo "A" > "$INITIATOR_DIR/$FileA"
@@ -1137,12 +1138,12 @@ function test_ConflictDetetion () {
 
 		# Now run should return conflicts
     
-		REMOTE_HOST_PING=$RHOST_PING _PARANOIA_DEBUG=yes $OSYNC_EXECUTABLE $i --log-conflicts > "$FAKEROOT/output2.log" 2>&1
+		SLEEP_TIME=1 REMOTE_HOST_PING=$RHOST_PING _PARANOIA_DEBUG=yes $OSYNC_EXECUTABLE $i --log-conflicts > "$FAKEROOT/output2.log" 2>&1
 		result=$?
 		assertEquals "Second run that should detect conflicts with parameters [$i]." "0" $result
     
 		#WIP
-		#cat "$FAKEROOT/output.log"
+		cat "$FAKEROOT/output2.log"
 
 		#WIP TODO change output.log from output2.log for debug reasons
 		grep "$INITIATOR_DIR/$FileA << >> $TARGET_DIR/$FileA" "$FAKEROOT/output2.log" 
