@@ -10,7 +10,7 @@
 
 ## On CYGWIN / MSYS, ACL and extended attributes aren't supported
 
-# osync test suite 2018100501
+# osync test suite 2018100701
 
 # 4 tests:
 # quicklocal
@@ -154,16 +154,12 @@ function CreateOldFile () {
 }
 
 function PrepareLocalDirs () {
-	# Remote dirs are the same as local dirs, so no problem here
-	if [ -d "$INITIATOR_DIR" ]; then
-		rm -rf "$INITIATOR_DIR"
+	if [ -d "$OSYNC_TESTS_DIR" ]; then
+		rm -rf "$OSYNC_TESTS_DIR"
 	fi
-	mkdir -p "$INITIATOR_DIR"
-
-	if [ -d "$TARGET_DIR" ]; then
-		rm -rf "$TARGET_DIR"
-	fi
-	mkdir -p "$TARGET_DIR"
+	mkdir "$OSYNC_TESTS_DIR"
+	mkdir "$INITIATOR_DIR"
+	mkdir "$TARGET_DIR"
 }
 
 function oneTimeSetUp () {
@@ -1129,8 +1125,7 @@ function test_ConflictDetetion () {
 		touch "$TARGET_DIR/$FileA"
 
 		# Initializing treeList
-		#WIP: temporary removed --initialize for log conflict diags
-		REMOTE_HOST_PING=$RHOST_PING _PARANOIA_DEBUG=yes bash -x $OSYNC_EXECUTABLE $i --initialize > "$FAKEROOT/output1.log" 2>&1
+		REMOTE_HOST_PING=$RHOST_PING _PARANOIA_DEBUG=yes $OSYNC_EXECUTABLE $i --initialize > "$FAKEROOT/output1.log" 2>&1
 		assertEquals "Initialization run with parameters [$i]." "0" $?
     
 		# Now modifying files on both sides
@@ -1142,7 +1137,7 @@ function test_ConflictDetetion () {
 
 		# Now run should return conflicts
     
-		REMOTE_HOST_PING=$RHOST_PING _PARANOIA_DEBUG=yes bash -x $OSYNC_EXECUTABLE $i --log-conflicts > "$FAKEROOT/output2.log" 2>&1
+		REMOTE_HOST_PING=$RHOST_PING _PARANOIA_DEBUG=yes $OSYNC_EXECUTABLE $i --log-conflicts > "$FAKEROOT/output2.log" 2>&1
 		result=$?
 		assertEquals "Second run that should detect conflicts with parameters [$i]." "0" $result
     
