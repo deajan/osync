@@ -10,7 +10,7 @@
 
 ## On CYGWIN / MSYS, ACL and extended attributes aren't supported
 
-# osync test suite 2018100701
+# osync test suite 2018100801
 
 # 4 tests:
 # quicklocal
@@ -209,8 +209,8 @@ function oneTimeSetUp () {
 	readonly __confRemote=3
 
 	osyncParameters=()
-	osyncParameters[$__quickLocal]="--initiator=$INITIATOR_DIR --target=$TARGET_DIR --instance-id=quicklocal"
-	osyncParameters[$__confLocal]="$CONF_DIR/$LOCAL_CONF"
+	#osyncParameters[$__quickLocal]="--initiator=$INITIATOR_DIR --target=$TARGET_DIR --instance-id=quicklocal"
+	#osyncParameters[$__confLocal]="$CONF_DIR/$LOCAL_CONF"
 
 	osyncDaemonParameters=()
 
@@ -222,7 +222,7 @@ function oneTimeSetUp () {
   # Do not check remote config on msys or cygwin since we don't have a local SSH server
 	if [ "$LOCAL_OS" != "msys" ] && [ "$LOCAL_OS" != "Cygwin" ] && [ $SKIP_REMOTE != true ]; then
 		osyncParameters[$__quickRemote]="--initiator=$INITIATOR_DIR --target=ssh://localhost:$SSH_PORT/$TARGET_DIR --rsakey=${HOME}/.ssh/id_rsa_local --instance-id=quickremote --remote-token=SomeAlphaNumericToken9"
-		osyncParameters[$__confRemote]="$CONF_DIR/$REMOTE_CONF"
+		#osyncParameters[$__confRemote]="$CONF_DIR/$REMOTE_CONF"
 
 		osyncDaemonParameters[$__remote]="$CONF_DIR/$REMOTE_CONF --on-changes"
 
@@ -1125,7 +1125,7 @@ function test_ConflictDetetion () {
 		touch "$TARGET_DIR/$FileA"
 
 		# Initializing treeList
-		SLEEP_TIME=1 REMOTE_HOST_PING=$RHOST_PING _PARANOIA_DEBUG=yes $OSYNC_EXECUTABLE $i --initialize > "$FAKEROOT/output1.log" 2>&1
+		SLEEP_TIME=.5 REMOTE_HOST_PING=$RHOST_PING _PARANOIA_DEBUG=no $OSYNC_EXECUTABLE $i --initialize > "$FAKEROOT/output1.log" 2>&1
 		cat "$FAKEROOT/output1.log"
 		assertEquals "Initialization run with parameters [$i]." "0" $?
 
@@ -1138,7 +1138,7 @@ function test_ConflictDetetion () {
 
 		# Now run should return conflicts
     
-		SLEEP_TIME=1 REMOTE_HOST_PING=$RHOST_PING _PARANOIA_DEBUG=yes $OSYNC_EXECUTABLE $i --log-conflicts > "$FAKEROOT/output2.log" 2>&1
+		SLEEP_TIME=.5 REMOTE_HOST_PING=$RHOST_PING _DEBUG=yes $OSYNC_EXECUTABLE $i --log-conflicts > "$FAKEROOT/output2.log" 2>&1
 		result=$?
 		assertEquals "Second run that should detect conflicts with parameters [$i]." "0" $result
     
