@@ -9,7 +9,7 @@ PROGRAM="osync" # Rsync based two way sync engine with fault tolerance
 AUTHOR="(C) 2013-2018 by Orsiris de Jong"
 CONTACT="http://www.netpower.fr/osync - ozy@netpower.fr"
 PROGRAM_VERSION=1.3.0-beta1
-PROGRAM_BUILD=2018100801
+PROGRAM_BUILD=2018100802
 IS_STABLE=no
 
 ##### Execution order						#__WITH_PARANOIA_DEBUG
@@ -282,6 +282,7 @@ env _DEBUG="'$_DEBUG'" env _PARANOIA_DEBUG="'$_PARANOIA_DEBUG'" env _LOGGER_SILE
 env PROGRAM="'$PROGRAM'" env SCRIPT_PID="'$SCRIPT_PID'" env TSTAMP="'$TSTAMP'" \
 env replicaPath="'$replicaPath'" env CREATE_DIRS="'$CREATE_DIRS'" env DF_CMD="'$DF_CMD'" env MINIMUM_SPACE="'$MINIMUM_SPACE'" \
 env LC_ALL=C $COMMAND_SUDO' bash -s' << 'ENDSSH' > "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$replicaType.$SCRIPT_PID.$TSTAMP" 2>&1
+include #### RUN_DIR SUBSET ####
 include #### DEBUG SUBSET ####
 include #### TrapError SUBSET ####
 include #### IsInteger SUBSET ####
@@ -470,6 +471,7 @@ env PROGRAM="'$PROGRAM'" env SCRIPT_PID="'$SCRIPT_PID'" env TSTAMP="'$TSTAMP'" \
 env replicaStateDir="'$replicaStateDir'" env initiatorRunningPidsFlat="\"(${initiatorRunningPids[@]})\"" env lockfile="'$lockfile'" env replicaType="'$replicaType'" env overwrite="'$overwrite'" \
 env INSTANCE_ID="'$INSTANCE_ID'" env FORCE_STRANGER_LOCK_RESUME="'$FORCE_STRANGER_LOCK_RESUME'" \
 env LC_ALL=C $COMMAND_SUDO' bash -s' << 'ENDSSH' > "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$replicaType.$SCRIPT_PID.$TSTAMP" 2>&1
+include #### RUN_DIR SUBSET ####
 include #### DEBUG SUBSET ####
 include #### TrapError SUBSET ####
 include #### ArrayContains SUBSET ####
@@ -856,7 +858,7 @@ function _getFileCtimeMtimeRemote {
 	local retval
 	local cmd
 
-	cmd='cat "'$fileList'" | '$SSH_CMD' "env LC_ALL=C env _REMOTE_TOKEN=$_REMOTE_TOKEN cat > \".$PROGRAM._getFileCtimeMtimeRemote.Sent.$replicaType.$SCRIPT_PID.$TSTAMP\""'
+	cmd='cat "'$fileList'" | '$SSH_CMD' "env LC_ALL=C env _REMOTE_TOKEN=$_REMOTE_TOKEN cat > \"./$PROGRAM._getFileCtimeMtimeRemote.Sent.$replicaType.$SCRIPT_PID.$TSTAMP\""'
 	Logger "Launching command [$cmd]." "DEBUG"
 	eval "$cmd" &
 	ExecTasks $! "${FUNCNAME[0]}" false 0 0 $SOFT_MAX_EXEC_TIME $HARD_MAX_EXEC_TIME false $SLEEP_TIME $KEEP_LOGGING
@@ -879,10 +881,10 @@ env LC_ALL=C $COMMAND_SUDO' bash -s' << 'ENDSSH' > "$RUN_DIR/$PROGRAM.${FUNCNAME
 
 	while IFS='' read -r file; do
 		$REMOTE_STAT_CTIME_MTIME_CMD "$replicaPath$file"
-	done < ".$PROGRAM._getFileCtimeMtimeRemote.Sent.$replicaType.$SCRIPT_PID.$TSTAMP"
+	done < "./$PROGRAM._getFileCtimeMtimeRemote.Sent.$replicaType.$SCRIPT_PID.$TSTAMP"
 
-	if [ -f ".$PROGRAM._getFileCtimeMtimeRemote.Sent.$replicaType.$SCRIPT_PID.$TSTAMP" ]; then
-		rm -f ".$PROGRAM._getFileCtimeMtimeRemote.Sent.$replicaType.$SCRIPT_PID.$TSTAMP"
+	if [ -f "./$PROGRAM._getFileCtimeMtimeRemote.Sent.$replicaType.$SCRIPT_PID.$TSTAMP" ]; then
+		rm -f "./$PROGRAM._getFileCtimeMtimeRemote.Sent.$replicaType.$SCRIPT_PID.$TSTAMP"
 	fi
 ENDSSH
 	retval=$?
@@ -1346,6 +1348,7 @@ env _DRYRUN="'$_DRYRUN'" \
 env FILE_LIST="'$(EscapeSpaces "${TARGET[$__replicaDir]}${TARGET[$__stateDir]}/$deletionListFromReplica${INITIATOR[$__deletedListFile]}")'" env REPLICA_DIR="'$(EscapeSpaces "$replicaDir")'" env SOFT_DELETE="'$SOFT_DELETE'" \
 env DELETION_DIR="'$(EscapeSpaces "$deletionDir")'" env FAILED_DELETE_LIST="'$failedDeleteList'" env SUCCESS_DELETE_LIST="'$successDeleteList'" \
 env LC_ALL=C $COMMAND_SUDO' bash -s' << 'ENDSSH' >> "$RUN_DIR/$PROGRAM.remote_deletion.$SCRIPT_PID.$TSTAMP" 2>&1
+include #### RUN_DIR SUBSET ####
 include #### DEBUG SUBSET ####
 include #### TrapError SUBSET ####
 include #### RemoteLogger SUBSET ####
@@ -2103,13 +2106,15 @@ env _DEBUG="'$_DEBUG'" env _PARANOIA_DEBUG="'$_PARANOIA_DEBUG'" env _LOGGER_SILE
 env PROGRAM="'$PROGRAM'" env SCRIPT_PID="'$SCRIPT_PID'" env TSTAMP="'$TSTAMP'" \
 env _DRYRUN="'$_DRYRUN'" env replicaType="'$replicaType'" env replicaDeletionPath="'$replicaDeletionPath'" env changeTime="'$changeTime'" env REMOTE_FIND_CMD="'$REMOTE_FIND_CMD'" \
 env LC_ALL=C $COMMAND_SUDO' bash -s' << 'ENDSSH' > "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$replicaType.$SCRIPT_PID.$TSTAMP" 2>&1
+include #### RUN_DIR SUBSET ####
 include #### DEBUG SUBSET ####
 include #### TrapError SUBSET ####
 include #### IsInteger SUBSET ####
 include #### HumanToNumeric SUBSET ####
 include #### RemoteLogger SUBSET ####
 
-if [ -d "$replicaDeletionPath" ]; then
+function _SoftDeleteRemoteSub {
+	if [ -d "$replicaDeletionPath" ]; then
 		$REMOTE_FIND_CMD "$replicaDeletionPath" -type f -ctime +"$changeTime" > "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.deleteList.$replicaType.$SCRIPT_PID.$TSTAMP" 2>> "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.deleteErrors.$replicaType.$SCRIPT_PID.$TSTAMP"
 		while IFS='' read -r file; do
 			RemoteLogger "On $replicaType will delete file [$file]" "VERBOSE"
@@ -2135,13 +2140,15 @@ if [ -d "$replicaDeletionPath" ]; then
 			RemoteLogger "File cleanup complete on $replicaType replica." "NOTICE"
 			exit 0
 		fi
-elif [ -d "$replicaDeletionPath" ] && ! [ -w "$replicaDeletionPath" ]; then
-	RemoteLogger "The $replicaType replica dir [$replicaDeletionPath] is not writable. Cannot clean old files." "ERROR"
-	exit 1
-else
-	RemoteLogger "The $replicaType replica dir [$replicaDeletionPath] does not exist. Skipping cleaning of old files." "VERBOSE"
-	exit 0
-fi
+	elif [ -d "$replicaDeletionPath" ] && ! [ -w "$replicaDeletionPath" ]; then
+		RemoteLogger "The $replicaType replica dir [$replicaDeletionPath] is not writable. Cannot clean old files." "ERROR"
+		exit 1
+	else
+		RemoteLogger "The $replicaType replica dir [$replicaDeletionPath] does not exist. Skipping cleaning of old files." "VERBOSE"
+		exit 0
+	fi
+}
+_SoftDeleteRemoteSub
 ENDSSH
 	retval=$?
 	if [ $retval -ne 0 ]; then
