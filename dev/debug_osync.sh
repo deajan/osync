@@ -43,7 +43,7 @@ IS_STABLE=no
 #	CleanUp					no		#__WITH_PARANOIA_DEBUG
 
 _OFUNCTIONS_VERSION=2.3.0-RC2
-_OFUNCTIONS_BUILD=2018100701
+_OFUNCTIONS_BUILD=2018100801
 _OFUNCTIONS_BOOTSTRAP=true
 
 if ! type "$BASH" > /dev/null; then
@@ -354,7 +354,7 @@ function IsInteger {
 	local value="${1}"
 
 	if type expr > /dev/null 2>&1; then
-		expr "$value" : "^[0-9]\+$" > /dev/null 2>&1
+		expr "$value" : '^[0-9]\{1,\}$' > /dev/null 2>&1
 		if [ $? -eq 0 ]; then
 			echo 1
 		else
@@ -1313,7 +1313,7 @@ function IsNumeric {
 	local value="${1}"
 
 	if type expr > /dev/null 2>&1; then
-		expr "$value" : "^[-+]\?[0-9]*\.\?[0-9]\+$" > /dev/null 2>&1
+		expr "$value" : '^[-+]\{0,1\}[0-9]*\.\{0,1\}[0-9]\{1,\}$' > /dev/null 2>&1
 		if [ $? -eq 0 ]; then
 			echo 1
 		else
@@ -2612,7 +2612,7 @@ function IsInteger {
 	local value="${1}"
 
 	if type expr > /dev/null 2>&1; then
-		expr "$value" : "^[0-9]\+$" > /dev/null 2>&1
+		expr "$value" : '^[0-9]\{1,\}$' > /dev/null 2>&1
 		if [ $? -eq 0 ]; then
 			echo 1
 		else
@@ -2981,7 +2981,7 @@ function IsInteger {
 	local value="${1}"
 
 	if type expr > /dev/null 2>&1; then
-		expr "$value" : "^[0-9]\+$" > /dev/null 2>&1
+		expr "$value" : '^[0-9]\{1,\}$' > /dev/null 2>&1
 		if [ $? -eq 0 ]; then
 			echo 1
 		else
@@ -3469,7 +3469,7 @@ function _getFileCtimeMtimeRemote {
 	local retval
 	local cmd
 
-	cmd='cat "'$fileList'" | '$SSH_CMD' "env LC_ALL=C env _REMOTE_TOKEN=$_REMOTE_TOKEN cat > \".$PROGRAM._getFileCtimeMtimeRemote.Sent.$replicaType.$SCRIPT_PID.$TSTAMP\"" > "$PROGRAM.${FUNCNAME[0].$replicaType.$SCRIPT_PID_$TSTAMP"'
+	cmd='cat "'$fileList'" | '$SSH_CMD' "env LC_ALL=C env _REMOTE_TOKEN=$_REMOTE_TOKEN cat > \".$PROGRAM._getFileCtimeMtimeRemote.Sent.$replicaType.$SCRIPT_PID.$TSTAMP\""'
 	Logger "Launching command [$cmd]." "DEBUG"
 	eval "$cmd" &
 	ExecTasks $! "${FUNCNAME[0]}" false 0 0 $SOFT_MAX_EXEC_TIME $HARD_MAX_EXEC_TIME false $SLEEP_TIME $KEEP_LOGGING
@@ -4863,7 +4863,7 @@ function IsInteger {
 	local value="${1}"
 
 	if type expr > /dev/null 2>&1; then
-		expr "$value" : "^[0-9]\+$" > /dev/null 2>&1
+		expr "$value" : '^[0-9]\{1,\}$' > /dev/null 2>&1
 		if [ $? -eq 0 ]; then
 			echo 1
 		else

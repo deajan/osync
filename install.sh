@@ -18,7 +18,7 @@ INSTANCE_ID="installer-$SCRIPT_BUILD"
 ## Please adapt this to fit your distro needs
 
 _OFUNCTIONS_VERSION=2.3.0-RC2
-_OFUNCTIONS_BUILD=2018100701
+_OFUNCTIONS_BUILD=2018100801
 _OFUNCTIONS_BOOTSTRAP=true
 
 if ! type "$BASH" > /dev/null; then
@@ -315,7 +315,7 @@ function IsInteger {
 	local value="${1}"
 
 	if type expr > /dev/null 2>&1; then
-		expr "$value" : "^[0-9]\+$" > /dev/null 2>&1
+		expr "$value" : '^[0-9]\{1,\}$' > /dev/null 2>&1
 		if [ $? -eq 0 ]; then
 			echo 1
 		else
