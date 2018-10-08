@@ -31,7 +31,7 @@
 #### OFUNCTIONS MINI SUBSET ####
 #### OFUNCTIONS MICRO SUBSET ####
 _OFUNCTIONS_VERSION=2.3.0-RC2
-_OFUNCTIONS_BUILD=2018100701
+_OFUNCTIONS_BUILD=2018100801
 #### _OFUNCTIONS_BOOTSTRAP SUBSET ####
 _OFUNCTIONS_BOOTSTRAP=true
 #### _OFUNCTIONS_BOOTSTRAP SUBSET END ####
@@ -353,7 +353,7 @@ function IsInteger {
 	local value="${1}"
 
 	if type expr > /dev/null 2>&1; then
-		expr "$value" : "^[0-9]\+$" > /dev/null 2>&1
+		expr "$value" : '^[0-9]\{1,\}$' > /dev/null 2>&1
 		if [ $? -eq 0 ]; then
 			echo 1
 		else
@@ -1318,7 +1318,7 @@ function IsNumeric {
 	local value="${1}"
 
 	if type expr > /dev/null 2>&1; then
-		expr "$value" : "^[-+]\?[0-9]*\.\?[0-9]\+$" > /dev/null 2>&1
+		expr "$value" : '^[-+]\{0,1\}[0-9]*\.\{0,1\}[0-9]\{1,\}$' > /dev/null 2>&1
 		if [ $? -eq 0 ]; then
 			echo 1
 		else
