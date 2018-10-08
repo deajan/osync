@@ -288,7 +288,7 @@ include #### TrapError SUBSET ####
 include #### IsInteger SUBSET ####
 include #### HumanToNumeric SUBSET ####
 include #### RemoteLogger SUBSET ####
-include #### Cleanup SUBSET ####
+include #### CleanUp SUBSET ####
 
 function _CheckReplicasRemoteSub {
 	if [ ! -d "$replicaPath" ]; then
@@ -481,7 +481,7 @@ include #### TrapError SUBSET ####
 include #### ArrayContains SUBSET ####
 include #### IsInteger SUBSET ####
 include #### RemoteLogger SUBSET ####
-include #### Cleanup SUBSET ####
+include #### CleanUp SUBSET ####
 
 function _HandleLocksRemoteSub {
 	local writeLocks=false
@@ -886,7 +886,7 @@ env _DEBUG="'$_DEBUG'" env _PARANOIA_DEBUG="'$_PARANOIA_DEBUG'" env _LOGGER_SILE
 env PROGRAM="'$PROGRAM'" env SCRIPT_PID="'$SCRIPT_PID'" env TSTAMP="'$TSTAMP'" \
 env replicaPath="'$replicaPath'" env replicaType="'$replicaType'" env REMOTE_STAT_CTIME_MTIME_CMD="'$REMOTE_STAT_CTIME_MTIME_CMD'" \
 env LC_ALL=C $COMMAND_SUDO' bash -s' << 'ENDSSH' > "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$replicaType.$SCRIPT_PID.$TSTAMP"
-include #### Cleanup SUBSET ####
+include #### CleanUp SUBSET ####
 
 function _getFileCtimeMtimeRemoteSub {
 	local retval=0
@@ -1372,7 +1372,7 @@ include #### RUN_DIR SUBSET ####
 include #### DEBUG SUBSET ####
 include #### TrapError SUBSET ####
 include #### RemoteLogger SUBSET ####
-include #### Cleanup SUBSET ####
+include #### CleanUp SUBSET ####
 
 	## Empty earlier failed delete list
 	> "$FAILED_DELETE_LIST"
@@ -2135,7 +2135,7 @@ include #### TrapError SUBSET ####
 include #### IsInteger SUBSET ####
 include #### HumanToNumeric SUBSET ####
 include #### RemoteLogger SUBSET ####
-include #### Cleanup SUBSET ####
+include #### CleanUp SUBSET ####
 
 function _SoftDeleteRemoteSub {
 	if [ -d "$replicaDeletionPath" ]; then
