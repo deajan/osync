@@ -9,7 +9,7 @@ PROGRAM="osync" # Rsync based two way sync engine with fault tolerance
 AUTHOR="(C) 2013-2018 by Orsiris de Jong"
 CONTACT="http://www.netpower.fr/osync - ozy@netpower.fr"
 PROGRAM_VERSION=1.3.0-beta1
-PROGRAM_BUILD=2018100703
+PROGRAM_BUILD=2018100801
 IS_STABLE=no
 
 ##### Execution order						#__WITH_PARANOIA_DEBUG
@@ -879,10 +879,10 @@ env LC_ALL=C $COMMAND_SUDO' bash -s' << 'ENDSSH' > "$RUN_DIR/$PROGRAM.${FUNCNAME
 
 	while IFS='' read -r file; do
 		$REMOTE_STAT_CTIME_MTIME_CMD "$replicaPath$file"
-	done < ".$PROGRAM.._getFileCtimeMtimeRemote.Sent.$replicaType.$SCRIPT_PID.$TSTAMP"
+	done < ".$PROGRAM._getFileCtimeMtimeRemote.Sent.$replicaType.$SCRIPT_PID.$TSTAMP"
 
-	if [ -f ".$PROGRAM.._getFileCtimeMtimeRemote.Sent.$replicaType.$SCRIPT_PID.$TSTAMP" ]; then
-		rm -f ".$PROGRAM.._getFileCtimeMtimeRemote.Sent.$replicaType.$SCRIPT_PID.$TSTAMP"
+	if [ -f ".$PROGRAM._getFileCtimeMtimeRemote.Sent.$replicaType.$SCRIPT_PID.$TSTAMP" ]; then
+		rm -f ".$PROGRAM._getFileCtimeMtimeRemote.Sent.$replicaType.$SCRIPT_PID.$TSTAMP"
 	fi
 ENDSSH
 	retval=$?
