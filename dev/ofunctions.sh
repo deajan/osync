@@ -31,7 +31,7 @@
 #### OFUNCTIONS MINI SUBSET ####
 #### OFUNCTIONS MICRO SUBSET ####
 _OFUNCTIONS_VERSION=2.3.0-RC2
-_OFUNCTIONS_BUILD=2018100801
+_OFUNCTIONS_BUILD=2018100802
 #### _OFUNCTIONS_BOOTSTRAP SUBSET ####
 _OFUNCTIONS_BOOTSTRAP=true
 #### _OFUNCTIONS_BOOTSTRAP SUBSET END ####
@@ -104,6 +104,7 @@ else
 	LOG_FILE="/tmp/$PROGRAM.log"
 fi
 
+#### RUN_DIR SUBSET ####
 ## Default directory where to store temporary run files
 if [ -w /tmp ]; then
 	RUN_DIR=/tmp
@@ -112,6 +113,7 @@ elif [ -w /var/tmp ]; then
 else
 	RUN_DIR=.
 fi
+#### RUN_DIR SUBSET END ####
 
 #### PoorMansRandomGenerator SUBSET ####
 # Get a random number on Windows BusyBox alike, also works on most Unixes that have dd, if dd is not found, then return $RANDOM

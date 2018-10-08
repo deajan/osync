@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-## MERGE 2018100204
+## MERGE 2018100801
 
 ## Merges ofunctions.sh and n_program.sh into program.sh
 ## Adds installer
@@ -46,6 +46,7 @@ function __PREPROCESSOR_Constants {
 	'#### OFUNCTIONS MICRO SUBSET ####'
 	'#### PoorMansRandomGenerator SUBSET ####'
 	'#### _OFUNCTIONS_BOOTSTRAP SUBSET ####'
+	'#### RUN_DIR SUBSET ####'
 	'#### DEBUG SUBSET ####'
 	'#### TrapError SUBSET ####'
 	'#### RemoteLogger SUBSET ####'
