@@ -9,7 +9,7 @@ PROGRAM="osync" # Rsync based two way sync engine with fault tolerance
 AUTHOR="(C) 2013-2018 by Orsiris de Jong"
 CONTACT="http://www.netpower.fr/osync - ozy@netpower.fr"
 PROGRAM_VERSION=1.3.0-beta1
-PROGRAM_BUILD=2018100802
+PROGRAM_BUILD=2018100803
 IS_STABLE=no
 
 ##### Execution order						#__WITH_PARANOIA_DEBUG
@@ -288,6 +288,7 @@ include #### TrapError SUBSET ####
 include #### IsInteger SUBSET ####
 include #### HumanToNumeric SUBSET ####
 include #### RemoteLogger SUBSET ####
+include #### Cleanup SUBSET ####
 
 function _CheckReplicasRemoteSub {
 	if [ ! -d "$replicaPath" ]; then
@@ -326,9 +327,12 @@ function _CheckReplicasRemoteSub {
 			RemoteLogger "There is not enough free space on remote replica [$replicaPath] ($diskSpace KB)." "WARN"
 		fi
 	fi
+	return $retval
 }
 _CheckReplicasRemoteSub
-exit $?
+retval=$?
+CleanUp
+exit $retval
 ENDSSH
 	retval=$?
 	if [ $retval -ne 0 ]; then
@@ -477,6 +481,7 @@ include #### TrapError SUBSET ####
 include #### ArrayContains SUBSET ####
 include #### IsInteger SUBSET ####
 include #### RemoteLogger SUBSET ####
+include #### Cleanup SUBSET ####
 
 function _HandleLocksRemoteSub {
 	local writeLocks=false
@@ -541,12 +546,15 @@ function _HandleLocksRemoteSub {
 			return 1
 		else
 			RemoteLogger "Locked local $replicaType replica in [$lockfile]." "DEBUG"
+			return 0
 		fi
 	fi
 }
 
 _HandleLocksRemoteSub
-exit $?
+retval=$?
+CleanUp
+exit $retval
 ENDSSH
 	retval=$?
 	if [ $retval -ne 0 ]; then
@@ -878,14 +886,26 @@ env _DEBUG="'$_DEBUG'" env _PARANOIA_DEBUG="'$_PARANOIA_DEBUG'" env _LOGGER_SILE
 env PROGRAM="'$PROGRAM'" env SCRIPT_PID="'$SCRIPT_PID'" env TSTAMP="'$TSTAMP'" \
 env replicaPath="'$replicaPath'" env replicaType="'$replicaType'" env REMOTE_STAT_CTIME_MTIME_CMD="'$REMOTE_STAT_CTIME_MTIME_CMD'" \
 env LC_ALL=C $COMMAND_SUDO' bash -s' << 'ENDSSH' > "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$replicaType.$SCRIPT_PID.$TSTAMP"
+include #### Cleanup SUBSET ####
+
+function _getFileCtimeMtimeRemoteSub {
+	local retval=0
 
 	while IFS='' read -r file; do
 		$REMOTE_STAT_CTIME_MTIME_CMD "$replicaPath$file"
+		if [ $? -ne 0 ] && $retval -eq 0 ]; then
+			retval=1
+		fi
 	done < "./$PROGRAM._getFileCtimeMtimeRemote.Sent.$replicaType.$SCRIPT_PID.$TSTAMP"
 
-	if [ -f "./$PROGRAM._getFileCtimeMtimeRemote.Sent.$replicaType.$SCRIPT_PID.$TSTAMP" ]; then
-		rm -f "./$PROGRAM._getFileCtimeMtimeRemote.Sent.$replicaType.$SCRIPT_PID.$TSTAMP"
-	fi
+	return $retval
+}
+
+	_getFileCtimeMtimeRemoteSub
+	retval=$?
+	CleanUp
+	exit $retval
+
 ENDSSH
 	retval=$?
 	if [ $retval -ne 0 ]; then
@@ -1352,6 +1372,7 @@ include #### RUN_DIR SUBSET ####
 include #### DEBUG SUBSET ####
 include #### TrapError SUBSET ####
 include #### RemoteLogger SUBSET ####
+include #### Cleanup SUBSET ####
 
 	## Empty earlier failed delete list
 	> "$FAILED_DELETE_LIST"
@@ -1418,6 +1439,8 @@ include #### RemoteLogger SUBSET ####
 			previousFile="$files"
 		fi
 	done < "$FILE_LIST"
+	CleanUp
+
 ENDSSH
 
 	if [ -s "$RUN_DIR/$PROGRAM.remote_deletion.$SCRIPT_PID.$TSTAMP" ]; then
@@ -2112,6 +2135,7 @@ include #### TrapError SUBSET ####
 include #### IsInteger SUBSET ####
 include #### HumanToNumeric SUBSET ####
 include #### RemoteLogger SUBSET ####
+include #### Cleanup SUBSET ####
 
 function _SoftDeleteRemoteSub {
 	if [ -d "$replicaDeletionPath" ]; then
@@ -2149,6 +2173,9 @@ function _SoftDeleteRemoteSub {
 	fi
 }
 _SoftDeleteRemoteSub
+retval=$?
+CleanUp
+exit $retval
 ENDSSH
 	retval=$?
 	if [ $retval -ne 0 ]; then
@@ -2237,6 +2264,7 @@ env INSTANCE_ID="'$INSTANCE_ID'" env PUSH_FILE="'$(EscapeSpaces "${INITIATOR[$__
 env LC_ALL=C $COMMAND_SUDO' bash -s' << 'ENDSSH' > "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$SCRIPT_PID.$TSTAMP" 2> "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.error.$SCRIPT_PID.$TSTAMP"
 
 	echo "$INSTANCE_ID#$(date '+%Y%m%dT%H%M%S.%N')" >> "$PUSH_FILE"
+	exit $?
 ENDSSH
 	if [ $? -ne 0 ]; then
 		Logger "Could not notifiy remote initiator of file changes." "ERROR"
