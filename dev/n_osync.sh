@@ -712,7 +712,7 @@ function UnlockReplicas {
 	fi
 	if [ "$targetPid" -ne 0 ]; then
 		if [ "$unlockPids" -ne 0 ]; then
-			unlockPids"$unlockPids;$targetPid"
+			unlockPids="$unlockPids;$targetPid"
 		else
 			unlockPids="$targetPid"
 		fi
