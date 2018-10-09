@@ -9,7 +9,7 @@ PROGRAM="osync" # Rsync based two way sync engine with fault tolerance
 AUTHOR="(C) 2013-2018 by Orsiris de Jong"
 CONTACT="http://www.netpower.fr/osync - ozy@netpower.fr"
 PROGRAM_VERSION=1.3.0-beta1
-PROGRAM_BUILD=2018101004
+PROGRAM_BUILD=2018101005
 IS_STABLE=no
 
 ##### Execution order						#__WITH_PARANOIA_DEBUG
@@ -2257,15 +2257,20 @@ function _TriggerInitiatorRunLocal {
 
 	PUSH_FILE="${INITIATOR[$__updateTriggerFile]}"
 
-	echo "$INSTANCE_ID#$(date '+%Y%m%dT%H%M%S.%N')" >> "$PUSH_FILE" 2> "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.error.$SCRIPT_PID.$TSTAMP"
-	if [ $? -ne 0 ]; then
-		Logger "Could not notify local initiator of file changes." "ERROR"
-		Logger "$(cat "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.error.$SCRIPT_PID.$TSTAMP")" "ERROR"
-		return 1
+	if [ -f $(dirname "$PUSH_FILE") ]; then
+		echo "$INSTANCE_ID#$(date '+%Y%m%dT%H%M%S.%N')" >> "$PUSH_FILE" 2> "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.error.$SCRIPT_PID.$TSTAMP"
+		if [ $? -ne 0 ]; then
+			Logger "Could not notify local initiator of file changes." "ERROR"
+			Logger "$(cat "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.error.$SCRIPT_PID.$TSTAMP")" "ERROR"
+			return 1
+		else
+			Logger "Initiator of instance [$INSTANCE_ID] should be notified of file changes now." "NOTICE"
+		fi
+		return 0
 	else
-		Logger "Initiator of instance [$INSTANCE_ID] should be notified of file changes now." "NOTICE"
+		Logger "Cannot fin initiator replica dir [$dirname ("$PUSH_FILE")]." "ERROR"
+		return 1
 	fi
-	return 0
 }	
 
 function _TriggerInitiatorRunRemote {
@@ -2276,9 +2281,21 @@ env _DEBUG="'$_DEBUG'" env _PARANOIA_DEBUG="'$_PARANOIA_DEBUG'" env _LOGGER_SILE
 env PROGRAM="'$PROGRAM'" env SCRIPT_PID="'$SCRIPT_PID'" env TSTAMP="'$TSTAMP'" \
 env INSTANCE_ID="'$INSTANCE_ID'" env PUSH_FILE="'$(EscapeSpaces "${INITIATOR[$__updateTriggerFile]}")'" \
 env LC_ALL=C $COMMAND_SUDO' bash -s' << 'ENDSSH' > "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$SCRIPT_PID.$TSTAMP" 2> "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.error.$SCRIPT_PID.$TSTAMP"
+include #### RUN_DIR SUBSET ####
+include #### DEBUG SUBSET ####
+include #### TrapError SUBSET ####
+include #### RemoteLogger SUBSET ####
+include #### CleanUp SUBSET ####
 
-	echo "$INSTANCE_ID#$(date '+%Y%m%dT%H%M%S.%N')" >> "$PUSH_FILE"
-	exit $?
+	if [ -f $(dirname "$PUSH_FILE") ]; then
+		#WIP no %N on BSD (also in local)
+		echo "$INSTANCE_ID#$(date '+%Y%m%dT%H%M%S.%N')" >> "$PUSH_FILE"
+		retval=$?
+	else
+		Logger "Cannot find target replica dir [$(dirname "$PUSH_FILE")]." "ERROR"
+		retval=1
+	fi
+	exit $retval
 ENDSSH
 	if [ $? -ne 0 ]; then
 		Logger "Could not notifiy remote initiator of file changes." "ERROR"
