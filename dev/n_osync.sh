@@ -684,9 +684,9 @@ ENDSSH
 function UnlockReplicas {
 	__CheckArguments 0 $# "$@"	#__WITH_PARANOIA_DEBUG
 
-	local initiatorPid
-	local targetPid
-	local unlockPids
+	local initiatorPid=0
+	local targetPid=0
+	local unlockPids=0
 
 	if [ $_NOLOCKS == true ]; then
 		return 0
