@@ -9,7 +9,7 @@ PROGRAM="osync" # Rsync based two way sync engine with fault tolerance
 AUTHOR="(C) 2013-2018 by Orsiris de Jong"
 CONTACT="http://www.netpower.fr/osync - ozy@netpower.fr"
 PROGRAM_VERSION=1.3.0-beta1
-PROGRAM_BUILD=2018101003
+PROGRAM_BUILD=2018101004
 IS_STABLE=no
 
 ##### Execution order						#__WITH_PARANOIA_DEBUG
@@ -2872,7 +2872,7 @@ function GetCommandlineArguments {
 			;;
 			--password-file=*)
 			SSH_PASSWORD_FILE=${i##*=}
-			opts=$opts" --password-file\"$SSH_PASSWORD_FILE\""
+			opts=$opts" --password-file=\"$SSH_PASSWORD_FILE\""
 			;;
 			--instance-id=*)
 			INSTANCE_ID=${i##*=}
