@@ -9,7 +9,7 @@ PROGRAM="osync" # Rsync based two way sync engine with fault tolerance
 AUTHOR="(C) 2013-2018 by Orsiris de Jong"
 CONTACT="http://www.netpower.fr/osync - ozy@netpower.fr"
 PROGRAM_VERSION=1.3.0-beta1
-PROGRAM_BUILD=2018100803
+PROGRAM_BUILD=2018101001
 IS_STABLE=no
 
 ##### Execution order						#__WITH_PARANOIA_DEBUG
@@ -2770,6 +2770,9 @@ function SyncOnChanges {
 }
 
 #### SCRIPT ENTRY POINT
+
+# First TrapQuit declaration before knowing if we run as daemon or not
+trap TrapQuit TERM EXIT HUP QUIT
 
 # quicksync mode settings, overriden by config file
 STATS=false
