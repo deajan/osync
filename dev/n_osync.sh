@@ -2814,6 +2814,8 @@ _NOLOCKS=false
 osync_cmd=$0
 _SUMMARY=false
 INITIALIZE="no"
+MIN_WAIT=60
+MAX_WAIT=7200
 
 function GetCommandlineArguments {
 	local isFirstArgument=true
