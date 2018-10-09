@@ -9,7 +9,7 @@ PROGRAM="osync" # Rsync based two way sync engine with fault tolerance
 AUTHOR="(C) 2013-2018 by Orsiris de Jong"
 CONTACT="http://www.netpower.fr/osync - ozy@netpower.fr"
 PROGRAM_VERSION=1.3.0-beta1
-PROGRAM_BUILD=2018101001
+PROGRAM_BUILD=2018101002
 IS_STABLE=no
 
 ##### Execution order						#__WITH_PARANOIA_DEBUG
@@ -686,6 +686,7 @@ function UnlockReplicas {
 
 	local initiatorPid
 	local targetPid
+	local unlockPids
 
 	if [ $_NOLOCKS == true ]; then
 		return 0
@@ -706,7 +707,20 @@ function UnlockReplicas {
 		fi
 	fi
 
-	ExecTasks "$initiatorPid;$targetPid" "${FUNCNAME[0]}" false 0 0 720 1800 true $SLEEP_TIME $KEEP_LOGGING
+	if [ "$initiatorPid" -ne 0 ]; then
+		unlockPids=$initiatorPid
+	fi
+	if [ "$targetPid" -ne 0 ]; then
+		if [ "$unlockPids" -ne 0 ]; then
+			unlockPids"$unlockPids;$targetPid"
+		else
+			unlockPids="$targetPid"
+		fi
+	fi
+
+	if [ "$unlockPids" -ne 0 ]; then
+		ExecTasks "$initiatorPid;$targetPid" "${FUNCNAME[0]}" false 0 0 720 1800 true $SLEEP_TIME $KEEP_LOGGING
+	fi
 }
 
 ###### Sync core functions
