@@ -9,7 +9,7 @@ PROGRAM="osync" # Rsync based two way sync engine with fault tolerance
 AUTHOR="(C) 2013-2018 by Orsiris de Jong"
 CONTACT="http://www.netpower.fr/osync - ozy@netpower.fr"
 PROGRAM_VERSION=1.3.0-beta1
-PROGRAM_BUILD=2018101005
+PROGRAM_BUILD=2018101006
 IS_STABLE=no
 
 ##### Execution order						#__WITH_PARANOIA_DEBUG
@@ -2292,7 +2292,7 @@ include #### CleanUp SUBSET ####
 		echo "$INSTANCE_ID#$(date '+%Y%m%dT%H%M%S.%N')" >> "$PUSH_FILE"
 		retval=$?
 	else
-		Logger "Cannot find target replica dir [$(dirname "$PUSH_FILE")]." "ERROR"
+		RemoteLogger "Cannot find target replica dir [$(dirname "$PUSH_FILE")]." "ERROR"
 		retval=1
 	fi
 	exit $retval
