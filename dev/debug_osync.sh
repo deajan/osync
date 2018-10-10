@@ -9,7 +9,7 @@ PROGRAM="osync" # Rsync based two way sync engine with fault tolerance
 AUTHOR="(C) 2013-2018 by Orsiris de Jong"
 CONTACT="http://www.netpower.fr/osync - ozy@netpower.fr"
 PROGRAM_VERSION=1.3.0-beta1
-PROGRAM_BUILD=2018100703
+PROGRAM_BUILD=2018101008
 IS_STABLE=no
 
 ##### Execution order						#__WITH_PARANOIA_DEBUG
@@ -43,7 +43,7 @@ IS_STABLE=no
 #	CleanUp					no		#__WITH_PARANOIA_DEBUG
 
 _OFUNCTIONS_VERSION=2.3.0-RC2
-_OFUNCTIONS_BUILD=2018100801
+_OFUNCTIONS_BUILD=2018100803
 _OFUNCTIONS_BOOTSTRAP=true
 
 if ! type "$BASH" > /dev/null; then
@@ -437,8 +437,6 @@ function KillAllChilds {
 }
 
 function CleanUp {
-	__CheckArguments 0 $# "$@"	#__WITH_PARANOIA_DEBUG
-
 	if [ "$_DEBUG" != "yes" ]; then
 		rm -f "$RUN_DIR/$PROGRAM."*".$SCRIPT_PID.$TSTAMP"
 		# Fix for sed -i requiring backup extension for BSD & Mac (see all sed -i statements)
@@ -2581,6 +2579,14 @@ env _DEBUG="'$_DEBUG'" env _PARANOIA_DEBUG="'$_PARANOIA_DEBUG'" env _LOGGER_SILE
 env PROGRAM="'$PROGRAM'" env SCRIPT_PID="'$SCRIPT_PID'" env TSTAMP="'$TSTAMP'" \
 env replicaPath="'$replicaPath'" env CREATE_DIRS="'$CREATE_DIRS'" env DF_CMD="'$DF_CMD'" env MINIMUM_SPACE="'$MINIMUM_SPACE'" \
 env LC_ALL=C $COMMAND_SUDO' bash -s' << 'ENDSSH' > "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$replicaType.$SCRIPT_PID.$TSTAMP" 2>&1
+## Default directory where to store temporary run files
+if [ -w /tmp ]; then
+	RUN_DIR=/tmp
+elif [ -w /var/tmp ]; then
+	RUN_DIR=/var/tmp
+else
+	RUN_DIR=.
+fi
 ## allow function call checks			#__WITH_PARANOIA_DEBUG
 if [ "$_PARANOIA_DEBUG" == "yes" ];then		#__WITH_PARANOIA_DEBUG
 	_DEBUG=yes				#__WITH_PARANOIA_DEBUG
@@ -2749,6 +2755,13 @@ function RemoteLogger {
 		_Logger "" "Value was: $prefix$value" true
 	fi
 }
+function CleanUp {
+	if [ "$_DEBUG" != "yes" ]; then
+		rm -f "$RUN_DIR/$PROGRAM."*".$SCRIPT_PID.$TSTAMP"
+		# Fix for sed -i requiring backup extension for BSD & Mac (see all sed -i statements)
+		rm -f "$RUN_DIR/$PROGRAM."*".$SCRIPT_PID.$TSTAMP.tmp"
+	fi
+}
 
 function _CheckReplicasRemoteSub {
 	if [ ! -d "$replicaPath" ]; then
@@ -2787,9 +2800,12 @@ function _CheckReplicasRemoteSub {
 			RemoteLogger "There is not enough free space on remote replica [$replicaPath] ($diskSpace KB)." "WARN"
 		fi
 	fi
+	return $retval
 }
 _CheckReplicasRemoteSub
-exit $?
+retval=$?
+CleanUp
+exit $retval
 ENDSSH
 	retval=$?
 	if [ $retval -ne 0 ]; then
@@ -2932,6 +2948,14 @@ env PROGRAM="'$PROGRAM'" env SCRIPT_PID="'$SCRIPT_PID'" env TSTAMP="'$TSTAMP'" \
 env replicaStateDir="'$replicaStateDir'" env initiatorRunningPidsFlat="\"(${initiatorRunningPids[@]})\"" env lockfile="'$lockfile'" env replicaType="'$replicaType'" env overwrite="'$overwrite'" \
 env INSTANCE_ID="'$INSTANCE_ID'" env FORCE_STRANGER_LOCK_RESUME="'$FORCE_STRANGER_LOCK_RESUME'" \
 env LC_ALL=C $COMMAND_SUDO' bash -s' << 'ENDSSH' > "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$replicaType.$SCRIPT_PID.$TSTAMP" 2>&1
+## Default directory where to store temporary run files
+if [ -w /tmp ]; then
+	RUN_DIR=/tmp
+elif [ -w /var/tmp ]; then
+	RUN_DIR=/var/tmp
+else
+	RUN_DIR=.
+fi
 ## allow function call checks			#__WITH_PARANOIA_DEBUG
 if [ "$_PARANOIA_DEBUG" == "yes" ];then		#__WITH_PARANOIA_DEBUG
 	_DEBUG=yes				#__WITH_PARANOIA_DEBUG
@@ -3088,6 +3112,13 @@ function RemoteLogger {
 		_Logger "" "Value was: $prefix$value" true
 	fi
 }
+function CleanUp {
+	if [ "$_DEBUG" != "yes" ]; then
+		rm -f "$RUN_DIR/$PROGRAM."*".$SCRIPT_PID.$TSTAMP"
+		# Fix for sed -i requiring backup extension for BSD & Mac (see all sed -i statements)
+		rm -f "$RUN_DIR/$PROGRAM."*".$SCRIPT_PID.$TSTAMP.tmp"
+	fi
+}
 
 function _HandleLocksRemoteSub {
 	local writeLocks=false
@@ -3152,12 +3183,15 @@ function _HandleLocksRemoteSub {
 			return 1
 		else
 			RemoteLogger "Locked local $replicaType replica in [$lockfile]." "DEBUG"
+			return 0
 		fi
 	fi
 }
 
 _HandleLocksRemoteSub
-exit $?
+retval=$?
+CleanUp
+exit $retval
 ENDSSH
 	retval=$?
 	if [ $retval -ne 0 ]; then
@@ -3287,8 +3321,9 @@ ENDSSH
 function UnlockReplicas {
 	__CheckArguments 0 $# "$@"	#__WITH_PARANOIA_DEBUG
 
-	local initiatorPid
-	local targetPid
+	local initiatorPid=0
+	local targetPid=0
+	local unlockPids=0
 
 	if [ $_NOLOCKS == true ]; then
 		return 0
@@ -3309,7 +3344,20 @@ function UnlockReplicas {
 		fi
 	fi
 
-	ExecTasks "$initiatorPid;$targetPid" "${FUNCNAME[0]}" false 0 0 720 1800 true $SLEEP_TIME $KEEP_LOGGING
+	if [ "$initiatorPid" -ne 0 ]; then
+		unlockPids=$initiatorPid
+	fi
+	if [ "$targetPid" -ne 0 ]; then
+		if [ "$unlockPids" -ne 0 ]; then
+			unlockPids="$unlockPids;$targetPid"
+		else
+			unlockPids="$targetPid"
+		fi
+	fi
+
+	if [ "$unlockPids" != "0" ]; then
+		ExecTasks "$unlockPids" "${FUNCNAME[0]}" false 0 0 720 1800 true $SLEEP_TIME $KEEP_LOGGING
+	fi
 }
 
 ###### Sync core functions
@@ -3469,7 +3517,7 @@ function _getFileCtimeMtimeRemote {
 	local retval
 	local cmd
 
-	cmd='cat "'$fileList'" | '$SSH_CMD' "env LC_ALL=C env _REMOTE_TOKEN=$_REMOTE_TOKEN cat > \".$PROGRAM._getFileCtimeMtimeRemote.Sent.$replicaType.$SCRIPT_PID.$TSTAMP\""'
+	cmd='cat "'$fileList'" | '$SSH_CMD' "env LC_ALL=C env _REMOTE_TOKEN=$_REMOTE_TOKEN cat > \"./$PROGRAM._getFileCtimeMtimeRemote.Sent.$replicaType.$SCRIPT_PID.$TSTAMP\""'
 	Logger "Launching command [$cmd]." "DEBUG"
 	eval "$cmd" &
 	ExecTasks $! "${FUNCNAME[0]}" false 0 0 $SOFT_MAX_EXEC_TIME $HARD_MAX_EXEC_TIME false $SLEEP_TIME $KEEP_LOGGING
@@ -3489,14 +3537,32 @@ env _DEBUG="'$_DEBUG'" env _PARANOIA_DEBUG="'$_PARANOIA_DEBUG'" env _LOGGER_SILE
 env PROGRAM="'$PROGRAM'" env SCRIPT_PID="'$SCRIPT_PID'" env TSTAMP="'$TSTAMP'" \
 env replicaPath="'$replicaPath'" env replicaType="'$replicaType'" env REMOTE_STAT_CTIME_MTIME_CMD="'$REMOTE_STAT_CTIME_MTIME_CMD'" \
 env LC_ALL=C $COMMAND_SUDO' bash -s' << 'ENDSSH' > "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$replicaType.$SCRIPT_PID.$TSTAMP"
+function CleanUp {
+	if [ "$_DEBUG" != "yes" ]; then
+		rm -f "$RUN_DIR/$PROGRAM."*".$SCRIPT_PID.$TSTAMP"
+		# Fix for sed -i requiring backup extension for BSD & Mac (see all sed -i statements)
+		rm -f "$RUN_DIR/$PROGRAM."*".$SCRIPT_PID.$TSTAMP.tmp"
+	fi
+}
+
+function _getFileCtimeMtimeRemoteSub {
+	local retval=0
 
 	while IFS='' read -r file; do
 		$REMOTE_STAT_CTIME_MTIME_CMD "$replicaPath$file"
-	done < ".$PROGRAM.._getFileCtimeMtimeRemote.Sent.$replicaType.$SCRIPT_PID.$TSTAMP"
+		if [ $? -ne 0 ] && $retval -eq 0 ]; then
+			retval=1
+		fi
+	done < "./$PROGRAM._getFileCtimeMtimeRemote.Sent.$replicaType.$SCRIPT_PID.$TSTAMP"
 
-	if [ -f ".$PROGRAM.._getFileCtimeMtimeRemote.Sent.$replicaType.$SCRIPT_PID.$TSTAMP" ]; then
-		rm -f ".$PROGRAM.._getFileCtimeMtimeRemote.Sent.$replicaType.$SCRIPT_PID.$TSTAMP"
-	fi
+	return $retval
+}
+
+	_getFileCtimeMtimeRemoteSub
+	retval=$?
+	CleanUp
+	exit $retval
+
 ENDSSH
 	retval=$?
 	if [ $retval -ne 0 ]; then
@@ -3959,6 +4025,14 @@ env _DRYRUN="'$_DRYRUN'" \
 env FILE_LIST="'$(EscapeSpaces "${TARGET[$__replicaDir]}${TARGET[$__stateDir]}/$deletionListFromReplica${INITIATOR[$__deletedListFile]}")'" env REPLICA_DIR="'$(EscapeSpaces "$replicaDir")'" env SOFT_DELETE="'$SOFT_DELETE'" \
 env DELETION_DIR="'$(EscapeSpaces "$deletionDir")'" env FAILED_DELETE_LIST="'$failedDeleteList'" env SUCCESS_DELETE_LIST="'$successDeleteList'" \
 env LC_ALL=C $COMMAND_SUDO' bash -s' << 'ENDSSH' >> "$RUN_DIR/$PROGRAM.remote_deletion.$SCRIPT_PID.$TSTAMP" 2>&1
+## Default directory where to store temporary run files
+if [ -w /tmp ]; then
+	RUN_DIR=/tmp
+elif [ -w /var/tmp ]; then
+	RUN_DIR=/var/tmp
+else
+	RUN_DIR=.
+fi
 ## allow function call checks			#__WITH_PARANOIA_DEBUG
 if [ "$_PARANOIA_DEBUG" == "yes" ];then		#__WITH_PARANOIA_DEBUG
 	_DEBUG=yes				#__WITH_PARANOIA_DEBUG
@@ -4078,6 +4152,13 @@ function RemoteLogger {
 		_Logger "" "Value was: $prefix$value" true
 	fi
 }
+function CleanUp {
+	if [ "$_DEBUG" != "yes" ]; then
+		rm -f "$RUN_DIR/$PROGRAM."*".$SCRIPT_PID.$TSTAMP"
+		# Fix for sed -i requiring backup extension for BSD & Mac (see all sed -i statements)
+		rm -f "$RUN_DIR/$PROGRAM."*".$SCRIPT_PID.$TSTAMP.tmp"
+	fi
+}
 
 	## Empty earlier failed delete list
 	> "$FAILED_DELETE_LIST"
@@ -4144,6 +4225,8 @@ function RemoteLogger {
 			previousFile="$files"
 		fi
 	done < "$FILE_LIST"
+	CleanUp
+
 ENDSSH
 
 	if [ -s "$RUN_DIR/$PROGRAM.remote_deletion.$SCRIPT_PID.$TSTAMP" ]; then
@@ -4832,6 +4915,14 @@ env _DEBUG="'$_DEBUG'" env _PARANOIA_DEBUG="'$_PARANOIA_DEBUG'" env _LOGGER_SILE
 env PROGRAM="'$PROGRAM'" env SCRIPT_PID="'$SCRIPT_PID'" env TSTAMP="'$TSTAMP'" \
 env _DRYRUN="'$_DRYRUN'" env replicaType="'$replicaType'" env replicaDeletionPath="'$replicaDeletionPath'" env changeTime="'$changeTime'" env REMOTE_FIND_CMD="'$REMOTE_FIND_CMD'" \
 env LC_ALL=C $COMMAND_SUDO' bash -s' << 'ENDSSH' > "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$replicaType.$SCRIPT_PID.$TSTAMP" 2>&1
+## Default directory where to store temporary run files
+if [ -w /tmp ]; then
+	RUN_DIR=/tmp
+elif [ -w /var/tmp ]; then
+	RUN_DIR=/var/tmp
+else
+	RUN_DIR=.
+fi
 ## allow function call checks			#__WITH_PARANOIA_DEBUG
 if [ "$_PARANOIA_DEBUG" == "yes" ];then		#__WITH_PARANOIA_DEBUG
 	_DEBUG=yes				#__WITH_PARANOIA_DEBUG
@@ -5000,8 +5091,16 @@ function RemoteLogger {
 		_Logger "" "Value was: $prefix$value" true
 	fi
 }
+function CleanUp {
+	if [ "$_DEBUG" != "yes" ]; then
+		rm -f "$RUN_DIR/$PROGRAM."*".$SCRIPT_PID.$TSTAMP"
+		# Fix for sed -i requiring backup extension for BSD & Mac (see all sed -i statements)
+		rm -f "$RUN_DIR/$PROGRAM."*".$SCRIPT_PID.$TSTAMP.tmp"
+	fi
+}
 
-if [ -d "$replicaDeletionPath" ]; then
+function _SoftDeleteRemoteSub {
+	if [ -d "$replicaDeletionPath" ]; then
 		$REMOTE_FIND_CMD "$replicaDeletionPath" -type f -ctime +"$changeTime" > "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.deleteList.$replicaType.$SCRIPT_PID.$TSTAMP" 2>> "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.deleteErrors.$replicaType.$SCRIPT_PID.$TSTAMP"
 		while IFS='' read -r file; do
 			RemoteLogger "On $replicaType will delete file [$file]" "VERBOSE"
@@ -5027,13 +5126,18 @@ if [ -d "$replicaDeletionPath" ]; then
 			RemoteLogger "File cleanup complete on $replicaType replica." "NOTICE"
 			exit 0
 		fi
-elif [ -d "$replicaDeletionPath" ] && ! [ -w "$replicaDeletionPath" ]; then
-	RemoteLogger "The $replicaType replica dir [$replicaDeletionPath] is not writable. Cannot clean old files." "ERROR"
-	exit 1
-else
-	RemoteLogger "The $replicaType replica dir [$replicaDeletionPath] does not exist. Skipping cleaning of old files." "VERBOSE"
-	exit 0
-fi
+	elif [ -d "$replicaDeletionPath" ] && ! [ -w "$replicaDeletionPath" ]; then
+		RemoteLogger "The $replicaType replica dir [$replicaDeletionPath] is not writable. Cannot clean old files." "ERROR"
+		exit 1
+	else
+		RemoteLogger "The $replicaType replica dir [$replicaDeletionPath] does not exist. Skipping cleaning of old files." "VERBOSE"
+		exit 0
+	fi
+}
+_SoftDeleteRemoteSub
+retval=$?
+CleanUp
+exit $retval
 ENDSSH
 	retval=$?
 	if [ $retval -ne 0 ]; then
@@ -5101,15 +5205,20 @@ function _TriggerInitiatorRunLocal {
 
 	PUSH_FILE="${INITIATOR[$__updateTriggerFile]}"
 
-	echo "$INSTANCE_ID#$(date '+%Y%m%dT%H%M%S.%N')" >> "$PUSH_FILE" 2> "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.error.$SCRIPT_PID.$TSTAMP"
-	if [ $? -ne 0 ]; then
-		Logger "Could not notify local initiator of file changes." "ERROR"
-		Logger "$(cat "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.error.$SCRIPT_PID.$TSTAMP")" "ERROR"
-		return 1
+	if [ -d $(dirname "$PUSH_FILE") ]; then
+		echo "$INSTANCE_ID#$(date '+%Y%m%dT%H%M%S.%N')" >> "$PUSH_FILE" 2> "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.error.$SCRIPT_PID.$TSTAMP"
+		if [ $? -ne 0 ]; then
+			Logger "Could not notify local initiator of file changes." "ERROR"
+			Logger "$(cat "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.error.$SCRIPT_PID.$TSTAMP")" "ERROR"
+			return 1
+		else
+			Logger "Initiator of instance [$INSTANCE_ID] should be notified of file changes now." "NOTICE"
+		fi
+		return 0
 	else
-		Logger "Initiator of instance [$INSTANCE_ID] should be notified of file changes now." "NOTICE"
+		Logger "Cannot fin initiator replica dir [$dirname ("$PUSH_FILE")]." "ERROR"
+		return 1
 	fi
-	return 0
 }	
 
 function _TriggerInitiatorRunRemote {
@@ -5120,8 +5229,150 @@ env _DEBUG="'$_DEBUG'" env _PARANOIA_DEBUG="'$_PARANOIA_DEBUG'" env _LOGGER_SILE
 env PROGRAM="'$PROGRAM'" env SCRIPT_PID="'$SCRIPT_PID'" env TSTAMP="'$TSTAMP'" \
 env INSTANCE_ID="'$INSTANCE_ID'" env PUSH_FILE="'$(EscapeSpaces "${INITIATOR[$__updateTriggerFile]}")'" \
 env LC_ALL=C $COMMAND_SUDO' bash -s' << 'ENDSSH' > "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$SCRIPT_PID.$TSTAMP" 2> "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.error.$SCRIPT_PID.$TSTAMP"
+## Default directory where to store temporary run files
+if [ -w /tmp ]; then
+	RUN_DIR=/tmp
+elif [ -w /var/tmp ]; then
+	RUN_DIR=/var/tmp
+else
+	RUN_DIR=.
+fi
+## allow function call checks			#__WITH_PARANOIA_DEBUG
+if [ "$_PARANOIA_DEBUG" == "yes" ];then		#__WITH_PARANOIA_DEBUG
+	_DEBUG=yes				#__WITH_PARANOIA_DEBUG
+fi						#__WITH_PARANOIA_DEBUG
 
-	echo "$INSTANCE_ID#$(date '+%Y%m%dT%H%M%S.%N')" >> "$PUSH_FILE"
+## allow debugging from command line with _DEBUG=yes
+if [ ! "$_DEBUG" == "yes" ]; then
+	_DEBUG=no
+	_LOGGER_VERBOSE=false
+else
+	trap 'TrapError ${LINENO} $?' ERR
+	_LOGGER_VERBOSE=true
+fi
+
+if [ "$SLEEP_TIME" == "" ]; then # Leave the possibity to set SLEEP_TIME as environment variable when runinng with bash -x in order to avoid spamming console
+	SLEEP_TIME=.05
+fi
+function TrapError {
+	local job="$0"
+	local line="$1"
+	local code="${2:-1}"
+
+	if [ $_LOGGER_SILENT == false ]; then
+		(>&2 echo -e "\e[45m/!\ ERROR in ${job}: Near line ${line}, exit code ${code}\e[0m")
+	fi
+}
+
+# Array to string converter, see http://stackoverflow.com/questions/1527049/bash-join-elements-of-an-array
+# usage: joinString separaratorChar Array
+function joinString {
+	local IFS="$1"; shift; echo "$*";
+}
+
+# Sub function of Logger
+function _Logger {
+	local logValue="${1}"		# Log to file
+	local stdValue="${2}"		# Log to screeen
+	local toStdErr="${3:-false}"	# Log to stderr instead of stdout
+
+	if [ "$logValue" != "" ]; then
+		echo -e "$logValue" >> "$LOG_FILE"
+
+		# Build current log file for alerts if we have a sufficient environment
+		if [ "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$SCRIPT_PID.$TSTAMP" != "" ]; then
+			echo -e "$logValue" >> "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$SCRIPT_PID.$TSTAMP"
+		fi
+	fi
+
+	if [ "$stdValue" != "" ] && [ "$_LOGGER_SILENT" != true ]; then
+		if [ $toStdErr == true ]; then
+			# Force stderr color in subshell
+			(>&2 echo -e "$stdValue")
+
+		else
+			echo -e "$stdValue"
+		fi
+	fi
+}
+
+# Remote logger similar to below Logger, without log to file and alert flags
+function RemoteLogger {
+	local value="${1}"		# Sentence to log (in double quotes)
+	local level="${2}"		# Log level
+	local retval="${3:-undef}"	# optional return value of command
+
+	if [ "$_LOGGER_PREFIX" == "time" ]; then
+		prefix="TIME: $SECONDS - "
+	elif [ "$_LOGGER_PREFIX" == "date" ]; then
+		prefix="R $(date) - "
+	else
+		prefix=""
+	fi
+
+	if [ "$level" == "CRITICAL" ]; then
+		_Logger "" "$prefix\e[1;33;41m$value\e[0m" true
+		if [ $_DEBUG == "yes" ]; then
+			_Logger -e "" "[$retval] in [$(joinString , ${FUNCNAME[@]})] SP=$SCRIPT_PID P=$$" true
+		fi
+		return
+	elif [ "$level" == "ERROR" ]; then
+		_Logger "" "$prefix\e[31m$value\e[0m" true
+		if [ $_DEBUG == "yes" ]; then
+			_Logger -e "" "[$retval] in [$(joinString , ${FUNCNAME[@]})] SP=$SCRIPT_PID P=$$" true
+		fi
+		return
+	elif [ "$level" == "WARN" ]; then
+		_Logger "" "$prefix\e[33m$value\e[0m" true
+		if [ $_DEBUG == "yes" ]; then
+			_Logger -e "" "[$retval] in [$(joinString , ${FUNCNAME[@]})] SP=$SCRIPT_PID P=$$" true
+		fi
+		return
+	elif [ "$level" == "NOTICE" ]; then
+		if [ $_LOGGER_ERR_ONLY != true ]; then
+			_Logger "" "$prefix$value"
+		fi
+		return
+	elif [ "$level" == "VERBOSE" ]; then
+		if [ $_LOGGER_VERBOSE == true ]; then
+			_Logger "" "$prefix$value"
+		fi
+		return
+	elif [ "$level" == "ALWAYS" ]; then
+		_Logger	 "" "$prefix$value"
+		return
+	elif [ "$level" == "DEBUG" ]; then
+		if [ "$_DEBUG" == "yes" ]; then
+			_Logger "" "$prefix$value"
+			return
+		fi
+	elif [ "$level" == "PARANOIA_DEBUG" ]; then				#__WITH_PARANOIA_DEBUG
+		if [ "$_PARANOIA_DEBUG" == "yes" ]; then			#__WITH_PARANOIA_DEBUG
+			_Logger "" "$prefix\e[35m$value\e[0m"			#__WITH_PARANOIA_DEBUG
+			return							#__WITH_PARANOIA_DEBUG
+		fi								#__WITH_PARANOIA_DEBUG
+	else
+		_Logger "" "\e[41mLogger function called without proper loglevel [$level].\e[0m" true
+		_Logger "" "Value was: $prefix$value" true
+	fi
+}
+function CleanUp {
+	if [ "$_DEBUG" != "yes" ]; then
+		rm -f "$RUN_DIR/$PROGRAM."*".$SCRIPT_PID.$TSTAMP"
+		# Fix for sed -i requiring backup extension for BSD & Mac (see all sed -i statements)
+		rm -f "$RUN_DIR/$PROGRAM."*".$SCRIPT_PID.$TSTAMP.tmp"
+	fi
+}
+
+	if [ -d $(dirname "$PUSH_FILE") ]; then
+		#WIP no %N on BSD (also in local)
+		echo "$INSTANCE_ID#$(date '+%Y%m%dT%H%M%S.%N')" >> "$PUSH_FILE"
+		retval=$?
+	else
+		RemoteLogger "Cannot find initiator replica dir [$(dirname "$PUSH_FILE")]." "ERROR"
+		retval=1
+	fi
+	exit $retval
 ENDSSH
 	if [ $? -ne 0 ]; then
 		Logger "Could not notifiy remote initiator of file changes." "ERROR"
@@ -5602,6 +5853,7 @@ function SyncOnChanges {
 		elif [ "$LOCAL_OS" == "BSD" ]; then
 			# BSD version of inotifywait does not support multiple --exclude statements
 			inotifywait --exclude "$OSYNC_DIR" -qq -r -e create -e modify -e delete -e move -e attrib --timeout "$MAX_WAIT" "$watchDirectory" &
+			wait $!
 		else
 			inotifywait --exclude "$OSYNC_DIR" $RSYNC_PATTERNS -qq -r -e create -e modify -e delete -e move -e attrib --timeout "$MAX_WAIT" "$watchDirectory" &
 			wait $!
@@ -5627,6 +5879,9 @@ function SyncOnChanges {
 }
 
 #### SCRIPT ENTRY POINT
+
+# First TrapQuit declaration before knowing if we run as daemon or not
+trap TrapQuit TERM EXIT HUP QUIT
 
 # quicksync mode settings, overriden by config file
 STATS=false
@@ -5654,6 +5909,8 @@ _NOLOCKS=false
 osync_cmd=$0
 _SUMMARY=false
 INITIALIZE="no"
+MIN_WAIT=60
+MAX_WAIT=7200
 
 function GetCommandlineArguments {
 	local isFirstArgument=true
@@ -5712,7 +5969,7 @@ function GetCommandlineArguments {
 			;;
 			--password-file=*)
 			SSH_PASSWORD_FILE=${i##*=}
-			opts=$opts" --password-file\"$SSH_PASSWORD_FILE\""
+			opts=$opts" --password-file=\"$SSH_PASSWORD_FILE\""
 			;;
 			--instance-id=*)
 			INSTANCE_ID=${i##*=}
