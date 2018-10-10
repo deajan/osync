@@ -9,7 +9,7 @@ PROGRAM="osync" # Rsync based two way sync engine with fault tolerance
 AUTHOR="(C) 2013-2018 by Orsiris de Jong"
 CONTACT="http://www.netpower.fr/osync - ozy@netpower.fr"
 PROGRAM_VERSION=1.3.0-beta1
-PROGRAM_BUILD=2018101006
+PROGRAM_BUILD=2018101007
 IS_STABLE=no
 
 ##### Execution order						#__WITH_PARANOIA_DEBUG
@@ -2257,7 +2257,7 @@ function _TriggerInitiatorRunLocal {
 
 	PUSH_FILE="${INITIATOR[$__updateTriggerFile]}"
 
-	if [ -f $(dirname "$PUSH_FILE") ]; then
+	if [ -d $(dirname "$PUSH_FILE") ]; then
 		echo "$INSTANCE_ID#$(date '+%Y%m%dT%H%M%S.%N')" >> "$PUSH_FILE" 2> "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.error.$SCRIPT_PID.$TSTAMP"
 		if [ $? -ne 0 ]; then
 			Logger "Could not notify local initiator of file changes." "ERROR"
@@ -2287,12 +2287,12 @@ include #### TrapError SUBSET ####
 include #### RemoteLogger SUBSET ####
 include #### CleanUp SUBSET ####
 
-	if [ -f $(dirname "$PUSH_FILE") ]; then
+	if [ -d $(dirname "$PUSH_FILE") ]; then
 		#WIP no %N on BSD (also in local)
 		echo "$INSTANCE_ID#$(date '+%Y%m%dT%H%M%S.%N')" >> "$PUSH_FILE"
 		retval=$?
 	else
-		RemoteLogger "Cannot find target replica dir [$(dirname "$PUSH_FILE")]." "ERROR"
+		RemoteLogger "Cannot find initiator replica dir [$(dirname "$PUSH_FILE")]." "ERROR"
 		retval=1
 	fi
 	exit $retval
