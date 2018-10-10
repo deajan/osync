@@ -2782,26 +2782,25 @@ function SyncOnChanges {
 		fi
 			
 
-		#WIP Watch cmd log is debug and not notice
-
 		Logger "#### Monitoring now." "NOTICE"
+
+		# inotifywait < 3.20 can't handle multiple --exclude statements. For compat issues, we'll watch everything except .osync_workdir
+
 		if [ "$LOCAL_OS" == "MacOSX" ]; then
 			watchCmd="fswatch --exclude \"$OSYNC_DIR\" -1 \"$watchDirectory\" > /dev/null &"
 			# Mac fswatch doesn't have timeout switch, replacing wait $! with WaitForTaskCompletion without warning nor spinner and increased SLEEP_TIME to avoid cpu hogging. This simulates wait $! with timeout
-			Logger "Watch cmd M: [$watchCmd]."  "NOTICE"
+			Logger "Watch cmd M: [$watchCmd]."  "DEBUG"
 			eval "$watchCmd"
 			ExecTasks $! "MonitorMacOSXWait" false 0 0 0 $MAX_WAIT true 1 0
 		elif [ "$LOCAL_OS" == "BSD" ]; then
 			# BSD version of inotifywait does not support multiple --exclude statements
 			watchCmd="inotifywait --exclude \"$OSYNC_DIR\" -qq -r -e create -e modify -e delete -e move -e attrib --timeout \"$MAX_WAIT\" \"$watchDirectory\" &"
-			Logger "Watch cmd B: [$watchCmd]."  "NOTICE"
+			Logger "Watch cmd B: [$watchCmd]."  "DEBUG"
 			eval "$watchCmd"
 			wait $!
 		else
-			#WIP: replaced exclude $OSYNC_DIR with $watchDirectory/$OSYNC_DIR
-			Logger "--$RSYNC_PATTERNS--" "NOTICE"
 			watchCmd="inotifywait --exclude \"$OSYNC_DIR\" -qq -r -e create -e modify -e delete -e move -e attrib --timeout \"$MAX_WAIT\" \"$watchDirectory\" &"
-			Logger "Watch cmd L: [$watchCmd]."  "NOTICE"
+			Logger "Watch cmd L: [$watchCmd]."  "DEBUG"
 			eval "$watchCmd"
 			wait $!
 		fi
