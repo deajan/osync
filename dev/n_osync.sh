@@ -2831,8 +2831,12 @@ _NOLOCKS=false
 osync_cmd=$0
 _SUMMARY=false
 INITIALIZE="no"
-MIN_WAIT=60
-MAX_WAIT=7200
+if [ "$MIN_WAIT" == "" ]; then
+	MIN_WAIT=60
+fi
+if [ "$MAX_WAIT" == "" ]; then
+	MAX_WAIT=7200
+fi
 
 function GetCommandlineArguments {
 	local isFirstArgument=true
