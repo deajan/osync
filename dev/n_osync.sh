@@ -9,7 +9,7 @@ PROGRAM="osync" # Rsync based two way sync engine with fault tolerance
 AUTHOR="(C) 2013-2018 by Orsiris de Jong"
 CONTACT="http://www.netpower.fr/osync - ozy@netpower.fr"
 PROGRAM_VERSION=1.3.0-beta1
-PROGRAM_BUILD=2018101008
+PROGRAM_BUILD=2018101009
 IS_STABLE=no
 
 ##### Execution order						#__WITH_PARANOIA_DEBUG
@@ -2716,7 +2716,7 @@ function SyncOnChanges {
 	__CheckArguments 1 $# "$@"	#__WITH_PARANOIA_DEBUG
 
 	local watchDirectory
-	local cmd
+	local initiatorWatchCmd
 	local retval
 
 	if [ "$LOCAL_OS" == "MacOSX" ]; then
@@ -2736,35 +2736,34 @@ function SyncOnChanges {
 			Logger "Initiator directory [$INITIATOR_SYNC_DIR] does not exist. Cannot monitor." "CRITICAL"
 			exit 1
 		fi
-	Logger "#### Running $PROGRAM in initiator file monitor mode." "NOTICE"
+		watchDirectory="$INITIATOR_SYNC_DIR"
+		if [ "$ConfigFile" != "" ]; then
+			initiatorWatchCmd='bash '$osync_cmd' "'$ConfigFile'" '$opts
+		else
+			initiatorWatchCmd='bash '$osync_cmd' '$opts
+		fi
+		Logger "#### Running $PROGRAM in initiator file monitor mode." "NOTICE"
 	else
 		if [ ! -d "$TARGET_SYNC_DIR" ]; then
 			Logger "Target directory [$TARGET_SYNC_DIR] does not exist. Cannot monitor." "CRITICAL"
 			exit 1
 		fi
+		watchDirectory="$TARGET_SYNC_DIR"
 	Logger "#### Running $PROGRAM in target helper file monitor mode." "NOTICE"
 	fi		
 
 	while true; do
 		if [ $isTargetHelper == false ]; then
-			if [ "$ConfigFile" != "" ]; then
-				cmd='bash '$osync_cmd' "'$ConfigFile'" '$opts
-			else
-				cmd='bash '$osync_cmd' '$opts
-			fi
-			Logger "Daemon cmd: $cmd" "DEBUG"
-			eval "$cmd"
+			Logger "Daemon cmd: [$initiatorWatchCmd]" "DEBUG"
+			eval "$initiatorWatchCmd"
 			retval=$?
 			if [ $retval -ne 0 ] && [ $retval != 2 ]; then
 				Logger "$PROGRAM child exited with error." "ERROR" $retval
 			fi
 
-			watchDirectory="$INITIATOR_SYNC_DIR"
 		else
-			# Notify initiator about target changes
-			
+			# Notify initiator about target changes			
 			TriggerInitiatorRun
-			watchDirectory="$TARGET_SYNC_DIR"
 		fi
 			
 
