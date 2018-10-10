@@ -9,7 +9,7 @@ PROGRAM="osync" # Rsync based two way sync engine with fault tolerance
 AUTHOR="(C) 2013-2018 by Orsiris de Jong"
 CONTACT="http://www.netpower.fr/osync - ozy@netpower.fr"
 PROGRAM_VERSION=1.3.0-beta1
-PROGRAM_BUILD=2018101010
+PROGRAM_BUILD=2018101011
 IS_STABLE=no
 
 ##### Execution order						#__WITH_PARANOIA_DEBUG
@@ -2255,7 +2255,7 @@ function _TriggerInitiatorRunLocal {
 
 	local PUSH_FILE
 
-	PUSH_FILE="${INITIATOR[$__updateTriggerFile]}"
+	PUSH_FILE="${INITIATOR[$__replicaDir]}${INITIATOR[$__updateTriggerFile]}"
 
 	if [ -d $(dirname "$PUSH_FILE") ]; then
 		echo "$INSTANCE_ID#$(date '+%Y%m%dT%H%M%S.%N')" >> "$PUSH_FILE" 2> "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.error.$SCRIPT_PID.$TSTAMP"
@@ -2279,7 +2279,7 @@ function _TriggerInitiatorRunRemote {
 $SSH_CMD env _REMOTE_TOKEN="$_REMOTE_TOKEN" \
 env _DEBUG="'$_DEBUG'" env _PARANOIA_DEBUG="'$_PARANOIA_DEBUG'" env _LOGGER_SILENT="'$_LOGGER_SILENT'" env _LOGGER_VERBOSE="'$_LOGGER_VERBOSE'" env _LOGGER_PREFIX="'$_LOGGER_PREFIX'" env _LOGGER_ERR_ONLY="'$_LOGGER_ERR_ONLY'" \
 env PROGRAM="'$PROGRAM'" env SCRIPT_PID="'$SCRIPT_PID'" env TSTAMP="'$TSTAMP'" \
-env INSTANCE_ID="'$INSTANCE_ID'" env PUSH_FILE="'$(EscapeSpaces "${INITIATOR[$__updateTriggerFile]}")'" \
+env INSTANCE_ID="'$INSTANCE_ID'" env PUSH_FILE="'$(EscapeSpaces "${INITIATOR[$__replicaDir]}${INITIATOR[$__updateTriggerFile]}")'" \
 env LC_ALL=C $COMMAND_SUDO' bash -s' << 'ENDSSH' > "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$SCRIPT_PID.$TSTAMP" 2> "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.error.$SCRIPT_PID.$TSTAMP"
 include #### RUN_DIR SUBSET ####
 include #### DEBUG SUBSET ####
@@ -2582,7 +2582,7 @@ function Init {
 	INITIATOR[$__timestampAfterFile]="-timestamps-after-$INSTANCE_ID$drySuffix"
 	INITIATOR[$__timestampAfterFileNoSuffix]="-timestamps-after-$INSTANCE_ID"
 	INITIATOR[$__conflictListFile]="conflicts-$INSTANCE_ID$drySuffix"
-	INITIATOR[$__updateTriggerFile]="$INITIATOR_SYNC_DIR$pushFile"
+	INITIATOR[$__updateTriggerFile]="$pushFile"
 
 	TARGET=()
 	TARGET[$__type]='target'
@@ -2605,7 +2605,7 @@ function Init {
 	TARGET[$__timestampAfterFile]="-timestamps-after-$INSTANCE_ID$drySuffix"
 	TARGET[$__timestampAfterFileNoSuffix]="-timestamps-after-$INSTANCE_ID"
 	TARGET[$__conflictListFile]="conflicts-$INSTANCE_ID$drySuffix"
-	TARGET[$__updateTriggerFile]="$TARGET_SYNC_DIR$pushFile"
+	TARGET[$__updateTriggerFile]="$pushFile"
 
 	PARTIAL_DIR="${INITIATOR[$__partialDir]}"
 
@@ -2716,7 +2716,8 @@ function SyncOnChanges {
 	__CheckArguments 1 $# "$@"	#__WITH_PARANOIA_DEBUG
 
 	local watchDirectory
-	local initiatorWatchCmd
+	local watchCmd
+	local osyncSubcmd
 	local retval
 
 	if [ "$LOCAL_OS" == "MacOSX" ]; then
@@ -2738,9 +2739,9 @@ function SyncOnChanges {
 		fi
 		watchDirectory="$INITIATOR_SYNC_DIR"
 		if [ "$ConfigFile" != "" ]; then
-			initiatorWatchCmd='bash '$osync_cmd' "'$ConfigFile'" '$opts
+			osyncSubcmd='bash '$osync_cmd' "'$ConfigFile'" '$opts
 		else
-			initiatorWatchCmd='bash '$osync_cmd' '$opts
+			osyncSubcmd='bash '$osync_cmd' '$opts
 		fi
 		Logger "#### Running $PROGRAM in initiator file monitor mode." "NOTICE"
 	else
@@ -2754,8 +2755,8 @@ function SyncOnChanges {
 
 	while true; do
 		if [ $isTargetHelper == false ]; then
-			Logger "Daemon cmd: [$initiatorWatchCmd]" "DEBUG"
-			eval "$initiatorWatchCmd"
+			Logger "Daemon cmd: [$osyncSubcmd]" "DEBUG"
+			eval "$osyncSubcmd"
 			retval=$?
 			if [ $retval -ne 0 ] && [ $retval != 2 ]; then
 				Logger "$PROGRAM child exited with error." "ERROR" $retval
@@ -2767,17 +2768,27 @@ function SyncOnChanges {
 		fi
 			
 
+		#WIP Watch cmd log is debug and not notice
+
 		Logger "#### Monitoring now." "NOTICE"
 		if [ "$LOCAL_OS" == "MacOSX" ]; then
-			fswatch $RSYNC_PATTERNS --exclude "$OSYNC_DIR" -1 "$watchDirectory" > /dev/null &
+			watchCmd="fswatch --exclude \"$OSYNC_DIR\" -1 \"$watchDirectory\" > /dev/null &"
 			# Mac fswatch doesn't have timeout switch, replacing wait $! with WaitForTaskCompletion without warning nor spinner and increased SLEEP_TIME to avoid cpu hogging. This simulates wait $! with timeout
+			Logger "Watch cmd M: [$watchCmd]."  "NOTICE"
+			eval "$watchCmd"
 			ExecTasks $! "MonitorMacOSXWait" false 0 0 0 $MAX_WAIT true 1 0
 		elif [ "$LOCAL_OS" == "BSD" ]; then
 			# BSD version of inotifywait does not support multiple --exclude statements
-			inotifywait --exclude "$OSYNC_DIR" -qq -r -e create -e modify -e delete -e move -e attrib --timeout "$MAX_WAIT" "$watchDirectory" &
+			watchCmd="inotifywait --exclude \"$OSYNC_DIR\" -qq -r -e create -e modify -e delete -e move -e attrib --timeout \"$MAX_WAIT\" \"$watchDirectory\" &"
+			Logger "Watch cmd B: [$watchCmd]."  "NOTICE"
+			eval "$watchCmd"
 			wait $!
 		else
-			inotifywait --exclude "$OSYNC_DIR" $RSYNC_PATTERNS -qq -r -e create -e modify -e delete -e move -e attrib --timeout "$MAX_WAIT" "$watchDirectory" &
+			#WIP: replaced exclude $OSYNC_DIR with $watchDirectory/$OSYNC_DIR
+			Logger "--$RSYNC_PATTERNS--" "NOTICE"
+			watchCmd="inotifywait --exclude \"$OSYNC_DIR\" -qq -r -e create -e modify -e delete -e move -e attrib --timeout \"$MAX_WAIT\" \"$watchDirectory\" &"
+			Logger "Watch cmd L: [$watchCmd]."  "NOTICE"
+			eval "$watchCmd"
 			wait $!
 		fi
 		retval=$?
