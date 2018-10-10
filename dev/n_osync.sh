@@ -9,7 +9,7 @@ PROGRAM="osync" # Rsync based two way sync engine with fault tolerance
 AUTHOR="(C) 2013-2018 by Orsiris de Jong"
 CONTACT="http://www.netpower.fr/osync - ozy@netpower.fr"
 PROGRAM_VERSION=1.3.0-beta1
-PROGRAM_BUILD=2018101011
+PROGRAM_BUILD=2018101012
 IS_STABLE=no
 
 ##### Execution order						#__WITH_PARANOIA_DEBUG
@@ -1257,7 +1257,7 @@ function _deleteLocal {
 	local deletionDir="${3}" # deletion dir in format .[workdir]/deleted
 	__CheckArguments 3 $# "$@"	#__WITH_PARANOIA_DEBUG
 
-	local retval
+	local retval=0
 	local parentdir
 	local previousFile=""
 
@@ -1277,7 +1277,7 @@ function _deleteLocal {
 		retval=$?
 		if [ $retval -ne 0 ]; then
 			Logger "Cannot create local replica deletion directory in [$replicaDir$deletionDir]." "ERROR" $retval
-			exit 1
+			return $retval
 		fi
 	fi
 
@@ -1288,6 +1288,10 @@ function _deleteLocal {
 				if [ $_DRYRUN == false ]; then
 					if [ -e "$replicaDir$deletionDir/$files" ] || [ -L "$replicaDir$deletionDir/$files" ]; then
 						rm -rf "${replicaDir:?}$deletionDir/$files"
+						if [ $? -ne 0 ]; then
+							Logger "Cannot remove [${replicaDir:?}$deletionDir/$files]." "ERROR"
+							retval=1
+						fi
 					fi
 
 					if [ -e "$replicaDir$files" ] || [ -L "$replicaDir$files" ]; then
@@ -1328,6 +1332,7 @@ function _deleteLocal {
 			previousFile="$files"
 		fi
 	done < "${INITIATOR[$__replicaDir]}${INITIATOR[$__stateDir]}/$deletionListFromReplica${INITIATOR[$__deletedListFile]}"
+	return $retval
 }
 
 function _deleteRemote {
@@ -1388,6 +1393,7 @@ include #### TrapError SUBSET ####
 include #### RemoteLogger SUBSET ####
 include #### CleanUp SUBSET ####
 
+function _deleteRemoteSub {
 	## Empty earlier failed delete list
 	> "$FAILED_DELETE_LIST"
 	> "$SUCCESS_DELETE_LIST"
@@ -1412,6 +1418,10 @@ include #### CleanUp SUBSET ####
 				if [ $_DRYRUN == false ]; then
 					if [ -e "$REPLICA_DIR$DELETION_DIR/$files" ] || [ -L "$REPLICA_DIR$DELETION_DIR/$files" ]; then
 						rm -rf "$REPLICA_DIR$DELETION_DIR/$files"
+						if [ $? -ne 0 ]; then
+							RemoteLogger "Cannot remove [$REPLICA_DIR$DELETION_DIR/$files]." "ERROR"
+							retval=1
+						fi
 					fi
 
 					if [ -e "$REPLICA_DIR$files" ] || [ -L "$REPLICA_DIR$files" ]; then
@@ -1453,11 +1463,15 @@ include #### CleanUp SUBSET ####
 			previousFile="$files"
 		fi
 	done < "$FILE_LIST"
+	return $retval
+}
+	_deleteRemoteSub
 	CleanUp
+	exit $retval
 
 ENDSSH
 
-	if [ -s "$RUN_DIR/$PROGRAM.remote_deletion.$SCRIPT_PID.$TSTAMP" ]; then
+	if [ -s "$RUN_DIR/$PROGRAM.remote_deletion.$SCRIPT_PID.$TSTAMP" ] && [ $retval -ne 0 ]; then
 		(
 		_LOGGER_PREFIX="RR"
 		Logger "$(cat $RUN_DIR/$PROGRAM.remote_deletion.$SCRIPT_PID.$TSTAMP)" "ERROR"
