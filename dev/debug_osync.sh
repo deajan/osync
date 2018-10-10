@@ -9,7 +9,7 @@ PROGRAM="osync" # Rsync based two way sync engine with fault tolerance
 AUTHOR="(C) 2013-2018 by Orsiris de Jong"
 CONTACT="http://www.netpower.fr/osync - ozy@netpower.fr"
 PROGRAM_VERSION=1.3.0-beta1
-PROGRAM_BUILD=2018101008
+PROGRAM_BUILD=2018101013
 IS_STABLE=no
 
 ##### Execution order						#__WITH_PARANOIA_DEBUG
@@ -3391,9 +3391,9 @@ function treeList {
 	if [ "$REMOTE_OPERATION" == "yes" ] && [ "$replicaType" == "${TARGET[$__type]}" ]; then
 		CheckConnectivity3rdPartyHosts
 		CheckConnectivityRemoteHost
-		rsyncCmd="$(type -p $RSYNC_EXECUTABLE) --rsync-path=\"env LC_ALL=C env _REMOTE_TOKEN=$_REMOTE_TOKEN $RSYNC_PATH\" $RSYNC_DEFAULT_ARGS $RSYNC_ATTR_ARGS $RSYNC_TYPE_ARGS --exclude \"$OSYNC_DIR\" $RSYNC_PATTERNS $RSYNC_PARTIAL_EXCLUDE -e \"$RSYNC_SSH_CMD\" --list-only $REMOTE_USER@$REMOTE_HOST:\"$escapedReplicaPath\" 2> \"$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$replicaType.error.$SCRIPT_PID.$TSTAMP\" | (grep -E \"^-|^d|^l\" || :) | (sed $SED_REGEX_ARG 's/^.{10} +[0-9,]+ [0-9/]{10} [0-9:]{8} //' || :) | (awk 'BEGIN { FS=\" -> \" } ; { print \$1 }' || :) | (grep -v \"^\.$\" || :) | sort > \"$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$replicaType.$SCRIPT_PID.$TSTAMP\""
+		rsyncCmd="$(type -p $RSYNC_EXECUTABLE) --rsync-path=\"env LC_ALL=C env _REMOTE_TOKEN=$_REMOTE_TOKEN $RSYNC_PATH\" $RSYNC_DEFAULT_ARGS $RSYNC_ATTR_ARGS $RSYNC_TYPE_ARGS --exclude \"$OSYNC_DIR\" $RSYNC_FULL_PATTERNS $RSYNC_PARTIAL_EXCLUDE -e \"$RSYNC_SSH_CMD\" --list-only $REMOTE_USER@$REMOTE_HOST:\"$escapedReplicaPath\" 2> \"$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$replicaType.error.$SCRIPT_PID.$TSTAMP\" | (grep -E \"^-|^d|^l\" || :) | (sed $SED_REGEX_ARG 's/^.{10} +[0-9,]+ [0-9/]{10} [0-9:]{8} //' || :) | (awk 'BEGIN { FS=\" -> \" } ; { print \$1 }' || :) | (grep -v \"^\.$\" || :) | sort > \"$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$replicaType.$SCRIPT_PID.$TSTAMP\""
 	else
-		rsyncCmd="$(type -p $RSYNC_EXECUTABLE) --rsync-path=\"env LC_ALL=C env _REMOTE_TOKEN=$_REMOTE_TOKEN $RSYNC_PATH\" $RSYNC_DEFAULT_ARGS $RSYNC_ATTR_ARGS $RSYNC_TYPE_ARGS --exclude \"$OSYNC_DIR\" $RSYNC_PATTERNS $RSYNC_PARTIAL_EXCLUDE --list-only \"$replicaPath\" 2> \"$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$replicaType.error.$SCRIPT_PID.$TSTAMP\" | (grep -E \"^-|^d|^l\" || :) | (sed $SED_REGEX_ARG 's/^.{10} +[0-9,]+ [0-9/]{10} [0-9:]{8} //' || :) | (awk 'BEGIN { FS=\" -> \" } ; { print \$1 }' || :) | (grep -v \"^\.$\" || :) | sort > \"$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$replicaType.$SCRIPT_PID.$TSTAMP\""
+		rsyncCmd="$(type -p $RSYNC_EXECUTABLE) --rsync-path=\"env LC_ALL=C env _REMOTE_TOKEN=$_REMOTE_TOKEN $RSYNC_PATH\" $RSYNC_DEFAULT_ARGS $RSYNC_ATTR_ARGS $RSYNC_TYPE_ARGS --exclude \"$OSYNC_DIR\" $RSYNC_FULL_PATTERNS $RSYNC_PARTIAL_EXCLUDE --list-only \"$replicaPath\" 2> \"$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$replicaType.error.$SCRIPT_PID.$TSTAMP\" | (grep -E \"^-|^d|^l\" || :) | (sed $SED_REGEX_ARG 's/^.{10} +[0-9,]+ [0-9/]{10} [0-9:]{8} //' || :) | (awk 'BEGIN { FS=\" -> \" } ; { print \$1 }' || :) | (grep -v \"^\.$\" || :) | sort > \"$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$replicaType.$SCRIPT_PID.$TSTAMP\""
 	fi
 	Logger "RSYNC_CMD: $rsyncCmd" "DEBUG"
 	eval "$rsyncCmd"
@@ -3719,9 +3719,9 @@ function syncAttrs {
 	if [ "$REMOTE_OPERATION" == "yes" ]; then
 		CheckConnectivity3rdPartyHosts
 		CheckConnectivityRemoteHost
-		rsyncCmd="$(type -p $RSYNC_EXECUTABLE) --rsync-path=\"env LC_ALL=C env _REMOTE_TOKEN=$_REMOTE_TOKEN $RSYNC_PATH\" -i -n $RSYNC_DEFAULT_ARGS $RSYNC_ATTR_ARGS $RSYNC_PARTIAL_EXCLUDE -e \"$RSYNC_SSH_CMD\" --exclude \"$OSYNC_DIR\" $RSYNC_PATTERNS $RSYNC_PARTIAL_EXCLUDE \"$initiatorReplica\" $REMOTE_USER@$REMOTE_HOST:\"$targetReplica\" >> $RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$SCRIPT_PID.$TSTAMP 2>&1 &"
+		rsyncCmd="$(type -p $RSYNC_EXECUTABLE) --rsync-path=\"env LC_ALL=C env _REMOTE_TOKEN=$_REMOTE_TOKEN $RSYNC_PATH\" -i -n $RSYNC_DEFAULT_ARGS $RSYNC_ATTR_ARGS $RSYNC_PARTIAL_EXCLUDE -e \"$RSYNC_SSH_CMD\" --exclude \"$OSYNC_DIR\" $RSYNC_FULL_PATTERNS $RSYNC_PARTIAL_EXCLUDE \"$initiatorReplica\" $REMOTE_USER@$REMOTE_HOST:\"$targetReplica\" >> $RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$SCRIPT_PID.$TSTAMP 2>&1 &"
 	else
-		rsyncCmd="$(type -p $RSYNC_EXECUTABLE) --rsync-path=\"env LC_ALL=C env _REMOTE_TOKEN=$_REMOTE_TOKEN $RSYNC_PATH\" -i -n $RSYNC_DEFAULT_ARGS $RSYNC_ATTR_ARGS $RSYNC_PARTIAL_EXCLUDE --exclude \"$OSYNC_DIR\" $RSYNC_PATTERNS $RSYNC_PARTIAL_EXCLUDE \"$initiatorReplica\" \"$targetReplica\" >> $RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$SCRIPT_PID.$TSTAMP 2>&1 &"
+		rsyncCmd="$(type -p $RSYNC_EXECUTABLE) --rsync-path=\"env LC_ALL=C env _REMOTE_TOKEN=$_REMOTE_TOKEN $RSYNC_PATH\" -i -n $RSYNC_DEFAULT_ARGS $RSYNC_ATTR_ARGS $RSYNC_PARTIAL_EXCLUDE --exclude \"$OSYNC_DIR\" $RSYNC_FULL_PATTERNS $RSYNC_PARTIAL_EXCLUDE \"$initiatorReplica\" \"$targetReplica\" >> $RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$SCRIPT_PID.$TSTAMP 2>&1 &"
 	fi
 	Logger "RSYNC_CMD: $rsyncCmd" "DEBUG"
 	eval "$rsyncCmd"
@@ -3801,12 +3801,12 @@ function syncAttrs {
 
 		# No rsync args (hence no -r) because files are selected with --from-file
 		if [ "$destReplica" == "${INITIATOR[$__type]}" ]; then
-			rsyncCmd="$(type -p $RSYNC_EXECUTABLE) --rsync-path=\"env LC_ALL=C env _REMOTE_TOKEN=$_REMOTE_TOKEN $RSYNC_PATH\" $RSYNC_DRY_ARG $RSYNC_ATTR_ARGS $SYNC_OPTS -e \"$RSYNC_SSH_CMD\" --exclude \"$OSYNC_DIR\" $RSYNC_PATTERNS $RSYNC_PARTIAL_EXCLUDE --exclude-from=\"${INITIATOR[$__replicaDir]}${INITIATOR[$__stateDir]}/${INITIATOR[$__type]}${INITIATOR[$__deletedListFile]}\" --exclude-from=\"${INITIATOR[$__replicaDir]}${INITIATOR[$__stateDir]}/${TARGET[$__type]}${INITIATOR[$__deletedListFile]}\" --files-from=\"$RUN_DIR/$PROGRAM.${FUNCNAME[0]}-ctime_files.$SCRIPT_PID.$TSTAMP\" $REMOTE_USER@$REMOTE_HOST:\"$escSourceDir\" \"$destDir\" >> $RUN_DIR/$PROGRAM.attr-update.$destReplica.$SCRIPT_PID.$TSTAMP 2>&1 &"
+			rsyncCmd="$(type -p $RSYNC_EXECUTABLE) --rsync-path=\"env LC_ALL=C env _REMOTE_TOKEN=$_REMOTE_TOKEN $RSYNC_PATH\" $RSYNC_DRY_ARG $RSYNC_ATTR_ARGS $SYNC_OPTS -e \"$RSYNC_SSH_CMD\" --exclude \"$OSYNC_DIR\" $RSYNC_FULL_PATTERNS $RSYNC_PARTIAL_EXCLUDE --exclude-from=\"${INITIATOR[$__replicaDir]}${INITIATOR[$__stateDir]}/${INITIATOR[$__type]}${INITIATOR[$__deletedListFile]}\" --exclude-from=\"${INITIATOR[$__replicaDir]}${INITIATOR[$__stateDir]}/${TARGET[$__type]}${INITIATOR[$__deletedListFile]}\" --files-from=\"$RUN_DIR/$PROGRAM.${FUNCNAME[0]}-ctime_files.$SCRIPT_PID.$TSTAMP\" $REMOTE_USER@$REMOTE_HOST:\"$escSourceDir\" \"$destDir\" >> $RUN_DIR/$PROGRAM.attr-update.$destReplica.$SCRIPT_PID.$TSTAMP 2>&1 &"
 		else
-			rsyncCmd="$(type -p $RSYNC_EXECUTABLE) --rsync-path=\"env LC_ALL=C env _REMOTE_TOKEN=$_REMOTE_TOKEN $RSYNC_PATH\" $RSYNC_DRY_ARG $RSYNC_ATTR_ARGS $SYNC_OPTS -e \"$RSYNC_SSH_CMD\" --exclude \"$OSYNC_DIR\" $RSYNC_PATTERNS $RSYNC_PARTIAL_EXCLUDE --exclude-from=\"${INITIATOR[$__replicaDir]}${INITIATOR[$__stateDir]}/${INITIATOR[$__type]}${INITIATOR[$__deletedListFile]}\" --exclude-from=\"${INITIATOR[$__replicaDir]}${INITIATOR[$__stateDir]}/${TARGET[$__type]}${INITIATOR[$__deletedListFile]}\" --files-from=\"$RUN_DIR/$PROGRAM.${FUNCNAME[0]}-ctime_files.$SCRIPT_PID.$TSTAMP\" \"$sourceDir\" $REMOTE_USER@$REMOTE_HOST:\"$escDestDir\" >> $RUN_DIR/$PROGRAM.attr-update.$destReplica.$SCRIPT_PID.$TSTAMP 2>&1 &"
+			rsyncCmd="$(type -p $RSYNC_EXECUTABLE) --rsync-path=\"env LC_ALL=C env _REMOTE_TOKEN=$_REMOTE_TOKEN $RSYNC_PATH\" $RSYNC_DRY_ARG $RSYNC_ATTR_ARGS $SYNC_OPTS -e \"$RSYNC_SSH_CMD\" --exclude \"$OSYNC_DIR\" $RSYNC_FULL_PATTERNS $RSYNC_PARTIAL_EXCLUDE --exclude-from=\"${INITIATOR[$__replicaDir]}${INITIATOR[$__stateDir]}/${INITIATOR[$__type]}${INITIATOR[$__deletedListFile]}\" --exclude-from=\"${INITIATOR[$__replicaDir]}${INITIATOR[$__stateDir]}/${TARGET[$__type]}${INITIATOR[$__deletedListFile]}\" --files-from=\"$RUN_DIR/$PROGRAM.${FUNCNAME[0]}-ctime_files.$SCRIPT_PID.$TSTAMP\" \"$sourceDir\" $REMOTE_USER@$REMOTE_HOST:\"$escDestDir\" >> $RUN_DIR/$PROGRAM.attr-update.$destReplica.$SCRIPT_PID.$TSTAMP 2>&1 &"
 		fi
 	else
-		rsyncCmd="$(type -p $RSYNC_EXECUTABLE) --rsync-path=\"env LC_ALL=C env _REMOTE_TOKEN=$_REMOTE_TOKEN $RSYNC_PATH\" $RSYNC_DRY_ARG $RSYNC_ATTR_ARGS $SYNC_OPTS --exclude \"$OSYNC_DIR\" $RSYNC_PATTERNS $RSYNC_PARTIAL_EXCLUDE --exclude-from=\"${INITIATOR[$__replicaDir]}${INITIATOR[$__stateDir]}/${INITIATOR[$__type]}${INITIATOR[$__deletedListFile]}\" --exclude-from=\"${INITIATOR[$__replicaDir]}${INITIATOR[$__stateDir]}/${TARGET[$__type]}${INITIATOR[$__deletedListFile]}\" --files-from=\"$RUN_DIR/$PROGRAM.${FUNCNAME[0]}-ctime_files.$SCRIPT_PID.$TSTAMP\" \"$sourceDir\" \"$destDir\" >> $RUN_DIR/$PROGRAM.attr-update.$destReplica.$SCRIPT_PID.$TSTAMP 2>&1 &"
+		rsyncCmd="$(type -p $RSYNC_EXECUTABLE) --rsync-path=\"env LC_ALL=C env _REMOTE_TOKEN=$_REMOTE_TOKEN $RSYNC_PATH\" $RSYNC_DRY_ARG $RSYNC_ATTR_ARGS $SYNC_OPTS --exclude \"$OSYNC_DIR\" $RSYNC_FULL_PATTERNS $RSYNC_PARTIAL_EXCLUDE --exclude-from=\"${INITIATOR[$__replicaDir]}${INITIATOR[$__stateDir]}/${INITIATOR[$__type]}${INITIATOR[$__deletedListFile]}\" --exclude-from=\"${INITIATOR[$__replicaDir]}${INITIATOR[$__stateDir]}/${TARGET[$__type]}${INITIATOR[$__deletedListFile]}\" --files-from=\"$RUN_DIR/$PROGRAM.${FUNCNAME[0]}-ctime_files.$SCRIPT_PID.$TSTAMP\" \"$sourceDir\" \"$destDir\" >> $RUN_DIR/$PROGRAM.attr-update.$destReplica.$SCRIPT_PID.$TSTAMP 2>&1 &"
 
 	fi
 
@@ -3867,12 +3867,12 @@ function syncUpdate {
 		CheckConnectivity3rdPartyHosts
 		CheckConnectivityRemoteHost
 		if [ "$sourceReplica" == "${INITIATOR[$__type]}" ]; then
-			rsyncCmd="$(type -p $RSYNC_EXECUTABLE) --rsync-path=\"env LC_ALL=C env _REMOTE_TOKEN=$_REMOTE_TOKEN $RSYNC_PATH\" $RSYNC_DEFAULT_ARGS $RSYNC_DRY_ARG $RSYNC_ATTR_ARGS $RSYNC_TYPE_ARGS $SYNC_OPTS -e \"$RSYNC_SSH_CMD\" $backupArgs --exclude \"$OSYNC_DIR\" $RSYNC_PATTERNS $RSYNC_PARTIAL_EXCLUDE --exclude-from=\"${INITIATOR[$__replicaDir]}${INITIATOR[$__stateDir]}/$sourceReplica${INITIATOR[$__deletedListFile]}\" --exclude-from=\"${INITIATOR[$__replicaDir]}${INITIATOR[$__stateDir]}/$destinationReplica${INITIATOR[$__deletedListFile]}\" \"$sourceDir\" $REMOTE_USER@$REMOTE_HOST:\"$escDestDir\" >> $RUN_DIR/$PROGRAM.update.$destinationReplica.$SCRIPT_PID.$TSTAMP 2>&1"
+			rsyncCmd="$(type -p $RSYNC_EXECUTABLE) --rsync-path=\"env LC_ALL=C env _REMOTE_TOKEN=$_REMOTE_TOKEN $RSYNC_PATH\" $RSYNC_DEFAULT_ARGS $RSYNC_DRY_ARG $RSYNC_ATTR_ARGS $RSYNC_TYPE_ARGS $SYNC_OPTS -e \"$RSYNC_SSH_CMD\" $backupArgs --exclude \"$OSYNC_DIR\" $RSYNC_FULL_PATTERNS $RSYNC_PARTIAL_EXCLUDE --exclude-from=\"${INITIATOR[$__replicaDir]}${INITIATOR[$__stateDir]}/$sourceReplica${INITIATOR[$__deletedListFile]}\" --exclude-from=\"${INITIATOR[$__replicaDir]}${INITIATOR[$__stateDir]}/$destinationReplica${INITIATOR[$__deletedListFile]}\" \"$sourceDir\" $REMOTE_USER@$REMOTE_HOST:\"$escDestDir\" >> $RUN_DIR/$PROGRAM.update.$destinationReplica.$SCRIPT_PID.$TSTAMP 2>&1"
 		else
-			rsyncCmd="$(type -p $RSYNC_EXECUTABLE) --rsync-path=\"env LC_ALL=C env _REMOTE_TOKEN=$_REMOTE_TOKEN $RSYNC_PATH\" $RSYNC_DEFAULT_ARGS $RSYNC_DRY_ARG $RSYNC_ATTR_ARGS $RSYNC_TYPE_ARGS $SYNC_OPTS -e \"$RSYNC_SSH_CMD\" $backupArgs --exclude \"$OSYNC_DIR\" $RSYNC_PATTERNS $RSYNC_PARTIAL_EXCLUDE --exclude-from=\"${INITIATOR[$__replicaDir]}${INITIATOR[$__stateDir]}/$destinationReplica${INITIATOR[$__deletedListFile]}\" --exclude-from=\"${INITIATOR[$__replicaDir]}${INITIATOR[$__stateDir]}/$sourceReplica${INITIATOR[$__deletedListFile]}\" $REMOTE_USER@$REMOTE_HOST:\"$escSourceDir\" \"$destDir\" >> $RUN_DIR/$PROGRAM.update.$destinationReplica.$SCRIPT_PID.$TSTAMP 2>&1"
+			rsyncCmd="$(type -p $RSYNC_EXECUTABLE) --rsync-path=\"env LC_ALL=C env _REMOTE_TOKEN=$_REMOTE_TOKEN $RSYNC_PATH\" $RSYNC_DEFAULT_ARGS $RSYNC_DRY_ARG $RSYNC_ATTR_ARGS $RSYNC_TYPE_ARGS $SYNC_OPTS -e \"$RSYNC_SSH_CMD\" $backupArgs --exclude \"$OSYNC_DIR\" $RSYNC_FULL_PATTERNS $RSYNC_PARTIAL_EXCLUDE --exclude-from=\"${INITIATOR[$__replicaDir]}${INITIATOR[$__stateDir]}/$destinationReplica${INITIATOR[$__deletedListFile]}\" --exclude-from=\"${INITIATOR[$__replicaDir]}${INITIATOR[$__stateDir]}/$sourceReplica${INITIATOR[$__deletedListFile]}\" $REMOTE_USER@$REMOTE_HOST:\"$escSourceDir\" \"$destDir\" >> $RUN_DIR/$PROGRAM.update.$destinationReplica.$SCRIPT_PID.$TSTAMP 2>&1"
 		fi
 	else
-		rsyncCmd="$(type -p $RSYNC_EXECUTABLE) --rsync-path=\"env LC_ALL=C env _REMOTE_TOKEN=$_REMOTE_TOKEN $RSYNC_PATH\" $RSYNC_DEFAULT_ARGS $RSYNC_DRY_ARG $RSYNC_ATTR_ARGS $RSYNC_TYPE_ARGS $SYNC_OPTS $backupArgs --exclude \"$OSYNC_DIR\" $RSYNC_PATTERNS $RSYNC_PARTIAL_EXCLUDE --exclude-from=\"${INITIATOR[$__replicaDir]}${INITIATOR[$__stateDir]}/$sourceReplica${INITIATOR[$__deletedListFile]}\" --exclude-from=\"${INITIATOR[$__replicaDir]}${INITIATOR[$__stateDir]}/$destinationReplica${INITIATOR[$__deletedListFile]}\" \"$sourceDir\" \"$destDir\" >> $RUN_DIR/$PROGRAM.update.$destinationReplica.$SCRIPT_PID.$TSTAMP 2>&1"
+		rsyncCmd="$(type -p $RSYNC_EXECUTABLE) --rsync-path=\"env LC_ALL=C env _REMOTE_TOKEN=$_REMOTE_TOKEN $RSYNC_PATH\" $RSYNC_DEFAULT_ARGS $RSYNC_DRY_ARG $RSYNC_ATTR_ARGS $RSYNC_TYPE_ARGS $SYNC_OPTS $backupArgs --exclude \"$OSYNC_DIR\" $RSYNC_FULL_PATTERNS $RSYNC_PARTIAL_EXCLUDE --exclude-from=\"${INITIATOR[$__replicaDir]}${INITIATOR[$__stateDir]}/$sourceReplica${INITIATOR[$__deletedListFile]}\" --exclude-from=\"${INITIATOR[$__replicaDir]}${INITIATOR[$__stateDir]}/$destinationReplica${INITIATOR[$__deletedListFile]}\" \"$sourceDir\" \"$destDir\" >> $RUN_DIR/$PROGRAM.update.$destinationReplica.$SCRIPT_PID.$TSTAMP 2>&1"
 	fi
 	Logger "RSYNC_CMD: $rsyncCmd" "DEBUG"
 	eval "$rsyncCmd"
@@ -3900,7 +3900,7 @@ function _deleteLocal {
 	local deletionDir="${3}" # deletion dir in format .[workdir]/deleted
 	__CheckArguments 3 $# "$@"	#__WITH_PARANOIA_DEBUG
 
-	local retval
+	local retval=0
 	local parentdir
 	local previousFile=""
 
@@ -3920,7 +3920,7 @@ function _deleteLocal {
 		retval=$?
 		if [ $retval -ne 0 ]; then
 			Logger "Cannot create local replica deletion directory in [$replicaDir$deletionDir]." "ERROR" $retval
-			exit 1
+			return $retval
 		fi
 	fi
 
@@ -3931,6 +3931,10 @@ function _deleteLocal {
 				if [ $_DRYRUN == false ]; then
 					if [ -e "$replicaDir$deletionDir/$files" ] || [ -L "$replicaDir$deletionDir/$files" ]; then
 						rm -rf "${replicaDir:?}$deletionDir/$files"
+						if [ $? -ne 0 ]; then
+							Logger "Cannot remove [${replicaDir:?}$deletionDir/$files]." "ERROR"
+							retval=1
+						fi
 					fi
 
 					if [ -e "$replicaDir$files" ] || [ -L "$replicaDir$files" ]; then
@@ -3971,6 +3975,7 @@ function _deleteLocal {
 			previousFile="$files"
 		fi
 	done < "${INITIATOR[$__replicaDir]}${INITIATOR[$__stateDir]}/$deletionListFromReplica${INITIATOR[$__deletedListFile]}"
+	return $retval
 }
 
 function _deleteRemote {
@@ -4160,6 +4165,7 @@ function CleanUp {
 	fi
 }
 
+function _deleteRemoteSub {
 	## Empty earlier failed delete list
 	> "$FAILED_DELETE_LIST"
 	> "$SUCCESS_DELETE_LIST"
@@ -4184,6 +4190,10 @@ function CleanUp {
 				if [ $_DRYRUN == false ]; then
 					if [ -e "$REPLICA_DIR$DELETION_DIR/$files" ] || [ -L "$REPLICA_DIR$DELETION_DIR/$files" ]; then
 						rm -rf "$REPLICA_DIR$DELETION_DIR/$files"
+						if [ $? -ne 0 ]; then
+							RemoteLogger "Cannot remove [$REPLICA_DIR$DELETION_DIR/$files]." "ERROR"
+							retval=1
+						fi
 					fi
 
 					if [ -e "$REPLICA_DIR$files" ] || [ -L "$REPLICA_DIR$files" ]; then
@@ -4225,11 +4235,15 @@ function CleanUp {
 			previousFile="$files"
 		fi
 	done < "$FILE_LIST"
+	return $retval
+}
+	_deleteRemoteSub
 	CleanUp
+	exit $retval
 
 ENDSSH
 
-	if [ -s "$RUN_DIR/$PROGRAM.remote_deletion.$SCRIPT_PID.$TSTAMP" ]; then
+	if [ -s "$RUN_DIR/$PROGRAM.remote_deletion.$SCRIPT_PID.$TSTAMP" ] && [ $retval -ne 0 ]; then
 		(
 		_LOGGER_PREFIX="RR"
 		Logger "$(cat $RUN_DIR/$PROGRAM.remote_deletion.$SCRIPT_PID.$TSTAMP)" "ERROR"
@@ -5203,7 +5217,7 @@ function _TriggerInitiatorRunLocal {
 
 	local PUSH_FILE
 
-	PUSH_FILE="${INITIATOR[$__updateTriggerFile]}"
+	PUSH_FILE="${INITIATOR[$__replicaDir]}${INITIATOR[$__updateTriggerFile]}"
 
 	if [ -d $(dirname "$PUSH_FILE") ]; then
 		echo "$INSTANCE_ID#$(date '+%Y%m%dT%H%M%S.%N')" >> "$PUSH_FILE" 2> "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.error.$SCRIPT_PID.$TSTAMP"
@@ -5227,7 +5241,7 @@ function _TriggerInitiatorRunRemote {
 $SSH_CMD env _REMOTE_TOKEN="$_REMOTE_TOKEN" \
 env _DEBUG="'$_DEBUG'" env _PARANOIA_DEBUG="'$_PARANOIA_DEBUG'" env _LOGGER_SILENT="'$_LOGGER_SILENT'" env _LOGGER_VERBOSE="'$_LOGGER_VERBOSE'" env _LOGGER_PREFIX="'$_LOGGER_PREFIX'" env _LOGGER_ERR_ONLY="'$_LOGGER_ERR_ONLY'" \
 env PROGRAM="'$PROGRAM'" env SCRIPT_PID="'$SCRIPT_PID'" env TSTAMP="'$TSTAMP'" \
-env INSTANCE_ID="'$INSTANCE_ID'" env PUSH_FILE="'$(EscapeSpaces "${INITIATOR[$__updateTriggerFile]}")'" \
+env INSTANCE_ID="'$INSTANCE_ID'" env PUSH_FILE="'$(EscapeSpaces "${INITIATOR[$__replicaDir]}${INITIATOR[$__updateTriggerFile]}")'" \
 env LC_ALL=C $COMMAND_SUDO' bash -s' << 'ENDSSH' > "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$SCRIPT_PID.$TSTAMP" 2> "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.error.$SCRIPT_PID.$TSTAMP"
 ## Default directory where to store temporary run files
 if [ -w /tmp ]; then
@@ -5659,7 +5673,7 @@ function Init {
 	INITIATOR[$__timestampAfterFile]="-timestamps-after-$INSTANCE_ID$drySuffix"
 	INITIATOR[$__timestampAfterFileNoSuffix]="-timestamps-after-$INSTANCE_ID"
 	INITIATOR[$__conflictListFile]="conflicts-$INSTANCE_ID$drySuffix"
-	INITIATOR[$__updateTriggerFile]="$INITIATOR_SYNC_DIR$pushFile"
+	INITIATOR[$__updateTriggerFile]="$pushFile"
 
 	TARGET=()
 	TARGET[$__type]='target'
@@ -5682,7 +5696,7 @@ function Init {
 	TARGET[$__timestampAfterFile]="-timestamps-after-$INSTANCE_ID$drySuffix"
 	TARGET[$__timestampAfterFileNoSuffix]="-timestamps-after-$INSTANCE_ID"
 	TARGET[$__conflictListFile]="conflicts-$INSTANCE_ID$drySuffix"
-	TARGET[$__updateTriggerFile]="$TARGET_SYNC_DIR$pushFile"
+	TARGET[$__updateTriggerFile]="$pushFile"
 
 	PARTIAL_DIR="${INITIATOR[$__partialDir]}"
 
@@ -5793,7 +5807,8 @@ function SyncOnChanges {
 	__CheckArguments 1 $# "$@"	#__WITH_PARANOIA_DEBUG
 
 	local watchDirectory
-	local cmd
+	local watchCmd
+	local osyncSubcmd
 	local retval
 
 	if [ "$LOCAL_OS" == "MacOSX" ]; then
@@ -5813,49 +5828,57 @@ function SyncOnChanges {
 			Logger "Initiator directory [$INITIATOR_SYNC_DIR] does not exist. Cannot monitor." "CRITICAL"
 			exit 1
 		fi
-	Logger "#### Running $PROGRAM in initiator file monitor mode." "NOTICE"
+		watchDirectory="$INITIATOR_SYNC_DIR"
+		if [ "$ConfigFile" != "" ]; then
+			osyncSubcmd='bash '$osync_cmd' "'$ConfigFile'" '$opts
+		else
+			osyncSubcmd='bash '$osync_cmd' '$opts
+		fi
+		Logger "#### Running $PROGRAM in initiator file monitor mode." "NOTICE"
 	else
 		if [ ! -d "$TARGET_SYNC_DIR" ]; then
 			Logger "Target directory [$TARGET_SYNC_DIR] does not exist. Cannot monitor." "CRITICAL"
 			exit 1
 		fi
+		watchDirectory="$TARGET_SYNC_DIR"
 	Logger "#### Running $PROGRAM in target helper file monitor mode." "NOTICE"
 	fi		
 
 	while true; do
 		if [ $isTargetHelper == false ]; then
-			if [ "$ConfigFile" != "" ]; then
-				cmd='bash '$osync_cmd' "'$ConfigFile'" '$opts
-			else
-				cmd='bash '$osync_cmd' '$opts
-			fi
-			Logger "Daemon cmd: $cmd" "DEBUG"
-			eval "$cmd"
+			Logger "Daemon cmd: [$osyncSubcmd]" "DEBUG"
+			eval "$osyncSubcmd"
 			retval=$?
 			if [ $retval -ne 0 ] && [ $retval != 2 ]; then
 				Logger "$PROGRAM child exited with error." "ERROR" $retval
 			fi
 
-			watchDirectory="$INITIATOR_SYNC_DIR"
 		else
-			# Notify initiator about target changes
-			
+			# Notify initiator about target changes			
 			TriggerInitiatorRun
-			watchDirectory="$TARGET_SYNC_DIR"
 		fi
 			
 
 		Logger "#### Monitoring now." "NOTICE"
+
+		# inotifywait < 3.20 can't handle multiple --exclude statements. For compat issues, we'll watch everything except .osync_workdir
+
 		if [ "$LOCAL_OS" == "MacOSX" ]; then
-			fswatch $RSYNC_PATTERNS --exclude "$OSYNC_DIR" -1 "$watchDirectory" > /dev/null &
+			watchCmd="fswatch --exclude \"$OSYNC_DIR\" -1 \"$watchDirectory\" > /dev/null &"
 			# Mac fswatch doesn't have timeout switch, replacing wait $! with WaitForTaskCompletion without warning nor spinner and increased SLEEP_TIME to avoid cpu hogging. This simulates wait $! with timeout
+			Logger "Watch cmd M: [$watchCmd]."  "DEBUG"
+			eval "$watchCmd"
 			ExecTasks $! "MonitorMacOSXWait" false 0 0 0 $MAX_WAIT true 1 0
 		elif [ "$LOCAL_OS" == "BSD" ]; then
 			# BSD version of inotifywait does not support multiple --exclude statements
-			inotifywait --exclude "$OSYNC_DIR" -qq -r -e create -e modify -e delete -e move -e attrib --timeout "$MAX_WAIT" "$watchDirectory" &
+			watchCmd="inotifywait --exclude \"$OSYNC_DIR\" -qq -r -e create -e modify -e delete -e move -e attrib --timeout \"$MAX_WAIT\" \"$watchDirectory\" &"
+			Logger "Watch cmd B: [$watchCmd]."  "DEBUG"
+			eval "$watchCmd"
 			wait $!
 		else
-			inotifywait --exclude "$OSYNC_DIR" $RSYNC_PATTERNS -qq -r -e create -e modify -e delete -e move -e attrib --timeout "$MAX_WAIT" "$watchDirectory" &
+			watchCmd="inotifywait --exclude \"$OSYNC_DIR\" -qq -r -e create -e modify -e delete -e move -e attrib --timeout \"$MAX_WAIT\" \"$watchDirectory\" &"
+			Logger "Watch cmd L: [$watchCmd]."  "DEBUG"
+			eval "$watchCmd"
 			wait $!
 		fi
 		retval=$?
@@ -5909,8 +5932,12 @@ _NOLOCKS=false
 osync_cmd=$0
 _SUMMARY=false
 INITIALIZE="no"
-MIN_WAIT=60
-MAX_WAIT=7200
+if [ "$MIN_WAIT" == "" ]; then
+	MIN_WAIT=60
+fi
+if [ "$MAX_WAIT" == "" ]; then
+	MAX_WAIT=7200
+fi
 
 function GetCommandlineArguments {
 	local isFirstArgument=true
@@ -6125,6 +6152,10 @@ PreInit
 Init
 CheckEnvironment
 PostInit
+
+# Add exclusion of $INITIATOR[$__updateTriggerFile] to rsync patterns used by sync functions, but not by daemon
+RSYNC_FULL_PATTERNS="$RSYNC_PATTERNS --exclude=${INITIATOR[$__updateTriggerFile]}"
+
 if [ $_QUICK_SYNC -lt 2 ]; then
 	if [ "$_SYNC_ON_CHANGES" == "no" ]; then
 		CheckCurrentConfig true
