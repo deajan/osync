@@ -1,3 +1,4 @@
+
 #!/usr/bin/env bash
 
 #TODO treeList, deleteList, _getFileCtimeMtime, conflictList should be called without having statedir informed. Just give the full path ?
@@ -9,7 +10,7 @@ PROGRAM="osync" # Rsync based two way sync engine with fault tolerance
 AUTHOR="(C) 2013-2018 by Orsiris de Jong"
 CONTACT="http://www.netpower.fr/osync - ozy@netpower.fr"
 PROGRAM_VERSION=1.3.0-beta1
-PROGRAM_BUILD=2018101013
+PROGRAM_BUILD=2018101201
 IS_STABLE=no
 
 ##### Execution order						#__WITH_PARANOIA_DEBUG
@@ -882,8 +883,7 @@ function _getFileCtimeMtimeRemote {
 
 	cmd='cat "'$fileList'" | '$SSH_CMD' "env LC_ALL=C env _REMOTE_TOKEN=$_REMOTE_TOKEN cat > \"./$PROGRAM._getFileCtimeMtimeRemote.Sent.$replicaType.$SCRIPT_PID.$TSTAMP\""'
 	Logger "Launching command [$cmd]." "DEBUG"
-	eval "$cmd" &
-	ExecTasks $! "${FUNCNAME[0]}" false 0 0 $SOFT_MAX_EXEC_TIME $HARD_MAX_EXEC_TIME false $SLEEP_TIME $KEEP_LOGGING
+	eval "$cmd"
 	retval=$?
 	if [ $retval -ne 0 ]; then
 		Logger "Sending ctime required file list failed with [$retval] on $replicaType. Stopping execution." "CRITICAL" $retval
@@ -900,7 +900,6 @@ env _DEBUG="'$_DEBUG'" env _PARANOIA_DEBUG="'$_PARANOIA_DEBUG'" env _LOGGER_SILE
 env PROGRAM="'$PROGRAM'" env SCRIPT_PID="'$SCRIPT_PID'" env TSTAMP="'$TSTAMP'" \
 env replicaPath="'$replicaPath'" env replicaType="'$replicaType'" env REMOTE_STAT_CTIME_MTIME_CMD="'$REMOTE_STAT_CTIME_MTIME_CMD'" \
 env LC_ALL=C $COMMAND_SUDO' bash -s' << 'ENDSSH' > "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$replicaType.$SCRIPT_PID.$TSTAMP"
-include #### CleanUp SUBSET ####
 
 function _getFileCtimeMtimeRemoteSub {
 	local retval=0
@@ -912,14 +911,15 @@ function _getFileCtimeMtimeRemoteSub {
 		fi
 	done < "./$PROGRAM._getFileCtimeMtimeRemote.Sent.$replicaType.$SCRIPT_PID.$TSTAMP"
 
+	if [ -f "./$PROGRAM._getFileCtimeMtimeRemote.Sent.$replicaType.$SCRIPT_PID.$TSTAMP" ]; then
+		rm -f "./$PROGRAM._getFileCtimeMtimeRemote.Sent.$replicaType.$SCRIPT_PID.$TSTAMP"
+	fi
 	return $retval
 }
 
 	_getFileCtimeMtimeRemoteSub
 	retval=$?
-	CleanUp
 	exit $retval
-
 ENDSSH
 	retval=$?
 	if [ $retval -ne 0 ]; then
