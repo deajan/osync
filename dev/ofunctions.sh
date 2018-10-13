@@ -31,7 +31,7 @@
 #### OFUNCTIONS MINI SUBSET ####
 #### OFUNCTIONS MICRO SUBSET ####
 _OFUNCTIONS_VERSION=2.3.0-RC2
-_OFUNCTIONS_BUILD=2018101301
+_OFUNCTIONS_BUILD=2018101302
 #### _OFUNCTIONS_BOOTSTRAP SUBSET ####
 _OFUNCTIONS_BOOTSTRAP=true
 #### _OFUNCTIONS_BOOTSTRAP SUBSET END ####
@@ -888,7 +888,7 @@ function ExecTasks {
 	fi
 
 	# Change '-' to '_' in task id
-	id="${id/-/_}"
+	id="${id//-/_}"
 
 	# Expand validExitCodes into array
 	IFS=';' read -r -a validExitCodes <<< "$validExitCodes"
