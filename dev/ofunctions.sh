@@ -31,7 +31,7 @@
 #### OFUNCTIONS MINI SUBSET ####
 #### OFUNCTIONS MICRO SUBSET ####
 _OFUNCTIONS_VERSION=2.3.0-RC2
-_OFUNCTIONS_BUILD=2018101403
+_OFUNCTIONS_BUILD=2018101404
 #### _OFUNCTIONS_BOOTSTRAP SUBSET ####
 _OFUNCTIONS_BOOTSTRAP=true
 #### _OFUNCTIONS_BOOTSTRAP SUBSET END ####
@@ -106,12 +106,19 @@ fi
 
 #### RUN_DIR SUBSET ####
 ## Default directory where to store temporary run files
+
 if [ -w /tmp ]; then
 	RUN_DIR=/tmp
 elif [ -w /var/tmp ]; then
 	RUN_DIR=/var/tmp
 else
 	RUN_DIR=.
+fi
+
+## Special note on synthetic unit tests. Since local initiator and remote target may be the same machine while testing, we'll have to differentiate RUN_DIR (this only affects unit tests)
+if [ "$_LOCAL_IS_REMOTE" == true ]; then
+	mkdir -p "$RUN_DIR/remote"
+	RUN_DIR="$RUN_DIR/remote"
 fi
 #### RUN_DIR SUBSET END ####
 
@@ -445,9 +452,9 @@ function KillAllChilds {
 #### CleanUp SUBSET ####
 function CleanUp {
 	if [ "$_DEBUG" != "yes" ]; then
-		rm -f "$RUN_DIR/$PROGRAM."*".$SCRIPT_PID.$TSTAMP"
+		rm -fv "$RUN_DIR/$PROGRAM."*".$SCRIPT_PID.$TSTAMP" >> /root/rm 2>&1 #WIP -v
 		# Fix for sed -i requiring backup extension for BSD & Mac (see all sed -i statements)
-		rm -f "$RUN_DIR/$PROGRAM."*".$SCRIPT_PID.$TSTAMP.tmp"
+		rm -fv "$RUN_DIR/$PROGRAM."*".$SCRIPT_PID.$TSTAMP.tmp" >> /root/rm 2>&1
 	fi
 }
 #### CleanUp SUBSET END ####
