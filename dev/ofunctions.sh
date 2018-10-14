@@ -31,7 +31,7 @@
 #### OFUNCTIONS MINI SUBSET ####
 #### OFUNCTIONS MICRO SUBSET ####
 _OFUNCTIONS_VERSION=2.3.0-RC2
-_OFUNCTIONS_BUILD=2018101302
+_OFUNCTIONS_BUILD=2018101401
 #### _OFUNCTIONS_BOOTSTRAP SUBSET ####
 _OFUNCTIONS_BOOTSTRAP=true
 #### _OFUNCTIONS_BOOTSTRAP SUBSET END ####
@@ -868,10 +868,11 @@ function ExecTasks {
 	local minTimeBetweenRetries="${17:-300}"	# Time (in seconds) between postponed command retries
 	local validExitCodes="${18:-0}"			# Semi colon separated list of valid main command exit codes which will not trigger errors
 
+	__CheckArguments 1-18 $# "$@"																	       #__WITH_PARANOIA_DEBUG
+
 	local i
 
 	Logger "${FUNCNAME[0]} id [$id] called by [${FUNCNAME[1]} < ${FUNCNAME[2]} < ${FUNCNAME[3]} < ${FUNCNAME[4]} < ${FUNCNAME[5]} < ${FUNCNAME[6]} ...]." "PARANOIA_DEBUG"	 #__WITH_PARANOIA_DEBUG
-	__CheckArguments 1-18 $# "$@"																	       #__WITH_PARANOIA_DEBUG
 
 	# Since ExecTasks takes up to 17 arguments, do a quick preflight check in DEBUG mode
 	if [ "$_DEBUG" == "yes" ]; then
