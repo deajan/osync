@@ -31,7 +31,7 @@
 #### OFUNCTIONS MINI SUBSET ####
 #### OFUNCTIONS MICRO SUBSET ####
 _OFUNCTIONS_VERSION=2.3.0-RC2
-_OFUNCTIONS_BUILD=2018101401
+_OFUNCTIONS_BUILD=2018101402
 #### _OFUNCTIONS_BOOTSTRAP SUBSET ####
 _OFUNCTIONS_BOOTSTRAP=true
 #### _OFUNCTIONS_BOOTSTRAP SUBSET END ####
@@ -927,16 +927,9 @@ function ExecTasks {
 	local newPidsArray		# New array of currently running pids for next iteration
 	local pidsTimeArray		# Array containing execution begin time of pids
 	local executeCommand		# Boolean to check if currentCommand can be executed given a condition
-
 	local hasPids=false		# Are any valable pids given to function ?		#__WITH_PARANOIA_DEBUG
-
 	local functionMode
-
-	if [ $counting == true ]; then
-		local softAlert=false # Does a soft alert need to be triggered, if yes, send an alert once
-	else
-		local softAlert=false
-	fi
+	local softAlert=false
 
 	# Initialise global variable
 	eval "WAIT_FOR_TASK_COMPLETION_$id=\"\""
