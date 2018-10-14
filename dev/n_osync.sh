@@ -7,7 +7,7 @@ PROGRAM="osync" # Rsync based two way sync engine with fault tolerance
 AUTHOR="(C) 2013-2018 by Orsiris de Jong"
 CONTACT="http://www.netpower.fr/osync - ozy@netpower.fr"
 PROGRAM_VERSION=1.3.0-beta1
-PROGRAM_BUILD=2018101402
+PROGRAM_BUILD=2018101403
 IS_STABLE=no
 
 ##### Execution order						#__WITH_PARANOIA_DEBUG
@@ -1678,9 +1678,9 @@ function Sync {
 			targetPid=$!
 		fi
 
-		ExecTasks "$initiatorPid;$targetPid" "${FUNCNAME[0]}-step0" false 0 0 $SOFT_MAX_EXEC_TIME $HARD_MAX_EXEC_TIME false $SLEEP_TIME $KEEP_LOGGING
+		ExecTasks "$initiatorPid;$targetPid" "${FUNCNAME[0]}_treeListBefore" false 0 0 $SOFT_MAX_EXEC_TIME $HARD_MAX_EXEC_TIME false $SLEEP_TIME $KEEP_LOGGING
 		if [ $? -ne 0 ]; then
-			IFS=';' read -r -a pidArray <<< "$(eval echo \"\$WAIT_FOR_TASK_COMPLETION_${FUNCNAME[0]}\")"
+			IFS=';' read -r -a pidArray <<< "$(eval echo \"\$WAIT_FOR_TASK_COMPLETION_${FUNCNAME[0]}_treeListBefore\")"
 			initiatorFail=false
 			targetFail=false
 			for pid in "${pidArray[@]}"; do
@@ -1723,9 +1723,9 @@ function Sync {
 			targetPid=$!
 		fi
 
-		ExecTasks "$initiatorPid;$targetPid" "${FUNCNAME[0]}-step1" false 0 0 $SOFT_MAX_EXEC_TIME $HARD_MAX_EXEC_TIME false $SLEEP_TIME $KEEP_LOGGING
+		ExecTasks "$initiatorPid;$targetPid" "${FUNCNAME[0]}_deleteList" false 0 0 $SOFT_MAX_EXEC_TIME $HARD_MAX_EXEC_TIME false $SLEEP_TIME $KEEP_LOGGING
 		if [ $? -ne 0 ]; then
-			IFS=';' read -r -a pidArray <<< "$(eval echo \"\$WAIT_FOR_TASK_COMPLETION_${FUNCNAME[0]}\")"
+			IFS=';' read -r -a pidArray <<< "$(eval echo \"\$WAIT_FOR_TASK_COMPLETION_${FUNCNAME[0]}_deleteList\")"
 			initiatorFail=false
 			targetFail=false
 			for pid in "${pidArray[@]}"; do
@@ -1772,9 +1772,9 @@ function Sync {
 				targetPid=$!
 			fi
 
-			ExecTasks "$initiatorPid;$targetPid" "${FUNCNAME[0]}-step2" false 0 0 $SOFT_MAX_EXEC_TIME $HARD_MAX_EXEC_TIME false $SLEEP_TIME $KEEP_LOGGING
+			ExecTasks "$initiatorPid;$targetPid" "${FUNCNAME[0]}_timestampListBefore" false 0 0 $SOFT_MAX_EXEC_TIME $HARD_MAX_EXEC_TIME false $SLEEP_TIME $KEEP_LOGGING
 			if [ $? -ne 0 ]; then
-				IFS=';' read -r -a pidArray <<< "$(eval echo \"\$WAIT_FOR_TASK_COMPLETION_${FUNCNAME[0]}\")"
+				IFS=';' read -r -a pidArray <<< "$(eval echo \"\$WAIT_FOR_TASK_COMPLETION_${FUNCNAME[0]}_timestampListBefore\")"
 				initiatorFail=false
 				targetFail=false
 				for pid in "${pidArray[@]}"; do
@@ -1926,9 +1926,9 @@ function Sync {
 			targetPid=$!
 		fi
 
-		ExecTasks "$initiatorPid;$targetPid" "${FUNCNAME[0]}-step6" false 0 0 $SOFT_MAX_EXEC_TIME $HARD_MAX_EXEC_TIME false $SLEEP_TIME $KEEP_LOGGING
+		ExecTasks "$initiatorPid;$targetPid" "${FUNCNAME[0]}_deletionPropagation" false 0 0 $SOFT_MAX_EXEC_TIME $HARD_MAX_EXEC_TIME false $SLEEP_TIME $KEEP_LOGGING
 		if [ $? -ne 0 ]; then
-			IFS=';' read -r -a pidArray <<< "$(eval echo \"\$WAIT_FOR_TASK_COMPLETION_${FUNCNAME[0]}\")"
+			IFS=';' read -r -a pidArray <<< "$(eval echo \"\$WAIT_FOR_TASK_COMPLETION_${FUNCNAME[0]}_deletionPropagation\")"
 			initiatorFail=false
 			targetFail=false
 			for pid in "${pidArray[@]}"; do
@@ -1972,9 +1972,9 @@ function Sync {
 			targetPid=$!
 		fi
 
-		ExecTasks "$initiatorPid;$targetPid" "${FUNCNAME[0]}-step7" false 0 0 $SOFT_MAX_EXEC_TIME $HARD_MAX_EXEC_TIME false $SLEEP_TIME $KEEP_LOGGING
+		ExecTasks "$initiatorPid;$targetPid" "${FUNCNAME[0]}_treeListAfter" false 0 0 $SOFT_MAX_EXEC_TIME $HARD_MAX_EXEC_TIME false $SLEEP_TIME $KEEP_LOGGING
 		if [ $? -ne 0 ]; then
-			IFS=';' read -r -a pidArray <<< "$(eval echo \"\$WAIT_FOR_TASK_COMPLETION_${FUNCNAME[0]}\")"
+			IFS=';' read -r -a pidArray <<< "$(eval echo \"\$WAIT_FOR_TASK_COMPLETION_${FUNCNAME[0]}_treeListAfter\")"
 			initiatorFail=false
 			targetFail=false
 			for pid in "${pidArray[@]}"; do
@@ -2021,9 +2021,9 @@ function Sync {
 				targetPid=$!
 			fi
 
-			ExecTasks "$initiatorPid;$targetPid" "${FUNCNAME[0]}-step8" false 0 0 $SOFT_MAX_EXEC_TIME $HARD_MAX_EXEC_TIME false $SLEEP_TIME $KEEP_LOGGING
+			ExecTasks "$initiatorPid;$targetPid" "${FUNCNAME[0]}_timestampListAfter" false 0 0 $SOFT_MAX_EXEC_TIME $HARD_MAX_EXEC_TIME false $SLEEP_TIME $KEEP_LOGGING
 			if [ $? -ne 0 ]; then
-				IFS=';' read -r -a pidArray <<< "$(eval echo \"\$WAIT_FOR_TASK_COMPLETION_${FUNCNAME[0]}\")"
+				IFS=';' read -r -a pidArray <<< "$(eval echo \"\$WAIT_FOR_TASK_COMPLETION_${FUNCNAME[0]}_timeStampListAfter\")"
 				initiatorFail=false
 				targetFail=false
 				for pid in "${pidArray[@]}"; do
