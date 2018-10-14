@@ -31,7 +31,7 @@
 #### OFUNCTIONS MINI SUBSET ####
 #### OFUNCTIONS MICRO SUBSET ####
 _OFUNCTIONS_VERSION=2.3.0-RC2
-_OFUNCTIONS_BUILD=2018101405
+_OFUNCTIONS_BUILD=2018101406
 #### _OFUNCTIONS_BOOTSTRAP SUBSET ####
 _OFUNCTIONS_BOOTSTRAP=true
 #### _OFUNCTIONS_BOOTSTRAP SUBSET END ####
@@ -899,9 +899,6 @@ function ExecTasks {
 		done
 	fi
 
-	# Change '-' to '_' in task id
-	id="${id//-/_}"
-
 	# Expand validExitCodes into array
 	IFS=';' read -r -a validExitCodes <<< "$validExitCodes"
 
@@ -1111,7 +1108,7 @@ function ExecTasks {
 						if [ "$(eval echo \"\$WAIT_FOR_TASK_COMPLETION_$id\")" == "" ]; then
 							eval "WAIT_FOR_TASK_COMPLETION_$id=\"$pid:$retval\""
 						else
-							eval "WAIT_FOR_TASK_COMPLETION_$id=\";$pid:$retval\""
+							eval "WAIT_FOR_TASK_COMPLETION_$id=\"$WAIT_FOR_TASK_COMPLETION_$id;$pid:$retval\""
 						fi
 					else
 						Logger "${FUNCNAME[0]} called by [$id] finished monitoring pid [$pid] with exitcode [$retval]." "DEBUG"
