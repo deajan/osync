@@ -31,7 +31,7 @@
 #### OFUNCTIONS MINI SUBSET ####
 #### OFUNCTIONS MICRO SUBSET ####
 _OFUNCTIONS_VERSION=2.3.0-RC2
-_OFUNCTIONS_BUILD=2018101404
+_OFUNCTIONS_BUILD=2018101405
 #### _OFUNCTIONS_BOOTSTRAP SUBSET ####
 _OFUNCTIONS_BOOTSTRAP=true
 #### _OFUNCTIONS_BOOTSTRAP SUBSET END ####
@@ -452,9 +452,9 @@ function KillAllChilds {
 #### CleanUp SUBSET ####
 function CleanUp {
 	if [ "$_DEBUG" != "yes" ]; then
-		rm -fv "$RUN_DIR/$PROGRAM."*".$SCRIPT_PID.$TSTAMP"
+		rm -f "$RUN_DIR/$PROGRAM."*".$SCRIPT_PID.$TSTAMP"
 		# Fix for sed -i requiring backup extension for BSD & Mac (see all sed -i statements)
-		rm -fv "$RUN_DIR/$PROGRAM."*".$SCRIPT_PID.$TSTAMP.tmp"
+		rm -f "$RUN_DIR/$PROGRAM."*".$SCRIPT_PID.$TSTAMP.tmp"
 	fi
 }
 #### CleanUp SUBSET END ####
