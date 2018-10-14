@@ -2,14 +2,12 @@
 
 #TODO treeList, deleteList, _getFileCtimeMtime, conflictList should be called without having statedir informed. Just give the full path ?
 #Check dryruns with nosuffix mode for timestampList
-#WIP: currently TRAVIS_RUN debug lines in n_osync and run_tests for conflictLog
-
 
 PROGRAM="osync" # Rsync based two way sync engine with fault tolerance
 AUTHOR="(C) 2013-2018 by Orsiris de Jong"
 CONTACT="http://www.netpower.fr/osync - ozy@netpower.fr"
 PROGRAM_VERSION=1.3.0-beta1
-PROGRAM_BUILD=2018101401
+PROGRAM_BUILD=2018101402
 IS_STABLE=no
 
 ##### Execution order						#__WITH_PARANOIA_DEBUG
@@ -1029,14 +1027,6 @@ function conflictList {
 
 		join -j 1 -t ';' -o 1.1,1.2,1.3,2.2,2.3 "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.${INITIATOR[$__type]}.$SCRIPT_PID.$TSTAMP" "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.${TARGET[$__type]}.$SCRIPT_PID.$TSTAMP" > "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.compare.$SCRIPT_PID.$TSTAMP"
 		retval=$?
-
-		#WIP
-		if [ "$TRAVIS_RUN" == true ]; then
-			echo "conflictList debug retval=$retval"
-			cat "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.${INITIATOR[$__type]}.$SCRIPT_PID.$TSTAMP"
-			cat "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.${TARGET[$__type]}.$SCRIPT_PID.$TSTAMP"
-			cat "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.compare.$SCRIPT_PID.$TSTAMP"
-		fi
 
 		if [ $retval -ne 0 ]; then
 			Logger "Cannot create conflict list file." "ERROR"
@@ -2396,12 +2386,6 @@ function LogConflicts {
 
 	local subject
 	local body
-
-	#WIP
-	if [ "$TRAVIS_RUN" == true ]; then
-		cat "$RUN_DIR/$PROGRAM.conflictList.compare.$SCRIPT_PID.$TSTAMP"
-	fi
-
 
 	# We keep this in a separate if check because of the subshell used for Logger with _LOGGER_PREFIX
 	if [ -f "$RUN_DIR/$PROGRAM.conflictList.compare.$SCRIPT_PID.$TSTAMP" ]; then
