@@ -1615,6 +1615,8 @@ function Sync {
 	local initiatorFail
 	local targetFail
 
+	local pid
+
 	Logger "Starting synchronization task." "NOTICE"
 
 	if [ "$RESUME_SYNC" != "no" ]; then
