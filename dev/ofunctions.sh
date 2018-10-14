@@ -31,7 +31,7 @@
 #### OFUNCTIONS MINI SUBSET ####
 #### OFUNCTIONS MICRO SUBSET ####
 _OFUNCTIONS_VERSION=2.3.0-RC2
-_OFUNCTIONS_BUILD=2018101402
+_OFUNCTIONS_BUILD=2018101403
 #### _OFUNCTIONS_BOOTSTRAP SUBSET ####
 _OFUNCTIONS_BOOTSTRAP=true
 #### _OFUNCTIONS_BOOTSTRAP SUBSET END ####
@@ -207,6 +207,8 @@ function RemoteLogger {
 	local level="${2}"		# Log level
 	local retval="${3:-undef}"	# optional return value of command
 
+	local prefix
+
 	if [ "$_LOGGER_PREFIX" == "time" ]; then
 		prefix="TIME: $SECONDS - "
 	elif [ "$_LOGGER_PREFIX" == "date" ]; then
@@ -283,6 +285,8 @@ function Logger {
 	local value="${1}"		# Sentence to log (in double quotes)
 	local level="${2}"		# Log level
 	local retval="${3:-undef}"	# optional return value of command
+
+	local prefix
 
 	if [ "$_LOGGER_PREFIX" == "time" ]; then
 		prefix="TIME: $SECONDS - "
