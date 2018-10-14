@@ -452,9 +452,9 @@ function KillAllChilds {
 #### CleanUp SUBSET ####
 function CleanUp {
 	if [ "$_DEBUG" != "yes" ]; then
-		rm -fv "$RUN_DIR/$PROGRAM."*".$SCRIPT_PID.$TSTAMP" >> /root/rm 2>&1 #WIP -v
+		rm -fv "$RUN_DIR/$PROGRAM."*".$SCRIPT_PID.$TSTAMP"
 		# Fix for sed -i requiring backup extension for BSD & Mac (see all sed -i statements)
-		rm -fv "$RUN_DIR/$PROGRAM."*".$SCRIPT_PID.$TSTAMP.tmp" >> /root/rm 2>&1
+		rm -fv "$RUN_DIR/$PROGRAM."*".$SCRIPT_PID.$TSTAMP.tmp"
 	fi
 }
 #### CleanUp SUBSET END ####
