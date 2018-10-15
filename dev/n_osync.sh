@@ -1933,6 +1933,7 @@ function Sync {
 			IFS=';' read -r -a pidArray <<< "$(eval echo \"\$WAIT_FOR_TASK_COMPLETION_${FUNCNAME[0]}_deletionPropagation\")"
 			initiatorFail=false
 			targetFail=false
+			echo "--${pidArray[@]}--" #WIP
 			for pid in "${pidArray[@]}"; do
 				pid=${pid%:*}
 				if [ "$pid" == "$initiatorPid" ]; then

@@ -938,6 +938,7 @@ function ExecTasks {
 	local hasPids=false		# Are any valable pids given to function ?		#__WITH_PARANOIA_DEBUG
 	local functionMode
 	local softAlert=false
+	local failedPidsList		# List containing failed pids with exit code separated by semicolons (eg : 2355:1;4534:2;2354:3)
 
 	# Initialise global variable
 	eval "WAIT_FOR_TASK_COMPLETION_$id=\"\""
@@ -1105,10 +1106,10 @@ function ExecTasks {
 						fi
 						errorcount=$((errorcount+1))
 						# Welcome to variable variable bash hell
-						if [ "$(eval echo \"\$WAIT_FOR_TASK_COMPLETION_$id\")" == "" ]; then
-							eval "WAIT_FOR_TASK_COMPLETION_$id=\"$pid:$retval\""
+						if [ "$failedPidsList" == "" ]; then
+							failedPidsList="$pid:$retval"
 						else
-							eval "WAIT_FOR_TASK_COMPLETION_$id=\"$WAIT_FOR_TASK_COMPLETION_$id;$pid:$retval\""
+							failedPidsList="$failedPidsList;$pid:$retval"
 						fi
 					else
 						Logger "${FUNCNAME[0]} called by [$id] finished monitoring pid [$pid] with exitcode [$retval]." "DEBUG"
@@ -1269,6 +1270,8 @@ function ExecTasks {
 
 	# Return exit code if only one process was monitored, else return number of errors
 	# As we cannot return multiple values, a global variable WAIT_FOR_TASK_COMPLETION contains all pids with their return value
+
+	eval "WAIT_FOR_TASK_COMPLETION_$id=\"$failedPidsList\""
 
 	if [ $mainItemCount -eq 1 ]; then
 		return $retval
