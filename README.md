@@ -12,7 +12,7 @@ osync provides the following capabilities
 
 - Local-Local and Local-Remote sync
 - Fault tolerance with resume scenarios
-- File ACL and extended attributes synchronization
+- POSIX ACL and extended attributes synchronization
 - Full script Time control
 - Soft deletions and multiple backups handling
 - Before / after run command execution
