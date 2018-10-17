@@ -1,4 +1,4 @@
-Coding style used for my bash projects (v3.0 Dec 2016)
+Coding style used for my bash projects (v3.2 Oct 2018)
 As bash is clearly an error prone script language, we'll use as much standard coding as possible, including some quick and dirty debug techniques described here.
 
 ++++++ Header
@@ -162,6 +162,15 @@ if [ $retval -ne 0 ]; then
 	Logger "Some error message" "ERROR" $retval
 fi
 
+++++++ includes
+
+Using merge.sh, the program may have includes like
+include #### RemoteLogger SUBSET ####
+All possible includes are listed in ofunctions.sh
+Mostly, includes are needed to port functions to a remote shell without writing them again.
+
+++++++ Remote execution
+
 Remote commands should always invoke bash (using '"'"' to escape single quotes of 'bash -c "command"'). It is preferable to use ssh heredoc in order to use plain code.
 If local and remote code is identical, wrap remote code in a function so only minor modifications are needed.
 Remote code return code is transmitted via exit.
@@ -183,6 +192,9 @@ retval=$?
 if [ $retval -ne 0 ]; then
 	Logger "Some error message" "ERROR" $retval
 fi
+
+We also need to transmit a couple of environment variables (RUN_DIR; PROGRAM; _LOGGER_VERBOSE... see current setups) in order to make standard code.
+Include works here too.
 
 ++++++ File variables
 
