@@ -1,22 +1,16 @@
 #!/usr/bin/env bash
 
-#TODO: generalize _LOCAL_IS_REMOTE
-
-
 # Allows the following environment variables
 # TRAVIS_RUN=[true|false]
 # SSH_PORT=22
 # SKIP_REMOTE=[true|false]
-
-# See note about this variable in ofunctions
-_LOCAL_IS_REMOTE=true
 
 ## On Mac OSX, this needs to be run as root in order to use sudo without password
 ## From current terminal run sudo -s in order to get a new terminal as root
 
 ## On CYGWIN / MSYS, ACL and extended attributes aren't supported
 
-# osync test suite 2018101401
+# osync test suite 2018101701
 
 # 4 tests:
 # quicklocal
@@ -475,7 +469,7 @@ function test_deletion_failure () {
 		$SUDO_CMD $IMMUTABLE_OFF_CMD "$TARGET_DIR/$FileA"
 		$SUDO_CMD $IMMUTABLE_OFF_CMD "$INITIATOR_DIR/$FileB"
 
-		REMOTE_HOST_PING=$RHOST_PING $OSYNC_EXECUTABLE $i
+		REMOTE_HOST_PING=$RHOST_PING $OSYNC_EXECUTABLE $i --verbose
 		assertEquals "Third deletion run with parameters [$i]." "0" $?
 
 		[ ! -f "$TARGET_DIR/$FileA" ]
@@ -1144,7 +1138,7 @@ function test_ConflictDetetion () {
 
 		# Now run should return conflicts
     
-		_LOCAL_IS_REMOTE=true REMOTE_HOST_PING=$RHOST_PING $OSYNC_EXECUTABLE $i --log-conflicts > "$FAKEROOT/output2.log" 2>&1
+		REMOTE_HOST_PING=$RHOST_PING $OSYNC_EXECUTABLE $i --log-conflicts > "$FAKEROOT/output2.log" 2>&1
 		result=$?
 		assertEquals "Second run that should detect conflicts with parameters [$i]." "0" $result
     
