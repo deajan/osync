@@ -31,7 +31,7 @@
 #### OFUNCTIONS MINI SUBSET ####
 #### OFUNCTIONS MICRO SUBSET ####
 _OFUNCTIONS_VERSION=2.3.0-RC2
-_OFUNCTIONS_BUILD=2018101406
+_OFUNCTIONS_BUILD=2018101701
 #### _OFUNCTIONS_BOOTSTRAP SUBSET ####
 _OFUNCTIONS_BOOTSTRAP=true
 #### _OFUNCTIONS_BOOTSTRAP SUBSET END ####
@@ -115,10 +115,10 @@ else
 	RUN_DIR=.
 fi
 
-## Special note on synthetic unit tests. Since local initiator and remote target may be the same machine while testing, we'll have to differentiate RUN_DIR (this only affects unit tests)
-if [ "$_LOCAL_IS_REMOTE" == true ]; then
-	mkdir -p "$RUN_DIR/remote"
-	RUN_DIR="$RUN_DIR/remote"
+## Special note when remote target is on the same host as initiator (happens for unit tests): we'll have to differentiate RUN_DIR so remote CleanUp won't affect initiator.
+if [ "$_REMOTE_EXECUTION" == true ]; then
+	mkdir -p "$RUN_DIR/$PROGRAM.remote"
+	RUN_DIR="$RUN_DIR/$PROGRAM.remote"
 fi
 #### RUN_DIR SUBSET END ####
 

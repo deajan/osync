@@ -7,7 +7,7 @@ PROGRAM="osync" # Rsync based two way sync engine with fault tolerance
 AUTHOR="(C) 2013-2018 by Orsiris de Jong"
 CONTACT="http://www.netpower.fr/osync - ozy@netpower.fr"
 PROGRAM_VERSION=1.3.0-beta1
-PROGRAM_BUILD=2018101403
+PROGRAM_BUILD=2018101701
 IS_STABLE=no
 
 ##### Execution order						#__WITH_PARANOIA_DEBUG
@@ -137,6 +137,16 @@ function CheckEnvironment {
 
 	if ! type pgrep > /dev/null 2>&1 ; then
 		Logger "pgrep not present. Sync cannot start." "CRITICAL"
+		exit 1
+	fi
+
+	if ! type sort > /dev/null 2>&1 ; then
+		Logger "sort not present. Sync cannot start." "CRITICAL"
+		exit 1
+	fi
+
+	if ! type uniq > /dev/null 2>&1 ; then
+		Logger "uniq not present. Sync cannot start." "CRITICAL"
 		exit 1
 	fi
 
@@ -277,7 +287,7 @@ function _CheckReplicasRemote {
 
 $SSH_CMD env _REMOTE_TOKEN="$_REMOTE_TOKEN" \
 env _DEBUG="'$_DEBUG'" env _PARANOIA_DEBUG="'$_PARANOIA_DEBUG'" env _LOGGER_SILENT="'$_LOGGER_SILENT'" env _LOGGER_VERBOSE="'$_LOGGER_VERBOSE'" env _LOGGER_PREFIX="'$_LOGGER_PREFIX'" env _LOGGER_ERR_ONLY="'$_LOGGER_ERR_ONLY'" \
-env PROGRAM="'$PROGRAM'" env SCRIPT_PID="'$SCRIPT_PID'" env TSTAMP="'$TSTAMP'" \
+env _REMOTE_EXECUTION="true" env PROGRAM="'$PROGRAM'" env SCRIPT_PID="'$SCRIPT_PID'" env TSTAMP="'$TSTAMP'" \
 env replicaPath="'$replicaPath'" env CREATE_DIRS="'$CREATE_DIRS'" env DF_CMD="'$DF_CMD'" env MINIMUM_SPACE="'$MINIMUM_SPACE'" \
 env LC_ALL=C $COMMAND_SUDO' bash -s' << 'ENDSSH' > "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$replicaType.$SCRIPT_PID.$TSTAMP" 2>&1
 include #### RUN_DIR SUBSET ####
@@ -469,7 +479,7 @@ function _HandleLocksRemote {
 # passing initiatorRunningPids as litteral string (has to be run through eval to be an array again)
 $SSH_CMD env _REMOTE_TOKEN="$_REMOTE_TOKEN" \
 env _DEBUG="'$_DEBUG'" env _PARANOIA_DEBUG="'$_PARANOIA_DEBUG'" env _LOGGER_SILENT="'$_LOGGER_SILENT'" env _LOGGER_VERBOSE="'$_LOGGER_VERBOSE'" env _LOGGER_PREFIX="'$_LOGGER_PREFIX'" env _LOGGER_ERR_ONLY="'$_LOGGER_ERR_ONLY'" \
-env PROGRAM="'$PROGRAM'" env SCRIPT_PID="'$SCRIPT_PID'" env TSTAMP="'$TSTAMP'" \
+env _REMOTE_EXECUTION="true" env PROGRAM="'$PROGRAM'" env SCRIPT_PID="'$SCRIPT_PID'" env TSTAMP="'$TSTAMP'" \
 env replicaStateDir="'$replicaStateDir'" env initiatorRunningPidsFlat="\"(${initiatorRunningPids[@]})\"" env lockfile="'$lockfile'" env replicaType="'$replicaType'" env overwrite="'$overwrite'" \
 env INSTANCE_ID="'$INSTANCE_ID'" env FORCE_STRANGER_LOCK_RESUME="'$FORCE_STRANGER_LOCK_RESUME'" \
 env LC_ALL=C $COMMAND_SUDO' bash -s' << 'ENDSSH' > "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$replicaType.$SCRIPT_PID.$TSTAMP" 2>&1
@@ -599,10 +609,10 @@ function HandleLocks {
 		_HandleLocksRemote "${TARGET[$__replicaDir]}${TARGET[$__stateDir]}" "${TARGET[$__lockFile]}" "${TARGET[$__type]}" $overwrite &
 		targetPid=$!
 	fi
-	ExecTasks "$initiatorPid;$targetPid" "${FUNCNAME[0]}" false 0 0 720 1800 true $SLEEP_TIME $KEEP_LOGGING
+	ExecTasks "$initiatorPid;$targetPid" "HandleLocks" false 0 0 720 1800 true $SLEEP_TIME $KEEP_LOGGING
 	retval=$?
 	if [ $retval -ne 0 ]; then
-		IFS=';' read -r -a pidArray <<< "$(eval echo \"\$WAIT_FOR_TASK_COMPLETION_${FUNCNAME[0]}\")"
+		IFS=';' read -r -a pidArray <<< "$WAIT_FOR_TASK_COMPLETION_HandleLocks"
 		for pid in "${pidArray[@]}"; do
 			pid=${pid%:*}
 			if [ "$pid" == "$initiatorPid" ]; then
@@ -664,7 +674,7 @@ function _UnlockReplicasRemote {
 
 $SSH_CMD env _REMOTE_TOKEN="$_REMOTE_TOKEN" \
 env _DEBUG="'$_DEBUG'" env _PARANOIA_DEBUG="'$_PARANOIA_DEBUG'" env _LOGGER_SILENT="'$_LOGGER_SILENT'" env _LOGGER_VERBOSE="'$_LOGGER_VERBOSE'" env _LOGGER_PREFIX="'$_LOGGER_PREFIX'" env _LOGGER_ERR_ONLY="'$_LOGGER_ERR_ONLY'" \
-env PROGRAM="'$PROGRAM'" env SCRIPT_PID="'$SCRIPT_PID'" env TSTAMP="'$TSTAMP'" env lockfile="'$lockfile'" \
+env _REMOTE_EXECUTION="true" env PROGRAM="'$PROGRAM'" env SCRIPT_PID="'$SCRIPT_PID'" env TSTAMP="'$TSTAMP'" env lockfile="'$lockfile'" \
 env LC_ALL=C $COMMAND_SUDO' bash -s' << 'ENDSSH' > "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$replicaType.$SCRIPT_PID.$TSTAMP" 2>&1
 if [ -f "$lockfile" ]; then
 	rm -f "$lockfile"
@@ -830,11 +840,17 @@ function deleteList {
 				Logger "Cannot add failed deleted list to current deleted list for replica [$replicaType]." "ERROR" $subretval
 			fi
 		fi
-		return $retval
 	else
 		touch "${INITIATOR[$__replicaDir]}${INITIATOR[$__stateDir]}/$replicaType${INITIATOR[$__deletedListFile]}"
-		return $retval
 	fi
+
+	# Make sure deletion list does not contain duplicates from faledDeleteListFile
+	uniq "${INITIATOR[$__replicaDir]}${INITIATOR[$__stateDir]}/$replicaType${INITIATOR[$__deletedListFile]}" > "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$replicaType.$SCRIPT_PID.$TSTAMP"
+	if [ -f "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$replicaType.$SCRIPT_PID.$TSTAMP" ]; then
+		mv "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$replicaType.$SCRIPT_PID.$TSTAMP" "${INITIATOR[$__replicaDir]}${INITIATOR[$__stateDir]}/$replicaType${INITIATOR[$__deletedListFile]}"
+	fi
+
+	return $retval
 }
 
 function _getFileCtimeMtimeLocal {
@@ -845,24 +861,24 @@ function _getFileCtimeMtimeLocal {
 
 	__CheckArguments 4 $# "$@"	#__WITH_PARANOIA_DEBUG
 
-	local retval
-
 	echo -n "" > "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$replicaType.$SCRIPT_PID.$TSTAMP"
 
 	while IFS='' read -r file; do
 		$STAT_CTIME_MTIME_CMD "$replicaPath$file" >> "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$replicaType.$SCRIPT_PID.$TSTAMP"
+		if [ $? -ne 0 ]; then
+			Logger "Could not get file attributes for [$replicaPath$file]." "ERROR"
+			echo "1" > "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.subshellError.$replicaType.$SCRIPT_PID.$TSTAMP"
+		fi
 	done < "$fileList"
-	retval=$?
-	if [ $retval -ne 0 ]; then
+	if [ -f "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.subshellError.$replicaType.$SCRIPT_PID.$TSTAMP" ]; then
 		Logger "Getting file attributes failed [$retval] on $replicaType. Stopping execution." "CRITICAL" $retval
-		if [ -s "$RUN_DIR/$PROGRAM.ctime_mtime.$replicaType.$SCRIPT_PID.$TSTAMP" ]; then
+		if [ -s "$RUN_DIR/$PROGRAM.ctime_mtime.$replicaType.$SCRIPT_PID.$TSTAMP" ]; then #WIP: does this file exist
 			Logger "Command output:\n$(cat $RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$replicaType.$SCRIPT_PID.$TSTAMP)" "WARN"
 		fi
-		return $retval
+		return 1
 	else
 		cat "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$replicaType.$SCRIPT_PID.$TSTAMP" | sort > "$timestampFile"
-		retval=$?
-		return $retval
+		return $?
 	fi
 
 }
@@ -891,31 +907,44 @@ function _getFileCtimeMtimeRemote {
 		return $retval
 	fi
 
-
+#WIP: do we need separate error and non error files ?
 $SSH_CMD env _REMOTE_TOKEN="$_REMOTE_TOKEN" \
 env _DEBUG="'$_DEBUG'" env _PARANOIA_DEBUG="'$_PARANOIA_DEBUG'" env _LOGGER_SILENT="'$_LOGGER_SILENT'" env _LOGGER_VERBOSE="'$_LOGGER_VERBOSE'" env _LOGGER_PREFIX="'$_LOGGER_PREFIX'" env _LOGGER_ERR_ONLY="'$_LOGGER_ERR_ONLY'" \
-env PROGRAM="'$PROGRAM'" env SCRIPT_PID="'$SCRIPT_PID'" env TSTAMP="'$TSTAMP'" \
+env _REMOTE_EXECUTION="true" env PROGRAM="'$PROGRAM'" env SCRIPT_PID="'$SCRIPT_PID'" env TSTAMP="'$TSTAMP'" \
 env replicaPath="'$replicaPath'" env replicaType="'$replicaType'" env REMOTE_STAT_CTIME_MTIME_CMD="'$REMOTE_STAT_CTIME_MTIME_CMD'" \
 env LC_ALL=C $COMMAND_SUDO' bash -s' << 'ENDSSH' > "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$replicaType.$SCRIPT_PID.$TSTAMP"
+include #### RUN_DIR SUBSET ####
+include #### DEBUG SUBSET ####
+include #### TrapError SUBSET ####
+include #### IsInteger SUBSET ####
+include #### HumanToNumeric SUBSET ####
+include #### RemoteLogger SUBSET ####
+include #### CleanUp SUBSET ####
 
 function _getFileCtimeMtimeRemoteSub {
-	local retval=0
 
 	while IFS='' read -r file; do
 		$REMOTE_STAT_CTIME_MTIME_CMD "$replicaPath$file"
-		if [ $? -ne 0 ] && $retval -eq 0 ]; then
-			retval=1
+		if [ $? -ne 0 ]; then
+			RemoteLogger "Could not get file attributes for [$replicaPath$file]." "ERROR"
+			echo 1 > "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.subshellError.$replicaType.$SCRIPT_PID.$TSTAMP"
 		fi
 	done < "./$PROGRAM._getFileCtimeMtimeRemote.Sent.$replicaType.$SCRIPT_PID.$TSTAMP"
 
 	if [ -f "./$PROGRAM._getFileCtimeMtimeRemote.Sent.$replicaType.$SCRIPT_PID.$TSTAMP" ]; then
 		rm -f "./$PROGRAM._getFileCtimeMtimeRemote.Sent.$replicaType.$SCRIPT_PID.$TSTAMP"
 	fi
-	return $retval
+
+	if [ -f "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.subshellError.$replicaType.$SCRIPT_PID.$TSTAMP" ]; then
+		return 1
+	else
+		return 0
+	fi
 }
 
 	_getFileCtimeMtimeRemoteSub
 	retval=$?
+	CleanUp
 	exit $retval
 ENDSSH
 	retval=$?
@@ -1278,8 +1307,8 @@ function _deleteLocal {
 					if [ -e "$replicaDir$deletionDir/$files" ] || [ -L "$replicaDir$deletionDir/$files" ]; then
 						rm -rf "${replicaDir:?}$deletionDir/$files"
 						if [ $? -ne 0 ]; then
-							Logger "Cannot remove [${replicaDir:?}$deletionDir/$files]." "ERROR"
-							retval=1
+							Logger "Cannot remove [${replicaDir:?}$deletionDir/$files] on $replicaType." "ERROR"
+							echo "1" > "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.subshellError.$replicaType.$SCRIPT_PID.$TSTAMP"
 						fi
 					fi
 
@@ -1288,15 +1317,16 @@ function _deleteLocal {
 						parentdir="$(dirname "$files")"
 						if [ "$parentdir" != "." ]; then
 							mkdir -p "$replicaDir$deletionDir/$parentdir"
-							Logger "Moving deleted file [$replicaDir$files] to [$replicaDir$deletionDir/$parentdir]." "VERBOSE"
+							Logger "Moving deleted file [$replicaDir$files] to [$replicaDir$deletionDir/$parentdir] on $replicaType." "VERBOSE"
 							mv -f "$replicaDir$files" "$replicaDir$deletionDir/$parentdir"
 						else
-							Logger "Moving deleted file [$replicaDir$files] to [$replicaDir$deletionDir]." "VERBOSE"
+							Logger "Moving deleted file [$replicaDir$files] to [$replicaDir$deletionDir] on $replicaType." "VERBOSE"
 							mv -f "$replicaDir$files" "$replicaDir$deletionDir"
 						fi
 						retval=$?
 						if [ $retval -ne 0 ]; then
-							Logger "Cannot move [$replicaDir$files] to deletion directory." "ERROR" $retval
+							Logger "Cannot move [$replicaDir$files] to deletion directory on $replicaType." "ERROR" $retval
+							echo "1" > "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.subshellError.$replicaType.$SCRIPT_PID.$TSTAMP"
 							echo "$files" >> "${INITIATOR[$__replicaDir]}${INITIATOR[$__stateDir]}/$replicaType${INITIATOR[$__failedDeletedListFile]}"
 						else
 							echo "$files" >> "$RUN_DIR/$PROGRAM.delete.$replicaType.$SCRIPT_PID.$TSTAMP"
@@ -1310,7 +1340,8 @@ function _deleteLocal {
 						retval=$?
 						Logger "Deleting [$replicaDir$files]." "VERBOSE"
 						if [ $retval -ne 0 ]; then
-							Logger "Cannot delete [$replicaDir$files]." "ERROR" $retval
+							Logger "Cannot delete [$replicaDir$files] on $replicaType." "ERROR" $retval
+							echo "1" > "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.subshellError.$replicaType.$SCRIPT_PID.$TSTAMP"
 							echo "$files" >> "${INITIATOR[$__replicaDir]}${INITIATOR[$__stateDir]}/$replicaType${INITIATOR[$__failedDeletedListFile]}"
 						else
 							echo "$files" >> "$RUN_DIR/$PROGRAM.delete.$replicaType.$SCRIPT_PID.$TSTAMP"
@@ -1321,7 +1352,11 @@ function _deleteLocal {
 			previousFile="$files"
 		fi
 	done < "${INITIATOR[$__replicaDir]}${INITIATOR[$__stateDir]}/$deletionListFromReplica${INITIATOR[$__deletedListFile]}"
-	return $retval
+	if [ -f "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.subshellError.$replicaType.$SCRIPT_PID.$TSTAMP" ]; then
+		return 1
+	else
+		return 0
+	fi
 }
 
 function _deleteRemote {
@@ -1369,12 +1404,13 @@ function _deleteRemote {
 		exit 1
 	fi
 
+#TODO: change $REPLICA_TYPE to $replicaType as in other remote functions, also applies to all other not standard env variables here
 $SSH_CMD env _REMOTE_TOKEN="$_REMOTE_TOKEN" \
 env _DEBUG="'$_DEBUG'" env _PARANOIA_DEBUG="'$_PARANOIA_DEBUG'" env _LOGGER_SILENT="'$_LOGGER_SILENT'" env _LOGGER_VERBOSE="'$_LOGGER_VERBOSE'" env _LOGGER_PREFIX="'$_LOGGER_PREFIX'" env _LOGGER_ERR_ONLY="'$_LOGGER_ERR_ONLY'" \
-env PROGRAM="'$PROGRAM'" env SCRIPT_PID="'$SCRIPT_PID'" env TSTAMP="'$TSTAMP'" \
+env _REMOTE_EXECUTION="true" env PROGRAM="'$PROGRAM'" env SCRIPT_PID="'$SCRIPT_PID'" env TSTAMP="'$TSTAMP'" \
 env _DRYRUN="'$_DRYRUN'" \
 env FILE_LIST="'$(EscapeSpaces "${TARGET[$__replicaDir]}${TARGET[$__stateDir]}/$deletionListFromReplica${INITIATOR[$__deletedListFile]}")'" env REPLICA_DIR="'$(EscapeSpaces "$replicaDir")'" env SOFT_DELETE="'$SOFT_DELETE'" \
-env DELETION_DIR="'$(EscapeSpaces "$deletionDir")'" env FAILED_DELETE_LIST="'$failedDeleteList'" env SUCCESS_DELETE_LIST="'$successDeleteList'" \
+env DELETION_DIR="'$(EscapeSpaces "$deletionDir")'" env FAILED_DELETE_LIST="'$failedDeleteList'" env SUCCESS_DELETE_LIST="'$successDeleteList'" env REPLICA_TYPE="'$replicaType'" \
 env LC_ALL=C $COMMAND_SUDO' bash -s' << 'ENDSSH' >> "$RUN_DIR/$PROGRAM.remote_deletion.$SCRIPT_PID.$TSTAMP" 2>&1
 include #### RUN_DIR SUBSET ####
 include #### DEBUG SUBSET ####
@@ -1408,8 +1444,8 @@ function _deleteRemoteSub {
 					if [ -e "$REPLICA_DIR$DELETION_DIR/$files" ] || [ -L "$REPLICA_DIR$DELETION_DIR/$files" ]; then
 						rm -rf "$REPLICA_DIR$DELETION_DIR/$files"
 						if [ $? -ne 0 ]; then
-							RemoteLogger "Cannot remove [$REPLICA_DIR$DELETION_DIR/$files]." "ERROR"
-							retval=1
+							RemoteLogger "Cannot remove [$REPLICA_DIR$DELETION_DIR/$files] on $REPLICA_TYPE." "ERROR"
+							echo "1" > "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.subshellError.$REPLICA_TYPE.$SCRIPT_PID.$TSTAMP"
 						fi
 					fi
 
@@ -1417,16 +1453,17 @@ function _deleteRemoteSub {
 						# In order to keep full path on soft deletion, create parent directories before move
 						parentdir="$(dirname "$files")"
 						if [ "$parentdir" != "." ]; then
-							RemoteLogger "Moving deleted file [$REPLICA_DIR$files] to [$REPLICA_DIR$DELETION_DIR/$parentdir]." "VERBOSE"
+							RemoteLogger "Moving deleted file [$REPLICA_DIR$files] to [$REPLICA_DIR$DELETION_DIR/$parentdir] on $REPLICA_TYPE." "VERBOSE"
 							mkdir -p "$REPLICA_DIR$DELETION_DIR/$parentdir"
 							mv -f "$REPLICA_DIR$files" "$REPLICA_DIR$DELETION_DIR/$parentdir"
 						else
-							RemoteLogger "Moving deleted file [$REPLICA_DIR$files] to [$REPLICA_DIR$DELETION_DIR]." "VERBOSE"
+							RemoteLogger "Moving deleted file [$REPLICA_DIR$files] to [$REPLICA_DIR$DELETION_DIR] on $REPLICA_TYPE." "VERBOSE"
 							mv -f "$REPLICA_DIR$files" "$REPLICA_DIR$DELETION_DIR"
 						fi
 						retval=$?
 						if [ $retval -ne 0 ]; then
-							RemoteLogger "Cannot move [$REPLICA_DIR$files] to deletion directory." "ERROR" $retval
+							RemoteLogger "Cannot move [$REPLICA_DIR$files] to deletion directory on $REPLICA_TYPE." "ERROR" $retval
+							echo "1" > "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.subshellError.$REPLICA_TYPE.$SCRIPT_PID.$TSTAMP"
 							# Using $files instead of $REPLICA_DIR$files here so the list is ready for next run
 							echo "$files" >> "$FAILED_DELETE_LIST"
 						else
@@ -1441,7 +1478,8 @@ function _deleteRemoteSub {
 						rm -rf "$REPLICA_DIR$files"
 						retval=$?
 						if [ $retval -ne 0 ]; then
-							RemoteLogger "Cannot delete [$REPLICA_DIR$files]." "ERROR" $retval
+							RemoteLogger "Cannot delete [$REPLICA_DIR$files] on $REPLICA_TYPE." "ERROR" $retval
+							echo "1" > "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.subshellError.$REPLICA_TYPE.$SCRIPT_PID.$TSTAMP"
 							echo "$files" >> "$FAILED_DELETE_LIST"
 						else
 							echo "$files" >> "$SUCCESS_DELETE_LIST"
@@ -1452,15 +1490,18 @@ function _deleteRemoteSub {
 			previousFile="$files"
 		fi
 	done < "$FILE_LIST"
-	return $retval
+	if [ -f "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.subshellError.$REPLICA_TYPE.$SCRIPT_PID.$TSTAMP" ]; then
+		return 1
+	else
+		return 0
+	fi
 }
 	_deleteRemoteSub
 	CleanUp
 	exit $retval
-
 ENDSSH
-
-	if [ -s "$RUN_DIR/$PROGRAM.remote_deletion.$SCRIPT_PID.$TSTAMP" ] && [ $retval -ne 0 ]; then
+	retval=$?
+	if [ -s "$RUN_DIR/$PROGRAM.remote_deletion.$SCRIPT_PID.$TSTAMP" ] && ([ $retval -ne 0 ] || [ "$_LOGGER_VERBOSE" == "yes" ]); then
 		(
 		_LOGGER_PREFIX="RR"
 		Logger "$(cat $RUN_DIR/$PROGRAM.remote_deletion.$SCRIPT_PID.$TSTAMP)" "ERROR"
@@ -1471,16 +1512,15 @@ ENDSSH
 	rsyncCmd="$(type -p $RSYNC_EXECUTABLE) -r --rsync-path=\"env LC_ALL=C env _REMOTE_TOKEN=$_REMOTE_TOKEN $RSYNC_PATH\" -e \"$RSYNC_SSH_CMD\" --include \"$(dirname ${TARGET[$__stateDir]})\" --include \"${TARGET[$__stateDir]}\" --include \"${TARGET[$__stateDir]}/$replicaType${TARGET[$__failedDeletedListFile]}\" --include \"${TARGET[$__stateDir]}/$replicaType${TARGET[$__successDeletedListFile]}\" --exclude='*' $REMOTE_USER@$REMOTE_HOST:\"$(EscapeSpaces ${TARGET[$__replicaDir]})\" \"${INITIATOR[$__replicaDir]}\" > \"$RUN_DIR/$PROGRAM.remote_failed_deletion_list_copy.$SCRIPT_PID.$TSTAMP\""
 	Logger "RSYNC_CMD: $rsyncCmd" "DEBUG"
 	eval "$rsyncCmd" 2>> "$LOG_FILE"
-	retval=$?
-	if [ $retval -ne 0 ]; then
+	if [ $? -ne 0 ]; then
 		Logger "Cannot copy back the failed deletion list to initiator replica." "CRITICAL" $retval
 		_LOGGER_SILENT=true Logger "Command was [$rsyncCmd]." "WARN"
 		if [ -f "$RUN_DIR/$PROGRAM.remote_failed_deletion_list_copy.$SCRIPT_PID.$TSTAMP" ]; then
 			Logger "Comand output: $(cat $RUN_DIR/$PROGRAM.remote_failed_deletion_list_copy.$SCRIPT_PID.$TSTAMP)" "NOTICE"
 		fi
-		exit 1
+		return 1
 	fi
-	return 0
+	return $retval
 }
 
 # delete_Propagation(replica type)
@@ -1503,7 +1543,7 @@ function deletionPropagation {
 			retval=$?
 			if [ $retval -ne 0 ]; then
 				Logger "Deletion on $replicaType replica failed." "CRITICAL" $retval
-				exit 1
+				return 1
 			fi
 		else
 			Logger "Skipping deletion on replica $replicaType." "NOTICE"
@@ -1519,17 +1559,9 @@ function deletionPropagation {
 				_deleteLocal "${TARGET[$__type]}" "$replicaDir" "$deleteDir"
 			fi
 			retval=$?
-			if [ $retval -eq 0 ]; then
-				if [ -f "$RUN_DIR/$PROGRAM._delete_remote.$SCRIPT_PID.$TSTAMP" ]; then
-					Logger "Remote:\n$(cat $RUN_DIR/$PROGRAM._delete_remote.$SCRIPT_PID.$TSTAMP)" "VERBOSE"
-				fi
-				return $retval
-			else
-				Logger "Deletion on $replicaType failed." "CRITICAL"
-				if [ -f "$RUN_DIR/$PROGRAM.remote_deletion.$SCRIPT_PID.$TSTAMP" ]; then
-					Logger "Remote:\n$(cat $RUN_DIR/$PROGRAM.remote_deletion.$SCRIPT_PID.$TSTAMP)" "CRITICAL" $retval
-				fi
-				exit 1
+			if [ $retval -ne 0 ]; then
+				Logger "Deletion on $replicaType replica failed." "CRITICAL" $retval
+				return 1
 			fi
 		else
 			Logger "Skipping deletion on replica $replicaType." "NOTICE"
@@ -1548,9 +1580,9 @@ function Initialize {
 	treeList "${TARGET[$__replicaDir]}" "${TARGET[$__type]}" "${INITIATOR[$__replicaDir]}${INITIATOR[$__stateDir]}/${TARGET[$__type]}${INITIATOR[$__treeAfterFile]}" &
 	targetPid=$!
 
-	ExecTasks "$initiatorPid;$targetPid" "${FUNCNAME[0]}" false 0 0 $SOFT_MAX_EXEC_TIME $HARD_MAX_EXEC_TIME false $SLEEP_TIME $KEEP_LOGGING
+	ExecTasks "$initiatorPid;$targetPid" "Initialize_1" false 0 0 $SOFT_MAX_EXEC_TIME $HARD_MAX_EXEC_TIME false $SLEEP_TIME $KEEP_LOGGING
 	if [ $? -ne 0 ]; then
-		IFS=';' read -r -a pidArray <<< "$(eval echo \"\$WAIT_FOR_TASK_COMPLETION_${FUNCNAME[0]}\")"
+		IFS=';' read -r -a pidArray <<< "$WAIT_FOR_TASK_COMPLETION_Initialize_1"
 		initiatorFail=false
 		targetFail=false
 		for pid in "${pidArray[@]}"; do
@@ -1571,9 +1603,9 @@ function Initialize {
 	timestampList "${TARGET[$__replicaDir]}" "${TARGET[$__type]}" "${INITIATOR[$__replicaDir]}${INITIATOR[$__stateDir]}/${TARGET[$__type]}${TARGET[$__treeAfterFile]}" "${INITIATOR[$__replicaDir]}${INITIATOR[$__stateDir]}/${TARGET[$__type]}${INITIATOR[$__timestampAfterFile]}" &
 	targetPid=$!
 
-	ExecTasks "$initiatorPid;$targetPid" "${FUNCNAME[0]}" false 0 0 $SOFT_MAX_EXEC_TIME $HARD_MAX_EXEC_TIME false $SLEEP_TIME $KEEP_LOGGING
+	ExecTasks "$initiatorPid;$targetPid" "Initialize_2" false 0 0 $SOFT_MAX_EXEC_TIME $HARD_MAX_EXEC_TIME false $SLEEP_TIME $KEEP_LOGGING
 	if [ $? -ne 0 ]; then
-		IFS=';' read -r -a pidArray <<< "$(eval echo \"\$WAIT_FOR_TASK_COMPLETION_${FUNCNAME[0]}\")"
+		IFS=';' read -r -a pidArray <<< "$WAIT_FOR_TASK_COMPLETION_Initialize_2"
 		initiatorFail=false
 		targetFail=false
 		for pid in "${pidArray[@]}"; do
@@ -1680,9 +1712,9 @@ function Sync {
 			targetPid=$!
 		fi
 
-		ExecTasks "$initiatorPid;$targetPid" "${FUNCNAME[0]}_treeListBefore" false 0 0 $SOFT_MAX_EXEC_TIME $HARD_MAX_EXEC_TIME false $SLEEP_TIME $KEEP_LOGGING
+		ExecTasks "$initiatorPid;$targetPid" "Sync_treeListBefore" false 0 0 $SOFT_MAX_EXEC_TIME $HARD_MAX_EXEC_TIME false $SLEEP_TIME $KEEP_LOGGING
 		if [ $? -ne 0 ]; then
-			IFS=';' read -r -a pidArray <<< "$(eval echo \"\$WAIT_FOR_TASK_COMPLETION_${FUNCNAME[0]}_treeListBefore\")"
+			IFS=';' read -r -a pidArray <<< "$WAIT_FOR_TASK_COMPLETION_Sync_treeListBefore"
 			initiatorFail=false
 			targetFail=false
 			for pid in "${pidArray[@]}"; do
@@ -1725,9 +1757,9 @@ function Sync {
 			targetPid=$!
 		fi
 
-		ExecTasks "$initiatorPid;$targetPid" "${FUNCNAME[0]}_deleteList" false 0 0 $SOFT_MAX_EXEC_TIME $HARD_MAX_EXEC_TIME false $SLEEP_TIME $KEEP_LOGGING
+		ExecTasks "$initiatorPid;$targetPid" "Sync_deleteList" false 0 0 $SOFT_MAX_EXEC_TIME $HARD_MAX_EXEC_TIME false $SLEEP_TIME $KEEP_LOGGING
 		if [ $? -ne 0 ]; then
-			IFS=';' read -r -a pidArray <<< "$(eval echo \"\$WAIT_FOR_TASK_COMPLETION_${FUNCNAME[0]}_deleteList\")"
+			IFS=';' read -r -a pidArray <<< "$WAIT_FOR_TASK_COMPLETION_Sync_deleteList"
 			initiatorFail=false
 			targetFail=false
 			for pid in "${pidArray[@]}"; do
@@ -1774,9 +1806,9 @@ function Sync {
 				targetPid=$!
 			fi
 
-			ExecTasks "$initiatorPid;$targetPid" "${FUNCNAME[0]}_timestampListBefore" false 0 0 $SOFT_MAX_EXEC_TIME $HARD_MAX_EXEC_TIME false $SLEEP_TIME $KEEP_LOGGING
+			ExecTasks "$initiatorPid;$targetPid" "Sync_timestampListBefore" false 0 0 $SOFT_MAX_EXEC_TIME $HARD_MAX_EXEC_TIME false $SLEEP_TIME $KEEP_LOGGING
 			if [ $? -ne 0 ]; then
-				IFS=';' read -r -a pidArray <<< "$(eval echo \"\$WAIT_FOR_TASK_COMPLETION_${FUNCNAME[0]}_timestampListBefore\")"
+				IFS=';' read -r -a pidArray <<< "$WAIT_FOR_TASK_COMPLETION_Sync_timestampListBefore"
 				initiatorFail=false
 				targetFail=false
 				for pid in "${pidArray[@]}"; do
@@ -1928,12 +1960,11 @@ function Sync {
 			targetPid=$!
 		fi
 
-		ExecTasks "$initiatorPid;$targetPid" "${FUNCNAME[0]}_deletionPropagation" false 0 0 $SOFT_MAX_EXEC_TIME $HARD_MAX_EXEC_TIME false $SLEEP_TIME $KEEP_LOGGING
+		ExecTasks "$initiatorPid;$targetPid" "Sync_deletionPropagation" false 0 0 $SOFT_MAX_EXEC_TIME $HARD_MAX_EXEC_TIME false $SLEEP_TIME $KEEP_LOGGING
 		if [ $? -ne 0 ]; then
-			IFS=';' read -r -a pidArray <<< "$(eval echo \"\$WAIT_FOR_TASK_COMPLETION_${FUNCNAME[0]}_deletionPropagation\")"
+			IFS=';' read -r -a pidArray <<< "$WAIT_FOR_TASK_COMPLETION_Sync_deletionPropagation"
 			initiatorFail=false
 			targetFail=false
-			echo "--${pidArray[@]}--" #WIP
 			for pid in "${pidArray[@]}"; do
 				pid=${pid%:*}
 				if [ "$pid" == "$initiatorPid" ]; then
@@ -1952,7 +1983,6 @@ function Sync {
 			if [ $targetFail == false ]; then
 				echo "${SYNC_ACTION[7]}" > "${INITIATOR[$__targetLastActionFile]}"
 			fi
-
 			exit 1
 		else
 			echo "${SYNC_ACTION[7]}" > "${INITIATOR[$__initiatorLastActionFile]}"
@@ -1975,9 +2005,9 @@ function Sync {
 			targetPid=$!
 		fi
 
-		ExecTasks "$initiatorPid;$targetPid" "${FUNCNAME[0]}_treeListAfter" false 0 0 $SOFT_MAX_EXEC_TIME $HARD_MAX_EXEC_TIME false $SLEEP_TIME $KEEP_LOGGING
+		ExecTasks "$initiatorPid;$targetPid" "Sync_treeListAfter" false 0 0 $SOFT_MAX_EXEC_TIME $HARD_MAX_EXEC_TIME false $SLEEP_TIME $KEEP_LOGGING
 		if [ $? -ne 0 ]; then
-			IFS=';' read -r -a pidArray <<< "$(eval echo \"\$WAIT_FOR_TASK_COMPLETION_${FUNCNAME[0]}_treeListAfter\")"
+			IFS=';' read -r -a pidArray <<< "$WAIT_FOR_TASK_COMPLETION_Sync_treeListAfter"
 			initiatorFail=false
 			targetFail=false
 			for pid in "${pidArray[@]}"; do
@@ -2024,9 +2054,9 @@ function Sync {
 				targetPid=$!
 			fi
 
-			ExecTasks "$initiatorPid;$targetPid" "${FUNCNAME[0]}_timestampListAfter" false 0 0 $SOFT_MAX_EXEC_TIME $HARD_MAX_EXEC_TIME false $SLEEP_TIME $KEEP_LOGGING
+			ExecTasks "$initiatorPid;$targetPid" "Sync_timestampListAfter" false 0 0 $SOFT_MAX_EXEC_TIME $HARD_MAX_EXEC_TIME false $SLEEP_TIME $KEEP_LOGGING
 			if [ $? -ne 0 ]; then
-				IFS=';' read -r -a pidArray <<< "$(eval echo \"\$WAIT_FOR_TASK_COMPLETION_${FUNCNAME[0]}_timeStampListAfter\")"
+				IFS=';' read -r -a pidArray <<< "$WAIT_FOR_TASK_COMPLETION_Sync_timeStampListAfter"
 				initiatorFail=false
 				targetFail=false
 				for pid in "${pidArray[@]}"; do
@@ -2146,7 +2176,7 @@ function _SoftDeleteRemote {
 
 $SSH_CMD env _REMOTE_TOKEN="$_REMOTE_TOKEN" \
 env _DEBUG="'$_DEBUG'" env _PARANOIA_DEBUG="'$_PARANOIA_DEBUG'" env _LOGGER_SILENT="'$_LOGGER_SILENT'" env _LOGGER_VERBOSE="'$_LOGGER_VERBOSE'" env _LOGGER_PREFIX="'$_LOGGER_PREFIX'" env _LOGGER_ERR_ONLY="'$_LOGGER_ERR_ONLY'" \
-env PROGRAM="'$PROGRAM'" env SCRIPT_PID="'$SCRIPT_PID'" env TSTAMP="'$TSTAMP'" \
+env _REMOTE_EXECUTION="true" env PROGRAM="'$PROGRAM'" env SCRIPT_PID="'$SCRIPT_PID'" env TSTAMP="'$TSTAMP'" \
 env _DRYRUN="'$_DRYRUN'" env replicaType="'$replicaType'" env replicaDeletionPath="'$replicaDeletionPath'" env changeTime="'$changeTime'" env REMOTE_FIND_CMD="'$REMOTE_FIND_CMD'" \
 env LC_ALL=C $COMMAND_SUDO' bash -s' << 'ENDSSH' > "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$replicaType.$SCRIPT_PID.$TSTAMP" 2>&1
 include #### RUN_DIR SUBSET ####
@@ -2284,7 +2314,7 @@ function _TriggerInitiatorRunRemote {
 
 $SSH_CMD env _REMOTE_TOKEN="$_REMOTE_TOKEN" \
 env _DEBUG="'$_DEBUG'" env _PARANOIA_DEBUG="'$_PARANOIA_DEBUG'" env _LOGGER_SILENT="'$_LOGGER_SILENT'" env _LOGGER_VERBOSE="'$_LOGGER_VERBOSE'" env _LOGGER_PREFIX="'$_LOGGER_PREFIX'" env _LOGGER_ERR_ONLY="'$_LOGGER_ERR_ONLY'" \
-env PROGRAM="'$PROGRAM'" env SCRIPT_PID="'$SCRIPT_PID'" env TSTAMP="'$TSTAMP'" \
+env _REMOTE_EXECUTION="true" env PROGRAM="'$PROGRAM'" env SCRIPT_PID="'$SCRIPT_PID'" env TSTAMP="'$TSTAMP'" \
 env INSTANCE_ID="'$INSTANCE_ID'" env PUSH_FILE="'$(EscapeSpaces "${INITIATOR[$__replicaDir]}${INITIATOR[$__updateTriggerFile]}")'" \
 env LC_ALL=C $COMMAND_SUDO' bash -s' << 'ENDSSH' > "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$SCRIPT_PID.$TSTAMP" 2> "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.error.$SCRIPT_PID.$TSTAMP"
 include #### RUN_DIR SUBSET ####
@@ -2401,7 +2431,6 @@ function LogConflicts {
 	if [ -f "$RUN_DIR/$PROGRAM.conflictList.compare.$SCRIPT_PID.$TSTAMP" ]; then
 		echo "" > "${INITIATOR[$__replicaDir]}${INITIATOR[$__stateDir]}/${INITIATOR[$__conflictListFile]}"
 		while read -r line; do
-
 			echo "${INITIATOR[$__replicaDir]}$(echo $line | awk -F';' '{print $1}') << >> ${TARGET[$__replicaDir]}$(echo $line | awk -F';' '{print $1}')" >> "${INITIATOR[$__replicaDir]}${INITIATOR[$__stateDir]}/${INITIATOR[$__conflictListFile]}"
 		done < "$RUN_DIR/$PROGRAM.conflictList.compare.$SCRIPT_PID.$TSTAMP"
 
