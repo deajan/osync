@@ -79,6 +79,8 @@ function RemoteLogger {
 	local level="${2}"		# Log level
 	local retval="${3:-undef}"	# optional return value of command
 
+	local prefix
+
 	if [ "$_LOGGER_PREFIX" == "time" ]; then
 		prefix="TIME: $SECONDS - "
 	elif [ "$_LOGGER_PREFIX" == "date" ]; then
@@ -150,6 +152,8 @@ function Logger {
 	local value="${1}"		# Sentence to log (in double quotes)
 	local level="${2}"		# Log level
 	local retval="${3:-undef}"	# optional return value of command
+
+	local prefix
 
 	if [ "$_LOGGER_PREFIX" == "time" ]; then
 		prefix="TIME: $SECONDS - "
