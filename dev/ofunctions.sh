@@ -31,7 +31,7 @@
 #### OFUNCTIONS MINI SUBSET ####
 #### OFUNCTIONS MICRO SUBSET ####
 _OFUNCTIONS_VERSION=2.3.0-RC2
-_OFUNCTIONS_BUILD=2018101701
+_OFUNCTIONS_BUILD=2018102601
 #### _OFUNCTIONS_BOOTSTRAP SUBSET ####
 _OFUNCTIONS_BOOTSTRAP=true
 #### _OFUNCTIONS_BOOTSTRAP SUBSET END ####
@@ -2335,13 +2335,26 @@ function SetConfFileValue () {
 	local value="${3}"
 	local separator="${4:-#}"
 
-	if grep "^$name=" "$file" > /dev/null; then
-		# Using -i.tmp for BSD compat
-		sed -i.tmp "s$separator^$name=.*$separator$name=$value$separator" "$file"
-		rm -f "$file.tmp"
-		Logger "Set [$name] to [$value] in config file [$file]." "DEBUG"
+	if [ -f "$file" ]; then
+		if grep "^$name=" "$file" > /dev/null 2>&1; then
+			# Using -i.tmp for BSD compat
+			sed -i.tmp "s$separator^$name=.*$separator$name=$value$separator" "$file"
+			if [ $? -ne 0 ]; then
+				Logger "Cannot update value [$name] to [$value] in config file [$file]." "ERROR"
+			fi
+			rm -f "$file.tmp"
+			Logger "Set [$name] to [$value] in config file [$file]." "DEBUG"
+		else
+			echo "$name=$value" >> "$file"
+			if [ $? -ne 0 ]; then
+				Logger "Cannot create value [$name] to [$value] in config file [$file]." "ERROR"
+			fi
+		fi
 	else
-		Logger "Cannot set value [$name] to [$value] in config file [$file]." "ERROR"
+		echo "$name=$value" > "$file"
+		if [ $? -ne 0 ]; then
+			Logger "Config file [$file] does not exist. Failed to create it witn value [$name]." "ERROR"
+		fi
 	fi
 }
 #### SetConfFileValue SUBSET END ####
