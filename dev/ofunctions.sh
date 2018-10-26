@@ -31,7 +31,7 @@
 #### OFUNCTIONS MINI SUBSET ####
 #### OFUNCTIONS MICRO SUBSET ####
 _OFUNCTIONS_VERSION=2.3.0-RC2
-_OFUNCTIONS_BUILD=2018102601
+_OFUNCTIONS_BUILD=2018102602
 #### _OFUNCTIONS_BOOTSTRAP SUBSET ####
 _OFUNCTIONS_BOOTSTRAP=true
 #### _OFUNCTIONS_BOOTSTRAP SUBSET END ####
@@ -1449,6 +1449,8 @@ function GetLocalOS {
 	# There is no good way to tell if currently running in BusyBox shell. Using sluggish way.
 	if ls --help 2>&1 | grep -i "BusyBox" > /dev/null; then
 		localOsVar="BusyBox"
+	elif set -o | grep "winxp" > /dev/null; then
+		localOsVar="BusyBox-w32"
 	else
 		# Detecting the special ubuntu userland in Windows 10 bash
 		if grep -i Microsoft /proc/sys/kernel/osrelease > /dev/null 2>&1; then
@@ -1481,7 +1483,7 @@ function GetLocalOS {
 		*"CYGWIN"*)
 		LOCAL_OS="Cygwin"
 		;;
-		*"Microsoft"*)
+		*"Microsoft"*|*"MS/Windows"*)
 		LOCAL_OS="WinNT10"
 		;;
 		*"Darwin"*)
@@ -1512,7 +1514,8 @@ function GetLocalOS {
 	fi
 
 	# Get Host info for Windows
-	if [ "$LOCAL_OS" == "msys" ] || [ "$LOCAL_OS" == "BusyBox" ] || [ "$LOCAL_OS" == "Cygwin" ] || [ "$LOCAL_OS" == "WinNT10" ]; then localOsVar="$(uname -a)"
+	if [ "$LOCAL_OS" == "msys" ] || [ "$LOCAL_OS" == "BusyBox" ] || [ "$LOCAL_OS" == "Cygwin" ] || [ "$LOCAL_OS" == "WinNT10" ]; then
+		localOsVar="$localOsVar $(uname -a)"
 		if [ "$PROGRAMW6432" != "" ]; then
 			LOCAL_OS_BITNESS=64
 			LOCAL_OS_FAMILY="Windows"
@@ -1526,6 +1529,9 @@ function GetLocalOS {
 	# Get Host info for Unix
 	else
 		LOCAL_OS_FAMILY="Unix"
+	fi
+
+	if [ "$LOCAL_OS_FAMILY" == "Unix" ]; then
 		if uname -m | grep '64' > /dev/null 2>&1; then
 			LOCAL_OS_BITNESS=64
 		else
