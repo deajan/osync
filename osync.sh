@@ -7,12 +7,12 @@ PROGRAM="osync" # Rsync based two way sync engine with fault tolerance
 AUTHOR="(C) 2013-2018 by Orsiris de Jong"
 CONTACT="http://www.netpower.fr/osync - ozy@netpower.fr"
 PROGRAM_VERSION=1.3.0-beta1
-PROGRAM_BUILD=2018101701
+PROGRAM_BUILD=2018101801
 IS_STABLE=no
 
 
 _OFUNCTIONS_VERSION=2.3.0-RC2
-_OFUNCTIONS_BUILD=2018101701
+_OFUNCTIONS_BUILD=2018110502
 _OFUNCTIONS_BOOTSTRAP=true
 
 if ! type "$BASH" > /dev/null; then
@@ -1022,7 +1022,7 @@ function ExecTasks {
 					# Check for valid exit codes
 					if [ $(ArrayContains $retval "${validExitCodes[@]}") -eq 0 ]; then
 						if [ $noErrorLogsAtAll != true ]; then
-							Logger "${FUNCNAME[0]} called by [$id] finished monitoring pid [$pid] with exitcode [$retval]." "DEBUG"
+							Logger "${FUNCNAME[0]} called by [$id] finished monitoring pid [$pid] with exitcode [$retval]." "ERROR"
 							if [ "$functionMode" == "ParallelExec" ]; then
 								Logger "Command was [${commandsArrayPid[$pid]}]." "ERROR"
 							fi
@@ -1355,6 +1355,8 @@ function GetLocalOS {
 	# There is no good way to tell if currently running in BusyBox shell. Using sluggish way.
 	if ls --help 2>&1 | grep -i "BusyBox" > /dev/null; then
 		localOsVar="BusyBox"
+	elif set -o | grep "winxp" > /dev/null; then
+		localOsVar="BusyBox-w32"
 	else
 		# Detecting the special ubuntu userland in Windows 10 bash
 		if grep -i Microsoft /proc/sys/kernel/osrelease > /dev/null 2>&1; then
@@ -1387,7 +1389,7 @@ function GetLocalOS {
 		*"CYGWIN"*)
 		LOCAL_OS="Cygwin"
 		;;
-		*"Microsoft"*)
+		*"Microsoft"*|*"MS/Windows"*)
 		LOCAL_OS="WinNT10"
 		;;
 		*"Darwin"*)
@@ -1418,7 +1420,8 @@ function GetLocalOS {
 	fi
 
 	# Get Host info for Windows
-	if [ "$LOCAL_OS" == "msys" ] || [ "$LOCAL_OS" == "BusyBox" ] || [ "$LOCAL_OS" == "Cygwin" ] || [ "$LOCAL_OS" == "WinNT10" ]; then localOsVar="$(uname -a)"
+	if [ "$LOCAL_OS" == "msys" ] || [ "$LOCAL_OS" == "BusyBox" ] || [ "$LOCAL_OS" == "Cygwin" ] || [ "$LOCAL_OS" == "WinNT10" ]; then
+		localOsVar="$localOsVar $(uname -a)"
 		if [ "$PROGRAMW6432" != "" ]; then
 			LOCAL_OS_BITNESS=64
 			LOCAL_OS_FAMILY="Windows"
@@ -1432,6 +1435,9 @@ function GetLocalOS {
 	# Get Host info for Unix
 	else
 		LOCAL_OS_FAMILY="Unix"
+	fi
+
+	if [ "$LOCAL_OS_FAMILY" == "Unix" ]; then
 		if uname -m | grep '64' > /dev/null 2>&1; then
 			LOCAL_OS_BITNESS=64
 		else
@@ -1975,14 +1981,14 @@ function InitLocalOSDependingSettings {
 # Gets executed regardless of the need of remote connections. It is just that this code needs to get executed after we know if there is a remote os, and if yes, which one
 function InitRemoteOSDependingSettings {
 
-	if [ "$REMOTE_OS" == "msys" ] || [ "$LOCAL_OS" == "Cygwin" ]; then
+	if [ "$REMOTE_OS" == "msys" ] || [ "$REMOTE_OS" == "Cygwin" ]; then
 		REMOTE_FIND_CMD=$(dirname $BASH)/find
 	else
 		REMOTE_FIND_CMD=find
 	fi
 
 	## Stat command has different syntax on Linux and FreeBSD/MacOSX
-	if [ "$LOCAL_OS" == "MacOSX" ] || [ "$LOCAL_OS" == "BSD" ]; then
+	if [ "$REMOTE_OS" == "MacOSX" ] || [ "$REMOTE_OS" == "BSD" ]; then
 		REMOTE_STAT_CMD="stat -f \"%Sm\""
 		REMOTE_STAT_CTIME_MTIME_CMD="stat -f \\\"%N;%c;%m\\\""
 	else
@@ -2161,13 +2167,26 @@ function SetConfFileValue () {
 	local value="${3}"
 	local separator="${4:-#}"
 
-	if grep "^$name=" "$file" > /dev/null; then
-		# Using -i.tmp for BSD compat
-		sed -i.tmp "s$separator^$name=.*$separator$name=$value$separator" "$file"
-		rm -f "$file.tmp"
-		Logger "Set [$name] to [$value] in config file [$file]." "DEBUG"
+	if [ -f "$file" ]; then
+		if grep "^$name=" "$file" > /dev/null 2>&1; then
+			# Using -i.tmp for BSD compat
+			sed -i.tmp "s$separator^$name=.*$separator$name=$value$separator" "$file"
+			if [ $? -ne 0 ]; then
+				Logger "Cannot update value [$name] to [$value] in config file [$file]." "ERROR"
+			fi
+			rm -f "$file.tmp"
+			Logger "Set [$name] to [$value] in config file [$file]." "DEBUG"
+		else
+			echo "$name=$value" >> "$file"
+			if [ $? -ne 0 ]; then
+				Logger "Cannot create value [$name] to [$value] in config file [$file]." "ERROR"
+			fi
+		fi
 	else
-		Logger "Cannot set value [$name] to [$value] in config file [$file]." "ERROR"
+		echo "$name=$value" > "$file"
+		if [ $? -ne 0 ]; then
+			Logger "Config file [$file] does not exist. Failed to create it witn value [$name]." "ERROR"
+		fi
 	fi
 }
 
@@ -3342,16 +3361,16 @@ function _getFileCtimeMtimeLocal {
 	echo -n "" > "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$replicaType.$SCRIPT_PID.$TSTAMP"
 
 	while IFS='' read -r file; do
-		$STAT_CTIME_MTIME_CMD "$replicaPath$file" >> "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$replicaType.$SCRIPT_PID.$TSTAMP"
+		$STAT_CTIME_MTIME_CMD "$replicaPath$file" >> "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$replicaType.$SCRIPT_PID.$TSTAMP" 2> "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$replicaType.error.$SCRIPT_PID.$TSTAMP"
 		if [ $? -ne 0 ]; then
 			Logger "Could not get file attributes for [$replicaPath$file]." "ERROR"
 			echo "1" > "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.subshellError.$replicaType.$SCRIPT_PID.$TSTAMP"
 		fi
 	done < "$fileList"
 	if [ -f "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.subshellError.$replicaType.$SCRIPT_PID.$TSTAMP" ]; then
-		Logger "Getting file attributes failed [$retval] on $replicaType. Stopping execution." "CRITICAL" $retval
-		if [ -s "$RUN_DIR/$PROGRAM.ctime_mtime.$replicaType.$SCRIPT_PID.$TSTAMP" ]; then #WIP: does this file exist
-			Logger "Command output:\n$(cat $RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$replicaType.$SCRIPT_PID.$TSTAMP)" "WARN"
+		Logger "Getting file time attributes failed [$retval] on $replicaType. Stopping execution." "CRITICAL" $retval
+		if [ -s "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$replicaType.error.$SCRIPT_PID.$TSTAMP" ]; then
+			Logger "Command output:\n$(cat "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$replicaType.error.$SCRIPT_PID.$TSTAMP")" "WARN"
 		fi
 		return 1
 	else
@@ -5488,23 +5507,21 @@ function LogConflicts {
 	local subject
 	local body
 
-	# We keep this in a separate if check because of the subshell used for Logger with _LOGGER_PREFIX
 	if [ -f "$RUN_DIR/$PROGRAM.conflictList.compare.$SCRIPT_PID.$TSTAMP" ]; then
 		Logger "File conflicts: INITIATOR << >> TARGET" "ALWAYS"
-	fi
-
-	
-	_LOGGER_PREFIX=""
-	(
-	if [ -f "$RUN_DIR/$PROGRAM.conflictList.compare.$SCRIPT_PID.$TSTAMP" ]; then
-		echo "" > "${INITIATOR[$__replicaDir]}${INITIATOR[$__stateDir]}/${INITIATOR[$__conflictListFile]}"
+		> "${INITIATOR[$__replicaDir]}${INITIATOR[$__stateDir]}/${INITIATOR[$__conflictListFile]}"
 		while read -r line; do
 			echo "${INITIATOR[$__replicaDir]}$(echo $line | awk -F';' '{print $1}') << >> ${TARGET[$__replicaDir]}$(echo $line | awk -F';' '{print $1}')" >> "${INITIATOR[$__replicaDir]}${INITIATOR[$__stateDir]}/${INITIATOR[$__conflictListFile]}"
 		done < "$RUN_DIR/$PROGRAM.conflictList.compare.$SCRIPT_PID.$TSTAMP"
 
+		(
+		_LOGGER_PREFIX=""
 		Logger "$(cat ${INITIATOR[$__replicaDir]}${INITIATOR[$__stateDir]}/${INITIATOR[$__conflictListFile]})" "ALWAYS"
+		)
+	else
+		Logger "No conflictList file." "ERROR"
 	fi
-	)
+
 	if [ "$ALERT_CONFLICTS" == "yes" ] && [ -s "$RUN_DIR/$PROGRAM.conflictList.compare.$SCRIPT_PID.$TSTAMP" ]; then
 		subject="Conflictual files found in [$INSTANCE_ID]"
 		body="List of conflictual files:"$'\n'"$(cat ${INITIATOR[$__replicaDir]}${INITIATOR[$__stateDir]}/${INITIATOR[$__conflictListFile]})"
