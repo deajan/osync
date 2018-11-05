@@ -31,7 +31,7 @@
 #### OFUNCTIONS MINI SUBSET ####
 #### OFUNCTIONS MICRO SUBSET ####
 _OFUNCTIONS_VERSION=2.3.0-RC2
-_OFUNCTIONS_BUILD=2018102602
+_OFUNCTIONS_BUILD=2018110501
 #### _OFUNCTIONS_BOOTSTRAP SUBSET ####
 _OFUNCTIONS_BOOTSTRAP=true
 #### _OFUNCTIONS_BOOTSTRAP SUBSET END ####
@@ -1099,7 +1099,7 @@ function ExecTasks {
 					# Check for valid exit codes
 					if [ $(ArrayContains $retval "${validExitCodes[@]}") -eq 0 ]; then
 						if [ $noErrorLogsAtAll != true ]; then
-							Logger "${FUNCNAME[0]} called by [$id] finished monitoring pid [$pid] with exitcode [$retval]." "DEBUG"
+							Logger "${FUNCNAME[0]} called by [$id] finished monitoring pid [$pid] with exitcode [$retval]." "ERROR"
 							if [ "$functionMode" == "ParallelExec" ]; then
 								Logger "Command was [${commandsArrayPid[$pid]}]." "ERROR"
 							fi
