@@ -31,7 +31,7 @@
 #### OFUNCTIONS MINI SUBSET ####
 #### OFUNCTIONS MICRO SUBSET ####
 _OFUNCTIONS_VERSION=2.3.0-RC2
-_OFUNCTIONS_BUILD=2018110502
+_OFUNCTIONS_BUILD=2018121701
 #### _OFUNCTIONS_BOOTSTRAP SUBSET ####
 _OFUNCTIONS_BOOTSTRAP=true
 #### _OFUNCTIONS_BOOTSTRAP SUBSET END ####
@@ -908,7 +908,8 @@ function ExecTasks {
 	local commandsConditionArray=() # Array containing conditional commands
 	local currentCommand		# Variable containing currently processed command
 	local currentCommandCondition	# Variable containing currently processed conditional command
-	local commandsArrayPid=()	# Array containing pids of commands currently run
+	local commandsArrayPid=()	# Array containing commands indexed by pids
+	local commandsArrayOutput=()	# Array contining command results indexed by pids
 	local postponedRetryCount=0	# Number of current postponed commands retries
 	local postponedItemCount=0	# Number of commands that have been postponed (keep at least one in order to check once)
 	local postponedCounter=0
@@ -939,6 +940,7 @@ function ExecTasks {
 	local functionMode
 	local softAlert=false
 	local failedPidsList		# List containing failed pids with exit code separated by semicolons (eg : 2355:1;4534:2;2354:3)
+	local randomOutputName		# Random filename for command outputs
 
 	# Initialise global variable
 	eval "WAIT_FOR_TASK_COMPLETION_$id=\"\""
@@ -1103,6 +1105,7 @@ function ExecTasks {
 							if [ "$functionMode" == "ParallelExec" ]; then
 								Logger "Command was [${commandsArrayPid[$pid]}]." "ERROR"
 							fi
+							Logger "Command output was [$(cat ${commandsArrayOutput[$pid]})]." "ERROR"
 						fi
 						errorcount=$((errorcount+1))
 						# Welcome to variable variable bash hell
@@ -1246,10 +1249,12 @@ function ExecTasks {
 
 				if [ $executeCommand == true ]; then
 					Logger "Running command [$currentCommand]." "DEBUG"
-					eval "$currentCommand" >> "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$id.$SCRIPT_PID.$TSTAMP" 2>&1 &
+					randomOutputName=$(date '+%Y%m%dT%H%M%S').$(PoorMansRandomGenerator 5)
+					eval "$currentCommand" >> "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$randomOutputName.$SCRIPT_PID.$TSTAMP" 2>&1 &
 					pid=$!
 					pidsArray+=($pid)
 					commandsArrayPid[$pid]="$currentCommand"
+					commandsArrayOutput[$pid]="$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$randomOutputName.$SCRIPT_PID.$TSTAMP"
 					# Initialize pid execution time array
 					pidsTimeArray[$pid]=0
 				else
