@@ -31,7 +31,7 @@
 #### OFUNCTIONS MINI SUBSET ####
 #### OFUNCTIONS MICRO SUBSET ####
 _OFUNCTIONS_VERSION=2.3.0-RC2
-_OFUNCTIONS_BUILD=2018121702
+_OFUNCTIONS_BUILD=2018121703
 #### _OFUNCTIONS_BOOTSTRAP SUBSET ####
 _OFUNCTIONS_BOOTSTRAP=true
 #### _OFUNCTIONS_BOOTSTRAP SUBSET END ####
@@ -1105,7 +1105,9 @@ function ExecTasks {
 							if [ "$functionMode" == "ParallelExec" ]; then
 								Logger "Command was [${commandsArrayPid[$pid]}]." "ERROR"
 							fi
-							Logger "Command output was [$(cat ${commandsArrayOutput[$pid]})]." "ERROR"
+							if [ -f "${commandsArrayOutput[$pid]}" ]; then
+								Logger "Command output was [$(cat ${commandsArrayOutput[$pid]})]." "ERROR"
+							fi
 						fi
 						errorcount=$((errorcount+1))
 						# Welcome to variable variable bash hell
