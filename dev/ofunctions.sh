@@ -31,7 +31,7 @@
 #### OFUNCTIONS MINI SUBSET ####
 #### OFUNCTIONS MICRO SUBSET ####
 _OFUNCTIONS_VERSION=2.3.0-RC2
-_OFUNCTIONS_BUILD=2018121701
+_OFUNCTIONS_BUILD=2018121702
 #### _OFUNCTIONS_BOOTSTRAP SUBSET ####
 _OFUNCTIONS_BOOTSTRAP=true
 #### _OFUNCTIONS_BOOTSTRAP SUBSET END ####
@@ -938,7 +938,7 @@ function ExecTasks {
 	local executeCommand		# Boolean to check if currentCommand can be executed given a condition
 	local hasPids=false		# Are any valable pids given to function ?		#__WITH_PARANOIA_DEBUG
 	local functionMode
-	local softAlert=false
+	local softAlert=false		# Does a soft alert need to be triggered, if yes, send an alert once
 	local failedPidsList		# List containing failed pids with exit code separated by semicolons (eg : 2355:1;4534:2;2354:3)
 	local randomOutputName		# Random filename for command outputs
 
