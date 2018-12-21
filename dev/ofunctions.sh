@@ -31,7 +31,7 @@
 #### OFUNCTIONS MINI SUBSET ####
 #### OFUNCTIONS MICRO SUBSET ####
 _OFUNCTIONS_VERSION=2.3.0-RC2
-_OFUNCTIONS_BUILD=2018122101
+_OFUNCTIONS_BUILD=2018122102
 #### _OFUNCTIONS_BOOTSTRAP SUBSET ####
 _OFUNCTIONS_BOOTSTRAP=true
 #### _OFUNCTIONS_BOOTSTRAP SUBSET END ####
@@ -1106,7 +1106,7 @@ function ExecTasks {
 								Logger "Command was [${commandsArrayPid[$pid]}]." "ERROR"
 							fi
 							if [ -f "${commandsArrayOutput[$pid]}" ]; then
-								Logger "Command output was [$(cat ${commandsArrayOutput[$pid]})]." "ERROR"
+								Logger "Command output was [\$(cat ${commandsArrayOutput[$pid]})\n]." "ERROR"
 							fi
 						fi
 						errorcount=$((errorcount+1))
