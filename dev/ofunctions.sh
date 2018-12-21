@@ -31,7 +31,7 @@
 #### OFUNCTIONS MINI SUBSET ####
 #### OFUNCTIONS MICRO SUBSET ####
 _OFUNCTIONS_VERSION=2.3.0-RC2
-_OFUNCTIONS_BUILD=2018121703
+_OFUNCTIONS_BUILD=2018122101
 #### _OFUNCTIONS_BOOTSTRAP SUBSET ####
 _OFUNCTIONS_BOOTSTRAP=true
 #### _OFUNCTIONS_BOOTSTRAP SUBSET END ####
@@ -1321,7 +1321,7 @@ function EscapeSpaces {
 # Usage var=$(EscapeDoubleQuotes "$var") or var="$(EscapeDoubleQuotes "$var")"
 function EscapeDoubleQuotes {
 	local value="${1}"
-		
+
 	echo "${value//\"/\\\"}"
 }
 
