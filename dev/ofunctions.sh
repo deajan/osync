@@ -31,7 +31,7 @@
 #### OFUNCTIONS MINI SUBSET ####
 #### OFUNCTIONS MICRO SUBSET ####
 _OFUNCTIONS_VERSION=2.3.0-RC2
-_OFUNCTIONS_BUILD=2018122102
+_OFUNCTIONS_BUILD=2018122103
 #### _OFUNCTIONS_BOOTSTRAP SUBSET ####
 _OFUNCTIONS_BOOTSTRAP=true
 #### _OFUNCTIONS_BOOTSTRAP SUBSET END ####
@@ -741,9 +741,11 @@ function TrapError {
 
 function LoadConfigFile {
 	local configFile="${1}"
+	local revisionRequired="${2}"
 
 	__CheckArguments 1 $# "$@"	#__WITH_PARANOIA_DEBUG
 
+	local revisionPresent
 
 	if [ ! -f "$configFile" ]; then
 		Logger "Cannot load configuration file [$configFile]. Cannot start." "CRITICAL"
@@ -752,6 +754,16 @@ function LoadConfigFile {
 		Logger "Wrong configuration file supplied [$configFile]. Cannot start." "CRITICAL"
 		exit 1
 	else
+		revisionPresent=$(GetConfFileValue "$configFile" "CONFIG_FILE_REVISION" true)
+		if [ "$(IsNumeric $revisionPresent)" -eq 0 ]; then
+			revisionPresent=0
+		fi
+		if [ "$revisionRequired" != "" ]; then
+			if [ $(VerComp "$revisionPresent" "$revisionRequired") -eq 2 ]; then
+				Logger "Configuration file seems out of date. Required version [$revisionRequired]. Actual version [$revisionPresent]." "CRITICAL"
+				exit 1
+			fi
+		fi
 		# Remove everything that is not a variable assignation
 		grep '^[^ ]*=[^;&]*' "$configFile" > "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$SCRIPT_PID.$TSTAMP"
 		source "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$SCRIPT_PID.$TSTAMP"
