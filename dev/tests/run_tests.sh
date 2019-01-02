@@ -211,7 +211,7 @@ function oneTimeSetUp () {
 
 	osyncParameters=()
 	osyncParameters[$__quickLocal]="--initiator=$INITIATOR_DIR --target=$TARGET_DIR --instance-id=quicklocal"
-	#osyncParameters[$__confLocal]="$CONF_DIR/$LOCAL_CONF"
+	osyncParameters[$__confLocal]="$CONF_DIR/$LOCAL_CONF"
 
 	osyncDaemonParameters=()
 
@@ -222,8 +222,8 @@ function oneTimeSetUp () {
 
   # Do not check remote config on msys or cygwin since we don't have a local SSH server
 	if [ "$LOCAL_OS" != "msys" ] && [ "$LOCAL_OS" != "Cygwin" ] && [ $SKIP_REMOTE != true ]; then
-		#osyncParameters[$__quickRemote]="--initiator=$INITIATOR_DIR --target=ssh://localhost:$SSH_PORT/$TARGET_DIR --rsakey=${HOME}/.ssh/id_rsa_local --instance-id=quickremote --remote-token=SomeAlphaNumericToken9"
-		#osyncParameters[$__confRemote]="$CONF_DIR/$REMOTE_CONF"
+		osyncParameters[$__quickRemote]="--initiator=$INITIATOR_DIR --target=ssh://localhost:$SSH_PORT/$TARGET_DIR --rsakey=${HOME}/.ssh/id_rsa_local --instance-id=quickremote --remote-token=SomeAlphaNumericToken9"
+		osyncParameters[$__confRemote]="$CONF_DIR/$REMOTE_CONF"
 
 		osyncDaemonParameters[$__remote]="$CONF_DIR/$REMOTE_CONF --on-changes"
 
@@ -452,7 +452,7 @@ function test_deletion_failure () {
 		$SUDO_CMD $IMMUTABLE_ON_CMD "$INITIATOR_DIR/$FileB"
 
 		# This shuold fail with exitcode 1
-		REMOTE_HOST_PING=$RHOST_PING bash -x $OSYNC_EXECUTABLE $i
+		REMOTE_HOST_PING=$RHOST_PING $OSYNC_EXECUTABLE $i
 		assertEquals "Second deletion run with parameters [$i]." "1" $?
 
 		# standard file tests
