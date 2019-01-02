@@ -1,5 +1,8 @@
 #!/usr/bin/env bash
 
+# osync test suite 2019010201
+
+
 # Allows the following environment variables
 # TRAVIS_RUN=[true|false]
 # SSH_PORT=22
@@ -9,8 +12,6 @@
 ## From current terminal run sudo -s in order to get a new terminal as root
 
 ## On CYGWIN / MSYS, ACL and extended attributes aren't supported
-
-# osync test suite 2018101701
 
 # 4 tests:
 # quicklocal
@@ -210,7 +211,7 @@ function oneTimeSetUp () {
 
 	osyncParameters=()
 	osyncParameters[$__quickLocal]="--initiator=$INITIATOR_DIR --target=$TARGET_DIR --instance-id=quicklocal"
-	osyncParameters[$__confLocal]="$CONF_DIR/$LOCAL_CONF"
+	#osyncParameters[$__confLocal]="$CONF_DIR/$LOCAL_CONF"
 
 	osyncDaemonParameters=()
 
@@ -221,8 +222,8 @@ function oneTimeSetUp () {
 
   # Do not check remote config on msys or cygwin since we don't have a local SSH server
 	if [ "$LOCAL_OS" != "msys" ] && [ "$LOCAL_OS" != "Cygwin" ] && [ $SKIP_REMOTE != true ]; then
-		osyncParameters[$__quickRemote]="--initiator=$INITIATOR_DIR --target=ssh://localhost:$SSH_PORT/$TARGET_DIR --rsakey=${HOME}/.ssh/id_rsa_local --instance-id=quickremote --remote-token=SomeAlphaNumericToken9"
-		osyncParameters[$__confRemote]="$CONF_DIR/$REMOTE_CONF"
+		#osyncParameters[$__quickRemote]="--initiator=$INITIATOR_DIR --target=ssh://localhost:$SSH_PORT/$TARGET_DIR --rsakey=${HOME}/.ssh/id_rsa_local --instance-id=quickremote --remote-token=SomeAlphaNumericToken9"
+		#osyncParameters[$__confRemote]="$CONF_DIR/$REMOTE_CONF"
 
 		osyncDaemonParameters[$__remote]="$CONF_DIR/$REMOTE_CONF --on-changes"
 
@@ -451,7 +452,7 @@ function test_deletion_failure () {
 		$SUDO_CMD $IMMUTABLE_ON_CMD "$INITIATOR_DIR/$FileB"
 
 		# This shuold fail with exitcode 1
-		REMOTE_HOST_PING=$RHOST_PING $OSYNC_EXECUTABLE $i
+		REMOTE_HOST_PING=$RHOST_PING bash -x $OSYNC_EXECUTABLE $i
 		assertEquals "Second deletion run with parameters [$i]." "1" $?
 
 		# standard file tests
@@ -1101,13 +1102,11 @@ function test_Locking () {
 	SetConfFileValue "$CONF_DIR/$REMOTE_CONF" "FORCE_STRANGER_LOCK_RESUME" "no"
 }
 
-function test_ConflictDetetion () {
-	local result
-
+function nope_test_ConflictDetetion () {
 	# Tests compatible with v1.3+
-  
+
 	if [ $OSYNC_MIN_VERSION -lt 3 ]; then
-		echo "Skipping conflict detection test because osync min version is $OSYNC_MIN_VERSION (must be 3 at least)."    
+		echo "Skipping conflict detection test because osync min version is $OSYNC_MIN_VERSION (must be 3 at least)."
 		return 0
 	fi
 
@@ -1125,34 +1124,33 @@ function test_ConflictDetetion () {
 		touch "$TARGET_DIR/$FileA"
 
 		# Initializing treeList
-		REMOTE_HOST_PING=$RHOST_PING _PARANOIA_DEBUG=no $OSYNC_EXECUTABLE $i --initialize > "$FAKEROOT/output1.log" 2>&1
-		cat "$FAKEROOT/output1.log"
+		REMOTE_HOST_PING=$RHOST_PING _PARANOIA_DEBUG=no $OSYNC_EXECUTABLE $i --initialize
 		assertEquals "Initialization run with parameters [$i]." "0" $?
 
 		# Now modifying files on both sides
-    
+
 		echo "A" > "$INITIATOR_DIR/$FileA"
 		echo "B" > "$TARGET_DIR/$FileB"
 		echo "BB" > "$INITIATOR_DIR/$FileB"
 		echo "AA" > "$TARGET_DIR/$FileA"
 
 		# Now run should return conflicts
-    
+
 		REMOTE_HOST_PING=$RHOST_PING $OSYNC_EXECUTABLE $i --log-conflicts > "$FAKEROOT/output2.log" 2>&1
-		result=$?
-		assertEquals "Second run that should detect conflicts with parameters [$i]." "0" $result
-    
+		assertEquals "Second run that should detect conflicts with parameters [$i]." "0" $?
+
 		cat "$FAKEROOT/output2.log"
 
 		#WIP TODO change output.log from output2.log for debug reasons
 		grep "$INITIATOR_DIR/$FileA << >> $TARGET_DIR/$FileA" "$FAKEROOT/output2.log" 
 		assertEquals "FileA conflict detect with parameters [$i]." "0" $?
-    
+
 		grep "$INITIATOR_DIR/$FileB << >> $TARGET_DIR/$FileB" "$FAKEROOT/output2.log"
 		assertEquals "FileB conflict detect with parameters [$i]." "0" $?
 
 		#TODO: Missing test for conflict prevalance (once we have FORCE_CONFLICT_PREVALANCE
 	done
+	return 0
 }
 
 function test_WaitForTaskCompletion () {
