@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-# osync test suite 2019011001
+# osync test suite 2019011101
 
 
 # Allows the following environment variables
@@ -959,28 +959,28 @@ function test_MultipleConflictBackups () {
 		echo "$FileB" > "$TARGET_DIR/$FileB"
 
 		# First run
-		CONFLICT_BACKUP_MULTIPLE=yes REMOTE_HOST_PING=$RHOST_PING $OSYNC_EXECUTABLE $i $additionalParameters
+		CONFLICT_BACKUP_MULTIPLE=true REMOTE_HOST_PING=$RHOST_PING $OSYNC_EXECUTABLE $i $additionalParameters
 		assertEquals "First deletion run with parameters [$i]." "0" $?
 
 		echo "$FileA+" > "$TARGET_DIR/$FileA"
 		echo "$FileB+" > "$INITIATOR_DIR/$FileB"
 
 		# Second run
-		CONFLICT_BACKUP_MULTIPLE=yes REMOTE_HOST_PING=$RHOST_PING $OSYNC_EXECUTABLE $i $additionalParameters
+		CONFLICT_BACKUP_MULTIPLE=true REMOTE_HOST_PING=$RHOST_PING $OSYNC_EXECUTABLE $i $additionalParameters
 		assertEquals "First deletion run with parameters [$i]." "0" $?
 
 		echo "$FileA-" > "$TARGET_DIR/$FileA"
 		echo "$FileB-" > "$INITIATOR_DIR/$FileB"
 
 		# Third run
-		CONFLICT_BACKUP_MULTIPLE=yes REMOTE_HOST_PING=$RHOST_PING $OSYNC_EXECUTABLE $i $additionalParameters
+		CONFLICT_BACKUP_MULTIPLE=true REMOTE_HOST_PING=$RHOST_PING $OSYNC_EXECUTABLE $i $additionalParameters
 		assertEquals "First deletion run with parameters [$i]." "0" $?
 
 		echo "$FileA*" > "$TARGET_DIR/$FileA"
 		echo "$FileB*" > "$INITIATOR_DIR/$FileB"
 
 		# Fouth run
-		CONFLICT_BACKUP_MULTIPLE=yes REMOTE_HOST_PING=$RHOST_PING $OSYNC_EXECUTABLE $i $additionalParameters
+		CONFLICT_BACKUP_MULTIPLE=true REMOTE_HOST_PING=$RHOST_PING $OSYNC_EXECUTABLE $i $additionalParameters
 		assertEquals "First deletion run with parameters [$i]." "0" $?
 
 		# This test may fail only on 31th December at 23:59 :)
