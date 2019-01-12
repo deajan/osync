@@ -7,7 +7,7 @@ PROGRAM="osync" # Rsync based two way sync engine with fault tolerance
 AUTHOR="(C) 2013-2019 by Orsiris de Jong"
 CONTACT="http://www.netpower.fr/osync - ozy@netpower.fr"
 PROGRAM_VERSION=1.3.0-pre-rc1
-PROGRAM_BUILD=2019011101
+PROGRAM_BUILD=2019011201
 IS_STABLE=no
 
 CONFIG_FILE_REVISION_REQUIRED=1.3.0
@@ -206,9 +206,6 @@ function UpdateBooleans {
 	for i in "${booleans[@]}"; do
 		update="if [ \"\$$i\" == \"yes\" ]; then $i=true; fi; if [ \"\$$i\" == \"no\" ]; then $i=false; fi"
 		eval "$update"
-		#WIP
-		Logger "eval $update" "NOTICE"
-		Logger "cbm=$CONFLICT_BACKUP_MULTIPLE" "NOTICE"
 	done
 }
 
@@ -2690,6 +2687,8 @@ function Init {
 		TARGET_BACKUP=""
 	fi
 
+	Logger "Initiator_backup = $INITIATOR_BACKUP" "ERROR"
+
 	SYNC_ACTION=(
 	'replica-tree'
 	'deleted-list'
@@ -3107,6 +3106,8 @@ if [ "$IS_STABLE" != true ]; then
 	Logger "This is an unstable dev build [$PROGRAM_BUILD]. Please use with caution." "WARN"
 	fi
 
+# v2 config syntax compatibility
+UpdateBooleans
 GetLocalOS
 InitLocalOSDependingSettings
 PreInit
@@ -3117,8 +3118,6 @@ PostInit
 # Add exclusion of $INITIATOR[$__updateTriggerFile] to rsync patterns used by sync functions, but not by daemon
 RSYNC_FULL_PATTERNS="$RSYNC_PATTERNS --exclude=${INITIATOR[$__updateTriggerFile]}"
 
-# v2 config syntax compatibility
-UpdateBooleans
 if [ $_QUICK_SYNC -lt 2 ]; then
 	if [ "$_SYNC_ON_CHANGES" == false ]; then
 		CheckCurrentConfig true
