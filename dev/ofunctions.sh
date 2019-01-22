@@ -9,7 +9,7 @@
 
 ## PROGRAM=program-name
 ## INSTANCE_ID=program-instance-name
-## _DEBUG=yes/no
+## _DEBUG=true/false
 ## _LOGGER_SILENT=true/false
 ## _LOGGER_VERBOSE=true/false
 ## _LOGGER_ERR_ONLY=true/false
@@ -31,7 +31,7 @@
 #### OFUNCTIONS MINI SUBSET ####
 #### OFUNCTIONS MICRO SUBSET ####
 _OFUNCTIONS_VERSION=2.3.0-RC2
-_OFUNCTIONS_BUILD=20190110
+_OFUNCTIONS_BUILD=2019012201
 #### _OFUNCTIONS_BOOTSTRAP SUBSET ####
 _OFUNCTIONS_BOOTSTRAP=true
 #### _OFUNCTIONS_BOOTSTRAP SUBSET END ####
@@ -67,12 +67,12 @@ WARN_ALERT=false
 #### DEBUG SUBSET ####
 ## allow function call checks			#__WITH_PARANOIA_DEBUG
 if [ "$_PARANOIA_DEBUG" == true ];then		#__WITH_PARANOIA_DEBUG
-	_DEBUG=yes				#__WITH_PARANOIA_DEBUG
+	_DEBUG=true				#__WITH_PARANOIA_DEBUG
 fi						#__WITH_PARANOIA_DEBUG
 
-## allow debugging from command line with _DEBUG=yes
+## allow debugging from command line with _DEBUG=true
 if [ ! "$_DEBUG" == true ]; then
-	_DEBUG=no
+	_DEBUG=false
 	_LOGGER_VERBOSE=false
 else
 	trap 'TrapError ${LINENO} $?' ERR
@@ -286,7 +286,7 @@ function RemoteLogger {
 # NOTICE sent to stdout
 # VERBOSE sent to stdout if _LOGGER_VERBOSE = true
 # ALWAYS is sent to stdout unless _LOGGER_SILENT = true
-# DEBUG & PARANOIA_DEBUG are only sent to stdout if _DEBUG=yes
+# DEBUG & PARANOIA_DEBUG are only sent to stdout if _DEBUG=true
 # SIMPLE is a wrapper for QuickLogger that does not use advanced functionality
 function Logger {
 	local value="${1}"		# Sentence to log (in double quotes)
