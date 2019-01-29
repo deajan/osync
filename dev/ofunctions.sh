@@ -31,7 +31,7 @@
 #### OFUNCTIONS MINI SUBSET ####
 #### OFUNCTIONS MICRO SUBSET ####
 _OFUNCTIONS_VERSION=2.3.0-RC2
-_OFUNCTIONS_BUILD=2019012201
+_OFUNCTIONS_BUILD=2019012801
 #### _OFUNCTIONS_BOOTSTRAP SUBSET ####
 _OFUNCTIONS_BOOTSTRAP=true
 #### _OFUNCTIONS_BOOTSTRAP SUBSET END ####
@@ -284,10 +284,9 @@ function RemoteLogger {
 
 # CRITICAL, ERROR, WARN sent to stderr, color depending on level, level also logged
 # NOTICE sent to stdout
-# VERBOSE sent to stdout if _LOGGER_VERBOSE = true
-# ALWAYS is sent to stdout unless _LOGGER_SILENT = true
+# VERBOSE sent to stdout if _LOGGER_VERBOSE=true
+# ALWAYS is sent to stdout unless _LOGGER_SILENT=true
 # DEBUG & PARANOIA_DEBUG are only sent to stdout if _DEBUG=true
-# SIMPLE is a wrapper for QuickLogger that does not use advanced functionality
 function Logger {
 	local value="${1}"		# Sentence to log (in double quotes)
 	local level="${2}"		# Log level
@@ -346,13 +345,6 @@ function Logger {
 			_Logger "$prefix$value" "$prefix\e[35m$value\e[0m"	#__WITH_PARANOIA_DEBUG
 			return							#__WITH_PARANOIA_DEBUG
 		fi								#__WITH_PARANOIA_DEBUG
-	elif [ "$level" == "SIMPLE" ]; then
-		if [ "$_LOGGER_SILENT" == true ]; then
-			_Logger "$preix$value"
-		else
-			_Logger "$preix$value" "$prefix$value"
-		fi
-		return
 	else
 		_Logger "\e[41mLogger function called without proper loglevel [$level].\e[0m" "\e[41mLogger function called without proper loglevel [$level].\e[0m" true
 		_Logger "Value was: $prefix$value" "Value was: $prefix$value" true
