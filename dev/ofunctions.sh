@@ -573,8 +573,9 @@ function SendEmail {
 
 	local i
 
-	if [ "${destinationMails[@]}" != "" ]; then
-		for i in "${destinationMails[@]}"; do
+	if [ "${destinationMails}" != "" ]; then
+		# Not quoted since we split at space character, and emails cannot contain spaces
+		for i in ${destinationMails}; do
 			if [ $(CheckRFC822 "$i") -ne 1 ]; then
 				Logger "Given email [$i] does not seem to be valid." "WARN"
 			fi
