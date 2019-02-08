@@ -2,11 +2,11 @@
 
 PROGRAM="osync instance upgrade script"
 SUBPROGRAM="osync"
-AUTHOR="(C) 2016-2017 by Orsiris de Jong"
+AUTHOR="(C) 2016-2019 by Orsiris de Jong"
 CONTACT="http://www.netpower.fr/osync - ozy@netpower.fr"
-OLD_PROGRAM_VERSION="v1.0x-v1.1x"
-NEW_PROGRAM_VERSION="v1.2x"
-CONFIG_FILE_VERSION=2017060501
+OLD_PROGRAM_VERSION="v1.0x-v1.2x"
+NEW_PROGRAM_VERSION="v1.3x"
+CONFIG_FILE_REVISION=1.3.0
 PROGRAM_BUILD=2016121101
 
 ## type -p does not work on platforms other than linux (bash). If if does not work, always assume output is not a zero exitcode
@@ -99,11 +99,11 @@ sync-test
 ${HOME}/backupuser/.ssh/id_rsa
 ''
 SomeAlphaNumericToken9
-no
+false
 ''
 10240
 0
-no
+false
 rsync
 ''
 include
@@ -112,41 +112,41 @@ include
 ''
 ''
 \;
-yes
-no
-no
+true
+false
+false
 'www.kernel.org www.google.com'
 ''
-yes
-yes
-yes
-yes
-no
-no
-no
-no
-no
-no
-yes
+true
+true
+true
+true
+false
+false
+false
+false
+false
+false
+true
 7200
 10600
 1801
 60
 7200
-yes
-no
-yes
-no
+true
+false
+true
+false
 30
 initiator
-yes
+true
 30
 ''
-yes
+true
 2
-no
-no
-yes
+false
+false
+true
 ''
 ''
 alert@your.system.tld
@@ -161,8 +161,8 @@ none
 ''
 0
 0
-yes
-no
+true
+false
 )
 
 function Init {
@@ -312,7 +312,7 @@ function _RenameStateFilesLocal {
 	if [ -f "$state_dir""master"$TREE_AFTER_FILENAME"-dry" ]; then
 		mv -f "$state_dir""master"$TREE_AFTER_FILENAME"-dry" "$state_dir""initiator"$TREE_AFTER_FILENAME"-dry"
 		if [ $? != 0 ]; then
-			echo "Error while rewriting "$state_dir""master"$TREE_AFTER_FILENAME"
+			echo "Error while rewriting "$state_dir"master"$TREE_AFTER_FILENAME"-dry"
 		else
 			rewrite=true
 		fi
@@ -488,7 +488,7 @@ function RewriteOldConfigFiles {
 	rm -f "$config_file.tmp"
 }
 
-function AddMissingConfigOptions {
+function AddMissingConfigOptionsAndFixBooleans {
 	local config_file="${1}"
 	local counter=0
 
@@ -496,26 +496,63 @@ function AddMissingConfigOptions {
 		if ! grep "^${KEYWORDS[$counter]}=" > /dev/null "$config_file"; then
 			echo "${KEYWORDS[$counter]} not found"
 			if [ $counter -gt 0 ]; then
-				sed -i'.tmp' '/^'${KEYWORDS[$((counter-1))]}'=*/a\'$'\n'${KEYWORDS[$counter]}'="'"${VALUES[$counter]}"'"\'$'\n''' "$config_file"
+				if [ "{$VALUES[$counter]}" == true ] || [ "${VALUES[$counter]}" == false ]; then
+					sed -i'.tmp' '/^'${KEYWORDS[$((counter-1))]}'=*/a\'$'\n'${KEYWORDS[$counter]}'='"${VALUES[$counter]}"'\'$'\n''' "$config_file"
+				else
+					sed -i'.tmp' '/^'${KEYWORDS[$((counter-1))]}'=*/a\'$'\n'${KEYWORDS[$counter]}'="'"${VALUES[$counter]}"'"\'$'\n''' "$config_file"
+				fi
 				if [ $? -ne 0 ]; then
 					echo "Cannot add missing ${[KEYWORDS[$counter]}."
 					exit 1
 				fi
 			else
-				sed -i'.tmp' '/onfig file rev*/a\'$'\n'${KEYWORDS[$counter]}'="'"${VALUES[$counter]}"'"\'$'\n''' "$config_file"
+				if [ "{$VALUES[$counter]}" == true ] || [ "${VALUES[$counter]}" == false ]; then
+					sed -i'.tmp' '/[GENERAL\]$//a\'$'\n'${KEYWORDS[$counter]}'='"${VALUES[$counter]}"'\'$'\n''' "$config_file"
+				else
+					sed -i'.tmp' '/[GENERAL\]$//a\'$'\n'${KEYWORDS[$counter]}'="'"${VALUES[$counter]}"'"\'$'\n''' "$config_file"
+				fi
 			fi
 			echo "Added missing ${KEYWORDS[$counter]} config option with default option [${VALUES[$counter]}]"
+		else
+			# Not the most elegant but the quickest way :)
+			if [ "${VALUES[$counter]}" == true ]; then
+				sed -i'.tmp' 's/^'${KEYWORDS[$counter]}'=.*/'${KEYWORDS[$counter]}'=true/g' "$config_file"
+				if [ $? -ne 0 ]; then
+					echo "Cannot rewrite ${[KEYWORDS[$counter]} boolean to true."
+					exit 1
+				fi
+			elif [ "${VALUES[$counter]}" == false ]; then
+				if [ $? -ne 0 ]; then
+					echo "Cannot ${[KEYWORDS[$counter]} boolean to false."
+					exit 1
+				fi
+				sed -i'.tmp' 's/^'${KEYWORDS[$counter]}'=.*/'${KEYWORDS[$counter]}'=false/g' "$config_file"
+			fi
 		fi
 		counter=$((counter+1))
 	done
+}
+
+function RewriteSections {
+	local config_file="${1}"
+
+	sed -i'.tmp' 's/## ---------- GENERAL OPTIONS/[GENERAL]/g' "$config_file"
+	sed -i'.tmp' 's/## ---------- REMOTE OPTIONS/[REMOTE_OPTIONS]/g' "$config_file"
+	sed -i'.tmp' 's/## ---------- REMOTE SYNC OPTIONS/[REMOTE_OPTIONS]/g' "$config_file"
+	sed -i'.tmp' 's/## ---------- MISC OPTIONS/[MISC_OPTIONS]/g' "$config_file"
+	sed -i'.tmp' 's/## ---------- BACKUP AND DELETION OPTIONS/[BACKUP_DELETE_OPTIONS]/g' "$config_file"
+	sed -i'.tmp' 's/## ---------- BACKUP AND TRASH OPTIONS/[BACKUP_DELETE_OPTIONS]/g' "$config_file"
+	sed -i'.tmp' 's/## ---------- RESUME OPTIONS/[RESUME_OPTIONS]/g' "$config_file"
+	sed -i'.tmp' 's/## ---------- ALERT OPTIONS/[ALERT_OPTIONS]/g' "$config_file"
+	sed -i'.tmp' 's/## ---------- EXECUTION HOOKS/[EXECUTION_HOOKS]/g' "$config_file"
 }
 
 function UpdateConfigHeader {
 	local config_file="${1}"
 
 	# "onfig file rev" to deal with earlier variants of the file where c was lower or uppercase
-	#sed -i'.tmp' '/onfig file rev/c\###### '$SUBPROGRAM' config file rev '$CONFIG_FILE_VERSION' '$NEW_PROGRAM_VERSION "$config_file"
-	sed -i'.tmp' 's/.*onfig file rev.*/##### '$SUBPROGRAM' config file rev '$CONFIG_FILE_VERSION' '$NEW_PROGRAM_VERSION'/' "$config_file"
+	sed -i'.tmp' 's/.*onfig file rev.*//' "$config_file"
+	sed -i'.tmp' '/^\[GENERAL\]$/a\'$'\n'CONFIG_FILE_REVISION=$CONFIG_FILE_REVISION$'\n''' "$config_file"
 	rm -f "$config_file.tmp"
 }
 
@@ -553,7 +590,8 @@ elif [ "$1" != "" ] && [ -f "$1" ] && [ -w "$1" ]; then
 	LoadConfigFile "$CONF_FILE"
 	Init
 	RewriteOldConfigFiles "$CONF_FILE"
-	AddMissingConfigOptions "$CONF_FILE"
+	AddMissingConfigOptionsAndFixBooleans "$CONF_FILE"
+	RewriteSections "$CONF_FILE"
 	UpdateConfigHeader "$CONF_FILE"
 	RenameStateFiles "$MASTER_SYNC_DIR"
 	RenameStateFiles "$SLAVE_SYNC_DIR"

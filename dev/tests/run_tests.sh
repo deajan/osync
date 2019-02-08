@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-# osync test suite 2019010201
+# osync test suite 2019011101
 
 
 # Allows the following environment variables
@@ -66,7 +66,7 @@ TMP_OLD_CONF="tmp.old.conf"
 
 OSYNC_EXECUTABLE="$FAKEROOT/usr/local/bin/osync.sh"
 OSYNC_DEV_EXECUTABLE="dev/n_osync.sh"
-OSYNC_UPGRADE="upgrade-v1.0x-v1.2x.sh"
+OSYNC_UPGRADE="upgrade-v1.0x-v1.3x.sh"
 TMP_FILE="$DEV_DIR/tmp"
 
 
@@ -181,21 +181,21 @@ function oneTimeSetUp () {
 	if [ "$TRAVIS_RUN" == true ]; then
 	echo "Running with travis settings"
 		REMOTE_USER="travis"
-		RHOST_PING="no"
+		RHOST_PING=false
 		SetConfFileValue "$CONF_DIR/$REMOTE_CONF" "REMOTE_3RD_PARTY_HOSTS" ""
-		SetConfFileValue "$CONF_DIR/$REMOTE_CONF" "REMOTE_HOST_PING" "no"
+		SetConfFileValue "$CONF_DIR/$REMOTE_CONF" "REMOTE_HOST_PING" false
 
 		SetConfFileValue "$CONF_DIR/$OLD_CONF" "REMOTE_3RD_PARTY_HOSTS" ""
-		SetConfFileValue "$CONF_DIR/$OLD_CONF" "REMOTE_HOST_PING" "no"
+		SetConfFileValue "$CONF_DIR/$OLD_CONF" "REMOTE_HOST_PING" false
 	else
 		echo "Running with local settings"
 		REMOTE_USER="root"
-		RHOST_PING="yes"
+		RHOST_PING=true
 		SetConfFileValue "$CONF_DIR/$REMOTE_CONF" "REMOTE_3RD_PARTY_HOSTS" "\"www.kernel.org www.google.com\""
-		SetConfFileValue "$CONF_DIR/$REMOTE_CONF" "REMOTE_HOST_PING" "yes"
+		SetConfFileValue "$CONF_DIR/$REMOTE_CONF" "REMOTE_HOST_PING" true
 
 		SetConfFileValue "$CONF_DIR/$OLD_CONF" "REMOTE_3RD_PARTY_HOSTS" "\"www.kernel.org www.google.com\""
-		SetConfFileValue "$CONF_DIR/$OLD_CONF" "REMOTE_HOST_PING" "yes"
+		SetConfFileValue "$CONF_DIR/$OLD_CONF" "REMOTE_HOST_PING" true
 	fi
 
 	# Get default ssh port from env
@@ -256,14 +256,14 @@ function oneTimeSetUp () {
 	SetConfFileValue "$CONF_DIR/$LOCAL_CONF" "SKIP_DELETION" ""
 	SetConfFileValue "$CONF_DIR/$REMOTE_CONF" "SKIP_DELETION" ""
 
-	SetConfFileValue "$CONF_DIR/$LOCAL_CONF" "COPY_SYMLINKS" "no"
-	SetConfFileValue "$CONF_DIR/$REMOTE_CONF" "COPY_SYMLINKS" "no"
+	SetConfFileValue "$CONF_DIR/$LOCAL_CONF" "COPY_SYMLINKS" false
+	SetConfFileValue "$CONF_DIR/$REMOTE_CONF" "COPY_SYMLINKS" false
 
-	SetConfFileValue "$CONF_DIR/$LOCAL_CONF" "CONFLICT_BACKUP_MULTIPLE" "no"
-	SetConfFileValue "$CONF_DIR/$REMOTE_CONF" "CONFLICT_BACKUP_MULTIPLE" "no"
+	SetConfFileValue "$CONF_DIR/$LOCAL_CONF" "CONFLICT_BACKUP_MULTIPLE" false
+	SetConfFileValue "$CONF_DIR/$REMOTE_CONF" "CONFLICT_BACKUP_MULTIPLE" false
 
-	SetConfFileValue "$CONF_DIR/$LOCAL_CONF" "FORCE_STRANGER_LOCK_RESUME" "no"
-	SetConfFileValue "$CONF_DIR/$REMOTE_CONF" "FORCE_STRANGER_LOCK_RESUME" "no"
+	SetConfFileValue "$CONF_DIR/$LOCAL_CONF" "FORCE_STRANGER_LOCK_RESUME" false
+	SetConfFileValue "$CONF_DIR/$REMOTE_CONF" "FORCE_STRANGER_LOCK_RESUME" false
 
 	SetConfFileValue "$CONF_DIR/$REMOTE_CONF" "SOFT_MAX_EXEC_TIME" "7200"
 	SetConfFileValue "$CONF_DIR/$REMOTE_CONF" "HARD_MAX_EXEC_TIME" "10600"
@@ -318,11 +318,11 @@ function test_Merge () {
 	# Don't use SetConfFileValue here since for whatever reason Travis does not like creating a sed temporary file in $FAKEROOT
 
 	if [ "$TRAVIS_RUN" == true ]; then
-		$SUDO_CMD sed -i.tmp 's/^IS_STABLE=.*/IS_STABLE=yes/' "$OSYNC_EXECUTABLE"
+		$SUDO_CMD sed -i.tmp 's/^IS_STABLE=.*/IS_STABLE=true/' "$OSYNC_EXECUTABLE"
 	else
-		sed -i.tmp 's/^IS_STABLE=.*/IS_STABLE=yes/' "$OSYNC_EXECUTABLE"
+		sed -i.tmp 's/^IS_STABLE=.*/IS_STABLE=true/' "$OSYNC_EXECUTABLE"
 	fi
-	#SetConfFileValue "$OSYNC_EXECUTABLE" "IS_STABLE" "yes"
+	#SetConfFileValue "$OSYNC_EXECUTABLE" "IS_STABLE" true
 
 
 	assertEquals "Install failed" "0" $?
@@ -573,7 +573,7 @@ function test_handle_symlinks () {
 	fi
 
 	# Check with and without copySymlinks
-	copySymlinks="no"
+	copySymlinks=false
 
 	echo "Running with COPY_SYMLINKS=$copySymlinks"
 
@@ -660,7 +660,7 @@ function test_handle_symlinks () {
 	fi
 
 	# Check with and without copySymlinks
-	copySymlinks="yes"
+	copySymlinks=true
 
 	echo "Running with COPY_SYMLINKS=$copySymlinks"
 
@@ -938,8 +938,8 @@ function test_MultipleConflictBackups () {
 	local additionalParameters
 
 	# modify config files
-	SetConfFileValue "$CONF_DIR/$LOCAL_CONF" "CONFLICT_BACKUP_MULTIPLE" "yes"
-	SetConfFileValue "$CONF_DIR/$REMOTE_CONF" "CONFLICT_BACKUP_MULTIPLE" "yes"
+	SetConfFileValue "$CONF_DIR/$LOCAL_CONF" "CONFLICT_BACKUP_MULTIPLE" true
+	SetConfFileValue "$CONF_DIR/$REMOTE_CONF" "CONFLICT_BACKUP_MULTIPLE" true
 
 	if [ "$OSYNC_MIN_VERSION" != "1" ]; then
 		additionalParameters="--errors-only --summary --no-prefix"
@@ -959,28 +959,28 @@ function test_MultipleConflictBackups () {
 		echo "$FileB" > "$TARGET_DIR/$FileB"
 
 		# First run
-		CONFLICT_BACKUP_MULTIPLE=yes REMOTE_HOST_PING=$RHOST_PING $OSYNC_EXECUTABLE $i $additionalParameters
+		CONFLICT_BACKUP_MULTIPLE=true REMOTE_HOST_PING=$RHOST_PING $OSYNC_EXECUTABLE $i $additionalParameters
 		assertEquals "First deletion run with parameters [$i]." "0" $?
 
 		echo "$FileA+" > "$TARGET_DIR/$FileA"
 		echo "$FileB+" > "$INITIATOR_DIR/$FileB"
 
 		# Second run
-		CONFLICT_BACKUP_MULTIPLE=yes REMOTE_HOST_PING=$RHOST_PING $OSYNC_EXECUTABLE $i $additionalParameters
+		CONFLICT_BACKUP_MULTIPLE=true REMOTE_HOST_PING=$RHOST_PING $OSYNC_EXECUTABLE $i $additionalParameters
 		assertEquals "First deletion run with parameters [$i]." "0" $?
 
 		echo "$FileA-" > "$TARGET_DIR/$FileA"
 		echo "$FileB-" > "$INITIATOR_DIR/$FileB"
 
 		# Third run
-		CONFLICT_BACKUP_MULTIPLE=yes REMOTE_HOST_PING=$RHOST_PING $OSYNC_EXECUTABLE $i $additionalParameters
+		CONFLICT_BACKUP_MULTIPLE=true REMOTE_HOST_PING=$RHOST_PING $OSYNC_EXECUTABLE $i $additionalParameters
 		assertEquals "First deletion run with parameters [$i]." "0" $?
 
 		echo "$FileA*" > "$TARGET_DIR/$FileA"
 		echo "$FileB*" > "$INITIATOR_DIR/$FileB"
 
 		# Fouth run
-		CONFLICT_BACKUP_MULTIPLE=yes REMOTE_HOST_PING=$RHOST_PING $OSYNC_EXECUTABLE $i $additionalParameters
+		CONFLICT_BACKUP_MULTIPLE=true REMOTE_HOST_PING=$RHOST_PING $OSYNC_EXECUTABLE $i $additionalParameters
 		assertEquals "First deletion run with parameters [$i]." "0" $?
 
 		# This test may fail only on 31th December at 23:59 :)
@@ -991,8 +991,8 @@ function test_MultipleConflictBackups () {
 		assertEquals "3 Backup files are present in [$TARGET_DIR/$OSYNC_BACKUP_DIR/]." "0" $?
 	done
 
-	SetConfFileValue "$CONF_DIR/$LOCAL_CONF" "CONFLICT_BACKUP_MULTIPLE" "no"
-	SetConfFileValue "$CONF_DIR/$REMOTE_CONF" "CONFLICT_BACKUP_MULTIPLE" "no"
+	SetConfFileValue "$CONF_DIR/$LOCAL_CONF" "CONFLICT_BACKUP_MULTIPLE" false
+	SetConfFileValue "$CONF_DIR/$REMOTE_CONF" "CONFLICT_BACKUP_MULTIPLE" false
 }
 
 function test_Locking () {
@@ -1083,8 +1083,8 @@ function test_Locking () {
 
 	# Target lock present should be resumed if instance ID is NOT the same as current one but FORCE_STRANGER_UNLOCK=yes
 
-	SetConfFileValue "$CONF_DIR/$LOCAL_CONF" "FORCE_STRANGER_LOCK_RESUME" "yes"
-	SetConfFileValue "$CONF_DIR/$REMOTE_CONF" "FORCE_STRANGER_LOCK_RESUME" "yes"
+	SetConfFileValue "$CONF_DIR/$LOCAL_CONF" "FORCE_STRANGER_LOCK_RESUME" true
+	SetConfFileValue "$CONF_DIR/$REMOTE_CONF" "FORCE_STRANGER_LOCK_RESUME" true
 
 	for i in "${osyncParameters[@]}"; do
 
@@ -1098,8 +1098,8 @@ function test_Locking () {
 		assertEquals "Should be able to resume when target has lock with different instance id but FORCE_STRANGER_UNLOCK=yes." "0" $?
 	done
 
-	SetConfFileValue "$CONF_DIR/$LOCAL_CONF" "FORCE_STRANGER_LOCK_RESUME" "no"
-	SetConfFileValue "$CONF_DIR/$REMOTE_CONF" "FORCE_STRANGER_LOCK_RESUME" "no"
+	SetConfFileValue "$CONF_DIR/$LOCAL_CONF" "FORCE_STRANGER_LOCK_RESUME" false
+	SetConfFileValue "$CONF_DIR/$REMOTE_CONF" "FORCE_STRANGER_LOCK_RESUME" false
 }
 
 function nope_test_ConflictDetetion () {

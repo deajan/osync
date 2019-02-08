@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-## Generic and highly portable bash functions written in 2013-2018 by Orsiris de Jong - http://www.netpower.fr - ozy@netpower.fr
+## Generic and highly portable bash functions written in 2013-2019 by Orsiris de Jong - http://www.netpower.fr - ozy@netpower.fr
 
 #TODO: ExecTasks postponed arrays / files grow a lot. Consider having them "rolling" (cleaned at numberOfEvents)
 #TODO: command line arguments don't take -AaqV for example
@@ -9,7 +9,7 @@
 
 ## PROGRAM=program-name
 ## INSTANCE_ID=program-instance-name
-## _DEBUG=yes/no
+## _DEBUG=true/false
 ## _LOGGER_SILENT=true/false
 ## _LOGGER_VERBOSE=true/false
 ## _LOGGER_ERR_ONLY=true/false
@@ -31,7 +31,7 @@
 #### OFUNCTIONS MINI SUBSET ####
 #### OFUNCTIONS MICRO SUBSET ####
 _OFUNCTIONS_VERSION=2.3.0-RC2
-_OFUNCTIONS_BUILD=2018122103
+_OFUNCTIONS_BUILD=2019012801
 #### _OFUNCTIONS_BOOTSTRAP SUBSET ####
 _OFUNCTIONS_BOOTSTRAP=true
 #### _OFUNCTIONS_BOOTSTRAP SUBSET END ####
@@ -66,13 +66,13 @@ WARN_ALERT=false
 
 #### DEBUG SUBSET ####
 ## allow function call checks			#__WITH_PARANOIA_DEBUG
-if [ "$_PARANOIA_DEBUG" == "yes" ];then		#__WITH_PARANOIA_DEBUG
-	_DEBUG=yes				#__WITH_PARANOIA_DEBUG
+if [ "$_PARANOIA_DEBUG" == true ];then		#__WITH_PARANOIA_DEBUG
+	_DEBUG=true				#__WITH_PARANOIA_DEBUG
 fi						#__WITH_PARANOIA_DEBUG
 
-## allow debugging from command line with _DEBUG=yes
-if [ ! "$_DEBUG" == "yes" ]; then
-	_DEBUG=no
+## allow debugging from command line with _DEBUG=true
+if [ ! "$_DEBUG" == true ]; then
+	_DEBUG=false
 	_LOGGER_VERBOSE=false
 else
 	trap 'TrapError ${LINENO} $?' ERR
@@ -226,19 +226,19 @@ function RemoteLogger {
 
 	if [ "$level" == "CRITICAL" ]; then
 		_Logger "" "$prefix\e[1;33;41m$value\e[0m" true
-		if [ $_DEBUG == "yes" ]; then
+		if [ $_DEBUG == true ]; then
 			_Logger -e "" "[$retval] in [$(joinString , ${FUNCNAME[@]})] SP=$SCRIPT_PID P=$$" true
 		fi
 		return
 	elif [ "$level" == "ERROR" ]; then
 		_Logger "" "$prefix\e[31m$value\e[0m" true
-		if [ $_DEBUG == "yes" ]; then
+		if [ $_DEBUG == true ]; then
 			_Logger -e "" "[$retval] in [$(joinString , ${FUNCNAME[@]})] SP=$SCRIPT_PID P=$$" true
 		fi
 		return
 	elif [ "$level" == "WARN" ]; then
 		_Logger "" "$prefix\e[33m$value\e[0m" true
-		if [ $_DEBUG == "yes" ]; then
+		if [ $_DEBUG == true ]; then
 			_Logger -e "" "[$retval] in [$(joinString , ${FUNCNAME[@]})] SP=$SCRIPT_PID P=$$" true
 		fi
 		return
@@ -256,12 +256,12 @@ function RemoteLogger {
 		_Logger	 "" "$prefix$value"
 		return
 	elif [ "$level" == "DEBUG" ]; then
-		if [ "$_DEBUG" == "yes" ]; then
+		if [ "$_DEBUG" == true ]; then
 			_Logger "" "$prefix$value"
 			return
 		fi
 	elif [ "$level" == "PARANOIA_DEBUG" ]; then				#__WITH_PARANOIA_DEBUG
-		if [ "$_PARANOIA_DEBUG" == "yes" ]; then			#__WITH_PARANOIA_DEBUG
+		if [ "$_PARANOIA_DEBUG" == true ]; then			#__WITH_PARANOIA_DEBUG
 			_Logger "" "$prefix\e[35m$value\e[0m"			#__WITH_PARANOIA_DEBUG
 			return							#__WITH_PARANOIA_DEBUG
 		fi								#__WITH_PARANOIA_DEBUG
@@ -284,10 +284,9 @@ function RemoteLogger {
 
 # CRITICAL, ERROR, WARN sent to stderr, color depending on level, level also logged
 # NOTICE sent to stdout
-# VERBOSE sent to stdout if _LOGGER_VERBOSE = true
-# ALWAYS is sent to stdout unless _LOGGER_SILENT = true
-# DEBUG & PARANOIA_DEBUG are only sent to stdout if _DEBUG=yes
-# SIMPLE is a wrapper for QuickLogger that does not use advanced functionality
+# VERBOSE sent to stdout if _LOGGER_VERBOSE=true
+# ALWAYS is sent to stdout unless _LOGGER_SILENT=true
+# DEBUG & PARANOIA_DEBUG are only sent to stdout if _DEBUG=true
 function Logger {
 	local value="${1}"		# Sentence to log (in double quotes)
 	local level="${2}"		# Log level
@@ -337,22 +336,15 @@ function Logger {
 		_Logger "$prefix$value" "$prefix$value"
 		return
 	elif [ "$level" == "DEBUG" ]; then
-		if [ "$_DEBUG" == "yes" ]; then
+		if [ "$_DEBUG" == true ]; then
 			_Logger "$prefix$value" "$prefix$value"
 			return
 		fi
 	elif [ "$level" == "PARANOIA_DEBUG" ]; then				#__WITH_PARANOIA_DEBUG
-		if [ "$_PARANOIA_DEBUG" == "yes" ]; then			#__WITH_PARANOIA_DEBUG
+		if [ "$_PARANOIA_DEBUG" == true ]; then			#__WITH_PARANOIA_DEBUG
 			_Logger "$prefix$value" "$prefix\e[35m$value\e[0m"	#__WITH_PARANOIA_DEBUG
 			return							#__WITH_PARANOIA_DEBUG
 		fi								#__WITH_PARANOIA_DEBUG
-	elif [ "$level" == "SIMPLE" ]; then
-		if [ "$_LOGGER_SILENT" == true ]; then
-			_Logger "$preix$value"
-		else
-			_Logger "$preix$value" "$prefix$value"
-		fi
-		return
 	else
 		_Logger "\e[41mLogger function called without proper loglevel [$level].\e[0m" "\e[41mLogger function called without proper loglevel [$level].\e[0m" true
 		_Logger "Value was: $prefix$value" "Value was: $prefix$value" true
@@ -451,7 +443,7 @@ function KillAllChilds {
 
 #### CleanUp SUBSET ####
 function CleanUp {
-	if [ "$_DEBUG" != "yes" ]; then
+	if [ "$_DEBUG" != true ]; then
 		rm -f "$RUN_DIR/$PROGRAM."*".$SCRIPT_PID.$TSTAMP"
 		# Fix for sed -i requiring backup extension for BSD & Mac (see all sed -i statements)
 		rm -f "$RUN_DIR/$PROGRAM."*".$SCRIPT_PID.$TSTAMP.tmp"
@@ -494,7 +486,7 @@ function SendAlert {
 		return 0
 	fi
 
-	if [ "$_DEBUG" == "yes" ]; then
+	if [ "$_DEBUG" == true ]; then
 		Logger "Debug mode, no warning mail will be sent." "NOTICE"
 		return 0
 	fi
@@ -757,7 +749,7 @@ function LoadConfigFile {
 	else
 		revisionPresent=$(GetConfFileValue "$configFile" "CONFIG_FILE_REVISION" true)
 		if [ "$(IsNumeric $revisionPresent)" -eq 0 ]; then
-			revisionPresent=0
+			Logger "CONFIG_FILE_REVISION does not seem numeric [$revisionPresent]." "DEBUG"
 		fi
 		if [ "$revisionRequired" != "" ]; then
 			if [ $(VerComp "$revisionPresent" "$revisionRequired") -eq 2 ]; then
@@ -899,7 +891,7 @@ function ExecTasks {
 	Logger "${FUNCNAME[0]} id [$id] called by [${FUNCNAME[1]} < ${FUNCNAME[2]} < ${FUNCNAME[3]} < ${FUNCNAME[4]} < ${FUNCNAME[5]} < ${FUNCNAME[6]} ...]." "PARANOIA_DEBUG"	 #__WITH_PARANOIA_DEBUG
 
 	# Since ExecTasks takes up to 17 arguments, do a quick preflight check in DEBUG mode
-	if [ "$_DEBUG" == "yes" ]; then
+	if [ "$_DEBUG" == true ]; then
 		declare -a booleans=(readFromFile counting spinner noTimeErrorLog noErrorLogsAtAll)
 		for i in "${booleans[@]}"; do
 			test="if [ \$$i != false ] && [ \$$i != true ]; then Logger \"Bogus $i value [\$$i] given to ${FUNCNAME[0]}.\" \"CRITICAL\"; exit 1; fi"
@@ -1146,7 +1138,7 @@ function ExecTasks {
 		# Trivial wait time for bash to not eat up all CPU
 		sleep $sleepTime
 
-		if [ "$_PERF_PROFILER" == "yes" ]; then				##__WITH_PARANOIA_DEBUG
+		if [ "$_PERF_PROFILER" == true ]; then				##__WITH_PARANOIA_DEBUG
 			_PerfProfiler						##__WITH_PARANOIA_DEBUG
 		fi								##__WITH_PARANOIA_DEBUG
 
@@ -1513,7 +1505,7 @@ function GetLocalOS {
 		LOCAL_OS="BusyBox"
 		;;
 		*)
-		if [ "$IGNORE_OS_TYPE" == "yes" ]; then
+		if [ "$IGNORE_OS_TYPE" == true ]; then
 			Logger "Running on unknown local OS [$localOsVar]." "WARN"
 			return
 		fi
@@ -1571,7 +1563,7 @@ function GetLocalOS {
 function __CheckArguments {
 	# Checks the number of arguments of a function and raises an error if some are missing
 
-	if [ "$_DEBUG" == "yes" ]; then
+	if [ "$_DEBUG" == true ]; then
 		local numberOfArguments="${1}" # Number of arguments the tested function should have, can be a number of a range, eg 0-2 for zero to two arguments
 		local numberOfGivenArguments="${2}" # Number of arguments that have been passed
 
@@ -1628,7 +1620,7 @@ function __CheckArguments {
 function GetRemoteOS {
 	__CheckArguments 0 $# "$@"	#__WITH_PARANOIA_DEBUG
 
-	if [ "$REMOTE_OPERATION" != "yes" ]; then
+	if [ "$REMOTE_OPERATION" != true ]; then
 		return 0
 	fi
 
@@ -1745,7 +1737,7 @@ ENDSSH
 			exit 1
 			;;
 			*)
-			if [ "$IGNORE_OS_TYPE" == "yes" ]; then		#DOC: Undocumented debug only setting
+			if [ "$IGNORE_OS_TYPE" == true ]; then		#DOC: Undocumented debug only setting
 				Logger "Running on unknown remote OS [$remoteOsVar]." "WARN"
 				return
 			fi
@@ -1785,7 +1777,7 @@ function RunLocalCommand {
 		Logger "Command output:\n$(cat $RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$SCRIPT_PID.$TSTAMP)" "NOTICE"
 	fi
 
-	if [ "$STOP_ON_CMD_ERROR" == "yes" ] && [ $retval -ne 0 ]; then
+	if [ "$STOP_ON_CMD_ERROR" == true ] && [ $retval -ne 0 ]; then
 		Logger "Stopping on command execution error." "CRITICAL"
 		exit 1
 	fi
@@ -1798,7 +1790,7 @@ function RunRemoteCommand {
 	__CheckArguments 2 $# "$@"	#__WITH_PARANOIA_DEBUG
 
 
-	if [ "$REMOTE_OPERATION" != "yes" ]; then
+	if [ "$REMOTE_OPERATION" != true ]; then
 		Logger "Ignoring remote command [$command] because remote host is not configured." "WARN"
 		return 0
 	fi
@@ -1828,7 +1820,7 @@ function RunRemoteCommand {
 		Logger "Command output:\n$(cat $RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$SCRIPT_PID.$TSTAMP)" "NOTICE"
 	fi
 
-	if [ "$STOP_ON_CMD_ERROR" == "yes" ] && [ $retval -ne 0 ]; then
+	if [ "$STOP_ON_CMD_ERROR" == true ] && [ $retval -ne 0 ]; then
 		Logger "Stopping on command execution error." "CRITICAL"
 		exit 1
 	fi
@@ -1879,9 +1871,9 @@ function CheckConnectivityRemoteHost {
 
 	local retval
 
-	if [ "$_PARANOIA_DEBUG" != "yes" ]; then # Do not loose time in paranoia debug		#__WITH_PARANOIA_DEBUG
+	if [ "$_PARANOIA_DEBUG" != true ]; then # Do not loose time in paranoia debug		#__WITH_PARANOIA_DEBUG
 
-		if [ "$REMOTE_HOST_PING" != "no" ] && [ "$REMOTE_OPERATION" != "no" ]; then
+		if [ "$REMOTE_HOST_PING" != false ] && [ "$REMOTE_OPERATION" != false ]; then
 			eval "$PING_CMD $REMOTE_HOST > /dev/null 2>&1" &
 			ExecTasks $! "${FUNCNAME[0]}" false 0 0 60 180 true $SLEEP_TIME $KEEP_LOGGING
 			#ExecTasks "${FUNCNAME[0]}" 0 0 60 180 $SLEEP_TIME $KEEP_LOGGING true true false false 1 $!
@@ -1901,7 +1893,7 @@ function CheckConnectivity3rdPartyHosts {
 	local retval
 	local i
 
-	if [ "$_PARANOIA_DEBUG" != "yes" ]; then # Do not loose time in paranoia debug		#__WITH_PARANOIA_DEBUG
+	if [ "$_PARANOIA_DEBUG" != true ]; then # Do not loose time in paranoia debug		#__WITH_PARANOIA_DEBUG
 
 		if [ "$REMOTE_3RD_PARTY_HOSTS" != "" ]; then
 			remote3rdPartySuccess=false
@@ -2014,14 +2006,14 @@ function PreInit {
 	local compressionString
 
 	## SSH compression
-	if [ "$SSH_COMPRESSION" != "no" ]; then
+	if [ "$SSH_COMPRESSION" != false ]; then
 		SSH_COMP=-C
 	else
 		SSH_COMP=
 	fi
 
 	## Ignore SSH known host verification
-	if [ "$SSH_IGNORE_KNOWN_HOSTS" == "yes" ]; then
+	if [ "$SSH_IGNORE_KNOWN_HOSTS" == true ]; then
 		SSH_OPTS="-o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no"
 	fi
 
@@ -2031,7 +2023,7 @@ function PreInit {
 	fi
 
 	## Sudo execution option
-	if [ "$SUDO_EXEC" == "yes" ]; then
+	if [ "$SUDO_EXEC" == true ]; then
 		if [ "$RSYNC_REMOTE_PATH" != "" ]; then
 			RSYNC_PATH="sudo $RSYNC_REMOTE_PATH/$RSYNC_EXECUTABLE"
 		else
@@ -2195,19 +2187,19 @@ function InitRemoteOSDependingSettings {
 	fi
 
 	RSYNC_ATTR_ARGS=""
-	if [ "$PRESERVE_PERMISSIONS" != "no" ]; then
+	if [ "$PRESERVE_PERMISSIONS" != false ]; then
 		RSYNC_ATTR_ARGS=$RSYNC_ATTR_ARGS" -p"
 	fi
-	if [ "$PRESERVE_OWNER" != "no" ]; then
+	if [ "$PRESERVE_OWNER" != false ]; then
 		RSYNC_ATTR_ARGS=$RSYNC_ATTR_ARGS" -o"
 	fi
-	if [ "$PRESERVE_GROUP" != "no" ]; then
+	if [ "$PRESERVE_GROUP" != false ]; then
 		RSYNC_ATTR_ARGS=$RSYNC_ATTR_ARGS" -g"
 	fi
-	if [ "$PRESERVE_EXECUTABILITY" != "no" ]; then
+	if [ "$PRESERVE_EXECUTABILITY" != false ]; then
 		RSYNC_ATTR_ARGS=$RSYNC_ATTR_ARGS" --executability"
 	fi
-	if [ "$PRESERVE_ACL" == "yes" ]; then
+	if [ "$PRESERVE_ACL" == true ]; then
 		if [ "$LOCAL_OS" != "MacOSX" ] && [ "$REMOTE_OS" != "MacOSX" ] && [ "$LOCAL_OS" != "msys" ] && [ "$REMOTE_OS" != "msys" ] && [ "$LOCAL_OS" != "Cygwin" ] && [ "$REMOTE_OS" != "Cygwin" ] && [ "$LOCAL_OS" != "BusyBox" ] && [ "$REMOTE_OS" != "BusyBox" ] && [ "$LOCAL_OS" != "Android" ] && [ "$REMOTE_OS" != "Android" ]; then
 			RSYNC_ATTR_ARGS=$RSYNC_ATTR_ARGS" -A"
 		else
@@ -2215,45 +2207,45 @@ function InitRemoteOSDependingSettings {
 
 		fi
 	fi
-	if [ "$PRESERVE_XATTR" == "yes" ]; then
+	if [ "$PRESERVE_XATTR" == true ]; then
 		if [ "$LOCAL_OS" != "MacOSX" ] && [ "$REMOTE_OS" != "MacOSX" ] && [ "$LOCAL_OS" != "msys" ] && [ "$REMOTE_OS" != "msys" ] && [ "$LOCAL_OS" != "Cygwin" ] && [ "$REMOTE_OS" != "Cygwin" ] && [ "$LOCAL_OS" != "BusyBox" ] && [ "$REMOTE_OS" != "BusyBox" ]; then
 			RSYNC_ATTR_ARGS=$RSYNC_ATTR_ARGS" -X"
 		else
 			Logger "Disabling extended attributes synchronization on [$LOCAL_OS] due to lack of support." "NOTICE"
 		fi
 	fi
-	if [ "$RSYNC_COMPRESS" == "yes" ]; then
+	if [ "$RSYNC_COMPRESS" == true ]; then
 		if [ "$LOCAL_OS" != "MacOSX" ] && [ "$REMOTE_OS" != "MacOSX" ]; then
 			RSYNC_DEFAULT_ARGS=$RSYNC_DEFAULT_ARGS" -zz --skip-compress=gz/xz/lz/lzma/lzo/rz/jpg/mp3/mp4/7z/bz2/rar/zip/sfark/s7z/ace/apk/arc/cab/dmg/jar/kgb/lzh/lha/lzx/pak/sfx"
 		else
 			Logger "Disabling compression skips on synchronization on [$LOCAL_OS] due to lack of support." "NOTICE"
 		fi
 	fi
-	if [ "$COPY_SYMLINKS" == "yes" ]; then
+	if [ "$COPY_SYMLINKS" == true ]; then
 		RSYNC_DEFAULT_ARGS=$RSYNC_DEFAULT_ARGS" -L"
 	fi
-	if [ "$KEEP_DIRLINKS" == "yes" ]; then
+	if [ "$KEEP_DIRLINKS" == true ]; then
 		RSYNC_DEFAULT_ARGS=$RSYNC_DEFAULT_ARGS" -K"
 	fi
 	if [ "$RSYNC_OPTIONAL_ARGS" != "" ]; then
 		RSYNC_DEFAULT_ARGS=$RSYNC_DEFAULT_ARGS" "$RSYNC_OPTIONAL_ARGS
 	fi
-	if [ "$PRESERVE_HARDLINKS" == "yes" ]; then
+	if [ "$PRESERVE_HARDLINKS" == true ]; then
 		RSYNC_DEFAULT_ARGS=$RSYNC_DEFAULT_ARGS" -H"
 	fi
-	if [ "$CHECKSUM" == "yes" ]; then
+	if [ "$CHECKSUM" == true ]; then
 		RSYNC_TYPE_ARGS=$RSYNC_TYPE_ARGS" --checksum"
 	fi
 	if [ "$BANDWIDTH" != "" ] && [ "$BANDWIDTH" != "0" ]; then
 		RSYNC_DEFAULT_ARGS=$RSYNC_DEFAULT_ARGS" --bwlimit=$BANDWIDTH"
 	fi
 
-	if [ "$PARTIAL" == "yes" ]; then
+	if [ "$PARTIAL" == true ]; then
 		RSYNC_DEFAULT_ARGS=$RSYNC_DEFAULT_ARGS" --partial --partial-dir=\"$PARTIAL_DIR\""
 		RSYNC_PARTIAL_EXCLUDE="--exclude=\"$PARTIAL_DIR\""
 	fi
 
-	if [ "$DELTA_COPIES" != "no" ]; then
+	if [ "$DELTA_COPIES" != false ]; then
 		RSYNC_DEFAULT_ARGS=$RSYNC_DEFAULT_ARGS" --no-whole-file"
 	else
 		RSYNC_DEFAULT_ARGS=$RSYNC_DEFAULT_ARGS" --whole-file"
