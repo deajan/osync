@@ -1,6 +1,6 @@
 ###### osync - Rsync based two way sync engine with fault tolerance
 ###### (C) 2013-2019 by Orsiris de Jong (www.netpower.fr)
-###### osync v1.1x / v2.0x config file rev 2019011001
+###### osync v1.1x / v2.0x config file rev 2019020801
 
 [GENERAL]
 
@@ -182,7 +182,7 @@ SENDER_MAIL="alert@your.system.tld"
 SMTP_SERVER=smtp.your.isp.tld
 SMTP_PORT=25
 # encryption can be tls, ssl or none
-SMTP_ENCRYPTION=falsene
+SMTP_ENCRYPTION=none
 SMTP_USER=
 SMTP_PASSWORD=
 
