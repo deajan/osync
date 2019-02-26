@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-## MERGE 2018100801
+## MERGE 2019022601
 
 ## Merges ofunctions.sh and n_program.sh into program.sh
 ## Adds installer
@@ -70,7 +70,7 @@ function __PREPROCESSOR_Unexpand {
 
 	unexpand "$source" > "$destination"
 	if [ $? != 0 ]; then
-		Logger "Cannot unexpand [$source] to [$destination]." "SIMPLE"
+		Logger "Cannot unexpand [$source] to [$destination]." "CRITICAL"
 		exit 1
 	fi
 }
@@ -83,29 +83,29 @@ function __PREPROCESSOR_MergeSubset {
 
 	sed -n "/$subsetBegin/,/$subsetEnd/p" "$subsetFile" > "$subsetFile.$subsetBegin"
 	if [ $? != 0 ]; then
-		Logger "Cannot sed subset [$subsetBegin -- $subsetEnd] in [$subsetFile]." "SIMPLE"
+		Logger "Cannot sed subset [$subsetBegin -- $subsetEnd] in [$subsetFile]." "CRTICIAL"
 		exit 1
 	fi
 	sed "/include $subsetBegin/r $subsetFile.$subsetBegin" "$mergedFile" | grep -v -E "$subsetBegin\$|$subsetEnd\$" > "$mergedFile.tmp"
 	if [ $? != 0 ]; then
-		Logger "Cannot add subset [$subsetBegin] to [$mergedFile]." "SIMPLE"
+		Logger "Cannot add subset [$subsetBegin] to [$mergedFile]." "CRITICAL"
 		exit 1
 	fi
 	rm -f "$subsetFile.$subsetBegin"
 	if [ $? != 0 ]; then
-		Logger "Cannot remove temporary subset [$subsetFile.$subsetBegin]." "SIMPLE"
+		Logger "Cannot remove temporary subset [$subsetFile.$subsetBegin]." "CRITICAL"
 		exit 1
 	fi
 
 	rm -f "$mergedFile"
 	if [ $? != 0 ]; then
-		Logger "Cannot remove merged original file [$mergedFile]." "SIMPLE"
+		Logger "Cannot remove merged original file [$mergedFile]." "CRITICAL"
 		exit 1
 	fi
 
 	mv "$mergedFile.tmp" "$mergedFile"
 	if [ $? != 0 ]; then
-		Logger "Cannot move merged tmp file to original [$mergedFile]." "SIMPLE"
+		Logger "Cannot move merged tmp file to original [$mergedFile]." "CRITICAL"
 		exit 1
 	fi
 }
@@ -116,32 +116,32 @@ function __PREPROCESSOR_CleanDebug {
 
 	sed '/'$PARANOIA_DEBUG_BEGIN'/,/'$PARANOIA_DEBUG_END'/d' "$source" | grep -v "$PARANOIA_DEBUG_LINE" > "$destination.tmp"
 	if [ $? != 0 ]; then
-		Logger "Cannot remove PARANOIA_DEBUG code from standard build." "SIMPLE"
+		Logger "Cannot remove PARANOIA_DEBUG code from standard build." "CRITICAL"
 		exit 1
 	else
 		mv -f "$destination.tmp" "$destination"
 		if [ $? -ne 0 ]; then
-			Logger "Cannot move [$destination.tmp] to [$destination]." "SIMPLE"
+			Logger "Cannot move [$destination.tmp] to [$destination]." "CRITICAL"
 			exit 1
 		fi
 	fi
 
 	chmod +x "$source"
 	if [ $? != 0 ]; then
-		Logger "Cannot chmod [$source]." "SIMPLE"
+		Logger "Cannot chmod [$source]." "CRITICAL"
 		exit 1
 	else
-		Logger "Prepared [$source]." "SIMPLE"
+		Logger "Prepared [$source]." "NOTICE"
 	fi
 
 	if [ "$source" != "$destination" ]; then
 
 		chmod +x "$destination"
 		if [ $? != 0 ]; then
-			Logger "Cannot chmod [$destination]." "SIMPLE"
+			Logger "Cannot chmod [$destination]." "CRITICAL"
 			exit 1
 		else
-			Logger "Prepared [$destination]." "SIMPLE"
+			Logger "Prepared [$destination]." "NOTICE"
 		fi
 	fi
 }
@@ -151,7 +151,7 @@ function __PREPROCESSOR_CopyCommons {
 
 	sed "s/\[prgname\]/$nPROGRAM/g" common_install.sh > ../install.sh
 	if [ $? != 0 ]; then
-		Logger "Cannot assemble install." "SIMPLE"
+		Logger "Cannot assemble install." "CRITICAL"
 		exit 1
 	fi
 
@@ -164,7 +164,7 @@ function __PREPROCESSOR_CopyCommons {
 	if [ -f "common_batch.sh" ]; then
 		sed "s/\[prgname\]/$nPROGRAM/g" common_batch.sh > ../$nPROGRAM-batch.sh
 		if [ $? != 0 ]; then
-			Logger "Cannot assemble batch runner." "SIMPLE"
+			Logger "Cannot assemble batch runner." "CRITICAL"
 			exit 1
 		fi
 
