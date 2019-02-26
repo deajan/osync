@@ -10,7 +10,7 @@ PROGRAM_BINARY=$PROGRAM".sh"
 PROGRAM_BATCH=$PROGRAM"-batch.sh"
 SSH_FILTER="ssh_filter.sh"
 
-SCRIPT_BUILD=2018100206
+SCRIPT_BUILD=201902601
 INSTANCE_ID="installer-$SCRIPT_BUILD"
 
 ## osync / obackup / pmocr / zsnap install script
@@ -18,7 +18,7 @@ INSTANCE_ID="installer-$SCRIPT_BUILD"
 ## Please adapt this to fit your distro needs
 
 _OFUNCTIONS_VERSION=2.3.0-RC2
-_OFUNCTIONS_BUILD=2018110502
+_OFUNCTIONS_BUILD=2019021401
 _OFUNCTIONS_BOOTSTRAP=true
 
 if ! type "$BASH" > /dev/null; then
@@ -50,9 +50,9 @@ ERROR_ALERT=false
 WARN_ALERT=false
 
 
-## allow debugging from command line with _DEBUG=yes
-if [ ! "$_DEBUG" == "yes" ]; then
-	_DEBUG=no
+## allow debugging from command line with _DEBUG=true
+if [ ! "$_DEBUG" == true ]; then
+	_DEBUG=false
 	_LOGGER_VERBOSE=false
 else
 	trap 'TrapError ${LINENO} $?' ERR
@@ -165,8 +165,8 @@ function _Logger {
 		echo -e "$logValue" >> "$LOG_FILE"
 
 		# Build current log file for alerts if we have a sufficient environment
-		if [ "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$SCRIPT_PID.$TSTAMP" != "" ]; then
-			echo -e "$logValue" >> "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$SCRIPT_PID.$TSTAMP"
+		if [ "$RUN_DIR/$PROGRAM" != "/" ]; then
+			echo -e "$logValue" >> "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$SCRIPT_PID.$TSTAMP.log"
 		fi
 	fi
 
@@ -199,19 +199,19 @@ function RemoteLogger {
 
 	if [ "$level" == "CRITICAL" ]; then
 		_Logger "" "$prefix\e[1;33;41m$value\e[0m" true
-		if [ $_DEBUG == "yes" ]; then
+		if [ $_DEBUG == true ]; then
 			_Logger -e "" "[$retval] in [$(joinString , ${FUNCNAME[@]})] SP=$SCRIPT_PID P=$$" true
 		fi
 		return
 	elif [ "$level" == "ERROR" ]; then
 		_Logger "" "$prefix\e[31m$value\e[0m" true
-		if [ $_DEBUG == "yes" ]; then
+		if [ $_DEBUG == true ]; then
 			_Logger -e "" "[$retval] in [$(joinString , ${FUNCNAME[@]})] SP=$SCRIPT_PID P=$$" true
 		fi
 		return
 	elif [ "$level" == "WARN" ]; then
 		_Logger "" "$prefix\e[33m$value\e[0m" true
-		if [ $_DEBUG == "yes" ]; then
+		if [ $_DEBUG == true ]; then
 			_Logger -e "" "[$retval] in [$(joinString , ${FUNCNAME[@]})] SP=$SCRIPT_PID P=$$" true
 		fi
 		return
@@ -229,7 +229,7 @@ function RemoteLogger {
 		_Logger	 "" "$prefix$value"
 		return
 	elif [ "$level" == "DEBUG" ]; then
-		if [ "$_DEBUG" == "yes" ]; then
+		if [ "$_DEBUG" == true ]; then
 			_Logger "" "$prefix$value"
 			return
 		fi
@@ -251,10 +251,9 @@ function RemoteLogger {
 
 # CRITICAL, ERROR, WARN sent to stderr, color depending on level, level also logged
 # NOTICE sent to stdout
-# VERBOSE sent to stdout if _LOGGER_VERBOSE = true
-# ALWAYS is sent to stdout unless _LOGGER_SILENT = true
-# DEBUG & PARANOIA_DEBUG are only sent to stdout if _DEBUG=yes
-# SIMPLE is a wrapper for QuickLogger that does not use advanced functionality
+# VERBOSE sent to stdout if _LOGGER_VERBOSE=true
+# ALWAYS is sent to stdout unless _LOGGER_SILENT=true
+# DEBUG & PARANOIA_DEBUG are only sent to stdout if _DEBUG=true
 function Logger {
 	local value="${1}"		# Sentence to log (in double quotes)
 	local level="${2}"		# Log level
@@ -304,17 +303,10 @@ function Logger {
 		_Logger "$prefix$value" "$prefix$value"
 		return
 	elif [ "$level" == "DEBUG" ]; then
-		if [ "$_DEBUG" == "yes" ]; then
+		if [ "$_DEBUG" == true ]; then
 			_Logger "$prefix$value" "$prefix$value"
 			return
 		fi
-	elif [ "$level" == "SIMPLE" ]; then
-		if [ "$_LOGGER_SILENT" == true ]; then
-			_Logger "$preix$value"
-		else
-			_Logger "$preix$value" "$prefix$value"
-		fi
-		return
 	else
 		_Logger "\e[41mLogger function called without proper loglevel [$level].\e[0m" "\e[41mLogger function called without proper loglevel [$level].\e[0m" true
 		_Logger "Value was: $prefix$value" "Value was: $prefix$value" true
@@ -407,7 +399,7 @@ function KillAllChilds {
 }
 
 function CleanUp {
-	if [ "$_DEBUG" != "yes" ]; then
+	if [ "$_DEBUG" != true ]; then
 		rm -f "$RUN_DIR/$PROGRAM."*".$SCRIPT_PID.$TSTAMP"
 		# Fix for sed -i requiring backup extension for BSD & Mac (see all sed -i statements)
 		rm -f "$RUN_DIR/$PROGRAM."*".$SCRIPT_PID.$TSTAMP.tmp"
@@ -460,7 +452,7 @@ function GetCommandlineArguments {
 			Usage
 			;;
                         *)
-			Logger "Unknown option '$i'" "SIMPLE"
+			Logger "Unknown option '$i'" "ERROR"
 			Usage
 			exit
                         ;;
@@ -571,7 +563,7 @@ function GetLocalOS {
 		LOCAL_OS="BusyBox"
 		;;
 		*)
-		if [ "$IGNORE_OS_TYPE" == "yes" ]; then
+		if [ "$IGNORE_OS_TYPE" == true ]; then
 			Logger "Running on unknown local OS [$localOsVar]." "WARN"
 			return
 		fi
@@ -666,12 +658,12 @@ function SetLocalOSSettings {
 	esac
 
 	if [ "$LOCAL_OS" == "Android" ] || [ "$LOCAL_OS" == "BusyBox" ]; then
-		Logger "Cannot be installed on [$LOCAL_OS]. Please use $PROGRAM.sh directly." "SIMPLE"
+		Logger "Cannot be installed on [$LOCAL_OS]. Please use $PROGRAM.sh directly." "CRITICAL"
 		exit 1
 	fi
 
 	if ([ "$USER" != "" ] && [ "$(whoami)" != "$USER" ] && [ "$FAKEROOT" == "" ]); then
-		Logger "Must be run as $USER." "SIMPLE"
+		Logger "Must be run as $USER." "CRITICAL"
 		exit 1
 	fi
 
@@ -681,17 +673,17 @@ function SetLocalOSSettings {
 function GetInit {
 	if [ -f /sbin/openrc-run ]; then
 		init="openrc"
-		Logger "Detected openrc." "SIMPLE"
+		Logger "Detected openrc." "NOTICE"
 	elif [ -f /sbin/init ]; then
 		if file /sbin/init | grep systemd > /dev/null; then
 			init="systemd"
-			Logger "Detected systemd." "SIMPLE"
+			Logger "Detected systemd." "NOTICE"
 		else
 			init="initV"
-			Logger "Detected initV." "SIMPLE"
+			Logger "Detected initV." "NOTICE"
 		fi
 	else
-		Logger "Can't detect initV, systemd or openRC. Service files won't be installed. You can still run $PROGRAM manually or via cron." "SIMPLE"
+		Logger "Can't detect initV, systemd or openRC. Service files won't be installed. You can still run $PROGRAM manually or via cron." "WARN"
 		init="none"
 	fi
 }
@@ -710,9 +702,9 @@ function CreateDir {
 		mkdir -p "$dir"
 		)
 		if [ $? == 0 ]; then
-			Logger "Created directory [$dir]." "SIMPLE"
+			Logger "Created directory [$dir]." "NOTICE"
 		else
-			Logger "Cannot create directory [$dir]." "SIMPLE"
+			Logger "Cannot create directory [$dir]." "CRITICAL"
 			exit 1
 		fi
 	fi
@@ -724,10 +716,10 @@ function CreateDir {
 		fi
 		chown "$userGroup" "$dir"
 		if [ $? != 0 ]; then
-			Logger "Could not set directory ownership on [$dir] to [$userGroup]." "SIMPLE"
+			Logger "Could not set directory ownership on [$dir] to [$userGroup]." "CRITICAL"
 			exit 1
 		else
-			Logger "Set file ownership on [$dir] to [$userGroup]." "SIMPLE"
+			Logger "Set file ownership on [$dir] to [$userGroup]." "NOTICE"
 		fi
 	fi
 }
@@ -751,26 +743,26 @@ function CopyFile {
 
 	if [ -f "$destPath/$destFileName" ] && [ $overwrite == false ]; then
 		destfileName="$sourceFileName.new"
-		Logger "Copying [$sourceFileName] to [$destPath/$destFilename]." "SIMPLE"
+		Logger "Copying [$sourceFileName] to [$destPath/$destFilename]." "NOTICE"
 	fi
 
 	cp "$sourcePath/$sourceFileName" "$destPath/$destFileName"
 	if [ $? != 0 ]; then
-		Logger "Cannot copy [$sourcePath/$sourceFileName] to [$destPath/$destFileName]. Make sure to run install script in the directory containing all other files." "SIMPLE"
-		Logger "Also make sure you have permissions to write to [$BIN_DIR]." "SIMPLE"
+		Logger "Cannot copy [$sourcePath/$sourceFileName] to [$destPath/$destFileName]. Make sure to run install script in the directory containing all other files." "CRITICAL"
+		Logger "Also make sure you have permissions to write to [$BIN_DIR]." "ERROR"
 		exit 1
 	else
-		Logger "Copied [$sourcePath/$sourceFileName] to [$destPath/$destFileName]." "SIMPLE"
+		Logger "Copied [$sourcePath/$sourceFileName] to [$destPath/$destFileName]." "NOTICE"
 		if [ "$(IsInteger $fileMod)" -eq 1 ]; then
 			chmod "$fileMod" "$destPath/$destFileName"
 			if [ $? != 0 ]; then
-				Logger "Cannot set file permissions of [$destPath/$destFileName] to [$fileMod]." "SIMPLE"
+				Logger "Cannot set file permissions of [$destPath/$destFileName] to [$fileMod]." "CRITICAL"
 				exit 1
 			else
-				Logger "Set file permissions to [$fileMod] on [$destPath/$destFileName]." "SIMPLE"
+				Logger "Set file permissions to [$fileMod] on [$destPath/$destFileName]." "NOTICE"
 			fi
 		elif [ "$fileMod" != "" ]; then
-			Logger "Bogus filemod [$fileMod] for [$destPath] given." "SIMPLE"
+			Logger "Bogus filemod [$fileMod] for [$destPath] given." "WARN"
 		fi
 
 		if [ "$fileUser" != "" ]; then
@@ -782,10 +774,10 @@ function CopyFile {
 
 			chown "$userGroup" "$destPath/$destFileName"
 			if [ $? != 0 ]; then
-				Logger "Could not set file ownership on [$destPath/$destFileName] to [$userGroup]." "SIMPLE"
+				Logger "Could not set file ownership on [$destPath/$destFileName] to [$userGroup]." "CRITICAL"
 				exit 1
 			else
-				Logger "Set file ownership on [$destPath/$destFileName] to [$userGroup]." "SIMPLE"
+				Logger "Set file ownership on [$destPath/$destFileName] to [$userGroup]." "NOTICE"
 			fi
 		fi
 	fi
@@ -837,25 +829,25 @@ function CopyServiceFiles {
 			CreateDir "$SERVICE_DIR_SYSTEMD_USER"
 			CopyFile "$SCRIPT_PATH" "$SERVICE_DIR_SYSTEMD_USER" "$SERVICE_FILE_SYSTEMD_USER" "$SERVICE_FILE_SYSTEMD_USER" "" "" "" true
 		fi
-		Logger "Created [$SERVICE_NAME] service in [$SERVICE_DIR_SYSTEMD_SYSTEM] and [$SERVICE_DIR_SYSTEMD_USER]." "SIMPLE"
-		Logger "Can be activated with [systemctl start SERVICE_NAME@instance.conf] where instance.conf is the name of the config file in $CONF_DIR." "SIMPLE"
-		Logger "Can be enabled on boot with [systemctl enable $SERVICE_NAME@instance.conf]." "SIMPLE"
-		Logger "In userland, active with [systemctl --user start $SERVICE_NAME@instance.conf]." "SIMPLE"
+		Logger "Created [$SERVICE_NAME] service in [$SERVICE_DIR_SYSTEMD_SYSTEM] and [$SERVICE_DIR_SYSTEMD_USER]." "NOTICE"
+		Logger "Can be activated with [systemctl start SERVICE_NAME@instance.conf] where instance.conf is the name of the config file in $CONF_DIR." "NOTICE"
+		Logger "Can be enabled on boot with [systemctl enable $SERVICE_NAME@instance.conf]." "NOTICE"
+		Logger "In userland, active with [systemctl --user start $SERVICE_NAME@instance.conf]." "NOTICE"
 	elif ([ "$init" == "initV" ] && [ -f "$SCRIPT_PATH/$SERVICE_FILE_INIT" ] && [ -d "$SERVICE_DIR_INIT" ]); then
 		#CreateDir "$SERVICE_DIR_INIT"
 		CopyFile "$SCRIPT_PATH" "$SERVICE_DIR_INIT" "$SERVICE_FILE_INIT" "$SERVICE_FILE_INIT" "755" "" "" true
 
-		Logger "Created [$SERVICE_NAME] service in [$SERVICE_DIR_INIT]." "SIMPLE"
-		Logger "Can be activated with [service $SERVICE_FILE_INIT start]." "SIMPLE"
-		Logger "Can be enabled on boot with [chkconfig $SERVICE_FILE_INIT on]." "SIMPLE"
+		Logger "Created [$SERVICE_NAME] service in [$SERVICE_DIR_INIT]." "NOTICE"
+		Logger "Can be activated with [service $SERVICE_FILE_INIT start]." "NOTICE"
+		Logger "Can be enabled on boot with [chkconfig $SERVICE_FILE_INIT on]." "NOTICE"
 	elif ([ "$init" == "openrc" ] && [ -f "$SCRIPT_PATH/$SERVICE_FILE_OPENRC" ] && [ -d "$SERVICE_DIR_OPENRC" ]); then
 		# Rename service to usual service file
 		CopyFile "$SCRIPT_PATH" "$SERVICE_DIR_OPENRC" "$SERVICE_FILE_OPENRC" "$SERVICE_FILE_INIT" "755" "" "" true
 
-		Logger "Created [$SERVICE_NAME] service in [$SERVICE_DIR_OPENRC]." "SIMPLE"
-		Logger "Can be activated with [rc-update add $SERVICE_NAME.instance] where instance is a configuration file found in /etc/osync." "SIMPLE"
+		Logger "Created [$SERVICE_NAME] service in [$SERVICE_DIR_OPENRC]." "NOTICE"
+		Logger "Can be activated with [rc-update add $SERVICE_NAME.instance] where instance is a configuration file found in /etc/osync." "NOTICE"
 	else
-		Logger "Cannot properly find how to deal with init on this system. Skipping service file installation." "SIMPLE"
+		Logger "Cannot properly find how to deal with init on this system. Skipping service file installation." "NOTICE"
 	fi
 }
 
@@ -874,7 +866,7 @@ function Statistics {
 		fi
 	fi
 
-	Logger "Neiter wget nor curl could be used for. Cannot run statistics. Use the provided link please." "SIMPLE"
+	Logger "Neiter wget nor curl could be used for. Cannot run statistics. Use the provided link please." "WARN"
 	return 1
 }
 
@@ -884,12 +876,12 @@ function RemoveFile {
 	if [ -f "$file" ]; then
 		rm -f "$file"
 		if [ $? != 0 ]; then
-			Logger "Could not remove file [$file]." "SIMPLE"
+			Logger "Could not remove file [$file]." "ERROR"
 		else
-			Logger "Removed file [$file]." "SIMPLE"
+			Logger "Removed file [$file]." "NOTICE"
 		fi
 	else
-		Logger "File [$file] not found. Skipping." "SIMPLE"
+		Logger "File [$file] not found. Skipping." "NOTICE"
 	fi
 }
 
@@ -903,13 +895,13 @@ function RemoveAll {
 	if [ ! -f "$BIN_DIR/osync.sh" ] && [ ! -f "$BIN_DIR/obackup.sh" ]; then		# Check if any other program requiring ssh filter is present before removal
 		RemoveFile "$BIN_DIR/$SSH_FILTER"
 	else
-		Logger "Skipping removal of [$BIN_DIR/$SSH_FILTER] because other programs present that need it." "SIMPLE"
+		Logger "Skipping removal of [$BIN_DIR/$SSH_FILTER] because other programs present that need it." "NOTICE"
 	fi
 	RemoveFile "$SERVICE_DIR_SYSTEMD_SYSTEM/$SERVICE_FILE_SYSTEMD_SYSTEM"
 	RemoveFile "$SERVICE_DIR_SYSTEMD_USER/$SERVICE_FILE_SYSTEMD_USER"
 	RemoveFile "$SERVICE_DIR_INIT/$SERVICE_FILE_INIT"
 
-	Logger "Skipping configuration files in [$CONF_DIR]. You may remove this directory manually." "SIMPLE"
+	Logger "Skipping configuration files in [$CONF_DIR]. You may remove this directory manually." "NOTICE"
 }
 
 function Usage {
@@ -960,7 +952,7 @@ STATS_LINK="http://instcount.netpower.fr?program=$PROGRAM&version=$PROGRAM_VERSI
 
 if [ "$ACTION" == "uninstall" ]; then
 	RemoveAll
-	Logger "$PROGRAM uninstalled." "SIMPLE"
+	Logger "$PROGRAM uninstalled." "NOTICE"
 else
 	CreateDir "$CONF_DIR"
 	CreateDir "$BIN_DIR"
@@ -969,10 +961,10 @@ else
 	if [ "$PROGRAM" == "osync" ] || [ "$PROGRAM" == "pmocr" ]; then
 		CopyServiceFiles
 	fi
-	Logger "$PROGRAM installed. Use with $BIN_DIR/$PROGRAM_BINARY" "SIMPLE"
+	Logger "$PROGRAM installed. Use with $BIN_DIR/$PROGRAM_BINARY" "NOTICE"
 	if [ "$PROGRAM" == "osync" ] || [ "$PROGRAM" == "obackup" ]; then
 		echo ""
-		Logger "If connecting remotely, consider setup ssh filter to enhance security." "SIMPLE"
+		Logger "If connecting remotely, consider setup ssh filter to enhance security." "NOTICE"
 		echo ""
 	fi
 fi
@@ -981,7 +973,7 @@ if [ $_STATS -eq 1 ]; then
 	if [ $_LOGGER_SILENT == true ]; then
 		Statistics
 	else
-		Logger "In order to make usage statistics, the script would like to connect to $STATS_LINK" "SIMPLE"
+		Logger "In order to make usage statistics, the script would like to connect to $STATS_LINK" "NOTICE"
 		read -r -p "No data except those in the url will be send. Allow [Y/n] " response
 		case $response in
 			[nN])
