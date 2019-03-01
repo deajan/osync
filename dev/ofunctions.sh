@@ -31,7 +31,7 @@
 #### OFUNCTIONS MINI SUBSET ####
 #### OFUNCTIONS MICRO SUBSET ####
 _OFUNCTIONS_VERSION=2.3.0-RC2
-_OFUNCTIONS_BUILD=2019030101
+_OFUNCTIONS_BUILD=2019030102
 #### _OFUNCTIONS_BOOTSTRAP SUBSET ####
 _OFUNCTIONS_BOOTSTRAP=true
 #### _OFUNCTIONS_BOOTSTRAP SUBSET END ####
@@ -193,7 +193,7 @@ function _Logger {
 
 		# Build current log file for alerts if we have a sufficient environment
 		if [ "$RUN_DIR/$PROGRAM" != "/" ]; then
-			echo -e "$logValue" >> "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$SCRIPT_PID.$TSTAMP.log"
+			echo -e "$logValue" >> "$RUN_DIR/$PROGRAM._Logger.$SCRIPT_PID.$TSTAMP.log"
 		fi
 	fi
 
@@ -404,11 +404,11 @@ function KillChilds {
 		if kill -0 "$pid" > /dev/null 2>&1; then
 			kill -s TERM "$pid"
 			Logger "Sent SIGTERM to process [$pid]." "DEBUG"
-			if [ $? != 0 ]; then
+			if [ $? -ne 0 ]; then
 				sleep 15
 				Logger "Sending SIGTERM to process [$pid] failed." "DEBUG"
 				kill -9 "$pid"
-				if [ $? != 0 ]; then
+				if [ $? -ne 0 ]; then
 					Logger "Sending SIGKILL to process [$pid] failed." "DEBUG"
 					return 1
 				fi	# Simplify the return 0 logic here
@@ -434,7 +434,7 @@ function KillAllChilds {
 	IFS=';' read -a pidsArray <<< "$pids"
 	for pid in "${pidsArray[@]}"; do
 		KillChilds $pid $self
-		if [ $? != 0 ]; then
+		if [ $? -ne 0 ]; then
 			errorcount=$((errorcount+1))
 			fi
 	done
@@ -474,10 +474,10 @@ function GenericTrapQuit {
 # osync/obackup/pmocr script specific mail alert function, use SendEmail function for generic mail sending
 function SendAlert {
 	local runAlert="${1:-false}" # Specifies if current message is sent while running or at the end of a run
+	local attachment="${2:-true}" # Should we send the log file as attachment
 
-	__CheckArguments 0-1 $# "$@"	#__WITH_PARANOIA_DEBUG
+	__CheckArguments 0-2 $# "$@"	#__WITH_PARANOIA_DEBUG
 
-	local attachment
 	local attachmentFile
 	local subject
 	local body
@@ -491,14 +491,17 @@ function SendAlert {
 		return 0
 	fi
 
-	eval "cat \"$LOG_FILE\" $COMPRESSION_PROGRAM > $ALERT_LOG_FILE"
-	if [ $? != 0 ]; then
-		attachment=false
-	else
-		attachment=true
-	fi
+        if [ $attachment == true ]; then
+                attachmentFile="$LOG_FILE"
+                if type "$COMPRESSION_PROGRAM" > /dev/null 2>&1; then
+                        eval "cat \"$LOG_FILE\" \"$COMPRESSION_PROGRAM\" > \"$ALERT_LOG_FILE\""
+                        if [ $? -eq 0 ]; then
+                                attachmentFile="$ALERT_LOG_FILE"
+                        fi
+                fi
+        fi
 
-	body="$MAIL_ALERT_MSG"$'\n\n'"Last 1000 lines of current log"$'\n\n'"$(tail -n 1000 $RUN_DIR/$PROGRAM._Logger.$SCRIPT_PID.$TSTAMP.log)"
+	body="$MAIL_ALERT_MSG"$'\n\n'"Last 1000 lines of current log"$'\n\n'"$(tail -n 1000 "$RUN_DIR/$PROGRAM._Logger.$SCRIPT_PID.$TSTAMP.log")"
 
 	if [ $ERROR_ALERT == true ]; then
 		subject="Error alert for $INSTANCE_ID"
@@ -512,10 +515,6 @@ function SendAlert {
 		subject="Currently runing - $subject"
 	else
 		subject="Finished run - $subject"
-	fi
-
-	if [ "$attachment" == true ]; then
-		attachmentFile="$ALERT_LOG_FILE"
 	fi
 
 	SendEmail "$subject" "$body" "$DESTINATION_MAILS" "$attachmentFile" "$SENDER_MAIL" "$SMTP_SERVER" "$SMTP_PORT" "$SMTP_ENCRYPTION" "$SMTP_USER" "$SMTP_PASSWORD"
@@ -607,7 +606,7 @@ function SendEmail {
 				echo -e "Subject:$subject\r\n$message" | $(type -p sendmail) -f "$senderMail" -S "$smtpServer:$smtpPort" -au"$smtpUser" -ap"$smtpPassword" "$destinationMails"
 			fi
 
-			if [ $? != 0 ]; then
+			if [ $? -ne 0 ]; then
 				Logger "Cannot send alert mail via $(type -p sendmail) !!!" "WARN"
 				# Do not bother try other mail systems with busybox
 				return 1
@@ -623,7 +622,7 @@ function SendEmail {
 	if type mutt > /dev/null 2>&1 ; then
 		# We need to replace spaces with comma in order for mutt to be able to process multiple destinations
 		echo "$message" | $(type -p mutt) -x -s "$subject" "${destinationMails// /,}" $attachment_command
-		if [ $? != 0 ]; then
+		if [ $? -ne 0 ]; then
 			Logger "Cannot send mail via $(type -p mutt) !!!" "WARN"
 		else
 			Logger "Sent mail using mutt." "NOTICE"
@@ -645,10 +644,10 @@ function SendEmail {
 		fi
 
 		echo "$message" | $(type -p mail) $attachment_command -s "$subject" "$destinationMails"
-		if [ $? != 0 ]; then
+		if [ $? -ne 0 ]; then
 			Logger "Cannot send mail via $(type -p mail) with attachments !!!" "WARN"
 			echo "$message" | $(type -p mail) -s "$subject" "$destinationMails"
-			if [ $? != 0 ]; then
+			if [ $? -ne 0 ]; then
 				Logger "Cannot send mail via $(type -p mail) without attachments !!!" "WARN"
 			else
 				Logger "Sent mail using mail command without attachment." "NOTICE"
@@ -662,7 +661,7 @@ function SendEmail {
 
 	if type sendmail > /dev/null 2>&1 ; then
 		echo -e "Subject:$subject\r\n$message" | $(type -p sendmail) "$destinationMails"
-		if [ $? != 0 ]; then
+		if [ $? -ne 0 ]; then
 			Logger "Cannot send mail via $(type -p sendmail) !!!" "WARN"
 		else
 			Logger "Sent mail using sendmail command without attachment." "NOTICE"
@@ -696,7 +695,7 @@ function SendEmail {
 			auth_string="-auth -user \"$smtpUser\" -pass \"$smtpPassword\""
 		fi
 		$(type mailsend.exe) -f "$senderMail" -t "$destinationMails" -sub "$subject" -M "$message" -attach "$attachment" -smtp "$smtpServer" -port "$smtpPort" $encryption_string $auth_string
-		if [ $? != 0 ]; then
+		if [ $? -ne 0 ]; then
 			Logger "Cannot send mail via $(type mailsend.exe) !!!" "WARN"
 		else
 			Logger "Sent mail using mailsend.exe command with attachment." "NOTICE"
@@ -707,7 +706,7 @@ function SendEmail {
 	# pfSense specific
 	if [ -f /usr/local/bin/mail.php ]; then
 		echo "$message" | /usr/local/bin/mail.php -s="$subject"
-		if [ $? != 0 ]; then
+		if [ $? -ne 0 ]; then
 			Logger "Cannot send mail via /usr/local/bin/mail.php (pfsense) !!!" "WARN"
 		else
 			Logger "Sent mail using pfSense mail.php." "NOTICE"
@@ -1034,7 +1033,7 @@ function ExecTasks {
 			fi
 			for pid in "${pidsArray[@]}"; do
 				KillChilds $pid true
-				if [ $? == 0 ]; then
+				if [ $? -eq 0 ]; then
 					Logger "Task with pid [$pid] stopped successfully." "NOTICE"
 				else
 					if [ $noErrorLogsAtAll != true ]; then
@@ -1087,7 +1086,7 @@ function ExecTasks {
 								fi
 							fi
 							KillChilds $pid true
-							if [ $? == 0 ]; then
+							if [ $? -eq 0 ]; then
 								 Logger "Command with pid [$pid] stopped successfully." "NOTICE"
 							else
 								if [ $noErrorLogsAtAll != true ]; then
@@ -1473,9 +1472,9 @@ function GetLocalOS {
 			localOsVar="Microsoft"
 		else
 			localOsVar="$(uname -spior 2>&1)"
-			if [ $? != 0 ]; then
+			if [ $? -ne 0 ]; then
 				localOsVar="$(uname -v 2>&1)"
-				if [ $? != 0 ]; then
+				if [ $? -ne 0 ]; then
 					localOsVar="$(uname)"
 				fi
 			fi
@@ -1651,9 +1650,9 @@ function GetOs {
 			localOsVar="Microsoft"
 		else
 			localOsVar="$(uname -spior 2>&1)"
-			if [ $? != 0 ]; then
+			if [ $? -ne 0 ]; then
 				localOsVar="$(uname -v 2>&1)"
-				if [ $? != 0 ]; then
+				if [ $? -ne 0 ]; then
 					localOsVar="$(uname)"
 				fi
 			fi
@@ -1700,7 +1699,7 @@ function GetOs {
 GetOs
 
 ENDSSH
-	if [ $? != 0 ]; then
+	if [ $? -ne 0 ]; then
 		Logger "Cannot connect to remote system [$REMOTE_HOST] port [$REMOTE_PORT]." "CRITICAL"
 		if [ -f "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$SCRIPT_PID.$TSTAMP" ]; then
 			Logger "$(cat "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$SCRIPT_PID.$TSTAMP")" "ERROR"
@@ -1882,7 +1881,7 @@ function CheckConnectivityRemoteHost {
 			ExecTasks $! "${FUNCNAME[0]}" false 0 0 60 180 true $SLEEP_TIME $KEEP_LOGGING
 			#ExecTasks "${FUNCNAME[0]}" 0 0 60 180 $SLEEP_TIME $KEEP_LOGGING true true false false 1 $!
 			retval=$?
-			if [ $retval != 0 ]; then
+			if [ $retval -ne 0 ]; then
 				Logger "Cannot ping [$REMOTE_HOST]. Return code [$retval]." "WARN"
 				return $retval
 			fi
@@ -1907,7 +1906,7 @@ function CheckConnectivity3rdPartyHosts {
 				ExecTasks $! "${FUNCNAME[0]}" false 0 0 60 180 true $SLEEP_TIME $KEEP_LOGGING
 				#ExecTasks "${FUNCNAME[0]}" 0 0 180 360 $SLEEP_TIME $KEEP_LOGGING true true false false 1 $!
 				retval=$?
-				if [ $retval != 0 ]; then
+				if [ $retval -ne 0 ]; then
 					Logger "Cannot ping 3rd party host [$i]. Return code [$retval]." "NOTICE"
 				else
 					remote3rdPartySuccess=true
@@ -2336,7 +2335,7 @@ function GetConfFileValue () {
 	local value
 
 	value=$(grep "^$name=" "$file")
-	if [ $? == 0 ]; then
+	if [ $? -eq 0 ]; then
 		value="${value##*=}"
 		echo "$value"
 	else
