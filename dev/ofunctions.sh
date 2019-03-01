@@ -31,7 +31,7 @@
 #### OFUNCTIONS MINI SUBSET ####
 #### OFUNCTIONS MICRO SUBSET ####
 _OFUNCTIONS_VERSION=2.3.0-RC2
-_OFUNCTIONS_BUILD=2019021401
+_OFUNCTIONS_BUILD=2019030101
 #### _OFUNCTIONS_BOOTSTRAP SUBSET ####
 _OFUNCTIONS_BOOTSTRAP=true
 #### _OFUNCTIONS_BOOTSTRAP SUBSET END ####
@@ -566,8 +566,7 @@ function SendEmail {
 	local i
 
 	if [ "${destinationMails}" != "" ]; then
-		# Not quoted since we split at space character, and emails cannot contain spaces
-		for i in ${destinationMails}; do
+		for i in "${destinationMails[@]}"; do
 			if [ $(CheckRFC822 "$i") -ne 1 ]; then
 				Logger "Given email [$i] does not seem to be valid." "WARN"
 			fi
@@ -1004,13 +1003,18 @@ function ExecTasks {
 		fi
 
 		if [ $keepLogging -ne 0 ]; then
+			# This log solely exists for readability purposes before having next set of logs
+			if [ ${#pidsArray[@]} -eq $numberOfProcesses ] && [ $log_ttime -eq 0 ]; then
+				log_ttime=$exec_time
+				Logger "There are $((mainItemCount-counter+postponedItemCount)) / $mainItemCount tasks in the queue of which $postponedItemCount are postponed. Currently, ${#pidsArray[@]} tasks running with pids [$(joinString , ${pidsArray[@]})]." "NOTICE"
+			fi
 			if [ $(((exec_time + 1) % keepLogging)) -eq 0 ]; then
 				if [ $log_ttime -ne $exec_time ]; then # Fix when sleep time lower than 1 second
 					log_ttime=$exec_time
-					if [ $functionMode == "Wait" ]; then
+					if [ $functionMode == "WaitForTaskCompletion" ]; then
 						Logger "Current tasks still running with pids [$(joinString , ${pidsArray[@]})]." "NOTICE"
 					elif [ $functionMode == "ParallelExec" ]; then
-						Logger "There are $((mainItemCount-counter+postponedItemCount)) / $mainItemCount tasks in the queue. Currently, ${#pidsArray[@]} tasks running with pids [$(joinString , ${pidsArray[@]})]." "NOTICE"
+						Logger "There are $((mainItemCount-counter+postponedItemCount)) / $mainItemCount tasks in the queue of which $postponedItemCount are postponed. Currently, ${#pidsArray[@]} tasks running with pids [$(joinString , ${pidsArray[@]})]." "NOTICE"
 					fi
 				fi
 			fi
@@ -1111,7 +1115,7 @@ function ExecTasks {
 								Logger "Command was [${commandsArrayPid[$pid]}]." "ERROR"
 							fi
 							if [ -f "${commandsArrayOutput[$pid]}" ]; then
-								Logger "Command output was [\$(cat ${commandsArrayOutput[$pid]})\n]." "ERROR"
+								Logger "Command output was [$(cat ${commandsArrayOutput[$pid]})\n]." "ERROR"
 							fi
 						fi
 						errorcount=$((errorcount+1))
@@ -1257,11 +1261,11 @@ function ExecTasks {
 				if [ $executeCommand == true ]; then
 					Logger "Running command [$currentCommand]." "DEBUG"
 					randomOutputName=$(date '+%Y%m%dT%H%M%S').$(PoorMansRandomGenerator 5)
-					eval "$currentCommand" >> "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$randomOutputName.$SCRIPT_PID.$TSTAMP" 2>&1 &
+					eval "$currentCommand" >> "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$id.$pid.$randomOutputName.$SCRIPT_PID.$TSTAMP" 2>&1 &
 					pid=$!
 					pidsArray+=($pid)
 					commandsArrayPid[$pid]="$currentCommand"
-					commandsArrayOutput[$pid]="$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$randomOutputName.$SCRIPT_PID.$TSTAMP"
+					commandsArrayOutput[$pid]="$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$id.$pid.$randomOutputName.$SCRIPT_PID.$TSTAMP"
 					# Initialize pid execution time array
 					pidsTimeArray[$pid]=0
 				else
