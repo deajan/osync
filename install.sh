@@ -10,7 +10,7 @@ PROGRAM_BINARY=$PROGRAM".sh"
 PROGRAM_BATCH=$PROGRAM"-batch.sh"
 SSH_FILTER="ssh_filter.sh"
 
-SCRIPT_BUILD=201902601
+SCRIPT_BUILD=2019022601
 INSTANCE_ID="installer-$SCRIPT_BUILD"
 
 ## osync / obackup / pmocr / zsnap install script
@@ -18,7 +18,7 @@ INSTANCE_ID="installer-$SCRIPT_BUILD"
 ## Please adapt this to fit your distro needs
 
 _OFUNCTIONS_VERSION=2.3.0-RC2
-_OFUNCTIONS_BUILD=2019021401
+_OFUNCTIONS_BUILD=2019031501
 _OFUNCTIONS_BOOTSTRAP=true
 
 if ! type "$BASH" > /dev/null; then
@@ -166,7 +166,7 @@ function _Logger {
 
 		# Build current log file for alerts if we have a sufficient environment
 		if [ "$RUN_DIR/$PROGRAM" != "/" ]; then
-			echo -e "$logValue" >> "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$SCRIPT_PID.$TSTAMP.log"
+			echo -e "$logValue" >> "$RUN_DIR/$PROGRAM._Logger.$SCRIPT_PID.$TSTAMP.log"
 		fi
 	fi
 
@@ -362,11 +362,11 @@ function KillChilds {
 		if kill -0 "$pid" > /dev/null 2>&1; then
 			kill -s TERM "$pid"
 			Logger "Sent SIGTERM to process [$pid]." "DEBUG"
-			if [ $? != 0 ]; then
+			if [ $? -ne 0 ]; then
 				sleep 15
 				Logger "Sending SIGTERM to process [$pid] failed." "DEBUG"
 				kill -9 "$pid"
-				if [ $? != 0 ]; then
+				if [ $? -ne 0 ]; then
 					Logger "Sending SIGKILL to process [$pid] failed." "DEBUG"
 					return 1
 				fi	# Simplify the return 0 logic here
@@ -391,7 +391,7 @@ function KillAllChilds {
 	IFS=';' read -a pidsArray <<< "$pids"
 	for pid in "${pidsArray[@]}"; do
 		KillChilds $pid $self
-		if [ $? != 0 ]; then
+		if [ $? -ne 0 ]; then
 			errorcount=$((errorcount+1))
 			fi
 	done
@@ -527,9 +527,9 @@ function GetLocalOS {
 			localOsVar="Microsoft"
 		else
 			localOsVar="$(uname -spior 2>&1)"
-			if [ $? != 0 ]; then
+			if [ $? -ne 0 ]; then
 				localOsVar="$(uname -v 2>&1)"
-				if [ $? != 0 ]; then
+				if [ $? -ne 0 ]; then
 					localOsVar="$(uname)"
 				fi
 			fi
@@ -623,7 +623,7 @@ function GetConfFileValue () {
 	local value
 
 	value=$(grep "^$name=" "$file")
-	if [ $? == 0 ]; then
+	if [ $? -eq 0 ]; then
 		value="${value##*=}"
 		echo "$value"
 	else
