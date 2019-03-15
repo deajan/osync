@@ -31,7 +31,7 @@
 #### OFUNCTIONS MINI SUBSET ####
 #### OFUNCTIONS MICRO SUBSET ####
 _OFUNCTIONS_VERSION=2.3.0-RC2
-_OFUNCTIONS_BUILD=2019030102
+_OFUNCTIONS_BUILD=2019031501
 #### _OFUNCTIONS_BOOTSTRAP SUBSET ####
 _OFUNCTIONS_BOOTSTRAP=true
 #### _OFUNCTIONS_BOOTSTRAP SUBSET END ####
@@ -734,7 +734,7 @@ function LoadConfigFile {
 	local configFile="${1}"
 	local revisionRequired="${2}"
 
-	__CheckArguments 1 $# "$@"	#__WITH_PARANOIA_DEBUG
+	__CheckArguments 2 $# "$@"	#__WITH_PARANOIA_DEBUG
 
 	local revisionPresent
 
@@ -748,8 +748,7 @@ function LoadConfigFile {
 		revisionPresent=$(GetConfFileValue "$configFile" "CONFIG_FILE_REVISION" true)
 		if [ "$(IsNumeric $revisionPresent)" -eq 0 ]; then
 			Logger "CONFIG_FILE_REVISION does not seem numeric [$revisionPresent]." "DEBUG"
-		fi
-		if [ "$revisionRequired" != "" ]; then
+		elif [ "$revisionRequired" != "" ]; then
 			if [ $(VerComp "$revisionPresent" "$revisionRequired") -eq 2 ]; then
 				Logger "Configuration file seems out of date. Required version [$revisionRequired]. Actual version [$revisionPresent]." "CRITICAL"
 				exit 1
