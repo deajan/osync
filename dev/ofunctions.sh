@@ -31,7 +31,7 @@
 #### OFUNCTIONS MINI SUBSET ####
 #### OFUNCTIONS MICRO SUBSET ####
 _OFUNCTIONS_VERSION=2.3.0-RC2
-_OFUNCTIONS_BUILD=2019031501
+_OFUNCTIONS_BUILD=2019031502
 #### _OFUNCTIONS_BOOTSTRAP SUBSET ####
 _OFUNCTIONS_BOOTSTRAP=true
 #### _OFUNCTIONS_BOOTSTRAP SUBSET END ####
@@ -745,8 +745,9 @@ function LoadConfigFile {
 		Logger "Wrong configuration file supplied [$configFile]. Cannot start." "CRITICAL"
 		exit 1
 	else
-		revisionPresent=$(GetConfFileValue "$configFile" "CONFIG_FILE_REVISION" true)
-		if [ "$(IsNumeric $revisionPresent)" -eq 0 ]; then
+		revisionPresent="$(GetConfFileValue "$configFile" "CONFIG_FILE_REVISION" true)"
+		if [ "$(IsNumeric "${revisionPresent%%.*}")" -eq 0 ]; then
+			Logger "Missing CONFIG_FILE_REVISION. Please provide a valid config file, or run the config update script." "WARN"
 			Logger "CONFIG_FILE_REVISION does not seem numeric [$revisionPresent]." "DEBUG"
 		elif [ "$revisionRequired" != "" ]; then
 			if [ $(VerComp "$revisionPresent" "$revisionRequired") -eq 2 ]; then
