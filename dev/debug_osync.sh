@@ -7,7 +7,7 @@ PROGRAM="osync" # Rsync based two way sync engine with fault tolerance
 AUTHOR="(C) 2013-2019 by Orsiris de Jong"
 CONTACT="http://www.netpower.fr/osync - ozy@netpower.fr"
 PROGRAM_VERSION=1.3.0-pre-rc1
-PROGRAM_BUILD=2019031501
+PROGRAM_BUILD=2019051801
 IS_STABLE=false
 
 CONFIG_FILE_REVISION_REQUIRED=1.3.0
@@ -3221,7 +3221,7 @@ function _HandleLocksRemoteSub {
 
 	# Skip the whole part if overwrite true
 	if [ -s "$lockfile" ] && [ $overwrite != true ]; then
-		lockfileContent=$(cat $lockfile)
+		lockfileContent=$(cat "$lockfile")
 		RemoteLogger "Master lock pid present: $lockfileContent" "DEBUG"
 		lockPid="${lockfileContent%@*}"
 		if [ $(IsInteger $lockPid) -ne 1 ]; then
@@ -4284,8 +4284,8 @@ function _deleteRemote {
 		exit 1
 	fi
 
-	failedDeleteList="$(EscapeSpaces ${TARGET[$__replicaDir]}${TARGET[$__stateDir]}/$replicaType${TARGET[$__failedDeletedListFile]})"
-	successDeleteList="$(EscapeSpaces ${TARGET[$__replicaDir]}${TARGET[$__stateDir]}/$replicaType${TARGET[$__successDeletedListFile]})"
+	failedDeleteList="${TARGET[$__replicaDir]}${TARGET[$__stateDir]}/$replicaType${TARGET[$__failedDeletedListFile]}"
+	successDeleteList="${TARGET[$__replicaDir]}${TARGET[$__stateDir]}/$replicaType${TARGET[$__successDeletedListFile]}"
 
 	## This is a special coded function. Need to redelcare local functions on remote host, passing all needed variables as escaped arguments to ssh command.
 	## Anything beetween << ENDSSH and ENDSSH will be executed remotely
@@ -4310,7 +4310,7 @@ $SSH_CMD env _REMOTE_TOKEN="$_REMOTE_TOKEN" \
 env _DEBUG="'$_DEBUG'" env _PARANOIA_DEBUG="'$_PARANOIA_DEBUG'" env _LOGGER_SILENT="'$_LOGGER_SILENT'" env _LOGGER_VERBOSE="'$_LOGGER_VERBOSE'" env _LOGGER_PREFIX="'$_LOGGER_PREFIX'" env _LOGGER_ERR_ONLY="'$_LOGGER_ERR_ONLY'" \
 env _REMOTE_EXECUTION="true" env PROGRAM="'$PROGRAM'" env SCRIPT_PID="'$SCRIPT_PID'" env TSTAMP="'$TSTAMP'" \
 env _DRYRUN="'$_DRYRUN'" \
-env FILE_LIST="'$(EscapeSpaces "${TARGET[$__replicaDir]}${TARGET[$__stateDir]}/$deletionListFromReplica${INITIATOR[$__deletedListFile]}")'" env REPLICA_DIR="'$(EscapeSpaces "$replicaDir")'" env SOFT_DELETE="'$SOFT_DELETE'" \
+env FILE_LIST="'${TARGET[$__replicaDir]}${TARGET[$__stateDir]}/$deletionListFromReplica${INITIATOR[$__deletedListFile]}'" env REPLICA_DIR="'$replicaDir'" env SOFT_DELETE="'$SOFT_DELETE'" \
 env DELETION_DIR="'$(EscapeSpaces "$deletionDir")'" env FAILED_DELETE_LIST="'$failedDeleteList'" env SUCCESS_DELETE_LIST="'$successDeleteList'" env REPLICA_TYPE="'$replicaType'" \
 env LC_ALL=C $COMMAND_SUDO' bash -s' << 'ENDSSH' >> "$RUN_DIR/$PROGRAM.remote_deletion.$SCRIPT_PID.$TSTAMP" 2>&1
 ## Default directory where to store temporary run files
@@ -4548,7 +4548,7 @@ ENDSSH
 	fi
 
 	## Copy back the deleted failed file list
-	rsyncCmd="$(type -p $RSYNC_EXECUTABLE) -r --rsync-path=\"env LC_ALL=C env _REMOTE_TOKEN=$_REMOTE_TOKEN $RSYNC_PATH\" -e \"$RSYNC_SSH_CMD\" --include \"$(dirname ${TARGET[$__stateDir]})\" --include \"${TARGET[$__stateDir]}\" --include \"${TARGET[$__stateDir]}/$replicaType${TARGET[$__failedDeletedListFile]}\" --include \"${TARGET[$__stateDir]}/$replicaType${TARGET[$__successDeletedListFile]}\" --exclude='*' $REMOTE_USER@$REMOTE_HOST:\"$(EscapeSpaces ${TARGET[$__replicaDir]})\" \"${INITIATOR[$__replicaDir]}\" > \"$RUN_DIR/$PROGRAM.remote_failed_deletion_list_copy.$SCRIPT_PID.$TSTAMP\""
+	rsyncCmd="$(type -p $RSYNC_EXECUTABLE) -r --rsync-path=\"env LC_ALL=C env _REMOTE_TOKEN=$_REMOTE_TOKEN $RSYNC_PATH\" -e \"$RSYNC_SSH_CMD\" --include \"$(dirname ${TARGET[$__stateDir]})\" --include \"${TARGET[$__stateDir]}\" --include \"${TARGET[$__stateDir]}/$replicaType${TARGET[$__failedDeletedListFile]}\" --include \"${TARGET[$__stateDir]}/$replicaType${TARGET[$__successDeletedListFile]}\" --exclude='*' $REMOTE_USER@$REMOTE_HOST:\"$(EscapeSpaces "${TARGET[$__replicaDir]}")\" \"${INITIATOR[$__replicaDir]}\" > \"$RUN_DIR/$PROGRAM.remote_failed_deletion_list_copy.$SCRIPT_PID.$TSTAMP\""
 	Logger "RSYNC_CMD: $rsyncCmd" "DEBUG"
 	eval "$rsyncCmd" 2>> "$LOG_FILE"
 	if [ $? -ne 0 ]; then
@@ -5791,7 +5791,7 @@ function LogConflicts {
 
 		(
 		_LOGGER_PREFIX=""
-		Logger "$(cat ${INITIATOR[$__replicaDir]}${INITIATOR[$__stateDir]}/${INITIATOR[$__conflictListFile]})" "ALWAYS"
+		Logger "$(cat "${INITIATOR[$__replicaDir]}${INITIATOR[$__stateDir]}/${INITIATOR[$__conflictListFile]}")" "ALWAYS"
 		)
 	else
 		Logger "No conflictList file." "NOTICE"
@@ -5799,7 +5799,7 @@ function LogConflicts {
 
 	if [ "$ALERT_CONFLICTS" == true ] && [ -s "$RUN_DIR/$PROGRAM.conflictList.compare.$SCRIPT_PID.$TSTAMP" ]; then
 		subject="Conflictual files found in [$INSTANCE_ID]"
-		body="List of conflictual files:"$'\n'"$(cat ${INITIATOR[$__replicaDir]}${INITIATOR[$__stateDir]}/${INITIATOR[$__conflictListFile]})"
+		body="List of conflictual files:"$'\n'"$(cat "${INITIATOR[$__replicaDir]}${INITIATOR[$__stateDir]}/${INITIATOR[$__conflictListFile]}")"
 
 		SendEmail "$subject" "$body" "$DESTINATION_MAILS" "" "$SENDER_MAIL" "$SMTP_SERVER" "$SMTP_PORT" "$SMTP_ENCRYPTION" "$SMTP_USER" "$SMTP_PASSWORD"
 	fi
