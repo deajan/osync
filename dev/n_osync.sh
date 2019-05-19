@@ -7,7 +7,7 @@ PROGRAM="osync" # Rsync based two way sync engine with fault tolerance
 AUTHOR="(C) 2013-2019 by Orsiris de Jong"
 CONTACT="http://www.netpower.fr/osync - ozy@netpower.fr"
 PROGRAM_VERSION=1.3.0-pre-rc1
-PROGRAM_BUILD=2019051902
+PROGRAM_BUILD=2019051903
 IS_STABLE=false
 
 CONFIG_FILE_REVISION_REQUIRED=1.3.0
@@ -2395,9 +2395,9 @@ function _SummaryFromRsyncFile {
 			if echo "$file" | grep -E "^<|^>|^\." > /dev/null 2>&1; then
 				# awk removes first part of line until space, then show all others
 				Logger "$direction $replicaPath$(echo $file | awk '{for (i=2; i<NF; i++) printf $i " "; print $NF}')" "ALWAYS"
-				if [ "$direction" == "- >>" ]; then
+				if [ "$direction" == "+ >>" ]; then
 					TARGET_UPDATES_COUNT=$((TARGET_UPDATES_COUNT+1))
-				elif [ "$direction" == "- <<" ]; then
+				elif [ "$direction" == "+ <<" ]; then
 					INITIATOR_UPDATES_COUNT=$((INITIATOR_UPDATES_COUNT+1))
 				fi
 			fi
@@ -2449,12 +2449,12 @@ function Summary {
 		_SummaryFromDeleteFile "${TARGET[$__replicaDir]}" "$RUN_DIR/$PROGRAM.delete.target.$SCRIPT_PID.$TSTAMP" "- >>"
 	fi
 	_SummaryFromDeleteFile "${INITIATOR[$__replicaDir]}" "$RUN_DIR/$PROGRAM.delete.initiator.$SCRIPT_PID.$TSTAMP" "- <<"
-	)
 
 	Logger "Initiator has $INITIATOR_UPDATES_COUNT updates." "ALWAYS"
 	Logger "Target has $TARGET_UPDATES_COUNT updates." "ALWAYS"
 	Logger "Initiator has $INITIATOR_DELETES_COUNT deletions." "ALWAYS"
 	Logger "Target has $TARGET_DELETES_COUNT deletions." "ALWAYS"
+	)
 }
 
 function LogConflicts {
