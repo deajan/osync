@@ -7,7 +7,7 @@ PROGRAM="osync" # Rsync based two way sync engine with fault tolerance
 AUTHOR="(C) 2013-2019 by Orsiris de Jong"
 CONTACT="http://www.netpower.fr/osync - ozy@netpower.fr"
 PROGRAM_VERSION=1.3.0-pre-rc1
-PROGRAM_BUILD=2019051901
+PROGRAM_BUILD=2019051902
 IS_STABLE=false
 
 CONFIG_FILE_REVISION_REQUIRED=1.3.0
@@ -5726,8 +5726,8 @@ function _SummaryFromRsyncFile {
 
 	__CheckArguments 3 $# "$@"	#__WITH_PARANOIA_DEBUG
 
-	local initiator_updates=0
-	local target_updates=0
+	INITIATOR_UPDATES_COUNT=0
+	local TARGET_UPDATES_COUNT=0
 
 	if [ -f "$summaryFile" ]; then
 		while read -r file; do
@@ -5735,15 +5735,13 @@ function _SummaryFromRsyncFile {
 			if echo "$file" | grep -E "^<|^>|^\." > /dev/null 2>&1; then
 				# awk removes first part of line until space, then show all others
 				Logger "$direction $replicaPath$(echo $file | awk '{for (i=2; i<NF; i++) printf $i " "; print $NF}')" "ALWAYS"
-				if [ "$direction" == ">>" ]; then
-					target_updates=$((target_updates+1))
-				elif [ "$direction" == "<<" ]; then
-					initiator_updates=$((initiator_updates+1))
+				if [ "$direction" == "- >>" ]; then
+					TARGET_UPDATES_COUNT=$((TARGET_UPDATES_COUNT+1))
+				elif [ "$direction" == "- <<" ]; then
+					INITIATOR_UPDATES_COUNT=$((INITIATOR_UPDATES_COUNT+1))
 				fi
 			fi
 		done < "$summaryFile"
-		Logger "Initiator has $initiator_updates updates." "ALWAYS"
-		Logger "Target has $target_updates updates." "ALWAYS"
 	fi
 }
 
@@ -5754,20 +5752,18 @@ function _SummaryFromDeleteFile {
 
 	__CheckArguments 3 $# "$@"	#__WITH_PARANOIA_DEBUG
 
-	local initiator_deletes=0
-	local target_deletes=0
+	local INITIAOTR_DELETES_COUNT=0
+	local TARGET_DELETES_COUNT=0
 
 	if [ -f "$summaryFile" ]; then
 		while read -r file; do
 			Logger "$direction $replicaPath$file" "ALWAYS"
 			if [ "$direction" == ">>" ]; then
-				target_deletes=$((target_deletes+1))
+				TARGET_DELETES_COUNT=$((TARGET_DELETES_COUNT+1))
 			elif [ "$direction" == "<<" ]; then
-				initiator_deletes=$((initiator_deletes+1))
+				INITIATOR_DELETES_COUNT=$((INITIATOR_DELETES_COUNT+1))
 			fi
 		done < "$summaryFile"
-		Logger "Initiator has $initiator_deletes deletions." "ALWAYS"
-		Logger "Target has $target_deletes deletions.." "ALWAYS"
 	fi
 }
 
@@ -5794,6 +5790,11 @@ function Summary {
 	fi
 	_SummaryFromDeleteFile "${INITIATOR[$__replicaDir]}" "$RUN_DIR/$PROGRAM.delete.initiator.$SCRIPT_PID.$TSTAMP" "- <<"
 	)
+
+	Logger "Initiator has $INITIATOR_UPDATES_COUNT updates." "ALWAYS"
+	Logger "Target has $TARGET_UPDATES_COUNT updates." "ALWAYS"
+	Logger "Initiator has $INITIATOR_DELETES_COUNT deletions." "ALWAYS"
+	Logger "Target has $TARGET_DELETES_COUNT deletions.." "ALWAYS"
 }
 
 function LogConflicts {
