@@ -5492,7 +5492,7 @@ function _SummaryFromRsyncFile {
 
 
 	INITIATOR_UPDATES_COUNT=0
-	local TARGET_UPDATES_COUNT=0
+	TARGET_UPDATES_COUNT=0
 
 	if [ -f "$summaryFile" ]; then
 		while read -r file; do
@@ -5516,8 +5516,8 @@ function _SummaryFromDeleteFile {
 	local direction="${3}"
 
 
-	local INITIAOTR_DELETES_COUNT=0
-	local TARGET_DELETES_COUNT=0
+	INITIATOR_DELETES_COUNT=0
+	TARGET_DELETES_COUNT=0
 
 	if [ -f "$summaryFile" ]; then
 		while read -r file; do
@@ -5557,7 +5557,7 @@ function Summary {
 	Logger "Initiator has $INITIATOR_UPDATES_COUNT updates." "ALWAYS"
 	Logger "Target has $TARGET_UPDATES_COUNT updates." "ALWAYS"
 	Logger "Initiator has $INITIATOR_DELETES_COUNT deletions." "ALWAYS"
-	Logger "Target has $TARGET_DELETES_COUNT deletions.." "ALWAYS"
+	Logger "Target has $TARGET_DELETES_COUNT deletions." "ALWAYS"
 }
 
 function LogConflicts {
