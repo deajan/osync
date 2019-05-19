@@ -9,7 +9,10 @@ dd Mmm YYYY: osync v1.3 release (for full changelog since v1.2 branch see all v1
 dd Mmm YYYY: osync v1.3-RC1 release
 
 - Deprecated --log-conflicts for 1.3 branch
-! Config file revision check
+- Config file syntax now uses booleans instead of yes / no (but still accepts old syntax)
+	- Added boolean update in upgrade script
+- Config file revision check
+	- Added config file revision in upgrade script
 ! New option --sync=bidir|initator2target|target2initiator #147
 ! new option FORCE_CONFLICT_PREVALANCE which will always use Initiator or Target, regardless of best time
 - New osync target helper service
