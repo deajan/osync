@@ -2755,7 +2755,7 @@ function Usage {
 	echo "--silent               Will run osync without any output to stdout, used for cron jobs"
 	echo "--errors-only          Output only errors (can be combined with silent or verbose)"
 	echo "--summary              Outputs a list of transferred / deleted files at the end of the run"
-	echo "--log-conflicts        Outputs a list of conflicted files"
+	echo "--log-conflicts        [EXPERIMENTAL] Outputs a list of conflicted files"
 	echo "--alert-conflicts      Send an email if conflictual files found (implies --log-conflicts)"
 	echo "--verbose              Increases output"
 	echo "--stats                Adds rsync transfer statistics to verbose output"
