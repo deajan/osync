@@ -2418,9 +2418,9 @@ function _SummaryFromDeleteFile {
 	if [ -f "$summaryFile" ]; then
 		while read -r file; do
 			Logger "$direction $replicaPath$file" "ALWAYS"
-			if [ "$direction" == ">>" ]; then
+			if [ "$direction" == "- >>" ]; then
 				TARGET_DELETES_COUNT=$((TARGET_DELETES_COUNT+1))
-			elif [ "$direction" == "<<" ]; then
+			elif [ "$direction" == "- <<" ]; then
 				INITIATOR_DELETES_COUNT=$((INITIATOR_DELETES_COUNT+1))
 			fi
 		done < "$summaryFile"
