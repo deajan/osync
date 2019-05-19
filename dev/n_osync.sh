@@ -7,7 +7,7 @@ PROGRAM="osync" # Rsync based two way sync engine with fault tolerance
 AUTHOR="(C) 2013-2019 by Orsiris de Jong"
 CONTACT="http://www.netpower.fr/osync - ozy@netpower.fr"
 PROGRAM_VERSION=1.3.0-pre-rc1
-PROGRAM_BUILD=2019051801
+PROGRAM_BUILD=2019051901
 IS_STABLE=false
 
 CONFIG_FILE_REVISION_REQUIRED=1.3.0
@@ -2386,14 +2386,24 @@ function _SummaryFromRsyncFile {
 
 	__CheckArguments 3 $# "$@"	#__WITH_PARANOIA_DEBUG
 
+	local initiator_updates=0
+	local target_updates=0
+
 	if [ -f "$summaryFile" ]; then
 		while read -r file; do
 			# grep -E "^<|^>|^\." = Remove all lines that do not begin with <, > or . to deal with a bizarre bug involving rsync 3.0.6 / CentOS 6 and --skip-compress showing 'adding zip' line for every skipped compressed extension
 			if echo "$file" | grep -E "^<|^>|^\." > /dev/null 2>&1; then
 				# awk removes first part of line until space, then show all others
 				Logger "$direction $replicaPath$(echo $file | awk '{for (i=2; i<NF; i++) printf $i " "; print $NF}')" "ALWAYS"
+				if [ "$direction" == ">>" ]; then
+					target_updates=$((target_updates+1))
+				elif [ "$direction" == "<<" ]; then
+					initiator_updates=$((initiator_updates+1))
+				fi
 			fi
 		done < "$summaryFile"
+		Logger "Initiator has $initiator_updates updates." "ALWAYS"
+		Logger "Target has $target_updates updates." "ALWAYS"
 	fi
 }
 
@@ -2404,10 +2414,20 @@ function _SummaryFromDeleteFile {
 
 	__CheckArguments 3 $# "$@"	#__WITH_PARANOIA_DEBUG
 
+	local initiator_deletes=0
+	local target_deletes=0
+
 	if [ -f "$summaryFile" ]; then
 		while read -r file; do
 			Logger "$direction $replicaPath$file" "ALWAYS"
+			if [ "$direction" == ">>" ]; then
+				target_deletes=$((target_deletes+1))
+			elif [ "$direction" == "<<" ]; then
+				initiator_deletes=$((initiator_deletes+1))
+			fi
 		done < "$summaryFile"
+		Logger "Initiator has $initiator_deletes deletions." "ALWAYS"
+		Logger "Target has $target_deletes deletions.." "ALWAYS"
 	fi
 }
 
@@ -2442,19 +2462,24 @@ function LogConflicts {
 	local subject
 	local body
 
+	local conflicts=0
+
 	if [ -f "$RUN_DIR/$PROGRAM.conflictList.compare.$SCRIPT_PID.$TSTAMP" ]; then
 		Logger "File conflicts: INITIATOR << >> TARGET" "ALWAYS"
 		> "${INITIATOR[$__replicaDir]}${INITIATOR[$__stateDir]}/${INITIATOR[$__conflictListFile]}"
 		while read -r line; do
 			echo "${INITIATOR[$__replicaDir]}$(echo $line | awk -F';' '{print $1}') << >> ${TARGET[$__replicaDir]}$(echo $line | awk -F';' '{print $1}')" >> "${INITIATOR[$__replicaDir]}${INITIATOR[$__stateDir]}/${INITIATOR[$__conflictListFile]}"
+			conflicts=$((conflicts+1))
 		done < "$RUN_DIR/$PROGRAM.conflictList.compare.$SCRIPT_PID.$TSTAMP"
 
 		(
 		_LOGGER_PREFIX=""
 		Logger "$(cat "${INITIATOR[$__replicaDir]}${INITIATOR[$__stateDir]}/${INITIATOR[$__conflictListFile]}")" "ALWAYS"
 		)
+
+		Logger "There are $conflicts conflictual files." "ALWAYS"
 	else
-		Logger "No conflictList file." "NOTICE"
+		Logger "No are no conflicatual files." "ALWAYS"
 	fi
 
 	if [ "$ALERT_CONFLICTS" == true ] && [ -s "$RUN_DIR/$PROGRAM.conflictList.compare.$SCRIPT_PID.$TSTAMP" ]; then
