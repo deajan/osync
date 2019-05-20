@@ -7,6 +7,11 @@ dd Mmm YYYY: dev
 dd Mmm YYYY: osync v1.3 release (for full changelog since v1.2 branch see all v1.3-beta/RC entries)
 
 dd Mmm YYYY: osync v1.3-RC1 release
+- ! new option FORCE_CONFLICT_PREVALANCE which will always use Initiator or Target, regardless of best time
+- ! target-helper: destination mails etc on target, also, no cmd after on configs
+
+
+20 May 2019: osync v1.3-beta2 release
 
 - More --summary statistics
 - Config file syntax now uses booleans instead of yes / no (but still accepts old syntax)
@@ -14,10 +19,7 @@ dd Mmm YYYY: osync v1.3-RC1 release
 - Config file revision check
 	- Added config file revision in upgrade script
 -  New option --sync-type=initator2target|target2initiator that allows using osync as rsync wrapper for unidirectional sync
-- ! new option FORCE_CONFLICT_PREVALANCE which will always use Initiator or Target, regardless of best time
 - New osync target helper service
-	- ! installer
-	- ! destination mails etc on target, also, no cmd after on configs
 - Fixed multiple race conditions in parallel executions (which also fixes random conflict logs failures)
 - Fixed directory softdeletion bug
 - Fixed multiple failed deletions will be retried as many times as failures happened
