@@ -7,7 +7,7 @@ PROGRAM="osync" # Rsync based two way sync engine with fault tolerance
 AUTHOR="(C) 2013-2019 by Orsiris de Jong"
 CONTACT="http://www.netpower.fr/osync - ozy@netpower.fr"
 PROGRAM_VERSION=1.3.0-pre-rc1
-PROGRAM_BUILD=2019052004
+PROGRAM_BUILD=2019052007
 IS_STABLE=false
 
 CONFIG_FILE_REVISION_REQUIRED=1.3.0
@@ -4117,7 +4117,8 @@ function syncAttrs {
 function syncUpdate {
 	local sourceReplica="${1}" # Contains replica type of source: initiator, target
 	local destinationReplica="${2}" # Contains replica type of destination: initiator, target
-	__CheckArguments 2 $# "$@"	#__WITH_PARANOIA_DEBUG
+	local remoteDelete="${3:-false}" # Use rsnyc to delete remote files if not existent in source
+	__CheckArguments 2-3 $# "$@"	#__WITH_PARANOIA_DEBUG
 
 	local rsyncCmd
 	local retval
@@ -4128,6 +4129,9 @@ function syncUpdate {
 	local escDestDir
 
 	local backupArgs
+	local deleteArgs
+	local exclude_list_initiator
+	local exclude_list_target
 
 	Logger "Updating $destinationReplica replica." "NOTICE"
 	if [ "$sourceReplica" == "${INITIATOR[$__type]}" ]; then
@@ -4146,16 +4150,27 @@ function syncUpdate {
 		escDestDir=$(EscapeSpaces "${INITIATOR[$__replicaDir]}")
 	fi
 
+	if [ "$remoteDelete" == true ]; then
+		deleteArgs="--delete-after"
+	fi
+
+	if [ -f "${INITIATOR[$__replicaDir]}${INITIATOR[$__stateDir]}/$sourceReplica${INITIATOR[$__deletedListFile]}" ]; then
+		exclude_list_initiator="--exclude-from=\"${INITIATOR[$__replicaDir]}${INITIATOR[$__stateDir]}/$sourceReplica${INITIATOR[$__deletedListFile]}\""
+	fi
+	if [ -f "${INITIATOR[$__replicaDir]}${INITIATOR[$__stateDir]}/$destinationReplica${INITIATOR[$__deletedListFile]}" ]; then
+		exclude_list_target="--exclude-from=\"${INITIATOR[$__replicaDir]}${INITIATOR[$__stateDir]}/$destinationReplica${INITIATOR[$__deletedListFile]}\""
+	fi
+
 	if [ "$REMOTE_OPERATION" == true ]; then
 		CheckConnectivity3rdPartyHosts
 		CheckConnectivityRemoteHost
 		if [ "$sourceReplica" == "${INITIATOR[$__type]}" ]; then
-			rsyncCmd="$(type -p $RSYNC_EXECUTABLE) --rsync-path=\"env LC_ALL=C env _REMOTE_TOKEN=$_REMOTE_TOKEN $RSYNC_PATH\" $RSYNC_DEFAULT_ARGS $RSYNC_DRY_ARG $RSYNC_ATTR_ARGS $RSYNC_TYPE_ARGS $SYNC_OPTS -e \"$RSYNC_SSH_CMD\" $backupArgs --exclude \"$OSYNC_DIR\" $RSYNC_FULL_PATTERNS $RSYNC_PARTIAL_EXCLUDE --exclude-from=\"${INITIATOR[$__replicaDir]}${INITIATOR[$__stateDir]}/$sourceReplica${INITIATOR[$__deletedListFile]}\" --exclude-from=\"${INITIATOR[$__replicaDir]}${INITIATOR[$__stateDir]}/$destinationReplica${INITIATOR[$__deletedListFile]}\" \"$sourceDir\" $REMOTE_USER@$REMOTE_HOST:\"$escDestDir\" >> $RUN_DIR/$PROGRAM.update.$destinationReplica.$SCRIPT_PID.$TSTAMP 2>&1"
+			rsyncCmd="$(type -p $RSYNC_EXECUTABLE) --rsync-path=\"env LC_ALL=C env _REMOTE_TOKEN=$_REMOTE_TOKEN $RSYNC_PATH\" $RSYNC_DEFAULT_ARGS $RSYNC_DRY_ARG $RSYNC_ATTR_ARGS $RSYNC_TYPE_ARGS $SYNC_OPTS -e \"$RSYNC_SSH_CMD\" $backupArgs $deleteArgs --exclude \"$OSYNC_DIR\" $RSYNC_FULL_PATTERNS $RSYNC_PARTIAL_EXCLUDE $exclude_list_initiator $exclude_list_target \"$sourceDir\" $REMOTE_USER@$REMOTE_HOST:\"$escDestDir\" >> $RUN_DIR/$PROGRAM.update.$destinationReplica.$SCRIPT_PID.$TSTAMP 2>&1"
 		else
-			rsyncCmd="$(type -p $RSYNC_EXECUTABLE) --rsync-path=\"env LC_ALL=C env _REMOTE_TOKEN=$_REMOTE_TOKEN $RSYNC_PATH\" $RSYNC_DEFAULT_ARGS $RSYNC_DRY_ARG $RSYNC_ATTR_ARGS $RSYNC_TYPE_ARGS $SYNC_OPTS -e \"$RSYNC_SSH_CMD\" $backupArgs --exclude \"$OSYNC_DIR\" $RSYNC_FULL_PATTERNS $RSYNC_PARTIAL_EXCLUDE --exclude-from=\"${INITIATOR[$__replicaDir]}${INITIATOR[$__stateDir]}/$destinationReplica${INITIATOR[$__deletedListFile]}\" --exclude-from=\"${INITIATOR[$__replicaDir]}${INITIATOR[$__stateDir]}/$sourceReplica${INITIATOR[$__deletedListFile]}\" $REMOTE_USER@$REMOTE_HOST:\"$escSourceDir\" \"$destDir\" >> $RUN_DIR/$PROGRAM.update.$destinationReplica.$SCRIPT_PID.$TSTAMP 2>&1"
+			rsyncCmd="$(type -p $RSYNC_EXECUTABLE) --rsync-path=\"env LC_ALL=C env _REMOTE_TOKEN=$_REMOTE_TOKEN $RSYNC_PATH\" $RSYNC_DEFAULT_ARGS $RSYNC_DRY_ARG $RSYNC_ATTR_ARGS $RSYNC_TYPE_ARGS $SYNC_OPTS -e \"$RSYNC_SSH_CMD\" $backupArgs $deleteArgs --exclude \"$OSYNC_DIR\" $RSYNC_FULL_PATTERNS $RSYNC_PARTIAL_EXCLUDE $exclude_list_initiator $exclude_list_target $REMOTE_USER@$REMOTE_HOST:\"$escSourceDir\" \"$destDir\" >> $RUN_DIR/$PROGRAM.update.$destinationReplica.$SCRIPT_PID.$TSTAMP 2>&1"
 		fi
 	else
-		rsyncCmd="$(type -p $RSYNC_EXECUTABLE) --rsync-path=\"env LC_ALL=C env _REMOTE_TOKEN=$_REMOTE_TOKEN $RSYNC_PATH\" $RSYNC_DEFAULT_ARGS $RSYNC_DRY_ARG $RSYNC_ATTR_ARGS $RSYNC_TYPE_ARGS $SYNC_OPTS $backupArgs --exclude \"$OSYNC_DIR\" $RSYNC_FULL_PATTERNS $RSYNC_PARTIAL_EXCLUDE --exclude-from=\"${INITIATOR[$__replicaDir]}${INITIATOR[$__stateDir]}/$sourceReplica${INITIATOR[$__deletedListFile]}\" --exclude-from=\"${INITIATOR[$__replicaDir]}${INITIATOR[$__stateDir]}/$destinationReplica${INITIATOR[$__deletedListFile]}\" \"$sourceDir\" \"$destDir\" >> $RUN_DIR/$PROGRAM.update.$destinationReplica.$SCRIPT_PID.$TSTAMP 2>&1"
+		rsyncCmd="$(type -p $RSYNC_EXECUTABLE) --rsync-path=\"env LC_ALL=C env _REMOTE_TOKEN=$_REMOTE_TOKEN $RSYNC_PATH\" $RSYNC_DEFAULT_ARGS $RSYNC_DRY_ARG $RSYNC_ATTR_ARGS $RSYNC_TYPE_ARGS $SYNC_OPTS $backupArgs $deleteArgs --exclude \"$OSYNC_DIR\" $RSYNC_FULL_PATTERNS $RSYNC_PARTIAL_EXCLUDE $exclude_list_initiator $exclude_list_target \"$sourceDir\" \"$destDir\" >> $RUN_DIR/$PROGRAM.update.$destinationReplica.$SCRIPT_PID.$TSTAMP 2>&1"
 	fi
 	Logger "RSYNC_CMD: $rsyncCmd" "DEBUG"
 	eval "$rsyncCmd"
@@ -4681,11 +4696,14 @@ function Initialize {
 ###### Step 8a & 8b: Create after run ctime & mtime file list of replicas
 
 function Sync {
+	local syncType="${1}"		# Optional sync type. By default, sync is bidirectional.
+
 	__CheckArguments 0 $# "$@"	#__WITH_PARANOIA_DEBUG
 
 	local resumeCount
 	local resumeInitiator
 	local resumeTarget
+	local rsyncRemoteDelete=false
 
 	local initiatorPid
 	local targetPid
@@ -4708,23 +4726,23 @@ function Sync {
 			if [ -f "${INITIATOR[$__initiatorLastActionFile]}" ]; then
 				resumeInitiator=$(cat "${INITIATOR[$__initiatorLastActionFile]}")
 			else
-				resumeInitiator="synced"
+				resumeInitiator="${SYNC_ACTION[9]}"
 			fi
 
 			if [ -f "${INITIATOR[$__targetLastActionFile]}" ]; then
 				resumeTarget=$(cat "${INITIATOR[$__targetLastActionFile]}")
 			else
-				resumeTarget="synced"
+				resumeTarget="${SYNC_ACTION[9]}"
 			fi
 
-			if [ "$resumeInitiator" != "synced" ]; then
+			if [ "$resumeInitiator" != "${SYNC_ACTION[9]}" ]; then
 				Logger "Trying to resume aborted execution on $($STAT_CMD "${INITIATOR[$__initiatorLastActionFile]}") at task [$resumeInitiator] for initiator. [$resumeCount] previous tries." "NOTICE"
 				echo $((resumeCount+1)) > "${INITIATOR[$__resumeCount]}"
 			else
 				resumeInitiator="none"
 			fi
 
-			if [ "$resumeTarget" != "synced" ]; then
+			if [ "$resumeTarget" != "${SYNC_ACTION[9]}" ]; then
 				Logger "Trying to resume aborted execution on $($STAT_CMD "${INITIATOR[$__targetLastActionFile]}") as task [$resumeTarget] for target. [$resumeCount] previous tries." "NOTICE"
 				echo $((resumeCount+1)) > "${INITIATOR[$__resumeCount]}"
 			else
@@ -4743,6 +4761,16 @@ function Sync {
 		resumeTarget="none"
 	fi
 
+	# If using unidirectional sync, let's point resumes at step 5 directly
+	if [ "$SYNC_TYPE" == "initiator2target" ]; then
+		resumeInitiator="${SYNC_ACTION[5]}"
+		resumeTarget="${SYNC_ACTION[6]}"
+		rsyncRemoteDelete=true
+	elif [ "$SYNC_TYPE" == "target2initiator" ]; then
+		resumeInitiator="${SYNC_ACTION[6]}"
+		resumeTarget="${SYNC_ACTION[5]}"
+		rsyncRemoteDelete=true
+	fi
 
 	################################################################################################################################################# Actual sync begins here
 
@@ -4943,7 +4971,7 @@ function Sync {
 	if [ "$resumeInitiator" == "${SYNC_ACTION[5]}" ] || [ "$resumeTarget" == "${SYNC_ACTION[5]}" ]; then
 		if [ "$CONFLICT_PREVALANCE" == "${TARGET[$__type]}" ]; then
 			if [ "$resumeTarget" == "${SYNC_ACTION[5]}" ]; then
-				syncUpdate "${TARGET[$__type]}" "${INITIATOR[$__type]}" &
+				syncUpdate "${TARGET[$__type]}" "${INITIATOR[$__type]}" $rsyncRemoteDelete &
 				ExecTasks $! "${FUNCNAME[0]}_syncUpdate_initiator" false 0 0 $SOFT_MAX_EXEC_TIME $HARD_MAX_EXEC_TIME false $SLEEP_TIME $KEEP_LOGGING
 				if [ $? -ne 0 ]; then
 					echo "${SYNC_ACTION[5]}" > "${INITIATOR[$__targetLastActionFile]}"
@@ -4955,7 +4983,7 @@ function Sync {
 				fi
 			fi
 			if [ "$resumeInitiator" == "${SYNC_ACTION[5]}" ]; then
-				syncUpdate "${INITIATOR[$__type]}" "${TARGET[$__type]}" &
+				syncUpdate "${INITIATOR[$__type]}" "${TARGET[$__type]}" $rsyncRemoteDelete &
 				ExecTasks $! "${FUNCNAME[0]}_syncUpdate_target" false 0 0 $SOFT_MAX_EXEC_TIME $HARD_MAX_EXEC_TIME false $SLEEP_TIME $KEEP_LOGGING
 				if [ $? -ne 0 ]; then
 					echo "${SYNC_ACTION[5]}" > "${INITIATOR[$__initiatorLastActionFile]}"
@@ -4968,7 +4996,7 @@ function Sync {
 			fi
 		else
 			if [ "$resumeInitiator" == "${SYNC_ACTION[5]}" ]; then
-				syncUpdate "${INITIATOR[$__type]}" "${TARGET[$__type]}" &
+				syncUpdate "${INITIATOR[$__type]}" "${TARGET[$__type]}" $rsyncRemoteDelete &
 				ExecTasks $! "${FUNCNAME[0]}_syncUpdate_target" false 0 0 $SOFT_MAX_EXEC_TIME $HARD_MAX_EXEC_TIME false $SLEEP_TIME $KEEP_LOGGING
 				if [ $? -ne 0 ]; then
 					echo "${SYNC_ACTION[5]}" > "${INITIATOR[$__initiatorLastActionFile]}"
@@ -4980,7 +5008,7 @@ function Sync {
 				fi
 			fi
 			if [ "$resumeTarget" == "${SYNC_ACTION[5]}" ]; then
-				syncUpdate "${TARGET[$__type]}" "${INITIATOR[$__type]}" &
+				syncUpdate "${TARGET[$__type]}" "${INITIATOR[$__type]}" $rsyncRemoteDelete &
 				ExecTasks $! "${FUNCNAME[0]}_syncUpdate_initiator" false 0 0 $SOFT_MAX_EXEC_TIME $HARD_MAX_EXEC_TIME false $SLEEP_TIME $KEEP_LOGGING
 				if [ $? -ne 0 ]; then
 					echo "${SYNC_ACTION[5]}" > "${INITIATOR[$__targetLastActionFile]}"
@@ -4992,6 +5020,14 @@ function Sync {
 				fi
 			fi
 		fi
+	fi
+
+	# If SYNC_TYPE is not bidirectional, skip all other steps
+	if [ "$SYNC_TYPE" == "initiator2target" ] || [ "$SYNC_TYPE" == "target2initiator" ]; then
+		echo "${SYNC_ACTION[9]}" > "${INITIATOR[$__initiatorLastActionFile]}"
+		echo "${SYNC_ACTION[9]}" > "${INITIATOR[$__targetLastActionFile]}"
+		resumeInitiator="${SYNC_ACTION[9]}"
+		resumeTarget="${SYNC_ACTION[9]}"
 	fi
 
 	## Step 6a & 6b
@@ -5135,7 +5171,7 @@ function Sync {
 			echo "${SYNC_ACTION[9]}" > "${INITIATOR[$__initiatorLastActionFile]}"
 			echo "${SYNC_ACTION[9]}" > "${INITIATOR[$__targetLastActionFile]}"
 			resumeInitiator="${SYNC_ACTION[9]}"
-			resumeTarget="${SYNC_ACTION[3]}"
+			resumeTarget="${SYNC_ACTION[9]}"
 		fi
 	fi
 
@@ -5735,14 +5771,23 @@ function _SummaryFromRsyncFile {
 
 	if [ -f "$summaryFile" ]; then
 		while read -r file; do
-			# grep -E "^<|^>|^\." = Remove all lines that do not begin with <, > or . to deal with a bizarre bug involving rsync 3.0.6 / CentOS 6 and --skip-compress showing 'adding zip' line for every skipped compressed extension
+			# grep -E "^<|^>|^\." = Remove all lines that do not begin with '<', '>' or '.' to deal with a bizarre bug involving rsync 3.0.6 / CentOS 6 and --skip-compress showing 'adding zip' line for every skipped compressed extension
 			if echo "$file" | grep -E "^<|^>|^\." > /dev/null 2>&1; then
 				# awk removes first part of line until space, then show all others
-				Logger "$direction $replicaPath$(echo $file | awk '{for (i=2; i<NF; i++) printf $i " "; print $NF}')" "ALWAYS"
-				if [ "$direction" == "+ >>" ]; then
+				Logger "+ $direction $replicaPath$(echo $file | awk '{for (i=2; i<NF; i++) printf $i " "; print $NF}')" "ALWAYS"
+				if [ "$direction" == ">>" ]; then
 					TARGET_UPDATES_COUNT=$((TARGET_UPDATES_COUNT+1))
-				elif [ "$direction" == "+ <<" ]; then
+				elif [ "$direction" == "<<" ]; then
 					INITIATOR_UPDATES_COUNT=$((INITIATOR_UPDATES_COUNT+1))
+				fi
+			fi
+			if echo "$file" | grep -E "\*deleting" > /dev/null 2>&1; then
+				if [ "$direction" == ">>" ]; then
+					Logger "- $direction $replicaPath$(echo $file | awk '{print $2}')" "ALWAYS"
+					TARGET_DELETES_COUNT=$((TARGET_DELETES_COUNT+1))
+				elif [ "$direction" == "<<" ]; then
+					Logger "- $direction $replicaPath$(echo $file | awk '{print $2}')" "ALWAYS"
+					INITIATOR_DELETES_COUNT=$((INITIATOR_DELETES_COUNT+1))
 				fi
 			fi
 		done < "$summaryFile"
@@ -5758,10 +5803,10 @@ function _SummaryFromDeleteFile {
 
 	if [ -f "$summaryFile" ]; then
 		while read -r file; do
-			Logger "$direction $replicaPath$file" "ALWAYS"
-			if [ "$direction" == "- >>" ]; then
+			Logger "- $direction $replicaPath$file" "ALWAYS"
+			if [ "$direction" == ">>" ]; then
 				TARGET_DELETES_COUNT=$((TARGET_DELETES_COUNT+1))
-			elif [ "$direction" == "- <<" ]; then
+			elif [ "$direction" == "<<" ]; then
 				INITIATOR_DELETES_COUNT=$((INITIATOR_DELETES_COUNT+1))
 			fi
 		done < "$summaryFile"
@@ -5774,22 +5819,22 @@ function Summary {
 	(
 	_LOGGER_PREFIX=""
 
-	Logger "Attrib updates: INITIATOR << >> TARGET" "ALWAYS"
+	Logger "Attributes only updates: INITIATOR << >> TARGET" "ALWAYS"
 
-	_SummaryFromRsyncFile "${TARGET[$__replicaDir]}" "$RUN_DIR/$PROGRAM.attr-update.target.$SCRIPT_PID.$TSTAMP" "~ >>"
-	_SummaryFromRsyncFile "${INITIATOR[$__replicaDir]}" "$RUN_DIR/$PROGRAM.attr-update.initiator.$SCRIPT_PID.$TSTAMP" "~ <<"
+	_SummaryFromRsyncFile "${TARGET[$__replicaDir]}" "$RUN_DIR/$PROGRAM.attr-update.target.$SCRIPT_PID.$TSTAMP" ">>"
+	_SummaryFromRsyncFile "${INITIATOR[$__replicaDir]}" "$RUN_DIR/$PROGRAM.attr-update.initiator.$SCRIPT_PID.$TSTAMP" "<<"
 
-	Logger "File transfers: INITIATOR << >> TARGET (may include file ownership and timestamp attributes)" "ALWAYS"
-	_SummaryFromRsyncFile "${TARGET[$__replicaDir]}" "$RUN_DIR/$PROGRAM.update.target.$SCRIPT_PID.$TSTAMP" "+ >>"
-	_SummaryFromRsyncFile "${INITIATOR[$__replicaDir]}" "$RUN_DIR/$PROGRAM.update.initiator.$SCRIPT_PID.$TSTAMP" "+ <<"
+	Logger "File transfers and simple deletions: INITIATOR << >> TARGET (may include file ownership and timestamp attributes)" "ALWAYS"
+	_SummaryFromRsyncFile "${TARGET[$__replicaDir]}" "$RUN_DIR/$PROGRAM.update.target.$SCRIPT_PID.$TSTAMP" ">>"
+	_SummaryFromRsyncFile "${INITIATOR[$__replicaDir]}" "$RUN_DIR/$PROGRAM.update.initiator.$SCRIPT_PID.$TSTAMP" "<<"
 
 	Logger "File deletions: INITIATOR << >> TARGET" "ALWAYS"
 	if [ "$REMOTE_OPERATION" == true ]; then
 		_SummaryFromDeleteFile "${TARGET[$__replicaDir]}" "${INITIATOR[$__replicaDir]}${INITIATOR[$__stateDir]}/target${TARGET[$__successDeletedListFile]}" "- >>"
 	else
-		_SummaryFromDeleteFile "${TARGET[$__replicaDir]}" "$RUN_DIR/$PROGRAM.delete.target.$SCRIPT_PID.$TSTAMP" "- >>"
+		_SummaryFromDeleteFile "${TARGET[$__replicaDir]}" "$RUN_DIR/$PROGRAM.delete.target.$SCRIPT_PID.$TSTAMP" ">>"
 	fi
-	_SummaryFromDeleteFile "${INITIATOR[$__replicaDir]}" "$RUN_DIR/$PROGRAM.delete.initiator.$SCRIPT_PID.$TSTAMP" "- <<"
+	_SummaryFromDeleteFile "${INITIATOR[$__replicaDir]}" "$RUN_DIR/$PROGRAM.delete.initiator.$SCRIPT_PID.$TSTAMP" "<<"
 
 	Logger "Initiator has $INITIATOR_UPDATES_COUNT updates." "ALWAYS"
 	Logger "Target has $TARGET_UPDATES_COUNT updates." "ALWAYS"
