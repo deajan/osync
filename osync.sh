@@ -7,7 +7,7 @@ PROGRAM="osync" # Rsync based two way sync engine with fault tolerance
 AUTHOR="(C) 2013-2019 by Orsiris de Jong"
 CONTACT="http://www.netpower.fr/osync - ozy@netpower.fr"
 PROGRAM_VERSION=1.3.0-pre-rc1
-PROGRAM_BUILD=2019052007
+PROGRAM_BUILD=2019052009
 IS_STABLE=false
 
 CONFIG_FILE_REVISION_REQUIRED=1.3.0
@@ -3672,7 +3672,7 @@ ENDSSH
 		return $retval
 	else
 		# Ugly fix for csh in FreeBSD 11 that adds leading and trailing '\"'
-		sed -i.tmp -e 's/^\\"//' -e 's/\\"$//' "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$replicaType.$SCRIPT_PID.$TSTAMP"
+		sed -i'.tmp' -e 's/^\\"//' -e 's/\\"$//' "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$replicaType.$SCRIPT_PID.$TSTAMP"
 		retval=$?
 		if [ $retval -ne 0 ]; then
 			Logger "Cannot fix FreeBSD 11 remote csh syntax." "ERROR"
@@ -3721,13 +3721,13 @@ function conflictList {
 
 	if [ -f "${INITIATOR[$__replicaDir]}${INITIATOR[$__stateDir]}/${INITIATOR[$__type]}$timestampCurrentFilename" ] && [ -f "${INITIATOR[$__replicaDir]}${INITIATOR[$__stateDir]}/${TARGET[$__type]}$timestampCurrentFilename" ]; then
 		# Remove prepending replicaPaths
-		sed -i'.replicaPath' "s;^${INITIATOR[$__replicaDir]};;g" "${INITIATOR[$__replicaDir]}${INITIATOR[$__stateDir]}/${INITIATOR[$__type]}$timestampCurrentFilename"
+		sed -i'.withReplicaPath' "s;^${INITIATOR[$__replicaDir]};;g" "${INITIATOR[$__replicaDir]}${INITIATOR[$__stateDir]}/${INITIATOR[$__type]}$timestampCurrentFilename"
 		retval=$?
 		if [ $retval -ne 0 ]; then
 			Logger "Cannot remove prepending replicaPaths for current initiator timestamp file." "ERROR"
 			return $retval
 		fi
-		sed -i'.replicaPath' "s;^${TARGET[$__replicaDir]};;g" "${INITIATOR[$__replicaDir]}${INITIATOR[$__stateDir]}/${TARGET[$__type]}$timestampCurrentFilename"
+		sed -i'.withReplicaPath' "s;^${TARGET[$__replicaDir]};;g" "${INITIATOR[$__replicaDir]}${INITIATOR[$__stateDir]}/${TARGET[$__type]}$timestampCurrentFilename"
 		retval=$?
 		if [ $retval -ne 0 ]; then
 			Logger "Cannot remove prepending replicaPaths for current target timestamp file." "ERROR"
@@ -3737,13 +3737,13 @@ function conflictList {
 
 	if [ -f "${INITIATOR[$__replicaDir]}${INITIATOR[$__stateDir]}/${INITIATOR[$__type]}$timestampAfterFilename" ] && [ -f "${INITIATOR[$__replicaDir]}${INITIATOR[$__stateDir]}/${TARGET[$__type]}$timestampAfterFilename" ]; then
 		# Remove prepending replicaPaths
-		sed -i'.replicaPath' "s;^${INITIATOR[$__replicaDir]};;g" "${INITIATOR[$__replicaDir]}${INITIATOR[$__stateDir]}/${INITIATOR[$__type]}$timestampAfterFilename"
+		sed -i'.withReplicaPath' "s;^${INITIATOR[$__replicaDir]};;g" "${INITIATOR[$__replicaDir]}${INITIATOR[$__stateDir]}/${INITIATOR[$__type]}$timestampAfterFilename"
 		retval=$?
 		if [ $retval -ne 0 ]; then
 			Logger "Cannot remove prepending replicaPaths for after initiator timestamp file." "ERROR"
 			return $retval
 		fi
-		sed -i'.replicaPath' "s;^${TARGET[$__replicaDir]};;g" "${INITIATOR[$__replicaDir]}${INITIATOR[$__stateDir]}/${TARGET[$__type]}$timestampAfterFilename"
+		sed -i'.withReplicaPath' "s;^${TARGET[$__replicaDir]};;g" "${INITIATOR[$__replicaDir]}${INITIATOR[$__stateDir]}/${TARGET[$__type]}$timestampAfterFilename"
 		retval=$?
 		if [ $retval -ne 0 ]; then
 			Logger "Cannot remove prepending replicaPaths for after target timestamp file." "ERROR"
@@ -4446,7 +4446,6 @@ function Initialize {
 			fi
 		done
 		exit 1
-		resumeTarget="${SYNC_ACTION[8]}"
 	fi
 
 	timestampList "${INITIATOR[$__replicaDir]}" "${INITIATOR[$__type]}" "${INITIATOR[$__replicaDir]}${INITIATOR[$__stateDir]}/${INITIATOR[$__type]}${INITIATOR[$__treeAfterFile]}" "${INITIATOR[$__replicaDir]}${INITIATOR[$__stateDir]}/${INITIATOR[$__type]}${INITIATOR[$__timestampAfterFile]}" &
@@ -4469,7 +4468,6 @@ function Initialize {
 			fi
 		done
 		exit 1
-		resumeTarget="${SYNC_ACTION[8]}"
 	fi
 
 }
