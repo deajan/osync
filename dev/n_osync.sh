@@ -7,7 +7,7 @@ PROGRAM="osync" # Rsync based two way sync engine with fault tolerance
 AUTHOR="(C) 2013-2019 by Orsiris de Jong"
 CONTACT="http://www.netpower.fr/osync - ozy@netpower.fr"
 PROGRAM_VERSION=1.3.0-pre-rc1
-PROGRAM_BUILD=2019052002
+PROGRAM_BUILD=2019052003
 IS_STABLE=false
 
 CONFIG_FILE_REVISION_REQUIRED=1.3.0
@@ -2939,8 +2939,8 @@ function GetCommandlineArguments {
 		Usage
 	fi
 
-	for i in "$@"; do
-		case $i in
+	for i in "${@}"; do
+		case "$i" in
 			--dry)
 			_DRYRUN=true
 			opts=$opts" --dry"
@@ -2974,33 +2974,33 @@ function GetCommandlineArguments {
 			;;
 			--initiator=*)
 			_QUICK_SYNC=$(($_QUICK_SYNC + 1))
-			INITIATOR_SYNC_DIR=${i##*=}
+			INITIATOR_SYNC_DIR="${i##*=}"
 			opts=$opts" --initiator=\"$INITIATOR_SYNC_DIR\""
 			;;
 			--target=*)
 			_QUICK_SYNC=$(($_QUICK_SYNC + 1))
-			TARGET_SYNC_DIR=${i##*=}
+			TARGET_SYNC_DIR="${i##*=}"
 			opts=$opts" --target=\"$TARGET_SYNC_DIR\""
 			;;
 			--rsakey=*)
-			SSH_RSA_PRIVATE_KEY=${i##*=}
+			SSH_RSA_PRIVATE_KEY="${i##*=}"
 			opts=$opts" --rsakey=\"$SSH_RSA_PRIVATE_KEY\""
 			;;
 			--password-file=*)
-			SSH_PASSWORD_FILE=${i##*=}
+			SSH_PASSWORD_FILE="${i##*=}"
 			opts=$opts" --password-file=\"$SSH_PASSWORD_FILE\""
 			;;
 			--instance-id=*)
-			INSTANCE_ID=${i##*=}
+			INSTANCE_ID="${i##*=}"
 			opts=$opts" --instance-id=\"$INSTANCE_ID\""
 			;;
 			--skip-deletion=*)
 			opts=$opts" --skip-deletion=\"${i##*=}\""
-			SKIP_DELETION=${i##*=}
+			SKIP_DELETION="${i##*=}"
 			;;
 			--sync-type=*)
 			opts=$opts" --sync-type=\"${i##*=}\""
-			SYNC_TYPE=${i##*=}
+			SYNC_TYPE="${i##*=}"
 			;;
 			--on-changes)
 			_SYNC_ON_CHANGES="initiator"
@@ -3045,10 +3045,10 @@ function GetCommandlineArguments {
 			_LOGGER_PREFIX=""
 			;;
 			--destination-mails=*)
-			DESTINATION_MAILS=${i##*=}
+			DESTINATION_MAILS="${i##*=}"
 			;;
 			--remote-token=*)
-			_REMOTE_TOKEN=${i##*=}
+			_REMOTE_TOKEN="${i##*=}"
 			;;
 			*)
 			if [ $isFirstArgument == false ]; then
@@ -3064,7 +3064,7 @@ function GetCommandlineArguments {
 	opts="${opts# *}"
 }
 
-GetCommandlineArguments "$@"
+GetCommandlineArguments "${@}"
 
 ## Here we set default options for quicksync tasks when no configuration file is provided.
 if [ $_QUICK_SYNC -eq 2 ]; then
