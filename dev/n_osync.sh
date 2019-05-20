@@ -7,7 +7,7 @@ PROGRAM="osync" # Rsync based two way sync engine with fault tolerance
 AUTHOR="(C) 2013-2019 by Orsiris de Jong"
 CONTACT="http://www.netpower.fr/osync - ozy@netpower.fr"
 PROGRAM_VERSION=1.3.0-pre-rc1
-PROGRAM_BUILD=2019051903
+PROGRAM_BUILD=2019052001
 IS_STABLE=false
 
 CONFIG_FILE_REVISION_REQUIRED=1.3.0
@@ -2386,9 +2386,6 @@ function _SummaryFromRsyncFile {
 
 	__CheckArguments 3 $# "$@"	#__WITH_PARANOIA_DEBUG
 
-	INITIATOR_UPDATES_COUNT=0
-	TARGET_UPDATES_COUNT=0
-
 	if [ -f "$summaryFile" ]; then
 		while read -r file; do
 			# grep -E "^<|^>|^\." = Remove all lines that do not begin with <, > or . to deal with a bizarre bug involving rsync 3.0.6 / CentOS 6 and --skip-compress showing 'adding zip' line for every skipped compressed extension
@@ -2411,9 +2408,6 @@ function _SummaryFromDeleteFile {
 	local direction="${3}"
 
 	__CheckArguments 3 $# "$@"	#__WITH_PARANOIA_DEBUG
-
-	INITIATOR_DELETES_COUNT=0
-	TARGET_DELETES_COUNT=0
 
 	if [ -f "$summaryFile" ]; then
 		while read -r file; do
@@ -2922,6 +2916,12 @@ fi
 if [ "$MAX_WAIT" == "" ]; then
 	MAX_WAIT=7200
 fi
+
+# Global counters for --summary
+INITIATOR_UPDATES_COUNT=0
+TARGET_UPDATES_COUNT=0
+INITIATOR_DELETES_COUNT=0
+TARGET_DELETES_COUNT=0
 
 function GetCommandlineArguments {
 	local isFirstArgument=true
