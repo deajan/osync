@@ -7,7 +7,7 @@ PROGRAM="osync" # Rsync based two way sync engine with fault tolerance
 AUTHOR="(C) 2013-2019 by Orsiris de Jong"
 CONTACT="http://www.netpower.fr/osync - ozy@netpower.fr"
 PROGRAM_VERSION=1.3.0-pre-rc1
-PROGRAM_BUILD=2019052009
+PROGRAM_BUILD=2019052010
 IS_STABLE=false
 
 CONFIG_FILE_REVISION_REQUIRED=1.3.0
@@ -5537,7 +5537,8 @@ function _SummaryFromRsyncFile {
 			# grep -E "^<|^>|^\." = Remove all lines that do not begin with '<', '>' or '.' to deal with a bizarre bug involving rsync 3.0.6 / CentOS 6 and --skip-compress showing 'adding zip' line for every skipped compressed extension
 			if echo "$file" | grep -E "^<|^>|^\." > /dev/null 2>&1; then
 				# awk removes first part of line until space, then show all others
-				Logger "+ $direction $replicaPath$(echo $file | awk '{for (i=2; i<NF; i++) printf $i " "; print $NF}')" "ALWAYS"
+				# We don't use awk '$1="";print $0' since it would keep a space as first character
+				Logger "+ $direction $replicaPath$(echo "$file" | awk '{for (i=2; i<NF; i++) printf $i " "; print $NF}')" "ALWAYS"
 				if [ "$direction" == ">>" ]; then
 					TARGET_UPDATES_COUNT=$((TARGET_UPDATES_COUNT+1))
 				elif [ "$direction" == "<<" ]; then
@@ -5546,10 +5547,10 @@ function _SummaryFromRsyncFile {
 			fi
 			if echo "$file" | grep -E "\*deleting" > /dev/null 2>&1; then
 				if [ "$direction" == ">>" ]; then
-					Logger "- $direction $replicaPath$(echo $file | awk '{print $2}')" "ALWAYS"
+					Logger "- $direction $replicaPath$(echo "$file" | awk '{for (i=2; i<NF; i++) printf $i " "; print $NF}')" "ALWAYS"
 					TARGET_DELETES_COUNT=$((TARGET_DELETES_COUNT+1))
 				elif [ "$direction" == "<<" ]; then
-					Logger "- $direction $replicaPath$(echo $file | awk '{print $2}')" "ALWAYS"
+					Logger "- $direction $replicaPath$(echo "$file" | awk '{for (i=2; i<NF; i++) printf $i " "; print $NF}')" "ALWAYS"
 					INITIATOR_DELETES_COUNT=$((INITIATOR_DELETES_COUNT+1))
 				fi
 			fi
