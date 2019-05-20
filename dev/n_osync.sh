@@ -6,8 +6,8 @@
 PROGRAM="osync" # Rsync based two way sync engine with fault tolerance
 AUTHOR="(C) 2013-2019 by Orsiris de Jong"
 CONTACT="http://www.netpower.fr/osync - ozy@netpower.fr"
-PROGRAM_VERSION=1.3.0-pre-rc1
-PROGRAM_BUILD=2019052011
+PROGRAM_VERSION=1.3.0-beta2
+PROGRAM_BUILD=2019052012
 IS_STABLE=false
 
 CONFIG_FILE_REVISION_REQUIRED=1.3.0
@@ -183,7 +183,6 @@ function CheckCurrentConfig {
 	# v2 config will use true / false instead of yes / no
 	# Check all variables that should contain "yes" or "no", true or false
 	for i in "${booleans[@]}"; do
-		#test="if [ \"\$$i\" != \"yes\" ] && [ \"\$$i\" != \"no\" ] && [ \"\$$i\" != true ] && [ \"\$$i\" != false ]; then Logger \"Bogus $i value [\$$i] defined in config file. Correct your config file or update it using the update script if using and old version.\" \"CRITICAL\"; exit 1; fi"
 		test="if [ \"\$$i\" != true ] && [ \"\$$i\" != false ]; then Logger \"Bogus $i value [\$$i] defined in config file. Correct your config file or update it using the update script if using and old version.\" \"CRITICAL\"; exit 1; fi"
 		eval "$test"
 		# Fix for upcomming v2 where yes and no do not exist anymore
