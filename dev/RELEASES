@@ -10,6 +10,7 @@ Run program and then use declare -p to find any leaked variables that should not
 	- ./shellcheck.sh ../install.sh
 	- ./shellcheck.sh ../osync-batch.sh
 	- ./shellcheck.sh ../ssh_filter.sh
+- Unexpansion of main and subprograms must be done
 - Arch repo must be updated
 - Source must be put to download on www.netpower.fr/osync
 - Tests must be run against all supported operating systems via run_tests.sh

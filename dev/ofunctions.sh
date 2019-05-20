@@ -149,17 +149,17 @@ function PoorMansRandomGenerator {
 	fi
 }
 function PoorMansRandomGenerator {
-        local digits="${1}" # The number of digits to generate
-        local number
+	local digits="${1}" # The number of digits to generate
+	local number
 
-        # Some read bytes can't be used, se we read twice the number of required bytes
-        dd if=/dev/urandom bs=$digits count=2 2> /dev/null | while read -r -n1 char; do
-                number=$number$(printf "%d" "'$char")
-                if [ ${#number} -ge $digits ]; then
-                        echo ${number:0:$digits}
-                        break;
-                fi
-        done
+	# Some read bytes can't be used, se we read twice the number of required bytes
+	dd if=/dev/urandom bs=$digits count=2 2> /dev/null | while read -r -n1 char; do
+		number=$number$(printf "%d" "'$char")
+		if [ ${#number} -ge $digits ]; then
+			echo ${number:0:$digits}
+			break;
+		fi
+	done
 }
 #### PoorMansRandomGenerator SUBSET END ####
 
@@ -491,15 +491,15 @@ function SendAlert {
 		return 0
 	fi
 
-        if [ $attachment == true ]; then
-                attachmentFile="$LOG_FILE"
-                if type "$COMPRESSION_PROGRAM" > /dev/null 2>&1; then
-                        eval "cat \"$LOG_FILE\" \"$COMPRESSION_PROGRAM\" > \"$ALERT_LOG_FILE\""
-                        if [ $? -eq 0 ]; then
-                                attachmentFile="$ALERT_LOG_FILE"
-                        fi
-                fi
-        fi
+	if [ $attachment == true ]; then
+		attachmentFile="$LOG_FILE"
+		if type "$COMPRESSION_PROGRAM" > /dev/null 2>&1; then
+			eval "cat \"$LOG_FILE\" \"$COMPRESSION_PROGRAM\" > \"$ALERT_LOG_FILE\""
+			if [ $? -eq 0 ]; then
+				attachmentFile="$ALERT_LOG_FILE"
+			fi
+		fi
+	fi
 
 	body="$MAIL_ALERT_MSG"$'\n\n'"Last 1000 lines of current log"$'\n\n'"$(tail -n 1000 "$RUN_DIR/$PROGRAM._Logger.$SCRIPT_PID.$TSTAMP.log")"
 
