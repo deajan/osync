@@ -162,7 +162,7 @@ FORCE_STRANGER_LOCK_RESUME=false
 ## Keep partial uploads that can be resumed on next run, experimental feature
 PARTIAL=false
 
-## Use delta copy algortithm (usefull when local paths are network drives), defaults to yes
+## Use delta copy algortithm (usefull when local paths are network drives), defaults to true
 DELTA_COPIES=true
 
 [ALERT_OPTIONS]
