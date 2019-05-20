@@ -7,7 +7,7 @@ PROGRAM="osync" # Rsync based two way sync engine with fault tolerance
 AUTHOR="(C) 2013-2019 by Orsiris de Jong"
 CONTACT="http://www.netpower.fr/osync - ozy@netpower.fr"
 PROGRAM_VERSION=1.3.0-beta2
-PROGRAM_BUILD=2019052012
+PROGRAM_BUILD=2019052013
 IS_STABLE=false
 
 CONFIG_FILE_REVISION_REQUIRED=1.3.0
@@ -649,23 +649,19 @@ function HandleLocks {
 				targetLockSuccess=false
 			fi
 		done
-
-		#WIP refactor the following
-		if [ $initiatorLockSuccess  == true ]; then
-			INITIATOR_LOCK_FILE_EXISTS=true
-		fi
-		if [ $targetLockSuccess == true ]; then
-			TARGET_LOCK_FILE_EXISTS=true
-		fi
-			Logger "Cancelling task." "CRITICAL" $retval
-		exit 1
 	fi
+
 
 	if [ $initiatorLockSuccess  == true ]; then
 		INITIATOR_LOCK_FILE_EXISTS=true
 	fi
 	if [ $targetLockSuccess == true ]; then
 		TARGET_LOCK_FILE_EXISTS=true
+	fi
+
+	if [ $retval -ne 0 ]; then
+		Logger "Cancelling task." "CRITICAL" $retval
+		exit 1
 	fi
 }
 
