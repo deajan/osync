@@ -663,11 +663,11 @@ function HandleLocks {
 	fi
 
 	if [ $initiatorLockSuccess  == true ]; then
-                INITIATOR_LOCK_FILE_EXISTS=true
-        fi
-        if [ $targetLockSuccess == true ]; then
-                TARGET_LOCK_FILE_EXISTS=true
-        fi
+		INITIATOR_LOCK_FILE_EXISTS=true
+	fi
+	if [ $targetLockSuccess == true ]; then
+		TARGET_LOCK_FILE_EXISTS=true
+	fi
 }
 
 function _UnlockReplicasLocal {
@@ -2428,32 +2428,32 @@ function _SummaryFromRsyncFile {
 	__CheckArguments 3 $# "$@"	#__WITH_PARANOIA_DEBUG
 
 	if [ -f "$summaryFile" ]; then
-                while read -r file; do
-                        # grep -E "^<|^>|^\." = Remove all lines that do not begin with '<', '>' or '.' to deal with a bizarre bug involving rsync 3.0.6 / CentOS 6 and --skip-compress showing 'adding zip' l$
-                        if echo "$file" | grep -E "^<|^>|^\.|^\*" > /dev/null 2>&1; then
-                                # Check for time attribute changes only (eg rsync output '.d..t......'
-                                if echo "$file" | grep -E "\..\.\.t\.\.\.\.\.\." > /dev/null 2>&1; then
-                                        verb="TIMESTAMP"
-                                elif echo "$file" | grep -E "\*deleting" > /dev/null 2>&1; then
-                                        verb="DELETE"
-                                        if [ "$direction" == ">>" ]; then
-                                                TARGET_DELETES_COUNT=$((TARGET_DELETES_COUNT+1))
-                                        elif [ "$direction" == "<<" ]; then
-                                                INITIATOR_DELETES_COUNT=$((INITIATOR_DELETES_COUNT+1))
-                                        fi
-                                else
-                                        verb="UPDATE"
-                                        if [ "$direction" == ">>" ]; then
-                                                TARGET_UPDATES_COUNT=$((TARGET_UPDATES_COUNT+1))
-                                        elif [ "$direction" == "<<" ]; then
-                                                INITIATOR_UPDATES_COUNT=$((INITIATOR_UPDATES_COUNT+1))
-                                        fi
-                                fi
-                                # awk removes first part of line until space, then show all others
-                                # We don't use awk '$1="";print $0' since it would keep a space as first character
-                                Logger "$verb $direction $replicaPath$(echo "$file" | awk '{for (i=2; i<NF; i++) printf $i " "; print $NF}')" "ALWAYS"
-                        fi
-                done < "$summaryFile"
+		while read -r file; do
+			# grep -E "^<|^>|^\." = Remove all lines that do not begin with '<', '>' or '.' to deal with a bizarre bug involving rsync 3.0.6 / CentOS 6 and --skip-compress showing 'adding zip' l$
+			if echo "$file" | grep -E "^<|^>|^\.|^\*" > /dev/null 2>&1; then
+				# Check for time attribute changes only (eg rsync output '.d..t......'
+				if echo "$file" | grep -E "\..\.\.t\.\.\.\.\.\." > /dev/null 2>&1; then
+					verb="TIMESTAMP"
+				elif echo "$file" | grep -E "\*deleting" > /dev/null 2>&1; then
+					verb="DELETE"
+					if [ "$direction" == ">>" ]; then
+						TARGET_DELETES_COUNT=$((TARGET_DELETES_COUNT+1))
+					elif [ "$direction" == "<<" ]; then
+						INITIATOR_DELETES_COUNT=$((INITIATOR_DELETES_COUNT+1))
+					fi
+				else
+					verb="UPDATE"
+					if [ "$direction" == ">>" ]; then
+						TARGET_UPDATES_COUNT=$((TARGET_UPDATES_COUNT+1))
+					elif [ "$direction" == "<<" ]; then
+						INITIATOR_UPDATES_COUNT=$((INITIATOR_UPDATES_COUNT+1))
+					fi
+				fi
+				# awk removes first part of line until space, then show all others
+				# We don't use awk '$1="";print $0' since it would keep a space as first character
+				Logger "$verb $direction $replicaPath$(echo "$file" | awk '{for (i=2; i<NF; i++) printf $i " "; print $NF}')" "ALWAYS"
+			fi
+		done < "$summaryFile"
 	fi
 }
 
@@ -2814,7 +2814,7 @@ function Usage {
 	echo "--force-unlock         Will override any existing active or dead locks on initiator and target replica"
 	echo "--on-changes           Will launch a sync task after a short wait period if there is some file activity on initiator replica. You should try daemon mode instead"
 	echo "--on-changes-target    Will trigger ansync task on initiator if initiator runs daemon mode. You should call this with the osync-target-helper service"
- 	echo "--no-resume            Do not try to resume a failed run. By default, execution is resumed once"
+	echo "--no-resume            Do not try to resume a failed run. By default, execution is resumed once"
 	echo "--initialize           Create file lists without actually synchronizing anything, this will help setup deletion detections before the first run"
 
 	echo ""
