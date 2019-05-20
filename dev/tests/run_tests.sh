@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-# osync test suite 2019051801
+# osync test suite 2019052001
 
 
 # Allows the following environment variables
@@ -41,6 +41,8 @@
 # on BSD, remount UFS with ACL support using mount -o acls /
 # setfacl needs double ':' to be compatible with both linux and BSD
 # setfacl -m o::rwx file
+
+# TODO, use copies of config file on each test function
 
 if [ "$SKIP_REMOTE" = "" ]; then
 	SKIP_REMOTE=false
@@ -328,7 +330,7 @@ function test_Merge () {
 	assertEquals "Install failed" "0" $?
 }
 
-function test_LargeFileSet () {
+function nope_test_LargeFileSet () {
 	for i in "${osyncParameters[@]}"; do
 		cd "$OSYNC_DIR"
 
@@ -346,7 +348,7 @@ function test_LargeFileSet () {
 	done
 }
 
-function test_Exclusions () {
+function nope_test_Exclusions () {
 	# Will sync except php files
 	# RSYNC_EXCLUDE_PATTERN="*.php" is set at runtime for quicksync and in config files for other runs
 
@@ -374,7 +376,7 @@ function test_Exclusions () {
 	done
 }
 
-function test_Deletetion () {
+function nope_test_Deletetion () {
 	local iFile1="$INITIATOR_DIR/i fic"
 	local iFile2="$INITIATOR_DIR/i foc"
 	local tFile1="$TARGET_DIR/t fic"
@@ -418,7 +420,7 @@ function test_Deletetion () {
 	done
 }
 
-function test_deletion_failure () {
+function nope_test_deletion_failure () {
 	if [ "$LOCAL_OS" == "WinNT10" ] || [ "$LOCAL_OS" == "msys" ] || [ "$LOCAL_OS" == "Cygwin" ]; then
 		echo "Skipping deletion failure test as Win10 does not have chattr  support."
 		return 0
@@ -485,7 +487,7 @@ function test_deletion_failure () {
 	done
 }
 
-function test_skip_deletion () {
+function nope_test_skip_deletion () {
 	local modes
 
 	if [ "$OSYNC_MIN_VERSION" == "1" ]; then
@@ -561,7 +563,7 @@ function test_skip_deletion () {
 	SetConfFileValue "$CONF_DIR/$REMOTE_CONF" "SKIP_DELETION" ""
 }
 
-function test_handle_symlinks () {
+function nope_test_handle_symlinks () {
 	if [ "$OSYNC_MIN_VERSION" == "1" ]; then
 		echo "Skipping symlink tests as osync v1.1x didn't handle this."
 		return 0
@@ -742,7 +744,7 @@ function test_handle_symlinks () {
 	done
 }
 
-function test_softdeletion_cleanup () {
+function nope_test_softdeletion_cleanup () {
 	#declare -A files
 
 	files=()
@@ -831,6 +833,11 @@ function test_FileAttributePropagation () {
 		return 0
 	fi
 
+        SetConfFileValue "$CONF_DIR/$LOCAL_CONF" "PRESERVE_ACL" true
+        SetConfFileValue "$CONF_DIR/$LOCAL_CONF" "PRESERVE_XATTR" true
+        SetConfFileValue "$CONF_DIR/$REMOTE_CONF" "PRESERVE_ACL" true
+        SetConfFileValue "$CONF_DIR/$REMOTE_CONF" "PRESERVE_XATTR" true
+
 	for i in "${osyncParameters[@]}"; do
 		cd "$OSYNC_DIR"
 		PrepareLocalDirs
@@ -895,9 +902,14 @@ function test_FileAttributePropagation () {
 		getfacl "$INITIATOR_DIR/$DirD" | grep "other::-wx" > /dev/null
 		assertEquals "ACLs matched original value on initiator subdirectory." "0" $?
 	done
+
+        SetConfFileValue "$CONF_DIR/$LOCAL_CONF" "PRESERVE_ACL" false
+        SetConfFileValue "$CONF_DIR/$LOCAL_CONF" "PRESERVE_XATTR" false
+        SetConfFileValue "$CONF_DIR/$REMOTE_CONF" "PRESERVE_ACL" false
+        SetConfFileValue "$CONF_DIR/$REMOTE_CONF" "PRESERVE_XATTR" false
 }
 
-function test_ConflictBackups () {
+function nope_test_ConflictBackups () {
 	for i in "${osyncParameters[@]}"; do
 		cd "$OSYNC_DIR"
 		PrepareLocalDirs
@@ -933,7 +945,7 @@ function test_ConflictBackups () {
 	done
 }
 
-function test_MultipleConflictBackups () {
+function nope_test_MultipleConflictBackups () {
 
 	local additionalParameters
 
@@ -995,7 +1007,7 @@ function test_MultipleConflictBackups () {
 	SetConfFileValue "$CONF_DIR/$REMOTE_CONF" "CONFLICT_BACKUP_MULTIPLE" false
 }
 
-function test_Locking () {
+function nope_test_Locking () {
 # local not running = resume
 # remote same instance_id = resume
 # remote different instance_id = stop
@@ -1153,7 +1165,7 @@ function nope_test_ConflictDetetion () {
 	return 0
 }
 
-function test_WaitForTaskCompletion () {
+function nope_test_WaitForTaskCompletion () {
 	local pids
 
 	# Tests compatible with v1.1 syntax
@@ -1247,7 +1259,7 @@ function test_WaitForTaskCompletion () {
 	assertEquals "WaitForTaskCompletion test 5" "2" $?
 }
 
-function test_ParallelExec () {
+function nope_test_ParallelExec () {
 	if [ "$OSYNC_MIN_VERSION" == "1" ]; then
 		echo "Skipping ParallelExec test because osync v1.1 ofunctions don't have this function."
 		return 0
@@ -1308,7 +1320,7 @@ function test_ParallelExec () {
 	assertNotEquals "ParallelExec full test 3" "0" $?
 }
 
-function test_timedExecution () {
+function nope_test_timedExecution () {
 	local arguments
 	local warnExitCode
 
@@ -1355,7 +1367,7 @@ function test_timedExecution () {
 	done
 }
 
-function test_UpgradeConfRun () {
+function nope_test_UpgradeConfRun () {
 	if [ "$OSYNC_MIN_VERSION" == "1" ]; then
 		echo "Skipping Upgrade script test because no further dev will happen on this for v1.1"
 		return 0
@@ -1381,7 +1393,7 @@ function test_UpgradeConfRun () {
 	rm -f "$CONF_DIR/$TMP_OLD_CONF.save"
 }
 
-function test_DaemonMode () {
+function nope_test_DaemonMode () {
 	if [ "$LOCAL_OS" == "WinNT10" ] || [ "$LOCAL_OS" == "msys" ] || [ "$LOCAL_OS" == "Cygwin" ]; then
 		echo "Skipping daemon mode test as [$LOCAL_OS] does not have inotifywait support."
 		return 0
@@ -1437,7 +1449,7 @@ function test_DaemonMode () {
 
 }
 
-function test_NoRemoteAccessTest () {
+function nope_test_NoRemoteAccessTest () {
 	RemoveSSH
 
 	cd "$OSYNC_DIR"
