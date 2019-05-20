@@ -7,7 +7,7 @@ PROGRAM="osync" # Rsync based two way sync engine with fault tolerance
 AUTHOR="(C) 2013-2019 by Orsiris de Jong"
 CONTACT="http://www.netpower.fr/osync - ozy@netpower.fr"
 PROGRAM_VERSION=1.3.0-pre-rc1
-PROGRAM_BUILD=2019052005
+PROGRAM_BUILD=2019052006
 IS_STABLE=false
 
 CONFIG_FILE_REVISION_REQUIRED=1.3.0
@@ -1699,23 +1699,23 @@ function Sync {
 			if [ -f "${INITIATOR[$__initiatorLastActionFile]}" ]; then
 				resumeInitiator=$(cat "${INITIATOR[$__initiatorLastActionFile]}")
 			else
-				resumeInitiator="synced"
+				resumeInitiator="${SYNC_ACTION[9]}"
 			fi
 
 			if [ -f "${INITIATOR[$__targetLastActionFile]}" ]; then
 				resumeTarget=$(cat "${INITIATOR[$__targetLastActionFile]}")
 			else
-				resumeTarget="synced"
+				resumeTarget="${SYNC_ACTION[9]}"
 			fi
 
-			if [ "$resumeInitiator" != "synced" ]; then
+			if [ "$resumeInitiator" != "${SYNC_ACTION[9]}" ]; then
 				Logger "Trying to resume aborted execution on $($STAT_CMD "${INITIATOR[$__initiatorLastActionFile]}") at task [$resumeInitiator] for initiator. [$resumeCount] previous tries." "NOTICE"
 				echo $((resumeCount+1)) > "${INITIATOR[$__resumeCount]}"
 			else
 				resumeInitiator="none"
 			fi
 
-			if [ "$resumeTarget" != "synced" ]; then
+			if [ "$resumeTarget" != "${SYNC_ACTION[9]}" ]; then
 				Logger "Trying to resume aborted execution on $($STAT_CMD "${INITIATOR[$__targetLastActionFile]}") as task [$resumeTarget] for target. [$resumeCount] previous tries." "NOTICE"
 				echo $((resumeCount+1)) > "${INITIATOR[$__resumeCount]}"
 			else
