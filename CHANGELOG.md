@@ -8,24 +8,25 @@ dd Mmm YYYY: osync v1.3 release (for full changelog since v1.2 branch see all v1
 
 dd Mmm YYYY: osync v1.3-RC1 release
 
-- Deprecated --log-conflicts for 1.3 branch
+- More --summary statistics
 - Config file syntax now uses booleans instead of yes / no (but still accepts old syntax)
 	- Added boolean update in upgrade script
 - Config file revision check
 	- Added config file revision in upgrade script
-! New option --sync=bidir|initator2target|target2initiator #147
-! new option FORCE_CONFLICT_PREVALANCE which will always use Initiator or Target, regardless of best time
+- ! New option --sync=bidir|initator2target|target2initiator #147
+- ! new option FORCE_CONFLICT_PREVALANCE which will always use Initiator or Target, regardless of best time
 - New osync target helper service
-        ! - installer
-        ! - destination mails etc on target, also, no cmd after on configs
+	- ! installer
+	- ! destination mails etc on target, also, no cmd after on configs
 - Fixed multiple race conditions in parallel executions (which also fixes random conflict logs failures)
 - Fixed directory softdeletion bug
 - Fixed multiple failed deletions will be retried as many times as failures happened
 - Fixed remote running on FreeBSD for some commands, thanks to Vladimirek
 - Fixed (again) deletion propagation when file contains spaces (thanks to http://github.com/weinhold)
+- Deprecated --log-conflicts for 1.3 branch
 - Updated ofunctions
-        - Has better random number generator
-        - IsInteger, IsNumeric and IsNumericExpand are now busybox compatible
+	- Has better random number generator
+	- IsInteger, IsNumeric and IsNumericExpand are now busybox compatible
 - Multiple installer fixes
 - Multiple batch fixes
 
