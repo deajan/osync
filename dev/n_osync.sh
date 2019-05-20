@@ -1847,7 +1847,7 @@ function Sync {
 	## Step 2a & 2b
 	if [ "$resumeInitiator" == "${SYNC_ACTION[2]}" ] || [ "$resumeTarget" == "${SYNC_ACTION[2]}" ]; then
 		#if [[ "$RSYNC_ATTR_ARGS" == *"-X"* ]] || [[ "$RSYNC_ATTR_ARGS" == *"-A"* ]] || [ "$LOG_CONFLICTS" == true ]; then
-		#TODO: refactor in v1.3 with syncattrs
+		#TODO: refactor in v1.4 with syncattrs
 		if [ "$LOG_CONFLICTS" == true ]; then
 
 			if [ "$resumeInitiator" == "${SYNC_ACTION[2]}" ]; then
@@ -2103,7 +2103,7 @@ function Sync {
 	# Step 8a & 8b
 	if [ "$resumeInitiator" == "${SYNC_ACTION[8]}" ] || [ "$resumeTarget" == "${SYNC_ACTION[8]}" ]; then
 		#if [[ "$RSYNC_ATTR_ARGS" == *"-X"* ]] || [[ "$RSYNC_ATTR_ARGS" == *"-A"* ]] || [ "$LOG_CONFLICTS" == true ]; then
-		#TODO: refactor in v1.3 with syncattrs
+		#TODO: refactor in v1.4 with syncattrs
 		if [ "$LOG_CONFLICTS" == true ]; then
 
 			if [ "$resumeInitiator" == "${SYNC_ACTION[8]}" ]; then
