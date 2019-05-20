@@ -7,7 +7,7 @@ PROGRAM="osync" # Rsync based two way sync engine with fault tolerance
 AUTHOR="(C) 2013-2019 by Orsiris de Jong"
 CONTACT="http://www.netpower.fr/osync - ozy@netpower.fr"
 PROGRAM_VERSION=1.3.0-pre-rc1
-PROGRAM_BUILD=2019052003
+PROGRAM_BUILD=2019052004
 IS_STABLE=false
 
 CONFIG_FILE_REVISION_REQUIRED=1.3.0
@@ -1702,14 +1702,14 @@ function Sync {
 
 			if [ "$resumeInitiator" != "synced" ]; then
 				Logger "Trying to resume aborted execution on $($STAT_CMD "${INITIATOR[$__initiatorLastActionFile]}") at task [$resumeInitiator] for initiator. [$resumeCount] previous tries." "NOTICE"
-				echo $(($resumeCount+1)) > "${INITIATOR[$__resumeCount]}"
+				echo $((resumeCount+1)) > "${INITIATOR[$__resumeCount]}"
 			else
 				resumeInitiator="none"
 			fi
 
 			if [ "$resumeTarget" != "synced" ]; then
 				Logger "Trying to resume aborted execution on $($STAT_CMD "${INITIATOR[$__targetLastActionFile]}") as task [$resumeTarget] for target. [$resumeCount] previous tries." "NOTICE"
-				echo $(($resumeCount+1)) > "${INITIATOR[$__resumeCount]}"
+				echo $((resumeCount+1)) > "${INITIATOR[$__resumeCount]}"
 			else
 				resumeTarget="none"
 			fi
@@ -2973,12 +2973,12 @@ function GetCommandlineArguments {
 			Usage
 			;;
 			--initiator=*)
-			_QUICK_SYNC=$(($_QUICK_SYNC + 1))
+			_QUICK_SYNC=$((_QUICK_SYNC + 1))
 			INITIATOR_SYNC_DIR="${i##*=}"
 			opts=$opts" --initiator=\"$INITIATOR_SYNC_DIR\""
 			;;
 			--target=*)
-			_QUICK_SYNC=$(($_QUICK_SYNC + 1))
+			_QUICK_SYNC=$((_QUICK_SYNC + 1))
 			TARGET_SYNC_DIR="${i##*=}"
 			opts=$opts" --target=\"$TARGET_SYNC_DIR\""
 			;;

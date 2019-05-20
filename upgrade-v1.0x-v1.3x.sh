@@ -565,11 +565,11 @@ do
 	case $i in
 		--master=*)
 		MASTER_SYNC_DIR=${i##*=}
-		_QUICK_SYNC=$(($_QUICK_SYNC + 1))
+		_QUICK_SYNC=$((_QUICK_SYNC + 1))
 		;;
 		--slave=*)
 		SLAVE_SYNC_DIR=${i##*=}
-		_QUICK_SYNC=$(($_QUICK_SYNC + 1))
+		_QUICK_SYNC=$((_QUICK_SYNC + 1))
 		;;
 		--rsakey=*)
 		SSH_RSA_PRIVATE_KEY=${i##*=}
