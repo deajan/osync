@@ -238,7 +238,7 @@ function CheckCurrentConfigAll {
 		tmp="$SKIP_DELETION"
 		IFS=',' read -r -a SKIP_DELETION <<< "$tmp"
 		if [ $(ArrayContains "${INITIATOR[$__type]}" "${SKIP_DELETION[@]}") -eq 0 ] && [ $(ArrayContains "${TARGET[$__type]}" "${SKIP_DELETION[@]}") -eq 0 ]; then
-			Logger "Bogus skip deletion parameter [$SKIP_DELETION]." "CRITICAL"
+			Logger "Bogus skip deletion parameter [${SKIP_DELETION[@]}]." "CRITICAL"
 			exit 1
 		fi
 	fi
