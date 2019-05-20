@@ -147,6 +147,9 @@ SOFT_DELETE_DAYS=30
 ## Optional deletion skip on replicas. Valid values are "initiator", "target", or "initiator,target"
 SKIP_DELETION=
 
+## Optional sync type. By default, osync is bidirectional. You may want to use osync as unidirectional sync in some circumstances. Valid values are "initiator2target" or "target2initiator"
+SYNC_TYPE=
+
 [RESUME_OPTIONS]
 
 ## Try to resume an aborted sync task

@@ -7,7 +7,7 @@ PROGRAM="osync" # Rsync based two way sync engine with fault tolerance
 AUTHOR="(C) 2013-2019 by Orsiris de Jong"
 CONTACT="http://www.netpower.fr/osync - ozy@netpower.fr"
 PROGRAM_VERSION=1.3.0-pre-rc1
-PROGRAM_BUILD=2019052001
+PROGRAM_BUILD=2019052002
 IS_STABLE=false
 
 CONFIG_FILE_REVISION_REQUIRED=1.3.0
@@ -240,6 +240,13 @@ function CheckCurrentConfigAll {
 		IFS=',' read -r -a SKIP_DELETION <<< "$tmp"
 		if [ $(ArrayContains "${INITIATOR[$__type]}" "${SKIP_DELETION[@]}") -eq 0 ] && [ $(ArrayContains "${TARGET[$__type]}" "${SKIP_DELETION[@]}") -eq 0 ]; then
 			Logger "Bogus skip deletion parameter [$SKIP_DELETION]." "CRITICAL"
+			exit 1
+		fi
+	fi
+
+	if [ "$SYNC_TYPE" != "" ]; then
+		if [ "$SYNC_TYPE" != "initiator2target" ] && [ "$SYNC_TYPE" != "target2initiator" ]; then
+			Logger "Bogus sync type parameter [$SYNC_TYPE]." "CRITICAL"
 			exit 1
 		fi
 	fi
@@ -2771,6 +2778,7 @@ function Usage {
 	echo "--remote-token=\"\"       When using ssh filter protection, you must specify the remote token set in ssh_filter.sh"
 	echo "--instance-id=\"\"	Optional sync task name to identify this synchronization task when using multiple targets"
 	echo "--skip-deletion=\"\"      You may skip deletion propagation on initiator or target. Valid values: initiator target initiator,target"
+	echo "--sync-type=\"\"          Allows osync to run in unidirectional sync mode. Valid values: initiator2target, target2initiator"
 	echo "--destination-mails=\"\"  Double quoted list of space separated email addresses to send alerts to"
 	echo ""
 	echo "Additionaly, you may set most osync options at runtime. eg:"
@@ -2989,6 +2997,10 @@ function GetCommandlineArguments {
 			--skip-deletion=*)
 			opts=$opts" --skip-deletion=\"${i##*=}\""
 			SKIP_DELETION=${i##*=}
+			;;
+			--sync-type=*)
+			opts=$opts" --sync-type=\"${i##*=}\""
+			SYNC_TYPE=${i##*=}
 			;;
 			--on-changes)
 			_SYNC_ON_CHANGES="initiator"
