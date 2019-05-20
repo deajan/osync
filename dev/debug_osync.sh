@@ -7,7 +7,7 @@ PROGRAM="osync" # Rsync based two way sync engine with fault tolerance
 AUTHOR="(C) 2013-2019 by Orsiris de Jong"
 CONTACT="http://www.netpower.fr/osync - ozy@netpower.fr"
 PROGRAM_VERSION=1.3.0-beta2
-PROGRAM_BUILD=2019052016
+PROGRAM_BUILD=2019052101
 IS_STABLE=false
 
 CONFIG_FILE_REVISION_REQUIRED=1.3.0
@@ -6449,6 +6449,11 @@ function GetCommandlineArguments {
 
 	# Remove leading space if there is one
 	opts="${opts# *}"
+
+	# Fix when reloading GetCommandlineArguments
+	if [ $_QUICK_SYNC -gt 2 ]; then
+		_QUICK_SYNC=2
+	fi
 }
 
 GetCommandlineArguments "${@}"
@@ -6508,7 +6513,7 @@ else
 	exit 1
 fi
 
-# Reload GetCommandLineArguments so we can override config file with run time arguments
+# Reload GetCommandlineArguments so we can override config file with run time arguments
 GetCommandlineArguments "${@}"
 
 if [ "$LOGFILE" == "" ]; then
