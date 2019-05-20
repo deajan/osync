@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-# osync test suite 2019052001
+# osync test suite 2019052002
 
 
 # Allows the following environment variables
@@ -1115,10 +1115,10 @@ function test_Locking () {
 }
 
 function test_ConflictDetetion () {
-	# Tests compatible with v1.3+
+	# Tests compatible with v1.4+
 
-	if [ $OSYNC_MIN_VERSION -lt 3 ]; then
-		echo "Skipping conflict detection test because osync min version is $OSYNC_MIN_VERSION (must be 3 at least)."
+	if [ $OSYNC_MIN_VERSION -lt 4 ]; then
+		echo "Skipping conflict detection test because osync min version is $OSYNC_MIN_VERSION (must be 4 at least)."
 		return 0
 	fi
 
