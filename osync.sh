@@ -7,7 +7,7 @@ PROGRAM="osync" # Rsync based two way sync engine with fault tolerance
 AUTHOR="(C) 2013-2019 by Orsiris de Jong"
 CONTACT="http://www.netpower.fr/osync - ozy@netpower.fr"
 PROGRAM_VERSION=1.3.0-pre-rc1
-PROGRAM_BUILD=2019051903
+PROGRAM_BUILD=2019052004
 IS_STABLE=false
 
 CONFIG_FILE_REVISION_REQUIRED=1.3.0
@@ -1432,7 +1432,7 @@ function GetLocalOS {
 		localOsName=$(GetConfFileValue "/etc/os-release" "NAME" true)
 		localOsVer=$(GetConfFileValue "/etc/os-release" "VERSION" true)
 	elif [ "$LOCAL_OS" == "BusyBox" ]; then
-		localOsVer=`ls --help 2>&1 | head -1 | cut -f2 -d' '`
+		localOsVer=$(ls --help 2>&1 | head -1 | cut -f2 -d' ')
 		localOsName="BusyBox"
 	fi
 
@@ -2424,6 +2424,13 @@ function CheckCurrentConfigAll {
 		IFS=',' read -r -a SKIP_DELETION <<< "$tmp"
 		if [ $(ArrayContains "${INITIATOR[$__type]}" "${SKIP_DELETION[@]}") -eq 0 ] && [ $(ArrayContains "${TARGET[$__type]}" "${SKIP_DELETION[@]}") -eq 0 ]; then
 			Logger "Bogus skip deletion parameter [$SKIP_DELETION]." "CRITICAL"
+			exit 1
+		fi
+	fi
+
+	if [ "$SYNC_TYPE" != "" ]; then
+		if [ "$SYNC_TYPE" != "initiator2target" ] && [ "$SYNC_TYPE" != "target2initiator" ]; then
+			Logger "Bogus sync type parameter [$SYNC_TYPE]." "CRITICAL"
 			exit 1
 		fi
 	fi
@@ -4502,14 +4509,14 @@ function Sync {
 
 			if [ "$resumeInitiator" != "synced" ]; then
 				Logger "Trying to resume aborted execution on $($STAT_CMD "${INITIATOR[$__initiatorLastActionFile]}") at task [$resumeInitiator] for initiator. [$resumeCount] previous tries." "NOTICE"
-				echo $(($resumeCount+1)) > "${INITIATOR[$__resumeCount]}"
+				echo $((resumeCount+1)) > "${INITIATOR[$__resumeCount]}"
 			else
 				resumeInitiator="none"
 			fi
 
 			if [ "$resumeTarget" != "synced" ]; then
 				Logger "Trying to resume aborted execution on $($STAT_CMD "${INITIATOR[$__targetLastActionFile]}") as task [$resumeTarget] for target. [$resumeCount] previous tries." "NOTICE"
-				echo $(($resumeCount+1)) > "${INITIATOR[$__resumeCount]}"
+				echo $((resumeCount+1)) > "${INITIATOR[$__resumeCount]}"
 			else
 				resumeTarget="none"
 			fi
@@ -5491,9 +5498,6 @@ function _SummaryFromRsyncFile {
 	local direction="${3}"
 
 
-	INITIATOR_UPDATES_COUNT=0
-	TARGET_UPDATES_COUNT=0
-
 	if [ -f "$summaryFile" ]; then
 		while read -r file; do
 			# grep -E "^<|^>|^\." = Remove all lines that do not begin with <, > or . to deal with a bizarre bug involving rsync 3.0.6 / CentOS 6 and --skip-compress showing 'adding zip' line for every skipped compressed extension
@@ -5515,9 +5519,6 @@ function _SummaryFromDeleteFile {
 	local summaryFile="${2}"
 	local direction="${3}"
 
-
-	INITIATOR_DELETES_COUNT=0
-	TARGET_DELETES_COUNT=0
 
 	if [ -f "$summaryFile" ]; then
 		while read -r file; do
@@ -5876,6 +5877,7 @@ function Usage {
 	echo "--remote-token=\"\"       When using ssh filter protection, you must specify the remote token set in ssh_filter.sh"
 	echo "--instance-id=\"\"	Optional sync task name to identify this synchronization task when using multiple targets"
 	echo "--skip-deletion=\"\"      You may skip deletion propagation on initiator or target. Valid values: initiator target initiator,target"
+	echo "--sync-type=\"\"          Allows osync to run in unidirectional sync mode. Valid values: initiator2target, target2initiator"
 	echo "--destination-mails=\"\"  Double quoted list of space separated email addresses to send alerts to"
 	echo ""
 	echo "Additionaly, you may set most osync options at runtime. eg:"
@@ -6021,6 +6023,12 @@ if [ "$MAX_WAIT" == "" ]; then
 	MAX_WAIT=7200
 fi
 
+# Global counters for --summary
+INITIATOR_UPDATES_COUNT=0
+TARGET_UPDATES_COUNT=0
+INITIATOR_DELETES_COUNT=0
+TARGET_DELETES_COUNT=0
+
 function GetCommandlineArguments {
 	local isFirstArgument=true
 
@@ -6029,8 +6037,8 @@ function GetCommandlineArguments {
 		Usage
 	fi
 
-	for i in "$@"; do
-		case $i in
+	for i in "${@}"; do
+		case "$i" in
 			--dry)
 			_DRYRUN=true
 			opts=$opts" --dry"
@@ -6063,30 +6071,34 @@ function GetCommandlineArguments {
 			Usage
 			;;
 			--initiator=*)
-			_QUICK_SYNC=$(($_QUICK_SYNC + 1))
-			INITIATOR_SYNC_DIR=${i##*=}
+			_QUICK_SYNC=$((_QUICK_SYNC + 1))
+			INITIATOR_SYNC_DIR="${i##*=}"
 			opts=$opts" --initiator=\"$INITIATOR_SYNC_DIR\""
 			;;
 			--target=*)
-			_QUICK_SYNC=$(($_QUICK_SYNC + 1))
-			TARGET_SYNC_DIR=${i##*=}
+			_QUICK_SYNC=$((_QUICK_SYNC + 1))
+			TARGET_SYNC_DIR="${i##*=}"
 			opts=$opts" --target=\"$TARGET_SYNC_DIR\""
 			;;
 			--rsakey=*)
-			SSH_RSA_PRIVATE_KEY=${i##*=}
+			SSH_RSA_PRIVATE_KEY="${i##*=}"
 			opts=$opts" --rsakey=\"$SSH_RSA_PRIVATE_KEY\""
 			;;
 			--password-file=*)
-			SSH_PASSWORD_FILE=${i##*=}
+			SSH_PASSWORD_FILE="${i##*=}"
 			opts=$opts" --password-file=\"$SSH_PASSWORD_FILE\""
 			;;
 			--instance-id=*)
-			INSTANCE_ID=${i##*=}
+			INSTANCE_ID="${i##*=}"
 			opts=$opts" --instance-id=\"$INSTANCE_ID\""
 			;;
 			--skip-deletion=*)
 			opts=$opts" --skip-deletion=\"${i##*=}\""
-			SKIP_DELETION=${i##*=}
+			SKIP_DELETION="${i##*=}"
+			;;
+			--sync-type=*)
+			opts=$opts" --sync-type=\"${i##*=}\""
+			SYNC_TYPE="${i##*=}"
 			;;
 			--on-changes)
 			_SYNC_ON_CHANGES="initiator"
@@ -6131,10 +6143,10 @@ function GetCommandlineArguments {
 			_LOGGER_PREFIX=""
 			;;
 			--destination-mails=*)
-			DESTINATION_MAILS=${i##*=}
+			DESTINATION_MAILS="${i##*=}"
 			;;
 			--remote-token=*)
-			_REMOTE_TOKEN=${i##*=}
+			_REMOTE_TOKEN="${i##*=}"
 			;;
 			*)
 			if [ $isFirstArgument == false ]; then
@@ -6150,7 +6162,7 @@ function GetCommandlineArguments {
 	opts="${opts# *}"
 }
 
-GetCommandlineArguments "$@"
+GetCommandlineArguments "${@}"
 
 ## Here we set default options for quicksync tasks when no configuration file is provided.
 if [ $_QUICK_SYNC -eq 2 ]; then
