@@ -2139,7 +2139,7 @@ function Sync {
 			echo "${SYNC_ACTION[9]}" > "${INITIATOR[$__initiatorLastActionFile]}"
 			echo "${SYNC_ACTION[9]}" > "${INITIATOR[$__targetLastActionFile]}"
 			resumeInitiator="${SYNC_ACTION[9]}"
-			resumeTarget="${SYNC_ACTION[3]}"
+			resumeTarget="${SYNC_ACTION[9]}"
 		fi
 	fi
 
