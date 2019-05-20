@@ -7,7 +7,7 @@ PROGRAM="osync" # Rsync based two way sync engine with fault tolerance
 AUTHOR="(C) 2013-2019 by Orsiris de Jong"
 CONTACT="http://www.netpower.fr/osync - ozy@netpower.fr"
 PROGRAM_VERSION=1.3.0-beta2
-PROGRAM_BUILD=2019052013
+PROGRAM_BUILD=2019052014
 IS_STABLE=false
 
 CONFIG_FILE_REVISION_REQUIRED=1.3.0
@@ -4548,11 +4548,15 @@ function Sync {
 	if [ "$SYNC_TYPE" == "initiator2target" ]; then
 		resumeInitiator="${SYNC_ACTION[5]}"
 		resumeTarget="${SYNC_ACTION[6]}"
-		rsyncRemoteDelete=true
+		if [ $(ArrayContains "${TARGET[$__type]}" "${SKIP_DELETION[@]}") -ne 0 ]; then
+			rsyncRemoteDelete=true
+		fi
 	elif [ "$SYNC_TYPE" == "target2initiator" ]; then
 		resumeInitiator="${SYNC_ACTION[6]}"
 		resumeTarget="${SYNC_ACTION[5]}"
-		rsyncRemoteDelete=true
+		if [ $(ArrayContains "${INITIATOR[$__type]}" "${SKIP_DELETION[@]}") -ne 0 ]; then
+			rsyncRemoteDelete=true
+		fi
 	fi
 
 	################################################################################################################################################# Actual sync begins here
