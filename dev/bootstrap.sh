@@ -23,7 +23,6 @@ opts=()
 outputFileName="$0"
 
 for i in "${@}"; do
-	echo "-$i-"
         case "$i" in
                 --program=*)
                 bootstrapProgram="${i##*=}"
