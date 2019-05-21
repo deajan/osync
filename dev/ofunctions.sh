@@ -31,7 +31,7 @@
 #### OFUNCTIONS MINI SUBSET ####
 #### OFUNCTIONS MICRO SUBSET ####
 _OFUNCTIONS_VERSION=2.3.0-dev-postRC2
-_OFUNCTIONS_BUILD=2019052102
+_OFUNCTIONS_BUILD=2019052103
 #### _OFUNCTIONS_BOOTSTRAP SUBSET ####
 _OFUNCTIONS_BOOTSTRAP=true
 #### _OFUNCTIONS_BOOTSTRAP SUBSET END ####
@@ -2123,6 +2123,8 @@ function InitLocalOSDependingSettings {
 	## Getting running processes is quite different
 	## Ping command is not the same
 	if [ "$LOCAL_OS" == "msys" ] || [ "$LOCAL_OS" == "Cygwin" ] || [ "$LOCAL_OS" == "Microsoft" ] || [ "$LOCAL_OS" == "WinNT10" ]; then
+
+		# Newer bash on Win10 finally uses integrated find command instead of windows one
 		if [ -f "/usr/bin/find" ]; then
 			FIND_CMD="/usr/bin/find"
 		elif [ -f "/bin/find" ]; then
@@ -2130,7 +2132,13 @@ function InitLocalOSDependingSettings {
 		else
 			FIND_CMD="$(dirname $BASH)/find"
 		fi
-		PING_CMD='$SYSTEMROOT\system32\ping -n 2'
+
+		# Newer bash on Windows 10 uses integrated ping whereas cygwin & msys use Windows version
+		if [ "$LOCAL_OS" == "WinNT10" ]; then
+			PING_CMD="ping -c 2 -i 1"
+		else
+			PING_CMD='$SYSTEMROOT\system32\ping -n 2'
+		fi
 
 	# On BSD, when not root, min ping interval is 1s
 	elif [ "$LOCAL_OS" == "BSD" ] && [ "$LOCAL_USER" != "root" ]; then
