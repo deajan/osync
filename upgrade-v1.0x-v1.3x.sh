@@ -7,7 +7,7 @@ CONTACT="http://www.netpower.fr/osync - ozy@netpower.fr"
 OLD_PROGRAM_VERSION="v1.0x-v1.2x"
 NEW_PROGRAM_VERSION="v1.3x"
 CONFIG_FILE_REVISION=1.3.0
-PROGRAM_BUILD=2019051801
+PROGRAM_BUILD=2019052101
 
 ## type -p does not work on platforms other than linux (bash). If if does not work, always assume output is not a zero exitcode
 if ! type "$BASH" > /dev/null; then
@@ -591,9 +591,9 @@ elif [ "$1" != "" ] && [ -f "$1" ] && [ -w "$1" ]; then
 	CONF_FILE="${CONF_FILE%/}"
 	LoadConfigFile "$CONF_FILE"
 	Init
+	RewriteSections "$CONF_FILE"
 	RewriteOldConfigFiles "$CONF_FILE"
 	AddMissingConfigOptionsAndFixBooleans "$CONF_FILE"
-	RewriteSections "$CONF_FILE"
 	UpdateConfigHeader "$CONF_FILE"
 	RenameStateFiles "$MASTER_SYNC_DIR"
 	RenameStateFiles "$SLAVE_SYNC_DIR"
