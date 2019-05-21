@@ -7,7 +7,7 @@ CONTACT="http://www.netpower.fr/osync - ozy@netpower.fr"
 OLD_PROGRAM_VERSION="v1.0x-v1.2x"
 NEW_PROGRAM_VERSION="v1.3x"
 CONFIG_FILE_REVISION=1.3.0
-PROGRAM_BUILD=2019052104
+PROGRAM_BUILD=2019052105
 
 ## type -p does not work on platforms other than linux (bash). If if does not work, always assume output is not a zero exitcode
 if ! type "$BASH" > /dev/null; then
@@ -175,7 +175,8 @@ function Init {
 	FAILED_DELETE_LIST_FILENAME="-failed-delete-$SYNC_ID"
 
 	if [ "${SLAVE_SYNC_DIR:0:6}" == "ssh://" ]; then
-		REMOTE_OPERATION="yes"
+		# Might also exist from old config file as REMOTE_OPERATION=yes
+		REMOTE_OPERATION=true
 
 		# remove leadng 'ssh://'
 		uri=${SLAVE_SYNC_DIR#ssh://*}
@@ -226,7 +227,7 @@ function Usage {
 }
 
 function CheckEnvironment {
-	if [ "$REMOTE_OPERATION" == "yes" ]; then
+	if [ "$REMOTE_OPERATION" == "yes" ] || [ "$REMOTE_OPERATION" == true ]; then
 		if ! type -p ssh > /dev/null 2>&1
 		then
 			Logger "ssh not present. Cannot start sync." "CRITICAL"
@@ -452,7 +453,7 @@ ENDSSH
 
 function RenameStateFiles {
 	_RenameStateFilesLocal "$MASTER_SYNC_DIR/$OSYNC_DIR/$STATE_DIR"
-	if [ "$REMOTE_OPERATION" != "yes" ]; then
+	if [ "$REMOTE_OPERATION" != "yes" ] || "$REMOTE_OPERATION" == true ]; then
 		_RenameStateFilesLocal "$SLAVE_SYNC_DIR/$OSYNC_DIR/$STATE_DIR"
 	else
 		_RenameStateFilesRemote "$SLAVE_SYNC_DIR/$OSYNC_DIR/$STATE_DIR"
@@ -500,7 +501,7 @@ function AddMissingConfigOptionsAndFixBooleans {
 		if ! grep "^${KEYWORDS[$counter]}=" > /dev/null "$config_file"; then
 			echo "${KEYWORDS[$counter]} not found"
 			if [ $counter -gt 0 ]; then
-				if [ "{$VALUES[$counter]}" == true ] || [ "${VALUES[$counter]}" == false ]; then
+				if [ "${VALUES[$counter]}" == true ] || [ "${VALUES[$counter]}" == false ]; then
 					sed -i'.tmp' '/^'${KEYWORDS[$((counter-1))]}'=*/a\'$'\n'${KEYWORDS[$counter]}'='"${VALUES[$counter]}"'\'$'\n''' "$config_file"
 				else
 					sed -i'.tmp' '/^'${KEYWORDS[$((counter-1))]}'=*/a\'$'\n'${KEYWORDS[$counter]}'="'"${VALUES[$counter]}"'"\'$'\n''' "$config_file"
@@ -510,7 +511,7 @@ function AddMissingConfigOptionsAndFixBooleans {
 					exit 1
 				fi
 			else
-				if [ "{$VALUES[$counter]}" == true ] || [ "${VALUES[$counter]}" == false ]; then
+				if [ "${VALUES[$counter]}" == true ] || [ "${VALUES[$counter]}" == false ]; then
 					sed -i'.tmp' '/[GENERAL\]$//a\'$'\n'${KEYWORDS[$counter]}'='"${VALUES[$counter]}"'\'$'\n''' "$config_file"
 				else
 					sed -i'.tmp' '/[GENERAL\]$//a\'$'\n'${KEYWORDS[$counter]}'="'"${VALUES[$counter]}"'"\'$'\n''' "$config_file"
@@ -519,13 +520,13 @@ function AddMissingConfigOptionsAndFixBooleans {
 			echo "Added missing ${KEYWORDS[$counter]} config option with default option [${VALUES[$counter]}]"
 		else
 			# Not the most elegant but the quickest way :)
-			if grep "^{$KEYWORDS[$counter]}=yes" > /dev/null "$config_file"; then
+			if grep "^${KEYWORDS[$counter]}=yes" > /dev/null "$config_file"; then
 				sed -i'.tmp' 's/^'${KEYWORDS[$counter]}'=.*/'${KEYWORDS[$counter]}'=true/g' "$config_file"
 				if [ $? -ne 0 ]; then
 					echo "Cannot rewrite ${[KEYWORDS[$counter]} boolean to true."
 					exit 1
 				fi
-			elif grep "^{$KEYWORDS[$counter]}=no" > /dev/null "$config_file"; then
+			elif grep "^${KEYWORDS[$counter]}=no" > /dev/null "$config_file"; then
 				sed -i'.tmp' 's/^'${KEYWORDS[$counter]}'=.*/'${KEYWORDS[$counter]}'=false/g' "$config_file"
 				if [ $? -ne 0 ]; then
 					echo "Cannot rewrite ${[KEYWORDS[$counter]} boolean to false."
