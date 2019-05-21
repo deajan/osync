@@ -7,7 +7,7 @@ CONTACT="http://www.netpower.fr/osync - ozy@netpower.fr"
 OLD_PROGRAM_VERSION="v1.0x-v1.2x"
 NEW_PROGRAM_VERSION="v1.3x"
 CONFIG_FILE_REVISION=1.3.0
-PROGRAM_BUILD=2019052101
+PROGRAM_BUILD=2019052102
 
 ## type -p does not work on platforms other than linux (bash). If if does not work, always assume output is not a zero exitcode
 if ! type "$BASH" > /dev/null; then
@@ -459,7 +459,7 @@ function RenameStateFiles {
 	fi
 }
 
-function RewriteOldConfigFiles {
+function CheckAndBackup {
 	local config_file="${1}"
 
 	if ! grep "MASTER_SYNC_DIR=" "$config_file" > /dev/null && ! grep "INITIATOR_SYNC_DIR=" "$config_file" > /dev/null; then
@@ -473,6 +473,10 @@ function RewriteOldConfigFiles {
 		echo "Cannot backup config file."
 		exit 1
 	fi
+}
+
+function RewriteOldConfigFiles {
+	local config_file="${1}"
 
 	echo "Rewriting config file $config_file"
 
@@ -591,6 +595,7 @@ elif [ "$1" != "" ] && [ -f "$1" ] && [ -w "$1" ]; then
 	CONF_FILE="${CONF_FILE%/}"
 	LoadConfigFile "$CONF_FILE"
 	Init
+	CheckAndBackup "$CONF_FILE"
 	RewriteSections "$CONF_FILE"
 	RewriteOldConfigFiles "$CONF_FILE"
 	AddMissingConfigOptionsAndFixBooleans "$CONF_FILE"
