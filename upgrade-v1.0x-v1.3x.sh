@@ -7,7 +7,7 @@ CONTACT="http://www.netpower.fr/osync - ozy@netpower.fr"
 OLD_PROGRAM_VERSION="v1.0x-v1.2x"
 NEW_PROGRAM_VERSION="v1.3x"
 CONFIG_FILE_REVISION=1.3.0
-PROGRAM_BUILD=2019052102
+PROGRAM_BUILD=2019052103
 
 ## type -p does not work on platforms other than linux (bash). If if does not work, always assume output is not a zero exitcode
 if ! type "$BASH" > /dev/null; then
@@ -526,11 +526,11 @@ function AddMissingConfigOptionsAndFixBooleans {
 					exit 1
 				fi
 			elif grep "^{$KEYWORDS[$counter]}=no" > /dev/null "$config_file"; then
+				sed -i'.tmp' 's/^'${KEYWORDS[$counter]}'=.*/'${KEYWORDS[$counter]}'=false/g' "$config_file"
 				if [ $? -ne 0 ]; then
 					echo "Cannot rewrite ${[KEYWORDS[$counter]} boolean to false."
 					exit 1
 				fi
-				sed -i'.tmp' 's/^'${KEYWORDS[$counter]}'=.*/'${KEYWORDS[$counter]}'=false/g' "$config_file"
 			fi
 		fi
 		counter=$((counter+1))
