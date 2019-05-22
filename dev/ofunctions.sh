@@ -31,7 +31,7 @@
 #### OFUNCTIONS MINI SUBSET ####
 #### OFUNCTIONS MICRO SUBSET ####
 _OFUNCTIONS_VERSION=2.3.0-dev-postRC2
-_OFUNCTIONS_BUILD=2019052202
+_OFUNCTIONS_BUILD=2019052203
 #### _OFUNCTIONS_BOOTSTRAP SUBSET ####
 _OFUNCTIONS_BOOTSTRAP=true
 #### _OFUNCTIONS_BOOTSTRAP SUBSET END ####
@@ -193,7 +193,7 @@ function _Logger {
 
 		# Build current log file for alerts if we have a sufficient environment
 		if [ "$RUN_DIR/$PROGRAM" != "/" ]; then
-			echo -e "$logValue" >> "$RUN_DIR/$PROGRAM._Logger.$SCRIPT_PID.$TSTAMP.log"
+			echo -e "$logValue" >> "$RUN_DIR/$PROGRAM._Logger.$SCRIPT_PID.$TSTAMP"
 		fi
 	fi
 
@@ -501,7 +501,7 @@ function SendAlert {
 		fi
 	fi
 
-	body="$MAIL_ALERT_MSG"$'\n\n'"Last 1000 lines of current log"$'\n\n'"$(tail -n 1000 "$RUN_DIR/$PROGRAM._Logger.$SCRIPT_PID.$TSTAMP.log")"
+	body="$MAIL_ALERT_MSG"$'\n\n'"Last 1000 lines of current log"$'\n\n'"$(tail -n 1000 "$RUN_DIR/$PROGRAM._Logger.$SCRIPT_PID.$TSTAMP")"
 
 	if [ $ERROR_ALERT == true ]; then
 		subject="Error alert for $INSTANCE_ID"
