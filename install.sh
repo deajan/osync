@@ -10,7 +10,7 @@ PROGRAM_BINARY=$PROGRAM".sh"
 PROGRAM_BATCH=$PROGRAM"-batch.sh"
 SSH_FILTER="ssh_filter.sh"
 
-SCRIPT_BUILD=2019052001
+SCRIPT_BUILD=2019052202
 INSTANCE_ID="installer-$SCRIPT_BUILD"
 
 ## osync / obackup / pmocr / zsnap install script
@@ -18,7 +18,7 @@ INSTANCE_ID="installer-$SCRIPT_BUILD"
 ## Please adapt this to fit your distro needs
 
 _OFUNCTIONS_VERSION=2.3.0-dev-postRC2
-_OFUNCTIONS_BUILD=2019052201
+_OFUNCTIONS_BUILD=2019052203
 _OFUNCTIONS_BOOTSTRAP=true
 
 if ! type "$BASH" > /dev/null; then
@@ -166,7 +166,7 @@ function _Logger {
 
 		# Build current log file for alerts if we have a sufficient environment
 		if [ "$RUN_DIR/$PROGRAM" != "/" ]; then
-			echo -e "$logValue" >> "$RUN_DIR/$PROGRAM._Logger.$SCRIPT_PID.$TSTAMP.log"
+			echo -e "$logValue" >> "$RUN_DIR/$PROGRAM._Logger.$SCRIPT_PID.$TSTAMP"
 		fi
 	fi
 
@@ -741,15 +741,14 @@ function CopyFile {
 	local overwrite="${8:-false}"
 
 	local userGroup=""
-	local oldFileName
 
 	if [ "$destFileName" == "" ]; then
 		destFileName="$sourceFileName"
 	fi
 
 	if [ -f "$destPath/$destFileName" ] && [ $overwrite == false ]; then
-		destfileName="$sourceFileName.new"
-		Logger "Copying [$sourceFileName] to [$destPath/$destFilename]." "NOTICE"
+		destFileName="$sourceFileName.new"
+		Logger "Copying [$sourceFileName] to [$destPath/$destFileName]." "NOTICE"
 	fi
 
 	cp "$sourcePath/$sourceFileName" "$destPath/$destFileName"
