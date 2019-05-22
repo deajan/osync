@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-# osync test suite 2019052002
+# osync test suite 2019052201
 
 
 # Allows the following environment variables
@@ -41,6 +41,9 @@
 # on BSD, remount UFS with ACL support using mount -o acls /
 # setfacl needs double ':' to be compatible with both linux and BSD
 # setfacl -m o::rwx file
+
+# On Windows 10 bash, we need to create host SSH keys first with ssh-keygen -A
+# Then start ssh with service ssh start
 
 # TODO, use copies of config file on each test function
 
@@ -291,7 +294,7 @@ function oneTimeTearDown () {
 	$SUDO_CMD ./install.sh --remove --no-stats --prefix="$FAKEROOT"
 	assertEquals "Uninstall failed" "0" $?
 
-	ELAPSED_TIME=$(($SECONDS - $START_TIME))
+	ELAPSED_TIME=$((SECONDS-START_TIME))
 	echo "It took $ELAPSED_TIME seconds to run these tests."
 }
 
