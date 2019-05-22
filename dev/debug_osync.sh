@@ -6,8 +6,8 @@
 PROGRAM="osync" # Rsync based two way sync engine with fault tolerance
 AUTHOR="(C) 2013-2019 by Orsiris de Jong"
 CONTACT="http://www.netpower.fr/osync - ozy@netpower.fr"
-PROGRAM_VERSION=1.3.0-beta2
-PROGRAM_BUILD=2019052101
+PROGRAM_VERSION=1.3.0-beta3
+PROGRAM_BUILD=2019052201
 IS_STABLE=false
 
 CONFIG_FILE_REVISION_REQUIRED=1.3.0

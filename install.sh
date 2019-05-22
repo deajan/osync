@@ -17,8 +17,8 @@ INSTANCE_ID="installer-$SCRIPT_BUILD"
 ## Tested on RHEL / CentOS 6 & 7, Fedora 23, Debian 7 & 8, Mint 17 and FreeBSD 8, 10 and 11
 ## Please adapt this to fit your distro needs
 
-_OFUNCTIONS_VERSION=2.3.0-RC2
-_OFUNCTIONS_BUILD=2019031502
+_OFUNCTIONS_VERSION=2.3.0-dev-postRC2
+_OFUNCTIONS_BUILD=2019052103
 _OFUNCTIONS_BOOTSTRAP=true
 
 if ! type "$BASH" > /dev/null; then
@@ -125,17 +125,17 @@ function PoorMansRandomGenerator {
 	fi
 }
 function PoorMansRandomGenerator {
-        local digits="${1}" # The number of digits to generate
-        local number
+	local digits="${1}" # The number of digits to generate
+	local number
 
-        # Some read bytes can't be used, se we read twice the number of required bytes
-        dd if=/dev/urandom bs=$digits count=2 2> /dev/null | while read -r -n1 char; do
-                number=$number$(printf "%d" "'$char")
-                if [ ${#number} -ge $digits ]; then
-                        echo ${number:0:$digits}
-                        break;
-                fi
-        done
+	# Some read bytes can't be used, se we read twice the number of required bytes
+	dd if=/dev/urandom bs=$digits count=2 2> /dev/null | while read -r -n1 char; do
+		number=$number$(printf "%d" "'$char")
+		if [ ${#number} -ge $digits ]; then
+			echo ${number:0:$digits}
+			break;
+		fi
+	done
 }
 
 # Initial TSTMAP value before function declaration

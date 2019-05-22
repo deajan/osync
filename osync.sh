@@ -6,15 +6,15 @@
 PROGRAM="osync" # Rsync based two way sync engine with fault tolerance
 AUTHOR="(C) 2013-2019 by Orsiris de Jong"
 CONTACT="http://www.netpower.fr/osync - ozy@netpower.fr"
-PROGRAM_VERSION=1.3.0-beta2
-PROGRAM_BUILD=2019052101
+PROGRAM_VERSION=1.3.0-beta3
+PROGRAM_BUILD=2019052201
 IS_STABLE=false
 
 CONFIG_FILE_REVISION_REQUIRED=1.3.0
 
 
-_OFUNCTIONS_VERSION=2.3.0-RC2
-_OFUNCTIONS_BUILD=2019031502
+_OFUNCTIONS_VERSION=2.3.0-dev-postRC2
+_OFUNCTIONS_BUILD=2019052103
 _OFUNCTIONS_BOOTSTRAP=true
 
 if ! type "$BASH" > /dev/null; then
@@ -121,17 +121,17 @@ function PoorMansRandomGenerator {
 	fi
 }
 function PoorMansRandomGenerator {
-        local digits="${1}" # The number of digits to generate
-        local number
+	local digits="${1}" # The number of digits to generate
+	local number
 
-        # Some read bytes can't be used, se we read twice the number of required bytes
-        dd if=/dev/urandom bs=$digits count=2 2> /dev/null | while read -r -n1 char; do
-                number=$number$(printf "%d" "'$char")
-                if [ ${#number} -ge $digits ]; then
-                        echo ${number:0:$digits}
-                        break;
-                fi
-        done
+	# Some read bytes can't be used, se we read twice the number of required bytes
+	dd if=/dev/urandom bs=$digits count=2 2> /dev/null | while read -r -n1 char; do
+		number=$number$(printf "%d" "'$char")
+		if [ ${#number} -ge $digits ]; then
+			echo ${number:0:$digits}
+			break;
+		fi
+	done
 }
 
 # Initial TSTMAP value before function declaration
@@ -440,15 +440,15 @@ function SendAlert {
 		return 0
 	fi
 
-        if [ $attachment == true ]; then
-                attachmentFile="$LOG_FILE"
-                if type "$COMPRESSION_PROGRAM" > /dev/null 2>&1; then
-                        eval "cat \"$LOG_FILE\" \"$COMPRESSION_PROGRAM\" > \"$ALERT_LOG_FILE\""
-                        if [ $? -eq 0 ]; then
-                                attachmentFile="$ALERT_LOG_FILE"
-                        fi
-                fi
-        fi
+	if [ $attachment == true ]; then
+		attachmentFile="$LOG_FILE"
+		if type "$COMPRESSION_PROGRAM" > /dev/null 2>&1; then
+			eval "cat \"$LOG_FILE\" \"$COMPRESSION_PROGRAM\" > \"$ALERT_LOG_FILE\""
+			if [ $? -eq 0 ]; then
+				attachmentFile="$ALERT_LOG_FILE"
+			fi
+		fi
+	fi
 
 	body="$MAIL_ALERT_MSG"$'\n\n'"Last 1000 lines of current log"$'\n\n'"$(tail -n 1000 "$RUN_DIR/$PROGRAM._Logger.$SCRIPT_PID.$TSTAMP.log")"
 
@@ -1550,7 +1550,7 @@ GetOs
 
 ENDSSH
 	if [ $? -ne 0 ]; then
-		Logger "Cannot connect to remote system [$REMOTE_HOST] port [$REMOTE_PORT]." "CRITICAL"
+		Logger "Cannot connect to remote system [$REMOTE_HOST] port [$REMOTE_PORT] as [$REMOTE_USER]." "CRITICAL"
 		if [ -f "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$SCRIPT_PID.$TSTAMP" ]; then
 			Logger "$(cat "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$SCRIPT_PID.$TSTAMP")" "ERROR"
 		fi
@@ -1957,8 +1957,22 @@ function InitLocalOSDependingSettings {
 	## Getting running processes is quite different
 	## Ping command is not the same
 	if [ "$LOCAL_OS" == "msys" ] || [ "$LOCAL_OS" == "Cygwin" ] || [ "$LOCAL_OS" == "Microsoft" ] || [ "$LOCAL_OS" == "WinNT10" ]; then
-		FIND_CMD=$(dirname $BASH)/find
-		PING_CMD='$SYSTEMROOT\system32\ping -n 2'
+
+		# Newer bash on Win10 finally uses integrated find command instead of windows one
+		if [ -f "/usr/bin/find" ]; then
+			FIND_CMD="/usr/bin/find"
+		elif [ -f "/bin/find" ]; then
+			FIND_CMD="/bin/find"
+		else
+			FIND_CMD="$(dirname $BASH)/find"
+		fi
+
+		# Newer bash on Windows 10 uses integrated ping whereas cygwin & msys use Windows version
+		if [ "$LOCAL_OS" == "WinNT10" ]; then
+			PING_CMD="ping -c 2 -i 1"
+		else
+			PING_CMD='$SYSTEMROOT\system32\ping -n 2'
+		fi
 
 	# On BSD, when not root, min ping interval is 1s
 	elif [ "$LOCAL_OS" == "BSD" ] && [ "$LOCAL_USER" != "root" ]; then
