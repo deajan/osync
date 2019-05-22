@@ -1,4 +1,4 @@
-Copyright (c) 2013-2016, Orsiris de Jong. ozy@netpower.fr
+Copyright (c) 2013-2019, Orsiris de Jong. ozy@netpower.fr
 All rights reserved.
 
 Redistribution and use in source and binary forms, with or without
