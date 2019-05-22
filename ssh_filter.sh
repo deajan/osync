@@ -9,13 +9,13 @@
 ##### Any other command will return a "syntax error"
 ##### For details, see ssh_filter.log
 
-SCRIPT_BUILD=2017020802
+# BUILD=2017020802
 
 ## Allow sudo
-SUDO_EXEC=yes
+SUDO_EXEC=true
 
 ## Log all valid commands too
-_DEBUG=no
+_DEBUG=false
 
 ## Set remote token in authorized_keys
 if [ "$1" != "" ]; then
@@ -25,12 +25,12 @@ fi
 LOG_FILE="${HOME}/.ssh/ssh_filter.log"
 
 function Log {
-	DATE=$(date)
+	DATE="$(date)"
 	echo "$DATE - $1" >> "$LOG_FILE"
 }
 
 function Go {
-	if [ "$_DEBUG" == "yes" ]; then
+	if [ "$_DEBUG" == true ]; then
 		Log "Executing [$SSH_ORIGINAL_COMMAND]."
 	fi
 	eval "$SSH_ORIGINAL_COMMAND"
@@ -38,7 +38,7 @@ function Go {
 
 case "${SSH_ORIGINAL_COMMAND}" in
 	*"env _REMOTE_TOKEN=$_REMOTE_TOKEN"*)
-		if [ "$SUDO_EXEC" != "yes" ] && [[ $SSH_ORIGINAL_COMMAND == *"sudo "* ]]; then
+		if [ "$SUDO_EXEC" != true ] && [[ $SSH_ORIGINAL_COMMAND == *"sudo "* ]]; then
 			Log "Command [$SSH_ORIGINAL_COMMAND] contains sudo which is not allowed."
 			echo "Syntax error unexpected end of file"
 			exit 1
