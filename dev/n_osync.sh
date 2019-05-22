@@ -7,7 +7,7 @@ PROGRAM="osync" # Rsync based two way sync engine with fault tolerance
 AUTHOR="(C) 2013-2019 by Orsiris de Jong"
 CONTACT="http://www.netpower.fr/osync - ozy@netpower.fr"
 PROGRAM_VERSION=1.3.0-beta3+dev
-PROGRAM_BUILD=2019052202
+PROGRAM_BUILD=2019052203
 IS_STABLE=false
 
 CONFIG_FILE_REVISION_REQUIRED=1.3.0
@@ -1672,8 +1672,6 @@ function Initialize {
 ###### Step 8a & 8b: Create after run ctime & mtime file list of replicas
 
 function Sync {
-	local syncType="${1}"		# Optional sync type. By default, sync is bidirectional.
-
 	__CheckArguments 0 $# "$@"	#__WITH_PARANOIA_DEBUG
 
 	local resumeCount
