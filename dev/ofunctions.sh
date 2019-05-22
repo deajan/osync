@@ -31,7 +31,7 @@
 #### OFUNCTIONS MINI SUBSET ####
 #### OFUNCTIONS MICRO SUBSET ####
 _OFUNCTIONS_VERSION=2.3.0-dev-postRC2
-_OFUNCTIONS_BUILD=2019052203
+_OFUNCTIONS_BUILD=2019052204
 #### _OFUNCTIONS_BOOTSTRAP SUBSET ####
 _OFUNCTIONS_BOOTSTRAP=true
 #### _OFUNCTIONS_BOOTSTRAP SUBSET END ####
@@ -1971,38 +1971,34 @@ function RsyncPatternsFromAdd {
 function RsyncPatterns {
 	__CheckArguments 0 $# "$@"    #__WITH_PARANOIA_DEBUG
 
-       if [ "$RSYNC_PATTERN_FIRST" == "exclude" ]; then
-		if [ "$RSYNC_EXCLUDE_PATTERN" != "" ]; then
-			RsyncPatternsAdd "exclude" "$RSYNC_EXCLUDE_PATTERN"
-		fi
-		if [ "$RSYNC_EXCLUDE_FROM" != "" ]; then
-			RsyncPatternsFromAdd "exclude" "$RSYNC_EXCLUDE_FROM"
-		fi
-		if [ "$RSYNC_INCLUDE_PATTERN" != "" ]; then
-			RsyncPatternsAdd "include" "$RSYNC_INCLUDE_PATTERN"
-		fi
-		if [ "$RSYNC_INCLUDE_FROM" != "" ]; then
-			RsyncPatternsFromAdd "include" "$RSYNC_INCLUDE_FROM"
-		fi
-	# Use default include first for quicksync runs
+	local first
+	local second
+
+	if [ "$RSYNC_PATTERN_FIRST" == "exclude" ]; then
+		firstPattern="exclude"
+		secondPattern="include"
 	elif [ "$RSYNC_PATTERN_FIRST" == "include" ] || [ "$_QUICK_SYNC" == "2" ]; then
-		if [ "$RSYNC_INCLUDE_PATTERN" != "" ]; then
-			RsyncPatternsAdd "include" "$RSYNC_INCLUDE_PATTERN"
-		fi
-		if [ "$RSYNC_INCLUDE_FROM" != "" ]; then
-			RsyncPatternsFromAdd "include" "$RSYNC_INCLUDE_FROM"
-		fi
-		if [ "$RSYNC_EXCLUDE_PATTERN" != "" ]; then
-			RsyncPatternsAdd "exclude" "$RSYNC_EXCLUDE_PATTERN"
-		fi
-		if [ "$RSYNC_EXCLUDE_FROM" != "" ]; then
-			RsyncPatternsFromAdd "exclude" "$RSYNC_EXCLUDE_FROM"
-		fi
+		firstPattern="include"
+		secondPattern="exclude"
 	else
 		# osync target-helper specific clause
 		if [ "$_SYNC_ON_CHANGES" != "target" ]; then
 			Logger "Bogus RSYNC_PATTERN_FIRST value in config file. Will not use rsync patterns." "WARN"
+			return
 		fi
+	fi
+
+	if [ "$RSYNC_EXCLUDE_PATTERN" != "" ]; then
+		RsyncPatternsAdd "$firstPattern" "$RSYNC_EXCLUDE_PATTERN"
+	fi
+	if [ "$RSYNC_EXCLUDE_FROM" != "" ]; then
+		RsyncPatternsFromAdd "$firstPattern" "$RSYNC_EXCLUDE_FROM"
+	fi
+	if [ "$RSYNC_INCLUDE_PATTERN" != "" ]; then
+		RsyncPatternsAdd "$secondPattern" "$RSYNC_INCLUDE_PATTERN"
+	fi
+	if [ "$RSYNC_INCLUDE_FROM" != "" ]; then
+		RsyncPatternsFromAdd "$secondPattern" "$RSYNC_INCLUDE_FROM"
 	fi
 }
 
