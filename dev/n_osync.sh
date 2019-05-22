@@ -2874,7 +2874,7 @@ function SyncOnChanges {
 			exit 1
 		fi
 		watchDirectory="$TARGET_SYNC_DIR"
-	Logger "#### Running $PROGRAM in target helper file monitor mode." "NOTICE"
+		Logger "#### Running $PROGRAM in target helper file monitor mode." "NOTICE"
 	fi
 
 	while true; do
