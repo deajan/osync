@@ -7,9 +7,18 @@ dd Mmm YYYY: dev
 dd Mmm YYYY: osync v1.3 release (for full changelog since v1.2 branch see all v1.3-beta/RC entries)
 
 dd Mmm YYYY: osync v1.3-RC1 release
+- Improved upgrade script
 - ! new option FORCE_CONFLICT_PREVALANCE which will always use Initiator or Target, regardless of best time
 - ! target-helper: destination mails etc on target, also, no cmd after on configs
 
+dd Mmm YYYY: osync v1.3-x release
+- Fixed osync leaving temporary log files behind in RUN_DIR (/tmp by default)
+- Updated target helper service configuration file
+- Improved codacy results
+
+22 May 2019: osync v1.3-beta3 release
+- Config file update script fixes
+- Removed old Win10 1607 bash fixes to make Win10 1809 work (breaks Win10 1607 beta bash version...Yeah, nothing I can do about that)
 
 20 May 2019: osync v1.3-beta2 release
 
@@ -18,7 +27,7 @@ dd Mmm YYYY: osync v1.3-RC1 release
 	- Added boolean update in upgrade script
 - Config file revision check
 	- Added config file revision in upgrade script
--  New option --sync-type=initator2target|target2initiator that allows using osync as rsync wrapper for unidirectional sync
+- New option --sync-type=initator2target|target2initiator that allows using osync as rsync wrapper for unidirectional sync
 - New osync target helper service
 - Fixed multiple race conditions in parallel executions (which also fixes random conflict logs failures)
 - Fixed directory softdeletion bug
