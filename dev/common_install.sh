@@ -10,7 +10,7 @@ PROGRAM_BINARY=$PROGRAM".sh"
 PROGRAM_BATCH=$PROGRAM"-batch.sh"
 SSH_FILTER="ssh_filter.sh"
 
-SCRIPT_BUILD=2019052001
+SCRIPT_BUILD=2019052201
 INSTANCE_ID="installer-$SCRIPT_BUILD"
 
 ## osync / obackup / pmocr / zsnap install script
@@ -195,7 +195,6 @@ function CopyFile {
 	local overwrite="${8:-false}"
 
 	local userGroup=""
-	local oldFileName
 
 	if [ "$destFileName" == "" ]; then
 		destFileName="$sourceFileName"
