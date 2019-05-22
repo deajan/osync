@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-# osync test suite 2019052201
+# osync test suite 2019052202
 
 
 # Allows the following environment variables
@@ -1325,7 +1325,6 @@ function test_ParallelExec () {
 
 function test_timedExecution () {
 	local arguments
-	local warnExitCode
 
 	# Clever usage of indexes and exit codes
 	# osync exits with 0 when no problem detected
