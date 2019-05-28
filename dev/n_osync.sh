@@ -7,7 +7,7 @@ PROGRAM="osync" # Rsync based two way sync engine with fault tolerance
 AUTHOR="(C) 2013-2019 by Orsiris de Jong"
 CONTACT="http://www.netpower.fr/osync - ozy@netpower.fr"
 PROGRAM_VERSION=1.3.0-beta3+dev
-PROGRAM_BUILD=2019052203
+PROGRAM_BUILD=2019052801
 IS_STABLE=false
 
 CONFIG_FILE_REVISION_REQUIRED=1.3.0
@@ -3185,8 +3185,8 @@ if [ "$LOGFILE" == "" ]; then
 else
 	LOG_FILE="$LOGFILE"
 fi
-if [ ! -w "$(dirname $LOG_FILE)" ]; then
-	echo "Cannot write to log [$(dirname $LOG_FILE)]."
+if [ ! -w "$(dirname "$LOG_FILE")" ]; then
+	echo "Cannot write to log [$(dirname "$LOG_FILE")]."
 else
 	Logger "Script begin, logging to [$LOG_FILE]." "DEBUG"
 fi
