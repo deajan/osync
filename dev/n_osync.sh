@@ -7,7 +7,7 @@ PROGRAM="osync" # Rsync based two way sync engine with fault tolerance
 AUTHOR="(C) 2013-2019 by Orsiris de Jong"
 CONTACT="http://www.netpower.fr/osync - ozy@netpower.fr"
 PROGRAM_VERSION=1.3.0-beta3+dev
-PROGRAM_BUILD=2019052801
+PROGRAM_BUILD=2019070501
 IS_STABLE=false
 
 CONFIG_FILE_REVISION_REQUIRED=1.3.0
@@ -2819,6 +2819,7 @@ function Usage {
 	echo "--initiator=\"\"		Master replica path. Will contain state and backup directory (is mandatory)"
 	echo "--target=\"\" 		Local or remote target replica path. Can be a ssh uri like ssh://user@host.com:22//path/to/target/replica (is mandatory)"
 	echo "--rsakey=\"\"		Alternative path to rsa private key for ssh connection to target replica"
+	echo "--ssh-controlmaster       Allow using a single TCP connection for all ssh calls. Will make remote sync faster, but may fail easier on lossy links"
 	echo "--password-file=\"\"      If no rsa private key is used for ssh authentication, a password file can be used"
 	echo "--remote-token=\"\"       When using ssh filter protection, you must specify the remote token set in ssh_filter.sh"
 	echo "--instance-id=\"\"	Optional sync task name to identify this synchronization task when using multiple targets"
@@ -3034,6 +3035,10 @@ function GetCommandlineArguments {
 			--password-file=*)
 			SSH_PASSWORD_FILE="${i##*=}"
 			opts=$opts" --password-file=\"$SSH_PASSWORD_FILE\""
+			;;
+			--ssh-controlmaster)
+			SSH_CONTROLMASTER=true
+			opts=$opts" --ssh-controlmaster"
 			;;
 			--instance-id=*)
 			INSTANCE_ID="${i##*=}"
