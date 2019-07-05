@@ -7,7 +7,7 @@ CONTACT="http://www.netpower.fr/osync - ozy@netpower.fr"
 OLD_PROGRAM_VERSION="v1.0x-v1.2x"
 NEW_PROGRAM_VERSION="v1.3x"
 CONFIG_FILE_REVISION=1.3.0
-PROGRAM_BUILD=2019052105
+PROGRAM_BUILD=2019070501
 
 ## type -p does not work on platforms other than linux (bash). If if does not work, always assume output is not a zero exitcode
 if ! type "$BASH" > /dev/null; then
@@ -41,6 +41,7 @@ RSYNC_EXCLUDE_FROM
 PATH_SEPARATOR_CHAR
 SSH_COMPRESSION
 SSH_IGNORE_KNOWN_HOSTS
+SSH_CONTROLMASTER
 REMOTE_HOST_PING
 REMOTE_3RD_PARTY_HOSTS
 RSYNC_OPTIONAL_ARGS
@@ -113,6 +114,7 @@ include
 ''
 \;
 true
+false
 false
 false
 'www.kernel.org www.google.com'
