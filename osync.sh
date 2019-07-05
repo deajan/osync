@@ -7,7 +7,7 @@ PROGRAM="osync" # Rsync based two way sync engine with fault tolerance
 AUTHOR="(C) 2013-2019 by Orsiris de Jong"
 CONTACT="http://www.netpower.fr/osync - ozy@netpower.fr"
 PROGRAM_VERSION=1.3.0-beta3+dev
-PROGRAM_BUILD=2019052203
+PROGRAM_BUILD=2019070501
 IS_STABLE=false
 
 CONFIG_FILE_REVISION_REQUIRED=1.3.0
@@ -90,6 +90,8 @@ else
 fi
 
 ## Special note when remote target is on the same host as initiator (happens for unit tests): we'll have to differentiate RUN_DIR so remote CleanUp won't affect initiator.
+## If the same program gets remotely executed, add _REMOTE_EXECUTION=true to it's environment so it knows it has to write into a separate directory
+## This will thus not affect local $RUN_DIR variables
 if [ "$_REMOTE_EXECUTION" == true ]; then
 	mkdir -p "$RUN_DIR/$PROGRAM.remote"
 	RUN_DIR="$RUN_DIR/$PROGRAM.remote"
@@ -399,6 +401,10 @@ function CleanUp {
 		rm -f "$RUN_DIR/$PROGRAM."*".$SCRIPT_PID.$TSTAMP"
 		# Fix for sed -i requiring backup extension for BSD & Mac (see all sed -i statements)
 		rm -f "$RUN_DIR/$PROGRAM."*".$SCRIPT_PID.$TSTAMP.tmp"
+	fi
+
+	if [ "$SSH_CONTROLMASTER" == true ]; then
+		$SSH_CMD -O exit
 	fi
 }
 
@@ -1859,6 +1865,11 @@ function PreInit {
 		SSH_OPTS="-o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no"
 	fi
 
+	## SSH ControlMaster Multiplexing
+	if [ "$SSH_CONTROLMASTER" == true ]; then
+		SSH_OPTS="$SSH_OPTS -o ControlMaster=auto -o ControlPersist=yes -o ControlPath=\"$RUN_DIR/$PROGRAM.ctrlm.%r@%h.$SCRIPT_PID.$TSTAMP\""
+	fi
+
 	## Support for older config files without RSYNC_EXECUTABLE option
 	if [ "$RSYNC_EXECUTABLE" == "" ]; then
 		RSYNC_EXECUTABLE=rsync
@@ -2374,11 +2385,11 @@ function CheckCurrentConfig {
 
 	# Full check is for initiator driven runs
 	if [ $fullCheck == true ]; then
-		declare -a booleans=(CREATE_DIRS SUDO_EXEC SSH_COMPRESSION SSH_IGNORE_KNOWN_HOSTS REMOTE_HOST_PING PRESERVE_PERMISSIONS PRESERVE_OWNER PRESERVE_GROUP PRESERVE_EXECUTABILITY PRESERVE_ACL PRESERVE_XATTR COPY_SYMLINKS KEEP_DIRLINKS PRESERVE_HARDLINKS CHECKSUM RSYNC_COMPRESS CONFLICT_BACKUP CONFLICT_BACKUP_MULTIPLE SOFT_DELETE RESUME_SYNC FORCE_STRANGER_LOCK_RESUME PARTIAL DELTA_COPIES STOP_ON_CMD_ERROR RUN_AFTER_CMD_ON_ERROR)
+		declare -a booleans=(CREATE_DIRS SUDO_EXEC SSH_COMPRESSION SSH_IGNORE_KNOWN_HOSTS REMOTE_HOST_PING PRESERVE_PERMISSIONS PRESERVE_OWNER PRESERVE_GROUP PRESERVE_EXECUTABILITY PRESERVE_ACL PRESERVE_XATTR COPY_SYMLINKS KEEP_DIRLINKS PRESERVE_HARDLINKS CHECKSUM RSYNC_COMPRESS CONFLICT_BACKUP CONFLICT_BACKUP_MULTIPLE SOFT_DELETE RESUME_SYNC FORCE_STRANGER_LOCK_RESUME PARTIAL DELTA_COPIES STOP_ON_CMD_ERROR RUN_AFTER_CMD_ON_ERROR SSH_CONTROLMASTER)
 		declare -a num_vars=(MINIMUM_SPACE BANDWIDTH SOFT_MAX_EXEC_TIME HARD_MAX_EXEC_TIME KEEP_LOGGING MIN_WAIT MAX_WAIT CONFLICT_BACKUP_DAYS SOFT_DELETE_DAYS RESUME_TRY MAX_EXEC_TIME_PER_CMD_BEFORE MAX_EXEC_TIME_PER_CMD_AFTER)
 	# target-helper runs need less configuration
 	else
-		declare -a booleans=(SUDO_EXEC SSH_COMPRESSION SSH_IGNORE_KNOWN_HOSTS REMOTE_HOST_PING)
+		declare -a booleans=(SUDO_EXEC SSH_COMPRESSION SSH_IGNORE_KNOWN_HOSTS REMOTE_HOST_PING SSH_CONTROLMASTER)
 		declare -a num_vars=(KEEP_LOGGING MIN_WAIT MAX_WAIT)
 	fi
 
@@ -2402,7 +2413,7 @@ function UpdateBooleans {
 	local update
 	local booleans
 
-	declare -a booleans=(CREATE_DIRS SUDO_EXEC SSH_COMPRESSION SSH_IGNORE_KNOWN_HOSTS REMOTE_HOST_PING PRESERVE_PERMISSIONS PRESERVE_OWNER PRESERVE_GROUP PRESERVE_EXECUTABILITY PRESERVE_ACL PRESERVE_XATTR COPY_SYMLINKS KEEP_DIRLINKS PRESERVE_HARDLINKS CHECKSUM RSYNC_COMPRESS CONFLICT_BACKUP CONFLICT_BACKUP_MULTIPLE SOFT_DELETE RESUME_SYNC FORCE_STRANGER_LOCK_RESUME PARTIAL DELTA_COPIES STOP_ON_CMD_ERROR RUN_AFTER_CMD_ON_ERROR)
+	declare -a booleans=(CREATE_DIRS SUDO_EXEC SSH_COMPRESSION SSH_IGNORE_KNOWN_HOSTS REMOTE_HOST_PING PRESERVE_PERMISSIONS PRESERVE_OWNER PRESERVE_GROUP PRESERVE_EXECUTABILITY PRESERVE_ACL PRESERVE_XATTR COPY_SYMLINKS KEEP_DIRLINKS PRESERVE_HARDLINKS CHECKSUM RSYNC_COMPRESS CONFLICT_BACKUP CONFLICT_BACKUP_MULTIPLE SOFT_DELETE RESUME_SYNC FORCE_STRANGER_LOCK_RESUME PARTIAL DELTA_COPIES STOP_ON_CMD_ERROR RUN_AFTER_CMD_ON_ERROR SSH_CONTROLMASTER)
 
 	for i in "${booleans[@]}"; do
 		update="if [ \"\$$i\" == \"yes\" ]; then $i=true; fi; if [ \"\$$i\" == \"no\" ]; then $i=false; fi"
@@ -2528,6 +2539,8 @@ else
 fi
 
 ## Special note when remote target is on the same host as initiator (happens for unit tests): we'll have to differentiate RUN_DIR so remote CleanUp won't affect initiator.
+## If the same program gets remotely executed, add _REMOTE_EXECUTION=true to it's environment so it knows it has to write into a separate directory
+## This will thus not affect local $RUN_DIR variables
 if [ "$_REMOTE_EXECUTION" == true ]; then
 	mkdir -p "$RUN_DIR/$PROGRAM.remote"
 	RUN_DIR="$RUN_DIR/$PROGRAM.remote"
@@ -2698,6 +2711,10 @@ function CleanUp {
 		rm -f "$RUN_DIR/$PROGRAM."*".$SCRIPT_PID.$TSTAMP"
 		# Fix for sed -i requiring backup extension for BSD & Mac (see all sed -i statements)
 		rm -f "$RUN_DIR/$PROGRAM."*".$SCRIPT_PID.$TSTAMP.tmp"
+	fi
+
+	if [ "$SSH_CONTROLMASTER" == true ]; then
+		$SSH_CMD -O exit
 	fi
 }
 
@@ -2894,6 +2911,8 @@ else
 fi
 
 ## Special note when remote target is on the same host as initiator (happens for unit tests): we'll have to differentiate RUN_DIR so remote CleanUp won't affect initiator.
+## If the same program gets remotely executed, add _REMOTE_EXECUTION=true to it's environment so it knows it has to write into a separate directory
+## This will thus not affect local $RUN_DIR variables
 if [ "$_REMOTE_EXECUTION" == true ]; then
 	mkdir -p "$RUN_DIR/$PROGRAM.remote"
 	RUN_DIR="$RUN_DIR/$PROGRAM.remote"
@@ -3052,6 +3071,10 @@ function CleanUp {
 		rm -f "$RUN_DIR/$PROGRAM."*".$SCRIPT_PID.$TSTAMP"
 		# Fix for sed -i requiring backup extension for BSD & Mac (see all sed -i statements)
 		rm -f "$RUN_DIR/$PROGRAM."*".$SCRIPT_PID.$TSTAMP.tmp"
+	fi
+
+	if [ "$SSH_CONTROLMASTER" == true ]; then
+		$SSH_CMD -O exit
 	fi
 }
 
@@ -3476,6 +3499,8 @@ else
 fi
 
 ## Special note when remote target is on the same host as initiator (happens for unit tests): we'll have to differentiate RUN_DIR so remote CleanUp won't affect initiator.
+## If the same program gets remotely executed, add _REMOTE_EXECUTION=true to it's environment so it knows it has to write into a separate directory
+## This will thus not affect local $RUN_DIR variables
 if [ "$_REMOTE_EXECUTION" == true ]; then
 	mkdir -p "$RUN_DIR/$PROGRAM.remote"
 	RUN_DIR="$RUN_DIR/$PROGRAM.remote"
@@ -3646,6 +3671,10 @@ function CleanUp {
 		rm -f "$RUN_DIR/$PROGRAM."*".$SCRIPT_PID.$TSTAMP"
 		# Fix for sed -i requiring backup extension for BSD & Mac (see all sed -i statements)
 		rm -f "$RUN_DIR/$PROGRAM."*".$SCRIPT_PID.$TSTAMP.tmp"
+	fi
+
+	if [ "$SSH_CONTROLMASTER" == true ]; then
+		$SSH_CMD -O exit
 	fi
 }
 
@@ -4160,6 +4189,8 @@ else
 fi
 
 ## Special note when remote target is on the same host as initiator (happens for unit tests): we'll have to differentiate RUN_DIR so remote CleanUp won't affect initiator.
+## If the same program gets remotely executed, add _REMOTE_EXECUTION=true to it's environment so it knows it has to write into a separate directory
+## This will thus not affect local $RUN_DIR variables
 if [ "$_REMOTE_EXECUTION" == true ]; then
 	mkdir -p "$RUN_DIR/$PROGRAM.remote"
 	RUN_DIR="$RUN_DIR/$PROGRAM.remote"
@@ -4281,6 +4312,10 @@ function CleanUp {
 		rm -f "$RUN_DIR/$PROGRAM."*".$SCRIPT_PID.$TSTAMP"
 		# Fix for sed -i requiring backup extension for BSD & Mac (see all sed -i statements)
 		rm -f "$RUN_DIR/$PROGRAM."*".$SCRIPT_PID.$TSTAMP.tmp"
+	fi
+
+	if [ "$SSH_CONTROLMASTER" == true ]; then
+		$SSH_CMD -O exit
 	fi
 }
 
@@ -5072,6 +5107,8 @@ else
 fi
 
 ## Special note when remote target is on the same host as initiator (happens for unit tests): we'll have to differentiate RUN_DIR so remote CleanUp won't affect initiator.
+## If the same program gets remotely executed, add _REMOTE_EXECUTION=true to it's environment so it knows it has to write into a separate directory
+## This will thus not affect local $RUN_DIR variables
 if [ "$_REMOTE_EXECUTION" == true ]; then
 	mkdir -p "$RUN_DIR/$PROGRAM.remote"
 	RUN_DIR="$RUN_DIR/$PROGRAM.remote"
@@ -5243,6 +5280,10 @@ function CleanUp {
 		# Fix for sed -i requiring backup extension for BSD & Mac (see all sed -i statements)
 		rm -f "$RUN_DIR/$PROGRAM."*".$SCRIPT_PID.$TSTAMP.tmp"
 	fi
+
+	if [ "$SSH_CONTROLMASTER" == true ]; then
+		$SSH_CMD -O exit
+	fi
 }
 
 function _SoftDeleteRemoteSub {
@@ -5383,6 +5424,8 @@ else
 fi
 
 ## Special note when remote target is on the same host as initiator (happens for unit tests): we'll have to differentiate RUN_DIR so remote CleanUp won't affect initiator.
+## If the same program gets remotely executed, add _REMOTE_EXECUTION=true to it's environment so it knows it has to write into a separate directory
+## This will thus not affect local $RUN_DIR variables
 if [ "$_REMOTE_EXECUTION" == true ]; then
 	mkdir -p "$RUN_DIR/$PROGRAM.remote"
 	RUN_DIR="$RUN_DIR/$PROGRAM.remote"
@@ -5504,6 +5547,10 @@ function CleanUp {
 		rm -f "$RUN_DIR/$PROGRAM."*".$SCRIPT_PID.$TSTAMP"
 		# Fix for sed -i requiring backup extension for BSD & Mac (see all sed -i statements)
 		rm -f "$RUN_DIR/$PROGRAM."*".$SCRIPT_PID.$TSTAMP.tmp"
+	fi
+
+	if [ "$SSH_CONTROLMASTER" == true ]; then
+		$SSH_CMD -O exit
 	fi
 }
 
@@ -5935,6 +5982,7 @@ function Usage {
 	echo "--initiator=\"\"		Master replica path. Will contain state and backup directory (is mandatory)"
 	echo "--target=\"\" 		Local or remote target replica path. Can be a ssh uri like ssh://user@host.com:22//path/to/target/replica (is mandatory)"
 	echo "--rsakey=\"\"		Alternative path to rsa private key for ssh connection to target replica"
+	echo "--ssh-controlmaster       Allow using a single TCP connection for all ssh calls. Will make remote sync faster, but may fail easier on lossy links"
 	echo "--password-file=\"\"      If no rsa private key is used for ssh authentication, a password file can be used"
 	echo "--remote-token=\"\"       When using ssh filter protection, you must specify the remote token set in ssh_filter.sh"
 	echo "--instance-id=\"\"	Optional sync task name to identify this synchronization task when using multiple targets"
@@ -6150,6 +6198,10 @@ function GetCommandlineArguments {
 			SSH_PASSWORD_FILE="${i##*=}"
 			opts=$opts" --password-file=\"$SSH_PASSWORD_FILE\""
 			;;
+			--ssh-controlmaster)
+			SSH_CONTROLMASTER=true
+			opts=$opts" --ssh-controlmaster"
+			;;
 			--instance-id=*)
 			INSTANCE_ID="${i##*=}"
 			opts=$opts" --instance-id=\"$INSTANCE_ID\""
@@ -6300,8 +6352,8 @@ if [ "$LOGFILE" == "" ]; then
 else
 	LOG_FILE="$LOGFILE"
 fi
-if [ ! -w "$(dirname $LOG_FILE)" ]; then
-	echo "Cannot write to log [$(dirname $LOG_FILE)]."
+if [ ! -w "$(dirname "$LOG_FILE")" ]; then
+	echo "Cannot write to log [$(dirname "$LOG_FILE")]."
 else
 	Logger "Script begin, logging to [$LOG_FILE]." "DEBUG"
 fi

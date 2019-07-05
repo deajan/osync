@@ -94,6 +94,8 @@ else
 fi
 
 ## Special note when remote target is on the same host as initiator (happens for unit tests): we'll have to differentiate RUN_DIR so remote CleanUp won't affect initiator.
+## If the same program gets remotely executed, add _REMOTE_EXECUTION=true to it's environment so it knows it has to write into a separate directory
+## This will thus not affect local $RUN_DIR variables
 if [ "$_REMOTE_EXECUTION" == true ]; then
 	mkdir -p "$RUN_DIR/$PROGRAM.remote"
 	RUN_DIR="$RUN_DIR/$PROGRAM.remote"
@@ -403,6 +405,10 @@ function CleanUp {
 		rm -f "$RUN_DIR/$PROGRAM."*".$SCRIPT_PID.$TSTAMP"
 		# Fix for sed -i requiring backup extension for BSD & Mac (see all sed -i statements)
 		rm -f "$RUN_DIR/$PROGRAM."*".$SCRIPT_PID.$TSTAMP.tmp"
+	fi
+
+	if [ "$SSH_CONTROLMASTER" == true ]; then
+		$SSH_CMD -O exit
 	fi
 }
 
