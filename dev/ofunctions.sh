@@ -2031,7 +2031,7 @@ function PreInit {
 
 	## SSH ControlMaster Multiplexing
 	if [ "$SSH_CONTROLMASTER" == true ]; then
-		SSH_OPTS="$SSH_OPTS -o ControlMaster=auto -o ControlPersist=yes -o ControlPath=$RUN_DIR/%r@%h"
+		SSH_OPTS="$SSH_OPTS -o ControlMaster=auto -o ControlPersist=yes -o ControlPath=\"$RUN_DIR/$PROGRAM.ctrlm.%r@%h.$SCRIPT_PID.$TSTAMP\""
 	fi
 
 	## Support for older config files without RSYNC_EXECUTABLE option
