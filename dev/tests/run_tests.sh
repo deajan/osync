@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-# osync test suite 2019052202
+# osync test suite 2019070501
 
 
 # Allows the following environment variables
@@ -22,6 +22,7 @@
 # for each test
 # 	files with spaces, subdirs
 # 	largefileset (...large ?)
+#	quickremote test with controlmaster enabled
 # 	exclusions
 # 	conflict resolution initiator with backups / multiple backups
 # 	conflict resolution target with backups / multiple backups
@@ -349,6 +350,14 @@ function test_LargeFileSet () {
 		[ -d "$TARGET_DIR/$OSYNC_STATE_DIR" ]
 		assertEquals "Target state dir exists" "0" $?
 	done
+}
+
+function test_controlMaster () {
+	cd "$OSYNC_DIR"
+
+	PrepareLocalDirs
+	REMOTE_HOST_PING=$REMOTE_PING $OSYNC_EXECUTABLE $osyncParameters[$__quickRemote] --ssh-controlmaster
+	assertEquals "Running quick remote test with controlmaster enabled." "0" $?
 }
 
 function test_Exclusions () {
