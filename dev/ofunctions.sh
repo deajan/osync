@@ -116,6 +116,8 @@ else
 fi
 
 ## Special note when remote target is on the same host as initiator (happens for unit tests): we'll have to differentiate RUN_DIR so remote CleanUp won't affect initiator.
+## If the same program gets remotely executed, add _REMOTE_EXECUTION=true to it's environment so it knows it has to write into a separate directory
+## This will thus not affect local $RUN_DIR variables
 if [ "$_REMOTE_EXECUTION" == true ]; then
 	mkdir -p "$RUN_DIR/$PROGRAM.remote"
 	RUN_DIR="$RUN_DIR/$PROGRAM.remote"
