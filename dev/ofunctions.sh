@@ -450,6 +450,10 @@ function CleanUp {
 		# Fix for sed -i requiring backup extension for BSD & Mac (see all sed -i statements)
 		rm -f "$RUN_DIR/$PROGRAM."*".$SCRIPT_PID.$TSTAMP.tmp"
 	fi
+
+	if [ "$SSH_CONTROLMASTER" == true ]; then
+		$SSH_CMD -O exit
+	fi
 }
 #### CleanUp SUBSET END ####
 
@@ -2023,6 +2027,11 @@ function PreInit {
 	## Ignore SSH known host verification
 	if [ "$SSH_IGNORE_KNOWN_HOSTS" == true ]; then
 		SSH_OPTS="-o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no"
+	fi
+
+	## SSH ControlMaster Multiplexing
+	if [ "$SSH_CONTROLMASTER" == true ]; then
+		SSH_OPTS="$SSH_OPTS -o ControlMaster=auto -o ControlPersist=yes -o ControlPath=$RUN_DIR/%r@%h"
 	fi
 
 	## Support for older config files without RSYNC_EXECUTABLE option
