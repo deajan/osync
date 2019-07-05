@@ -31,7 +31,7 @@
 #### OFUNCTIONS MINI SUBSET ####
 #### OFUNCTIONS MICRO SUBSET ####
 _OFUNCTIONS_VERSION=2.3.0-dev-postRC2
-_OFUNCTIONS_BUILD=2019052203
+_OFUNCTIONS_BUILD=2019070501
 #### _OFUNCTIONS_BOOTSTRAP SUBSET ####
 _OFUNCTIONS_BOOTSTRAP=true
 #### _OFUNCTIONS_BOOTSTRAP SUBSET END ####
@@ -125,31 +125,7 @@ fi
 #### RUN_DIR SUBSET END ####
 
 #### PoorMansRandomGenerator SUBSET ####
-# Get a random number on Windows BusyBox alike, also works on most Unixes that have dd, if dd is not found, then return $RANDOM
-function PoorMansRandomGenerator {
-	local digits="${1}" # The number of digits to generate
-	local number
-	local isFirst=true
-
-	if type dd >/dev/null 2>&1; then
-
-		# Some read bytes can't be used, se we read twice the number of required bytes
-		dd if=/dev/urandom bs=$digits count=2 2> /dev/null | while read -r -n1 char; do
-			if [ $isFirst == false ] || [ $(printf "%d" "'$char") != "0" ]; then
-				number=$number$(printf "%d" "'$char")
-				isFirst=false
-			fi
-			if [ ${#number} -ge $digits ]; then
-				echo ${number:0:$digits}
-				break;
-			fi
-		done
-	elif [ "$RANDOM" -ne 0 ]; then
-		 echo $RANDOM
-	else
-		Logger "Cannot generate random number." "ERROR"
-	fi
-}
+# Get a random number of digits length on Windows BusyBox alike, also works on most Unixes that have dd
 function PoorMansRandomGenerator {
 	local digits="${1}" # The number of digits to generate
 	local number
