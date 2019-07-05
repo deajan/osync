@@ -31,7 +31,7 @@
 #### OFUNCTIONS MINI SUBSET ####
 #### OFUNCTIONS MICRO SUBSET ####
 _OFUNCTIONS_VERSION=2.3.0-dev-postRC2
-_OFUNCTIONS_BUILD=2019070501
+_OFUNCTIONS_BUILD=2019070502
 #### _OFUNCTIONS_BOOTSTRAP SUBSET ####
 _OFUNCTIONS_BOOTSTRAP=true
 #### _OFUNCTIONS_BOOTSTRAP SUBSET END ####
@@ -84,7 +84,29 @@ if [ "$SLEEP_TIME" == "" ]; then # Leave the possibity to set SLEEP_TIME as envi
 fi
 #### DEBUG SUBSET END ####
 
+# The variables SCRIPT_PID and TSTAMP needs to be declared as soon as the program begins. The function PoorMansRandomGenerator is needed for TSTAMP (since some systems date function does not give nanoseconds)
+
 SCRIPT_PID=$$
+
+#### PoorMansRandomGenerator SUBSET ####
+# Get a random number of digits length on Windows BusyBox alike, also works on most Unixes that have dd
+function PoorMansRandomGenerator {
+	local digits="${1}" # The number of digits to generate
+	local number
+
+	# Some read bytes can't be used, se we read twice the number of required bytes
+	dd if=/dev/urandom bs=$digits count=2 2> /dev/null | while read -r -n1 char; do
+		number=$number$(printf "%d" "'$char")
+		if [ ${#number} -ge $digits ]; then
+			echo ${number:0:$digits}
+			break;
+		fi
+	done
+}
+#### PoorMansRandomGenerator SUBSET END ####
+
+# Initial TSTMAP value before function declaration
+TSTAMP=$(date '+%Y%m%dT%H%M%S').$(PoorMansRandomGenerator 5)
 
 LOCAL_USER=$(whoami)
 LOCAL_HOST=$(hostname)
@@ -119,30 +141,10 @@ fi
 ## If the same program gets remotely executed, add _REMOTE_EXECUTION=true to it's environment so it knows it has to write into a separate directory
 ## This will thus not affect local $RUN_DIR variables
 if [ "$_REMOTE_EXECUTION" == true ]; then
-	mkdir -p "$RUN_DIR/$PROGRAM.remote"
-	RUN_DIR="$RUN_DIR/$PROGRAM.remote"
+	mkdir -p "$RUN_DIR/$PROGRAM.remote.$SCRIPT_PID.$TSTAMP"
+	RUN_DIR="$RUN_DIR/$PROGRAM.remote.$SCRIPT_PID.$TSTAMP"
 fi
 #### RUN_DIR SUBSET END ####
-
-#### PoorMansRandomGenerator SUBSET ####
-# Get a random number of digits length on Windows BusyBox alike, also works on most Unixes that have dd
-function PoorMansRandomGenerator {
-	local digits="${1}" # The number of digits to generate
-	local number
-
-	# Some read bytes can't be used, se we read twice the number of required bytes
-	dd if=/dev/urandom bs=$digits count=2 2> /dev/null | while read -r -n1 char; do
-		number=$number$(printf "%d" "'$char")
-		if [ ${#number} -ge $digits ]; then
-			echo ${number:0:$digits}
-			break;
-		fi
-	done
-}
-#### PoorMansRandomGenerator SUBSET END ####
-
-# Initial TSTMAP value before function declaration
-TSTAMP=$(date '+%Y%m%dT%H%M%S').$(PoorMansRandomGenerator 5)
 
 # Default alert attachment filename
 ALERT_LOG_FILE="$RUN_DIR/$PROGRAM.$SCRIPT_PID.$TSTAMP.last.log"
@@ -422,6 +424,11 @@ function KillAllChilds {
 #### CleanUp SUBSET ####
 function CleanUp {
 	if [ "$_DEBUG" != true ]; then
+		# Removing optional remote $RUN_DIR that goes into local $RUN_DIR
+		if [ -d "$RUN_DIR/$PROGRAM.remote.$SCRIPT_PID.$TSTAMP" ]; then
+			rm -rf "$RUN_DIR/$PROGRAM.remote.$SCRIPT_PID.$TSTAMP"
+                fi
+		# Removing all temporary run files
 		rm -f "$RUN_DIR/$PROGRAM."*".$SCRIPT_PID.$TSTAMP"
 		# Fix for sed -i requiring backup extension for BSD & Mac (see all sed -i statements)
 		rm -f "$RUN_DIR/$PROGRAM."*".$SCRIPT_PID.$TSTAMP.tmp"
