@@ -6,15 +6,15 @@
 PROGRAM="osync" # Rsync based two way sync engine with fault tolerance
 AUTHOR="(C) 2013-2019 by Orsiris de Jong"
 CONTACT="http://www.netpower.fr/osync - ozy@netpower.fr"
-PROGRAM_VERSION=1.3.0-beta3+dev
-PROGRAM_BUILD=2019070501
+PROGRAM_VERSION=1.3.0-prerc1
+PROGRAM_BUILD=2019070901
 IS_STABLE=false
 
 CONFIG_FILE_REVISION_REQUIRED=1.3.0
 
 
 _OFUNCTIONS_VERSION=2.3.0-dev-postRC2
-_OFUNCTIONS_BUILD=2019070502
+_OFUNCTIONS_BUILD=20190701901
 _OFUNCTIONS_BOOTSTRAP=true
 
 if ! type "$BASH" > /dev/null; then
@@ -375,6 +375,11 @@ function KillAllChilds {
 }
 
 function CleanUp {
+	# Exit controlmaster before it's socket gets deleted
+	if [ "$SSH_CONTROLMASTER" == true ] && [ "$SSH_CMD" != "" ]; then
+		$SSH_CMD -O exit
+	fi
+
 	if [ "$_DEBUG" != true ]; then
 		# Removing optional remote $RUN_DIR that goes into local $RUN_DIR
 		if [ -d "$RUN_DIR/$PROGRAM.remote.$SCRIPT_PID.$TSTAMP" ]; then
@@ -384,10 +389,6 @@ function CleanUp {
 		rm -f "$RUN_DIR/$PROGRAM."*".$SCRIPT_PID.$TSTAMP"
 		# Fix for sed -i requiring backup extension for BSD & Mac (see all sed -i statements)
 		rm -f "$RUN_DIR/$PROGRAM."*".$SCRIPT_PID.$TSTAMP.tmp"
-	fi
-
-	if [ "$SSH_CONTROLMASTER" == true ]; then
-		$SSH_CMD -O exit
 	fi
 }
 
@@ -539,8 +540,11 @@ function SendEmail {
 				echo -e "Subject:$subject\r\n$message" | $(type -p sendmail) -f "$senderMail" -H "exec openssl s_client -quiet -tls1_2 -starttls smtp -connect $smtpServer:$smtpPort" -au"$smtpUser" -ap"$smtpPassword" "$destinationMails"
 			elif [ "$encryption" == "ssl" ]; then
 				echo -e "Subject:$subject\r\n$message" | $(type -p sendmail) -f "$senderMail" -H "exec openssl s_client -quiet -connect $smtpServer:$smtpPort" -au"$smtpUser" -ap"$smtpPassword" "$destinationMails"
+			elif [ "$encryption" == "none" ]; then
+				echo -e "Subject:$subject\r\n$message" | $(type -p sendmail) -f "$senderMail" -S "$smtpServer:$smtpPort" -au"$smtpUser" -ap"$smtpPassword" "$destinationMails"
 			else
 				echo -e "Subject:$subject\r\n$message" | $(type -p sendmail) -f "$senderMail" -S "$smtpServer:$smtpPort" -au"$smtpUser" -ap"$smtpPassword" "$destinationMails"
+				Logger "Bogus email encryption used [$encryption]." "WARN"
 			fi
 
 			if [ $? -ne 0 ]; then
@@ -2511,6 +2515,7 @@ env _DEBUG="'$_DEBUG'" env _PARANOIA_DEBUG="'$_PARANOIA_DEBUG'" env _LOGGER_SILE
 env _REMOTE_EXECUTION="true" env PROGRAM="'$PROGRAM'" env SCRIPT_PID="'$SCRIPT_PID'" env TSTAMP="'$TSTAMP'" \
 env replicaPath="'$replicaPath'" env CREATE_DIRS="'$CREATE_DIRS'" env DF_CMD="'$DF_CMD'" env MINIMUM_SPACE="'$MINIMUM_SPACE'" \
 env LC_ALL=C $COMMAND_SUDO' bash -s' << 'ENDSSH' > "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$replicaType.$SCRIPT_PID.$TSTAMP" 2>&1
+_REMOTE_TOKEN=(o_0)
 ## Default directory where to store temporary run files
 
 if [ -w /tmp ]; then
@@ -2690,6 +2695,11 @@ function RemoteLogger {
 	fi
 }
 function CleanUp {
+	# Exit controlmaster before it's socket gets deleted
+	if [ "$SSH_CONTROLMASTER" == true ] && [ "$SSH_CMD" != "" ]; then
+		$SSH_CMD -O exit
+	fi
+
 	if [ "$_DEBUG" != true ]; then
 		# Removing optional remote $RUN_DIR that goes into local $RUN_DIR
 		if [ -d "$RUN_DIR/$PROGRAM.remote.$SCRIPT_PID.$TSTAMP" ]; then
@@ -2699,10 +2709,6 @@ function CleanUp {
 		rm -f "$RUN_DIR/$PROGRAM."*".$SCRIPT_PID.$TSTAMP"
 		# Fix for sed -i requiring backup extension for BSD & Mac (see all sed -i statements)
 		rm -f "$RUN_DIR/$PROGRAM."*".$SCRIPT_PID.$TSTAMP.tmp"
-	fi
-
-	if [ "$SSH_CONTROLMASTER" == true ]; then
-		$SSH_CMD -O exit
 	fi
 }
 
@@ -2888,6 +2894,7 @@ env _REMOTE_EXECUTION="true" env PROGRAM="'$PROGRAM'" env SCRIPT_PID="'$SCRIPT_P
 env replicaStateDir="'$replicaStateDir'" env initiatorRunningPidsFlat="\"(${initiatorRunningPids[@]})\"" env lockfile="'$lockfile'" env replicaType="'$replicaType'" env overwrite="'$overwrite'" \
 env INSTANCE_ID="'$INSTANCE_ID'" env FORCE_STRANGER_LOCK_RESUME="'$FORCE_STRANGER_LOCK_RESUME'" \
 env LC_ALL=C $COMMAND_SUDO' bash -s' << 'ENDSSH' > "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$replicaType.$SCRIPT_PID.$TSTAMP" 2>&1
+_REMOTE_TOKEN=(o_0)
 ## Default directory where to store temporary run files
 
 if [ -w /tmp ]; then
@@ -3055,6 +3062,11 @@ function RemoteLogger {
 	fi
 }
 function CleanUp {
+	# Exit controlmaster before it's socket gets deleted
+	if [ "$SSH_CONTROLMASTER" == true ] && [ "$SSH_CMD" != "" ]; then
+		$SSH_CMD -O exit
+	fi
+
 	if [ "$_DEBUG" != true ]; then
 		# Removing optional remote $RUN_DIR that goes into local $RUN_DIR
 		if [ -d "$RUN_DIR/$PROGRAM.remote.$SCRIPT_PID.$TSTAMP" ]; then
@@ -3064,10 +3076,6 @@ function CleanUp {
 		rm -f "$RUN_DIR/$PROGRAM."*".$SCRIPT_PID.$TSTAMP"
 		# Fix for sed -i requiring backup extension for BSD & Mac (see all sed -i statements)
 		rm -f "$RUN_DIR/$PROGRAM."*".$SCRIPT_PID.$TSTAMP.tmp"
-	fi
-
-	if [ "$SSH_CONTROLMASTER" == true ]; then
-		$SSH_CMD -O exit
 	fi
 }
 
@@ -3249,6 +3257,7 @@ $SSH_CMD env _REMOTE_TOKEN="$_REMOTE_TOKEN" \
 env _DEBUG="'$_DEBUG'" env _PARANOIA_DEBUG="'$_PARANOIA_DEBUG'" env _LOGGER_SILENT="'$_LOGGER_SILENT'" env _LOGGER_VERBOSE="'$_LOGGER_VERBOSE'" env _LOGGER_PREFIX="'$_LOGGER_PREFIX'" env _LOGGER_ERR_ONLY="'$_LOGGER_ERR_ONLY'" \
 env _REMOTE_EXECUTION="true" env PROGRAM="'$PROGRAM'" env SCRIPT_PID="'$SCRIPT_PID'" env TSTAMP="'$TSTAMP'" env lockfile="'$lockfile'" \
 env LC_ALL=C $COMMAND_SUDO' bash -s' << 'ENDSSH' > "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$replicaType.$SCRIPT_PID.$TSTAMP" 2>&1
+_REMOTE_TOKEN=(o_0)
 if [ -f "$lockfile" ]; then
 	rm -f "$lockfile"
 fi
@@ -3481,6 +3490,7 @@ env _DEBUG="'$_DEBUG'" env _PARANOIA_DEBUG="'$_PARANOIA_DEBUG'" env _LOGGER_SILE
 env _REMOTE_EXECUTION="true" env PROGRAM="'$PROGRAM'" env SCRIPT_PID="'$SCRIPT_PID'" env TSTAMP="'$TSTAMP'" \
 env replicaPath="'$replicaPath'" env replicaType="'$replicaType'" env REMOTE_STAT_CTIME_MTIME_CMD="'$REMOTE_STAT_CTIME_MTIME_CMD'" \
 env LC_ALL=C $COMMAND_SUDO' bash -s' << 'ENDSSH' > "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$replicaType.$SCRIPT_PID.$TSTAMP"
+_REMOTE_TOKEN=(o_0)
 ## Default directory where to store temporary run files
 
 if [ -w /tmp ]; then
@@ -3660,6 +3670,11 @@ function RemoteLogger {
 	fi
 }
 function CleanUp {
+	# Exit controlmaster before it's socket gets deleted
+	if [ "$SSH_CONTROLMASTER" == true ] && [ "$SSH_CMD" != "" ]; then
+		$SSH_CMD -O exit
+	fi
+
 	if [ "$_DEBUG" != true ]; then
 		# Removing optional remote $RUN_DIR that goes into local $RUN_DIR
 		if [ -d "$RUN_DIR/$PROGRAM.remote.$SCRIPT_PID.$TSTAMP" ]; then
@@ -3669,10 +3684,6 @@ function CleanUp {
 		rm -f "$RUN_DIR/$PROGRAM."*".$SCRIPT_PID.$TSTAMP"
 		# Fix for sed -i requiring backup extension for BSD & Mac (see all sed -i statements)
 		rm -f "$RUN_DIR/$PROGRAM."*".$SCRIPT_PID.$TSTAMP.tmp"
-	fi
-
-	if [ "$SSH_CONTROLMASTER" == true ]; then
-		$SSH_CMD -O exit
 	fi
 }
 
@@ -4176,6 +4187,7 @@ env _DRYRUN="'$_DRYRUN'" \
 env FILE_LIST="'${TARGET[$__replicaDir]}${TARGET[$__stateDir]}/$deletionListFromReplica${INITIATOR[$__deletedListFile]}'" env REPLICA_DIR="'$replicaDir'" env SOFT_DELETE="'$SOFT_DELETE'" \
 env DELETION_DIR="'$(EscapeSpaces "$deletionDir")'" env FAILED_DELETE_LIST="'$failedDeleteList'" env SUCCESS_DELETE_LIST="'$successDeleteList'" env REPLICA_TYPE="'$replicaType'" \
 env LC_ALL=C $COMMAND_SUDO' bash -s' << 'ENDSSH' >> "$RUN_DIR/$PROGRAM.remote_deletion.$SCRIPT_PID.$TSTAMP" 2>&1
+_REMOTE_TOKEN=(o_0)
 ## Default directory where to store temporary run files
 
 if [ -w /tmp ]; then
@@ -4306,6 +4318,11 @@ function RemoteLogger {
 	fi
 }
 function CleanUp {
+	# Exit controlmaster before it's socket gets deleted
+	if [ "$SSH_CONTROLMASTER" == true ] && [ "$SSH_CMD" != "" ]; then
+		$SSH_CMD -O exit
+	fi
+
 	if [ "$_DEBUG" != true ]; then
 		# Removing optional remote $RUN_DIR that goes into local $RUN_DIR
 		if [ -d "$RUN_DIR/$PROGRAM.remote.$SCRIPT_PID.$TSTAMP" ]; then
@@ -4315,10 +4332,6 @@ function CleanUp {
 		rm -f "$RUN_DIR/$PROGRAM."*".$SCRIPT_PID.$TSTAMP"
 		# Fix for sed -i requiring backup extension for BSD & Mac (see all sed -i statements)
 		rm -f "$RUN_DIR/$PROGRAM."*".$SCRIPT_PID.$TSTAMP.tmp"
-	fi
-
-	if [ "$SSH_CONTROLMASTER" == true ]; then
-		$SSH_CMD -O exit
 	fi
 }
 
@@ -5099,6 +5112,7 @@ env _DEBUG="'$_DEBUG'" env _PARANOIA_DEBUG="'$_PARANOIA_DEBUG'" env _LOGGER_SILE
 env _REMOTE_EXECUTION="true" env PROGRAM="'$PROGRAM'" env SCRIPT_PID="'$SCRIPT_PID'" env TSTAMP="'$TSTAMP'" \
 env _DRYRUN="'$_DRYRUN'" env replicaType="'$replicaType'" env replicaDeletionPath="'$replicaDeletionPath'" env changeTime="'$changeTime'" env REMOTE_FIND_CMD="'$REMOTE_FIND_CMD'" \
 env LC_ALL=C $COMMAND_SUDO' bash -s' << 'ENDSSH' > "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$replicaType.$SCRIPT_PID.$TSTAMP" 2>&1
+_REMOTE_TOKEN=(o_0)
 ## Default directory where to store temporary run files
 
 if [ -w /tmp ]; then
@@ -5278,6 +5292,11 @@ function RemoteLogger {
 	fi
 }
 function CleanUp {
+	# Exit controlmaster before it's socket gets deleted
+	if [ "$SSH_CONTROLMASTER" == true ] && [ "$SSH_CMD" != "" ]; then
+		$SSH_CMD -O exit
+	fi
+
 	if [ "$_DEBUG" != true ]; then
 		# Removing optional remote $RUN_DIR that goes into local $RUN_DIR
 		if [ -d "$RUN_DIR/$PROGRAM.remote.$SCRIPT_PID.$TSTAMP" ]; then
@@ -5287,10 +5306,6 @@ function CleanUp {
 		rm -f "$RUN_DIR/$PROGRAM."*".$SCRIPT_PID.$TSTAMP"
 		# Fix for sed -i requiring backup extension for BSD & Mac (see all sed -i statements)
 		rm -f "$RUN_DIR/$PROGRAM."*".$SCRIPT_PID.$TSTAMP.tmp"
-	fi
-
-	if [ "$SSH_CONTROLMASTER" == true ]; then
-		$SSH_CMD -O exit
 	fi
 }
 
@@ -5421,6 +5436,7 @@ env _DEBUG="'$_DEBUG'" env _PARANOIA_DEBUG="'$_PARANOIA_DEBUG'" env _LOGGER_SILE
 env _REMOTE_EXECUTION="true" env PROGRAM="'$PROGRAM'" env SCRIPT_PID="'$SCRIPT_PID'" env TSTAMP="'$TSTAMP'" \
 env INSTANCE_ID="'$INSTANCE_ID'" env PUSH_FILE="'$(EscapeSpaces "${INITIATOR[$__replicaDir]}${INITIATOR[$__updateTriggerFile]}")'" \
 env LC_ALL=C $COMMAND_SUDO' bash -s' << 'ENDSSH' > "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$SCRIPT_PID.$TSTAMP" 2> "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.error.$SCRIPT_PID.$TSTAMP"
+_REMOTE_TOKEN=(o_0)
 ## Default directory where to store temporary run files
 
 if [ -w /tmp ]; then
@@ -5551,6 +5567,11 @@ function RemoteLogger {
 	fi
 }
 function CleanUp {
+	# Exit controlmaster before it's socket gets deleted
+	if [ "$SSH_CONTROLMASTER" == true ] && [ "$SSH_CMD" != "" ]; then
+		$SSH_CMD -O exit
+	fi
+
 	if [ "$_DEBUG" != true ]; then
 		# Removing optional remote $RUN_DIR that goes into local $RUN_DIR
 		if [ -d "$RUN_DIR/$PROGRAM.remote.$SCRIPT_PID.$TSTAMP" ]; then
@@ -5560,10 +5581,6 @@ function CleanUp {
 		rm -f "$RUN_DIR/$PROGRAM."*".$SCRIPT_PID.$TSTAMP"
 		# Fix for sed -i requiring backup extension for BSD & Mac (see all sed -i statements)
 		rm -f "$RUN_DIR/$PROGRAM."*".$SCRIPT_PID.$TSTAMP.tmp"
-	fi
-
-	if [ "$SSH_CONTROLMASTER" == true ]; then
-		$SSH_CMD -O exit
 	fi
 }
 

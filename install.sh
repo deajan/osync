@@ -18,7 +18,7 @@ INSTANCE_ID="installer-$SCRIPT_BUILD"
 ## Please adapt this to fit your distro needs
 
 _OFUNCTIONS_VERSION=2.3.0-dev-postRC2
-_OFUNCTIONS_BUILD=2019070502
+_OFUNCTIONS_BUILD=20190701901
 _OFUNCTIONS_BOOTSTRAP=true
 
 if ! type "$BASH" > /dev/null; then
@@ -379,6 +379,11 @@ function KillAllChilds {
 }
 
 function CleanUp {
+	# Exit controlmaster before it's socket gets deleted
+	if [ "$SSH_CONTROLMASTER" == true ] && [ "$SSH_CMD" != "" ]; then
+		$SSH_CMD -O exit
+	fi
+
 	if [ "$_DEBUG" != true ]; then
 		# Removing optional remote $RUN_DIR that goes into local $RUN_DIR
 		if [ -d "$RUN_DIR/$PROGRAM.remote.$SCRIPT_PID.$TSTAMP" ]; then
@@ -388,10 +393,6 @@ function CleanUp {
 		rm -f "$RUN_DIR/$PROGRAM."*".$SCRIPT_PID.$TSTAMP"
 		# Fix for sed -i requiring backup extension for BSD & Mac (see all sed -i statements)
 		rm -f "$RUN_DIR/$PROGRAM."*".$SCRIPT_PID.$TSTAMP.tmp"
-	fi
-
-	if [ "$SSH_CONTROLMASTER" == true ]; then
-		$SSH_CMD -O exit
 	fi
 }
 
