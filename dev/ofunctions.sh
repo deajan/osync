@@ -31,7 +31,7 @@
 #### OFUNCTIONS MINI SUBSET ####
 #### OFUNCTIONS MICRO SUBSET ####
 _OFUNCTIONS_VERSION=2.3.0-dev-postRC2
-_OFUNCTIONS_BUILD=2019080802
+_OFUNCTIONS_BUILD=2019080803
 #### _OFUNCTIONS_BOOTSTRAP SUBSET ####
 _OFUNCTIONS_BOOTSTRAP=true
 #### _OFUNCTIONS_BOOTSTRAP SUBSET END ####
@@ -569,7 +569,7 @@ function SendEmail {
 	if [ "$MAIL_BODY_CHARSET" != "" ]; then
 		if type iconv > /dev/null 2>&1; then
 			echo "$message" | iconv -f UTF-8 -t $MAIL_BODY_CHARSET -o "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.iconv.$SCRIPT_PID.$TSTAMP"
-			message="$(head -c16384 "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.iconv.$SCRIPT_PID.$TSTAMP")"
+			message="$(cat "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.iconv.$SCRIPT_PID.$TSTAMP")"
 		else
 			Logger "iconv utility not installed. Will not convert email charset." "NOTICE"
 		fi
@@ -1107,7 +1107,7 @@ function ExecTasks {
 								Logger "Command was [${commandsArrayPid[$pid]}]." "ERROR"
 							fi
 							if [ -f "${commandsArrayOutput[$pid]}" ]; then
-								Logger "Command output was [$(head -c16384 "${commandsArrayOutput[$pid]}")\n]." "ERROR"
+								Logger "Command output was (first 16KB): [$(head -c16384 "${commandsArrayOutput[$pid]}")\n]." "ERROR"
 							fi
 						fi
 						errorcount=$((errorcount+1))
@@ -1514,10 +1514,10 @@ function GetLocalOS {
 
 	# Get linux versions
 	if [ -f "/etc/os-release" ]; then
-		localOsName=$(GetConfFileValue "/etc/os-release" "NAME" true)
-		localOsVer=$(GetConfFileValue "/etc/os-release" "VERSION" true)
+		localOsName="$(GetConfFileValue "/etc/os-release" "NAME" true)"
+		localOsVer="$(GetConfFileValue "/etc/os-release" "VERSION" true)"
 	elif [ "$LOCAL_OS" == "BusyBox" ]; then
-		localOsVer=$(ls --help 2>&1 | head -1 | cut -f2 -d' ')
+		localOsVer="$(ls --help 2>&1 | head -1 | cut -f2 -d' ')"
 		localOsName="BusyBox"
 	fi
 
@@ -1658,7 +1658,7 @@ function GetOs {
 		localOsVer=$(grep "^VERSION=" "$osInfo")
 		localOsVer="${localOsVer##*=}"
 	elif [ "$localOsVar" == "BusyBox" ]; then
-		localOsVer=`ls --help 2>&1 | head -1 | cut -f2 -d' '`
+		localOsVer=$(ls --help 2>&1 | head -1 | cut -f2 -d' ')
 		localOsName="BusyBox"
 	fi
 
@@ -1770,7 +1770,7 @@ function RunLocalCommand {
 	fi
 
 	if [ $_LOGGER_VERBOSE == true ] || [ $retval -ne 0 ]; then
-		Logger "Command output:\n$(head -c16384 "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$SCRIPT_PID.$TSTAMP")" "NOTICE"
+		Logger "Command output (first 16KB) :\n$(head -c16384 "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$SCRIPT_PID.$TSTAMP")" "NOTICE"
 	fi
 
 	if [ "$STOP_ON_CMD_ERROR" == true ] && [ $retval -ne 0 ]; then
@@ -1813,7 +1813,7 @@ function RunRemoteCommand {
 
 	if [ -f "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$SCRIPT_PID.$TSTAMP" ] && ([ $_LOGGER_VERBOSE == true ] || [ $retval -ne 0 ])
 	then
-		Logger "Command output:\n$(head -c16384 "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$SCRIPT_PID.$TSTAMP")" "NOTICE"
+		Logger "Command output (first 16KB):\n$(head -c16384 "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$SCRIPT_PID.$TSTAMP")" "NOTICE"
 	fi
 
 	if [ "$STOP_ON_CMD_ERROR" == true ] && [ $retval -ne 0 ]; then
