@@ -31,7 +31,7 @@
 #### OFUNCTIONS MINI SUBSET ####
 #### OFUNCTIONS MICRO SUBSET ####
 _OFUNCTIONS_VERSION=2.3.0-dev-postRC2
-_OFUNCTIONS_BUILD=2019080804
+_OFUNCTIONS_BUILD=2019080805
 #### _OFUNCTIONS_BOOTSTRAP SUBSET ####
 _OFUNCTIONS_BOOTSTRAP=true
 #### _OFUNCTIONS_BOOTSTRAP SUBSET END ####
@@ -1051,9 +1051,9 @@ function ExecTasks {
 	function _ExecTasksPidsCheck {
 		newPidsArray=()
 
-		if [ "$currentRunningPids" != "${pidsArray[@]}" ]; then
+		if [ "$currentRunningPids" != "$(joinString " " ${pidsArray[@]})" ]; then
 			Logger "ExecTask running for pids [${pidsArray[@]}]." "DEBUG"
-			currentRunningPids="${pidsArray[@]}"
+			currentRunningPids="$(joinString " " ${pidsArray[@]})"
 		fi
 
 		for pid in "${pidsArray[@]}"; do
