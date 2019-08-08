@@ -31,7 +31,7 @@
 #### OFUNCTIONS MINI SUBSET ####
 #### OFUNCTIONS MICRO SUBSET ####
 _OFUNCTIONS_VERSION=2.3.0-dev-postRC2
-_OFUNCTIONS_BUILD=2019080803
+_OFUNCTIONS_BUILD=2019080804
 #### _OFUNCTIONS_BOOTSTRAP SUBSET ####
 _OFUNCTIONS_BOOTSTRAP=true
 #### _OFUNCTIONS_BOOTSTRAP SUBSET END ####
@@ -937,6 +937,7 @@ function ExecTasks {
 	local softAlert=false		# Does a soft alert need to be triggered, if yes, send an alert once
 	local failedPidsList		# List containing failed pids with exit code separated by semicolons (eg : 2355:1;4534:2;2354:3)
 	local randomOutputName		# Random filename for command outputs
+	local currentRunningPids	# String of pids running, used for debugging purposes only
 
 	# Initialise global variable
 	eval "WAIT_FOR_TASK_COMPLETION_$id=\"\""
@@ -1049,6 +1050,11 @@ function ExecTasks {
 
 	function _ExecTasksPidsCheck {
 		newPidsArray=()
+
+		if [ "$currentRunningPids" != "${pidsArray[@]}" ]; then
+			Logger "ExecTask running for pids [${pidsArray[@]}]." "DEBUG"
+			currentRunningPids="${pidsArray[@]}"
+		fi
 
 		for pid in "${pidsArray[@]}"; do
 			if [ $(IsInteger $pid) -eq 1 ]; then
