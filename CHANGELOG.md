@@ -12,9 +12,12 @@ dd Mmm YYYY: osync v1.3-RC1 release
 - ! target-helper: destination mails etc on target, also, no cmd after on configs
 
 dd Mmm YYYY: osync v1.3-x release
+- Fixed a possible bash buffer overflow when synchronizing large filesets (tested with 2M files)
+	- This fix actually truncats every string sent to Logger not being more than 16KB
 - Fixed osync leaving temporary log files behind in RUN_DIR (/tmp by default)
 - Updated target helper service configuration file
 - Improved codacy results
+- Added more debugging
 
 22 May 2019: osync v1.3-beta3 release
 - Config file update script fixes
