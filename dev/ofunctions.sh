@@ -284,7 +284,7 @@ function Logger {
 
 	## Obfuscate _REMOTE_TOKEN in logs (for ssh_filter usage only in osync and obackup)
 	value="${value/env _REMOTE_TOKEN=$_REMOTE_TOKEN/env _REMOTE_TOKEN=__(o_O)__}"
-	value="${value/env _REMOTE_TOKEN=\$_REMOTE_TOKEN/env REMOTE_TOKEN=__(o_O)__}"
+	value="${value/env _REMOTE_TOKEN=\$_REMOTE_TOKEN/env _REMOTE_TOKEN=__(o_O)__}"
 
 	if [ "$level" == "CRITICAL" ]; then
 		_Logger "$prefix($level):$value" "$prefix\e[1;33;41m$value\e[0m" true
