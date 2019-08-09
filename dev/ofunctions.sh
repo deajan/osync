@@ -31,7 +31,7 @@
 #### OFUNCTIONS MINI SUBSET ####
 #### OFUNCTIONS MICRO SUBSET ####
 _OFUNCTIONS_VERSION=2.3.0-dev-postRC2
-_OFUNCTIONS_BUILD=2019080903
+_OFUNCTIONS_BUILD=2019080904
 #### _OFUNCTIONS_BOOTSTRAP SUBSET ####
 _OFUNCTIONS_BOOTSTRAP=true
 #### _OFUNCTIONS_BOOTSTRAP SUBSET END ####
@@ -1113,7 +1113,7 @@ function ExecTasks {
 								Logger "Command was [${commandsArrayPid[$pid]}]." "ERROR"
 							fi
 							if [ -f "${commandsArrayOutput[$pid]}" ]; then
-								Logger "Command output was (first 16KB): [$(head -c16384 "${commandsArrayOutput[$pid]}")\n]." "ERROR"
+								Logger "Truncated output:\n$(head -c16384 "${commandsArrayOutput[$pid]}")" "ERROR"
 							fi
 						fi
 						errorcount=$((errorcount+1))
@@ -1775,7 +1775,7 @@ function RunLocalCommand {
 	fi
 
 	if [ $_LOGGER_VERBOSE == true ] || [ $retval -ne 0 ]; then
-		Logger "Command output (first 16KB) :\n$(head -c16384 "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$SCRIPT_PID.$TSTAMP")" "NOTICE"
+		Logger "Truncated output:\n$(head -c16384 "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$SCRIPT_PID.$TSTAMP")" "NOTICE"
 	fi
 
 	if [ "$STOP_ON_CMD_ERROR" == true ] && [ $retval -ne 0 ]; then
@@ -1817,7 +1817,7 @@ function RunRemoteCommand {
 
 	if [ -f "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$SCRIPT_PID.$TSTAMP" ] && ([ $_LOGGER_VERBOSE == true ] || [ $retval -ne 0 ])
 	then
-		Logger "Command output (first 16KB):\n$(head -c16384 "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$SCRIPT_PID.$TSTAMP")" "NOTICE"
+		Logger "Truncated output:\n$(head -c16384 "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$SCRIPT_PID.$TSTAMP")" "NOTICE"
 	fi
 
 	if [ "$STOP_ON_CMD_ERROR" == true ] && [ $retval -ne 0 ]; then
