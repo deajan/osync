@@ -1629,7 +1629,7 @@ function GetRemoteOS {
 	local remoteOsVar
 
 $SSH_CMD env LC_ALL=C env _REMOTE_TOKEN="$_REMOTE_TOKEN" bash -s << 'ENDSSH' >> "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$SCRIPT_PID.$TSTAMP" 2>&1
-
+_REMOTE_TOKEN="(o_0)"
 
 function GetOs {
 	local localOsVar
