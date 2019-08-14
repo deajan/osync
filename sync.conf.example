@@ -70,6 +70,7 @@ SSH_COMPRESSION=true
 ## Optional ssh options. Example to lower CPU usage on ssh compression, one can specify '-T -c arcfour -o Compression=no -x'
 ## -T = turn off pseudo-tty, -c arcfour = weakest but fasted ssh encryption (destination must accept "Ciphers arcfour" in sshd_config), -x turns off X11 forwarding
 ## arcfour isn't accepted on most newer systems, you may then prefer any AES encryption if processor has aes-ni hardware acceleration
+## If the system does not provide hardware assisted acceleration, chacha20-poly1305@openssh.com is a good cipher to select
 ## Uncomment the following line to use those optimizations, on secured links only
 #SSH_OPTIONAL_ARGS="-T -c aes128-ctr -o Compression=no -x"
 
