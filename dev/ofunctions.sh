@@ -31,7 +31,7 @@
 #### OFUNCTIONS MINI SUBSET ####
 #### OFUNCTIONS MICRO SUBSET ####
 _OFUNCTIONS_VERSION=2.3.0-dev-postRC2
-_OFUNCTIONS_BUILD=2019080904
+_OFUNCTIONS_BUILD=2019081401
 #### _OFUNCTIONS_BOOTSTRAP SUBSET ####
 _OFUNCTIONS_BOOTSTRAP=true
 #### _OFUNCTIONS_BOOTSTRAP SUBSET END ####
@@ -57,7 +57,7 @@ _LOGGER_VERBOSE=false
 _LOGGER_ERR_ONLY=false
 _LOGGER_PREFIX="date"
 if [ "$KEEP_LOGGING" == "" ]; then
-	KEEP_LOGGING=1801
+	KEEP_LOGGING=30
 fi
 
 # Initial error status, logging 'WARN', 'ERROR' or 'CRITICAL' will enable alerts flags
@@ -2019,6 +2019,11 @@ function PreInit {
 	## SSH ControlMaster Multiplexing
 	if [ "$SSH_CONTROLMASTER" == true ]; then
 		SSH_OPTS="$SSH_OPTS -o ControlMaster=auto -o ControlPersist=yes -o ControlPath=\"$RUN_DIR/$PROGRAM.ctrlm.%r@%h.$SCRIPT_PID.$TSTAMP\""
+	fi
+
+	## Optional SSH arguments
+	if [ "$SSH_OPTIONAL_ARGS" != "" ]; then
+		SSH_OPTS="$SSH_OPTS $SSH_OPTIONAL_ARGS"
 	fi
 
 	## Support for older config files without RSYNC_EXECUTABLE option

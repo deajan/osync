@@ -64,8 +64,14 @@ PATH_SEPARATOR_CHAR=";"
 
 [REMOTE_OPTIONS]
 
-## ssh compression should be used unless your remote connection is good enough (LAN)
+## ssh compression should be used on WAN links, unless your remote connection is good enough (LAN), in which case it would slow down things
 SSH_COMPRESSION=true
+
+## Optional ssh options. Example to lower CPU usage on ssh compression, one can specify '-T -c arcfour -o Compression=no -x'
+## -T = turn off pseudo-tty, -c arcfour = weakest but fasted ssh encryption (destination must accept "Ciphers arcfour" in sshd_config), -x turns off X11 forwarding
+## arcfour isn't accepted on most newer systems, you may then prefer any AES encryption if processor has aes-ni hardware acceleration
+## Uncomment the following line to use those optimizations, on secured links only
+#SSH_OPTIONAL_ARGS="-T -c aes128-ctr -o Compression=no -x"
 
 ## Ignore ssh known hosts. DANGER WILL ROBINSON DANGER ! This can lead to security issues. Only enable this if you know what you're doing.
 SSH_IGNORE_KNOWN_HOSTS=false
