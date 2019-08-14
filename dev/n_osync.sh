@@ -7,7 +7,7 @@ PROGRAM="osync" # Rsync based two way sync engine with fault tolerance
 AUTHOR="(C) 2013-2019 by Orsiris de Jong"
 CONTACT="http://www.netpower.fr/osync - ozy@netpower.fr"
 PROGRAM_VERSION=1.3.0-prerc1
-PROGRAM_BUILD=2019080901
+PROGRAM_BUILD=2019081401
 IS_STABLE=false
 
 CONFIG_FILE_REVISION_REQUIRED=1.3.0
@@ -3165,6 +3165,10 @@ if [ $_QUICK_SYNC -eq 2 ]; then
 
 	if [ $(IsInteger $MAX_EXEC_TIME_PER_CMD_AFTER) -ne 1 ]; then
 		MAX_EXEC_TIME_PER_CMD_AFTER=0
+	fi
+
+	if [ "$RSYNC_COMPRESS" == "" ]; then
+		RSYNC_COMPRESS=true
 	fi
 
 	if [ "$PATH_SEPARATOR_CHAR" == "" ]; then
