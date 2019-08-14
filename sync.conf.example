@@ -71,6 +71,7 @@ SSH_COMPRESSION=true
 ## -T = turn off pseudo-tty, -c arcfour = weakest but fasted ssh encryption (destination must accept "Ciphers arcfour" in sshd_config), -x turns off X11 forwarding
 ## arcfour isn't accepted on most newer systems, you may then prefer any AES encryption if processor has aes-ni hardware acceleration
 ## If the system does not provide hardware assisted acceleration, chacha20-poly1305@openssh.com is a good cipher to select
+## See: https://wiki.csnu.org/index.php/SSH_ciphers_speed_comparison
 ## Uncomment the following line to use those optimizations, on secured links only
 #SSH_OPTIONAL_ARGS="-T -c aes128-ctr -o Compression=no -x"
 
