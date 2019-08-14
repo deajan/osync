@@ -57,7 +57,7 @@ _LOGGER_VERBOSE=false
 _LOGGER_ERR_ONLY=false
 _LOGGER_PREFIX="date"
 if [ "$KEEP_LOGGING" == "" ]; then
-	KEEP_LOGGING=30
+	KEEP_LOGGING=1801
 fi
 
 # Initial error status, logging 'WARN', 'ERROR' or 'CRITICAL' will enable alerts flags
