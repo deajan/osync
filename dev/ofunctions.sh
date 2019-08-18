@@ -31,7 +31,7 @@
 #### OFUNCTIONS MINI SUBSET ####
 #### OFUNCTIONS MICRO SUBSET ####
 _OFUNCTIONS_VERSION=2.3.0-dev-postRC2
-_OFUNCTIONS_BUILD=2019081401
+_OFUNCTIONS_BUILD=2019081801
 #### _OFUNCTIONS_BOOTSTRAP SUBSET ####
 _OFUNCTIONS_BOOTSTRAP=true
 #### _OFUNCTIONS_BOOTSTRAP SUBSET END ####
@@ -561,7 +561,7 @@ function SendEmail {
 			fi
 		done
 	else
-		Logger "No valid email adresses given." "WARN"
+		Logger "No valid email addresses given." "WARN"
 		return 1
 	fi
 
@@ -905,7 +905,7 @@ function ExecTasks {
 	local currentCommand		# Variable containing currently processed command
 	local currentCommandCondition	# Variable containing currently processed conditional command
 	local commandsArrayPid=()	# Array containing commands indexed by pids
-	local commandsArrayOutput=()	# Array contining command results indexed by pids
+	local commandsArrayOutput=()	# Array containing command results indexed by pids
 	local postponedRetryCount=0	# Number of current postponed commands retries
 	local postponedItemCount=0	# Number of commands that have been postponed (keep at least one in order to check once)
 	local postponedCounter=0
