@@ -37,6 +37,7 @@ fi
 # No need to edit under this line ##############################################################
 
 include #### Logger SUBSET ####
+include #### CleanUp SUBSET ####
 
 function TrapQuit {
         local exitcode=0
