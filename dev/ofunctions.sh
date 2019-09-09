@@ -30,8 +30,8 @@
 #### OFUNCTIONS FULL SUBSET ####
 #### OFUNCTIONS MINI SUBSET ####
 #### OFUNCTIONS MICRO SUBSET ####
-_OFUNCTIONS_VERSION=2.3.0-dev-postRC2
-_OFUNCTIONS_BUILD=2019081801
+_OFUNCTIONS_VERSION=2.3.0-RC3
+_OFUNCTIONS_BUILD=2019090901
 #### _OFUNCTIONS_BOOTSTRAP SUBSET ####
 _OFUNCTIONS_BOOTSTRAP=true
 #### _OFUNCTIONS_BOOTSTRAP SUBSET END ####
@@ -439,6 +439,7 @@ function CleanUp {
 		rm -f "$RUN_DIR/$PROGRAM."*".$SCRIPT_PID.$TSTAMP.tmp"
 	fi
 }
+
 #### CleanUp SUBSET END ####
 
 function GenericTrapQuit {
@@ -457,7 +458,6 @@ function GenericTrapQuit {
 	CleanUp
 	exit $exitcode
 }
-
 
 #### OFUNCTIONS MICRO SUBSET END ####
 
