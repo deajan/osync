@@ -228,22 +228,6 @@ function Usage {
 	exit 128
 }
 
-function CheckEnvironment {
-	if [ "$REMOTE_OPERATION" == "yes" ] || [ "$REMOTE_OPERATION" == true ]; then
-		if ! type -p ssh > /dev/null 2>&1
-		then
-			Logger "ssh not present. Cannot start sync." "CRITICAL"
-			return 1
-		fi
-	fi
-
-	if ! type -p rsync > /dev/null 2>&1
-	then
-		Logger "rsync not present. Sync cannot start." "CRITICAL"
-		return 1
-	fi
-}
-
 function LoadConfigFile {
 	local config_file="${1}"
 
