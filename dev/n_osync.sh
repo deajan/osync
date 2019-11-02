@@ -7,7 +7,7 @@ PROGRAM="osync" # Rsync based two way sync engine with fault tolerance
 AUTHOR="(C) 2013-2019 by Orsiris de Jong"
 CONTACT="http://www.netpower.fr/osync - ozy@netpower.fr"
 PROGRAM_VERSION=1.3.0-prerc1
-PROGRAM_BUILD=2019081401
+PROGRAM_BUILD=2019110201
 IS_STABLE=false
 
 CONFIG_FILE_REVISION_REQUIRED=1.3.0
@@ -798,7 +798,14 @@ function treeList {
 	retval=$?
 
 	if [ -f "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$replicaType.$SCRIPT_PID.$TSTAMP" ]; then
-		mv -f "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$replicaType.$SCRIPT_PID.$TSTAMP" "$treeFilename"
+		# mv fails on MacOS when $RUN_DIR =/tmp because of some shady apple BS
+		# see https://apple.stackexchange.com/questions/275521/how-does-group-wheel-get-on-my-files and #175
+		#mv -f "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$replicaType.$SCRIPT_PID.$TSTAMP" "$treeFilename"
+		rm -f "$treeFileName" && cp -p "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$replicaType.$SCRIPT_PID.$TSTAMP" "$treeFilename" && rm -f "$treeFileName"
+		if [ $? -ne 0 ]; then
+			Logger "Cannot move treeList files \"$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$replicaType.$SCRIPT_PID.$TSTAMP\" => \"$treeFilename\"". "ERROR"
+			return $retval
+		fi
 	fi
 
 	## Retval 24 = some files vanished while creating list
@@ -874,7 +881,11 @@ function deleteList {
 	# Make sure deletion list does not contain duplicates from faledDeleteListFile
 	uniq "${INITIATOR[$__replicaDir]}${INITIATOR[$__stateDir]}/$replicaType${INITIATOR[$__deletedListFile]}" > "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$replicaType.$SCRIPT_PID.$TSTAMP"
 	if [ -f "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$replicaType.$SCRIPT_PID.$TSTAMP" ]; then
-		mv "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$replicaType.$SCRIPT_PID.$TSTAMP" "${INITIATOR[$__replicaDir]}${INITIATOR[$__stateDir]}/$replicaType${INITIATOR[$__deletedListFile]}"
+		#mv "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$replicaType.$SCRIPT_PID.$TSTAMP" "${INITIATOR[$__replicaDir]}${INITIATOR[$__stateDir]}/$replicaType${INITIATOR[$__deletedListFile]}"
+		rm -f "${INITIATOR[$__replicaDir]}${INITIATOR[$__stateDir]}/$replicaType${INITIATOR[$__deletedListFile]}" && cp -p "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$replicaType.$SCRIPT_PID.$TSTAMP" "${INITIATOR[$__replicaDir]}${INITIATOR[$__stateDir]}/$replicaType${INITIATOR[$__deletedListFile]}" && rm -f "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$replicaType.$SCRIPT_PID.$TSTAMP" "${INITIATOR[$__replicaDir]}${INITIATOR[$__stateDir]}/$replicaType${INITIATOR[$__deletedListFile]}"
+		if [ $? -ne 0 ; then
+			Logger "Cannot move \"$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$replicaType.$SCRIPT_PID.$TSTAMP\" => \"${INITIATOR[$__replicaDir]}${INITIATOR[$__stateDir]}/$replicaType${INITIATOR[$__deletedListFile]}\"" "ERROR"
+		fi
 	fi
 
 	return $retval
@@ -1361,10 +1372,21 @@ function _deleteLocal {
 						if [ "$parentdir" != "." ]; then
 							mkdir -p "$replicaDir$deletionDir/$parentdir"
 							Logger "Moving deleted file [$replicaDir$files] to [$replicaDir$deletionDir/$parentdir] on $replicaType." "VERBOSE"
-							mv -f "$replicaDir$files" "$replicaDir$deletionDir/$parentdir"
+							#mv -f "$replicaDir$files" "$replicaDir$deletionDir/$parentdir"
+							#rm -f "$replicaDir$deletionDir/$parentdir"
+							cp -p "$replicaDir$files" "$replicaDir$deletionDir/$parentdir" && rm -f "$replicaDir$files"
+							if [ $? -ne 0 ]; then
+								Logger "Cannot move \"$replicaDir$files\" => \"$replicaDir$deletionDir/$parentdir\"" "ERROR"
+							fi
+
 						else
 							Logger "Moving deleted file [$replicaDir$files] to [$replicaDir$deletionDir] on $replicaType." "VERBOSE"
-							mv -f "$replicaDir$files" "$replicaDir$deletionDir"
+							#mv -f "$replicaDir$files" "$replicaDir$deletionDir"
+							#rm -f "$replicaDir$deletionDir"
+							cp -p "$replicaDir$files" "$replicaDir$deletionDir" && rm -f "$replicaDir$files"
+							if [ $? -ne 0 ]; then
+								Logger "Cannot move \"$replicaDir$files\" => \"$replicaDir$deletionDir\"" "ERROR"
+							fi
 						fi
 						retval=$?
 						if [ $retval -ne 0 ]; then
@@ -1499,10 +1521,21 @@ function _deleteRemoteSub {
 						if [ "$parentdir" != "." ]; then
 							RemoteLogger "Moving deleted file [$REPLICA_DIR$files] to [$REPLICA_DIR$DELETION_DIR/$parentdir] on $REPLICA_TYPE." "VERBOSE"
 							mkdir -p "$REPLICA_DIR$DELETION_DIR/$parentdir"
-							mv -f "$REPLICA_DIR$files" "$REPLICA_DIR$DELETION_DIR/$parentdir"
+							#mv -f "$REPLICA_DIR$files" "$REPLICA_DIR$DELETION_DIR/$parentdir"
+							#rm -f "$REPLICA_DIR$files" "$REPLICA_DIR$DELETION_DIR/$parentdir"
+							cp -p "$REPLICA_DIR$files" "$REPLICA_DIR$DELETION_DIR/$parentdir" && rm -f "$REPLICA_DIR$files"
+							if [ $? -ne 0 ]; then
+								Logger "Cannot move \"$REPLICA_DIR$files\" => \"$REPLICA_DIR$DELETION_DIR/$parentdir\"" "ERROR"
+							fi
 						else
 							RemoteLogger "Moving deleted file [$REPLICA_DIR$files] to [$REPLICA_DIR$DELETION_DIR] on $REPLICA_TYPE." "VERBOSE"
-							mv -f "$REPLICA_DIR$files" "$REPLICA_DIR$DELETION_DIR"
+							#mv -f "$REPLICA_DIR$files" "$REPLICA_DIR$DELETION_DIR"
+							#rm -f "$REPLICA_DIR$DELETION_DIR"
+							cp -p "$REPLICA_DIR$files" "$REPLICA_DIR$DELETION_DIR"
+							rm -f "$REPLICA_DIR$files"
+							if [ $? -ne 0 ]; then
+								Logger "Cannot move \"$REPLICA_DIR$files\" => \"$REPLICA_DIR$DELETION_DIR\"" "ERROR"
+							fi
 						fi
 						retval=$?
 						if [ $retval -ne 0 ]; then
