@@ -31,7 +31,7 @@
 #### OFUNCTIONS MINI SUBSET ####
 #### OFUNCTIONS MICRO SUBSET ####
 _OFUNCTIONS_VERSION=2.3.0-RC3
-_OFUNCTIONS_BUILD=2019090901
+_OFUNCTIONS_BUILD=2019120601
 #### _OFUNCTIONS_BOOTSTRAP SUBSET ####
 _OFUNCTIONS_BOOTSTRAP=true
 #### _OFUNCTIONS_BOOTSTRAP SUBSET END ####
@@ -776,7 +776,7 @@ function _PerfProfiler {												#__WITH_PARANOIA_DEBUG
 
 _OFUNCTIONS_SPINNER="|/-\\"
 function Spinner {
-	if [ $_LOGGER_SILENT == true ] || [ "$_LOGGER_ERR_ONLY" == true ]; then
+	if [ $_LOGGER_SILENT == true ] || [ "$_LOGGER_ERR_ONLY" == true ] || [ "$_SYNC_ON_CHANGES" == "initiator" ] || [ "$_SYNC_ON_CHANGES" == "target" ] ; then
 		return 0
 	else
 		printf " [%c]  \b\b\b\b\b\b" "$_OFUNCTIONS_SPINNER"
