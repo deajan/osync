@@ -61,6 +61,7 @@ function __PREPROCESSOR_Constants {
 	'#### SetConfFileValue SUBSET ####'
 	'#### CheckRFC822 SUBSET ####'
 	'#### CleanUp SUBSET ####'
+	'#### FileMove SUBSET ####'
 	)
 }
 
