@@ -7,7 +7,7 @@ PROGRAM="osync" # Rsync based two way sync engine with fault tolerance
 AUTHOR="(C) 2013-2019 by Orsiris de Jong"
 CONTACT="http://www.netpower.fr/osync - ozy@netpower.fr"
 PROGRAM_VERSION=1.3.0-prerc1
-PROGRAM_BUILD=2019122402
+PROGRAM_BUILD=2019122403
 IS_STABLE=false
 
 CONFIG_FILE_REVISION_REQUIRED=1.3.0
@@ -1378,7 +1378,7 @@ function _deleteLocal {
 							# Apple BS mv does not keep ownership, simulating move
 							#mv -f "$replicaDir$files" "$replicaDir$deletionDir/$parentdir"
 							if [ -w "$replicaDir$files" ]; then
-								[ -f "$replicaDir$deletionDir/$parentdir/$files" ] && rm -f "$replicaDir$deletionDir/$parentdir/$files"
+								([ -f "$replicaDir$deletionDir/$parentdir/$files" ] || [ -L "$replicaDir$deletionDir/$parentdir/$files" ]) && rm -f "$replicaDir$deletionDir/$parentdir/$files"
 								cp -p "$replicaDir$files" "$replicaDir$deletionDir/$parentdir" && rm -f "$replicaDir$files"
 								if [ $? -ne 0 ]; then
 									Logger "Cannot move \"$replicaDir$files\" => \"$replicaDir$deletionDir/$parentdir\"" "ERROR"
@@ -1394,7 +1394,7 @@ function _deleteLocal {
 							# Apple BS mv does not keep ownership, simulating move
 							#mv -f "$replicaDir$files" "$replicaDir$deletionDir"
 							if [ -w "$replicaDir$files" ]; then
-								[ -f "$replicaDir$deletionDir/$files" ] && rm -f "$replicaDir$deletionDir/$files"
+								([ -f "$replicaDir$deletionDir/$files" ] || [ -L "$replicaDir$deletionDir/$files" ]) && rm -f "$replicaDir$deletionDir/$files"
 								cp -p "$replicaDir$files" "$replicaDir$deletionDir/" && rm -f "$replicaDir$files"
 								if [ $? -ne 0 ]; then
 									Logger "Cannot move \"$replicaDir$files\" => \"$replicaDir$deletionDir\"" "ERROR"
