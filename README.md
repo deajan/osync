@@ -6,9 +6,6 @@ It is a command line tool rsync wrapper with a lot of additional features baked 
 
 This is a quickstart guide, you can find the full documentation on the author's site.
 
-**22 May 2019: I am happy to announce that osync 1.3-beta3 passed it's tests on all target platforms.
-In order to speed up a osync 1.3 final release, please consider testing this beta.**
-
 ## About
 
 osync provides the following capabilities
