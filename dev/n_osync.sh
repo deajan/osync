@@ -7,7 +7,7 @@ PROGRAM="osync" # Rsync based two way sync engine with fault tolerance
 AUTHOR="(C) 2013-2019 by Orsiris de Jong"
 CONTACT="http://www.netpower.fr/osync - ozy@netpower.fr"
 PROGRAM_VERSION=1.3.0-prerc1
-PROGRAM_BUILD=2019122403
+PROGRAM_BUILD=2019122405
 IS_STABLE=false
 
 CONFIG_FILE_REVISION_REQUIRED=1.3.0
@@ -1375,39 +1375,37 @@ function _deleteLocal {
 						if [ "$parentdir" != "." ]; then
 							mkdir -p "$replicaDir$deletionDir/$parentdir"
 							Logger "Moving deleted file [$replicaDir$files] to [$replicaDir$deletionDir/$parentdir] on $replicaType." "VERBOSE"
-							# Apple BS mv does not keep ownership, simulating move
-							#mv -f "$replicaDir$files" "$replicaDir$deletionDir/$parentdir"
-							if [ -w "$replicaDir$files" ]; then
-								([ -f "$replicaDir$deletionDir/$parentdir/$files" ] || [ -L "$replicaDir$deletionDir/$parentdir/$files" ]) && rm -f "$replicaDir$deletionDir/$parentdir/$files"
+							# Apple BS mv does not keep ownership, simulating move when subject is not a symlink
+							if [ -L "$replicaDir$files" ]; then
+								mv -f "$replicaDir$files" "$replicaDir$deletionDir/$parentdir"
+								retval=$?
+							elif [ -w "$replicaDir$files" ]; then
+								[ -f "$replicaDir$deletionDir/$parentdir/$files" ] && rm -f "$replicaDir$deletionDir/$parentdir/$files"
 								cp -p "$replicaDir$files" "$replicaDir$deletionDir/$parentdir" && rm -f "$replicaDir$files"
-								if [ $? -ne 0 ]; then
-									Logger "Cannot move \"$replicaDir$files\" => \"$replicaDir$deletionDir/$parentdir\"" "ERROR"
-									retval=-1
-								fi
+								retval=$?
 							else
-								Logger "File [$replicaDir$files] is not writable. Cannot move it to deletion directory." "ERROR"
+								Logger "File [$replicaDir$files] is not writable." "ERROR"
 								retval=-1
 							fi
 
 						else
 							Logger "Moving deleted file [$replicaDir$files] to [$replicaDir$deletionDir] on $replicaType." "VERBOSE"
 							# Apple BS mv does not keep ownership, simulating move
-							#mv -f "$replicaDir$files" "$replicaDir$deletionDir"
-							if [ -w "$replicaDir$files" ]; then
-								([ -f "$replicaDir$deletionDir/$files" ] || [ -L "$replicaDir$deletionDir/$files" ]) && rm -f "$replicaDir$deletionDir/$files"
+							if [ -L "$replicaDir$files" ]; then
+								mv -f "$replicaDir$files" "$replicaDir$deletionDir"
+								retval=$?
+							elif [ -w "$replicaDir$files" ]; then
+								[ -f "$replicaDir$deletionDir/$files" ] && rm -f "$replicaDir$deletionDir/$files"
 								cp -p "$replicaDir$files" "$replicaDir$deletionDir/" && rm -f "$replicaDir$files"
-								if [ $? -ne 0 ]; then
-									Logger "Cannot move \"$replicaDir$files\" => \"$replicaDir$deletionDir\"" "ERROR"
-									retval=-1
-								fi
+								retval=$?
 							else
-								Logger "File [$replicaDir$files] is not writable. Cannot move it to deletion directory." "ERROR"
+								Logger "File [$replicaDir$files] is not writable." "ERROR"
 								retval=-1
 							fi
 
 						fi
 						if [ $retval -ne 0 ]; then
-							Logger "Cannot move [$replicaDir$files] to deletion directory on $replicaType." "ERROR" $retval
+							Logger "Cannot move [$replicaDir$files] to deletion directory [$replicaDir$deletionDir] on $replicaType." "ERROR" $retval
 							echo "1" > "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.subshellError.$replicaType.$SCRIPT_PID.$TSTAMP"
 							echo "$files" >> "${INITIATOR[$__replicaDir]}${INITIATOR[$__stateDir]}/$replicaType${INITIATOR[$__failedDeletedListFile]}"
 						else
@@ -1540,36 +1538,34 @@ function _deleteRemoteSub {
 							RemoteLogger "Moving deleted file [$REPLICA_DIR$files] to [$REPLICA_DIR$DELETION_DIR/$parentdir] on $REPLICA_TYPE." "VERBOSE"
 							mkdir -p "$REPLICA_DIR$DELETION_DIR/$parentdir"
 							# Apple BS mv does not keep ownership, simulating move
-							#mv -f "$REPLICA_DIR$files" "$REPLICA_DIR$DELETION_DIR/$parentdir"
-							[ -f "$REPLICA_DIR$DELETION_DIR/$parentdir/$files" ] && rm -f "$REPLICA_DIR$DELETION_DIR/$parentdir/$files"
-							if [ -w "$REPLICA_DIR$files" ]; then
+							if [ -L "$REPLICA_DIR$files" ]; then
+								mv -f "$REPLICA_DIR$files" "$REPLICA_DIR$DELETION_DIR/$parentdir"
+								retval=$?
+							elif [ -w "$REPLICA_DIR$files" ]; then
+								[ -f "$REPLICA_DIR$DELETION_DIR/$parentdir/$files" ] && rm -f "$REPLICA_DIR$DELETION_DIR/$parentdir/$files"
 								cp -p "$REPLICA_DIR$files" "$REPLICA_DIR$DELETION_DIR/$parentdir/" && rm -f "$REPLICA_DIR$files"
-								if [ $? -ne 0 ]; then
-									RemoteLogger "Cannot move \"$REPLICA_DIR$files\" => \"$REPLICA_DIR$DELETION_DIR/$parentdir\"" "ERROR"
-									retval=-1
-								fi
+								retval=$?
 							else
-								RemoteLogger "File [$replicaDir$files] is not writable. Cannot move it to deletion directory." "ERROR"
+								RemoteLogger "File [$replicaDir$files] is not writable." "ERROR"
 								retval=-1
 							fi
 						else
 							RemoteLogger "Moving deleted file [$REPLICA_DIR$files] to [$REPLICA_DIR$DELETION_DIR] on $REPLICA_TYPE." "VERBOSE"
 							# Apple BS mv does not keep ownership, simulating move
-							#mv -f "$REPLICA_DIR$files" "$REPLICA_DIR$DELETION_DIR"
-							[ -f "$REPLICA_DIR$DELETION_DIR/$files" ] && rm -f "$REPLICA_DIR$DELETION_DIR/$files"
-							if [ -w "$REPLICA_DIR$files" ]; then
+							if [ -L "$REPLICA_DIR$files" ]; then
+								mv -f "$REPLICA_DIR$files" "$REPLICA_DIR$DELETION_DIR"
+								retval=$?
+							elif [ -w "$REPLICA_DIR$files" ]; then
+								[ -f "$REPLICA_DIR$DELETION_DIR/$files" ] && rm -f "$REPLICA_DIR$DELETION_DIR/$files"
 								cp -p "$REPLICA_DIR$files" "$REPLICA_DIR$DELETION_DIR/" && rm -f "$REPLICA_DIR$files"
-								if [ $? -ne 0 ]; then
-									RemoteLogger "Cannot move \"$REPLICA_DIR$files\" => \"$REPLICA_DIR$DELETION_DIR\"" "ERROR"
-									retval=-1
-								fi
+								retval=$?
 							else
-								RemoteLogger "File [$replicaDir$files] is not writable. Cannot move it to deletion directory." "ERROR"
+								RemoteLogger "File [$replicaDir$files] is not writable." "ERROR"
 								retval=-1
 							fi
 						fi
 						if [ $retval -ne 0 ]; then
-							RemoteLogger "Cannot move [$REPLICA_DIR$files] to deletion directory on $REPLICA_TYPE." "ERROR" $retval
+							RemoteLogger "Cannot move [$REPLICA_DIR$files] to deletion directory [$REPLICA_DIR$DELETION_DIR] on $REPLICA_TYPE." "ERROR" $retval
 							echo "1" > "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.subshellError.$REPLICA_TYPE.$SCRIPT_PID.$TSTAMP"
 							# Using $files instead of $REPLICA_DIR$files here so the list is ready for next run
 							echo "$files" >> "$FAILED_DELETE_LIST"
