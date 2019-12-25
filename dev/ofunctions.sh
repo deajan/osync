@@ -31,7 +31,7 @@
 #### OFUNCTIONS MINI SUBSET ####
 #### OFUNCTIONS MICRO SUBSET ####
 _OFUNCTIONS_VERSION=2.3.0-RC3
-_OFUNCTIONS_BUILD=2019120601
+_OFUNCTIONS_BUILD=2019122501
 #### _OFUNCTIONS_BOOTSTRAP SUBSET ####
 _OFUNCTIONS_BOOTSTRAP=true
 #### _OFUNCTIONS_BOOTSTRAP SUBSET END ####
@@ -2422,5 +2422,26 @@ function WildcardFileExists () {
 		echo 0
 	fi
 }
+
+# Some MacOS versions might loose file ownsership when using mv from /tmp dir (see #175)
+# This is a "mv" function wrapper that helps out with macOS
+#### FileMove SUBSET ####
+function FileMove () {
+	local source="${1}"
+	local dest="${2}"
+
+	# If file is symlink or OS is not Mac, just make a standard mv
+	if [ -L "$source" ] || [ "$LOCAL_OS" != "MacOSX" ]; then
+		mv -f "$source" "$dest"
+		return $?
+	elif [ -w "$source" ]; then
+		[ -f "$dest" ] && rm -f "$dest"
+		cp -p "$source" "$dest" && rm -f "$source"
+		return $?
+	else
+		return -1
+	fi
+}
+#### FileMove SUBSET END ####
 
 #### OFUNCTIONS FULL SUBSET END ####
