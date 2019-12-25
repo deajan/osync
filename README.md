@@ -43,8 +43,8 @@ Some users also have successfully used osync on Gentoo and created an openRC ini
 osync has been designed to not delete any data, but rather make backups of conflictual files or soft deletes.
 Nevertheless, you should always have a neat backup of your data before trying a new sync tool.
 
-You may get osync on the author's site (stable version) or on github (stable or latest dev snapshot)
-Getting osync via author's site on **http://www.netpower.fr/osync**
+You may get osync on github (stable or latest dev snapshot) or on the author's site (stable version)
+Getting osync via author's site on <https://www.netpower.fr/osync>
 
 	$ wget http://www.netpower.fr/projects/osync/osync.v1.2.tar.gz
 	$ tar xvf osync.v1.2.tar.gz
@@ -71,7 +71,7 @@ On *BSD and BusyBox, be sure to have bash installed.
 
 If you can't install osync, you may just copy osync.sh where you needed and run it from there.
 
-Archlinux packages are available at https://aur.archlinux.org/packages/osync/ (thanks to Shadowigor, https://github.com/shadowigor)
+Archlinux packages are available at <https://aur.archlinux.org/packages/osync/> (thanks to Shadowigor, <https://github.com/shadowigor>)
 
 ## Upgrade from previous configuration files
 
