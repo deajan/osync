@@ -7,7 +7,7 @@ CONTACT="http://www.netpower.fr/osync - ozy@netpower.fr"
 OLD_PROGRAM_VERSION="v1.0x-v1.2x"
 NEW_PROGRAM_VERSION="v1.3x"
 CONFIG_FILE_REVISION=1.3.0
-PROGRAM_BUILD=2019102101
+PROGRAM_BUILD=2019122501
 
 ## type -p does not work on platforms other than linux (bash). If if does not work, always assume output is not a zero exitcode
 if ! type "$BASH" > /dev/null; then
@@ -254,134 +254,134 @@ function _RenameStateFilesLocal {
 	# Make sure there is no ending slash
 	state_dir="${state_dir%/}/"
 
-	if [ -f "$state_dir""master"$TREE_CURRENT_FILENAME ]; then
-		mv -f "$state_dir""master"$TREE_CURRENT_FILENAME "$state_dir""initiator"$TREE_CURRENT_FILENAME
+	if [ -f "${state_dir}master${TREE_CURRENT_FILENAME}" ]; then
+		mv -f "${state_dir}master${TREE_CURRENT_FILENAME}" "${state_dir}initiator${TREE_CURRENT_FILENAME}"
 		if [ $? != 0 ]; then
-			echo "Error while rewriting "$state_dir"master"$TREE_CURRENT_FILENAME
+			echo "Error while rewriting ${state_dir}master${TREE_CURRENT_FILENAME}"
 		else
 			rewrite=true
 		fi
 	fi
-	if [ -f "$state_dir""master"$TREE_AFTER_FILENAME ]; then
-		mv -f "$state_dir""master"$TREE_AFTER_FILENAME "$state_dir""initiator"$TREE_AFTER_FILENAME
+	if [ -f "${state_dir}master${TREE_AFTER_FILENAME}" ]; then
+		mv -f "${state_dir}master${TREE_AFTER_FILENAME}" "${state_dir}initiator${TREE_AFTER_FILENAME}"
 		if [ $? != 0 ]; then
-			echo "Error while rewriting "$state_dir"master"$TREE_AFTER_FILENAME
+			echo "Error while rewriting ${state_dir}master${TREE_AFTER_FILENAME}"
 		else
 			rewrite=true
 		fi
 	fi
-	if [ -f "$state_dir""master"$DELETED_LIST_FILENAME ]; then
-		mv -f "$state_dir""master"$DELETED_LIST_FILENAME "$state_dir""initiator"$DELETED_LIST_FILENAME
+	if [ -f "${state_dir}master${DELETED_LIST_FILENAME}" ]; then
+		mv -f "${state_dir}master${DELETED_LIST_FILENAME}" "${state_dir}initiator${DELETED_LIST_FILENAME}"
 		if [ $? != 0 ]; then
-			echo "Error while rewriting "$state_dir"master"$DELETED_LIST_FILENAME
+			echo "Error while rewriting ${state_dir}master${DELETED_LIST_FILENAME}"
 		else
 			rewrite=true
 		fi
 		rewrite=true
 	fi
-	if [ -f "$state_dir""master"$FAILED_DELETE_LIST_FILENAME ]; then
-		mv -f "$state_dir""master"$FAILED_DELETE_LIST_FILENAME "$state_dir""initiator"$FAILED_DELETE_LIST_FILENAME
+	if [ -f "${state_dir}master${FAILED_DELETE_LIST_FILENAME}" ]; then
+		mv -f "${state_dir}master${FAILED_DELETE_LIST_FILENAME}" "${state_dir}initiator${FAILED_DELETE_LIST_FILENAME}"
 		if [ $? != 0 ]; then
-			echo "Error while rewriting "$state_dir"master"$FAILED_DELETE_LIST_FILENAME
+			echo "Error while rewriting ${state_dir}master${FAILED_DELETE_LIST_FILENAME}"
 		else
 			rewrite=true
 		fi
 	fi
 
-	if [ -f "$state_dir""master"$TREE_CURRENT_FILENAME"-dry" ]; then
-		mv -f "$state_dir""master"$TREE_CURRENT_FILENAME"-dry" "$state_dir""initiator"$TREE_CURRENT_FILENAME"-dry"
+	if [ -f "${state_dir}master${TREE_CURRENT_FILENAME}-dry" ]; then
+		mv -f "${state_dir}master${TREE_CURRENT_FILENAME}-dry" "${state_dir}initiator${TREE_CURRENT_FILENAME}-dry"
 		if [ $? != 0 ]; then
-			echo "Error while rewriting "$state_dir"master"$TREE_CURRENT_FILENAME"-dry"
+			echo "Error while rewriting ${state_dir}master${TREE_CURRENT_FILENAME}-dry"
 		else
 			rewrite=true
 		fi
 	fi
-	if [ -f "$state_dir""master"$TREE_AFTER_FILENAME"-dry" ]; then
-		mv -f "$state_dir""master"$TREE_AFTER_FILENAME"-dry" "$state_dir""initiator"$TREE_AFTER_FILENAME"-dry"
+	if [ -f "${state_dir}master${TREE_AFTER_FILENAME}-dry" ]; then
+		mv -f "${state_dir}master${TREE_AFTER_FILENAME}-dry" "${state_dir}initiator${TREE_AFTER_FILENAME}-dry"
 		if [ $? != 0 ]; then
-			echo "Error while rewriting "$state_dir"master"$TREE_AFTER_FILENAME"-dry"
+			echo "Error while rewriting ${state_dir}master${TREE_AFTER_FILENAME}-dry"
 		else
 			rewrite=true
 		fi
 	fi
-	if [ -f "$state_dir""master"$DELETED_LIST_FILENAME"-dry" ]; then
-		mv -f "$state_dir""master"$DELETED_LIST_FILENAME"-dry" "$state_dir""initiator"$DELETED_LIST_FILENAME"-dry"
+	if [ -f "${state_dir}master${DELETED_LIST_FILENAME}-dry" ]; then
+		mv -f "${state_dir}master${DELETED_LIST_FILENAME}-dry" "${state_dir}initiator${DELETED_LIST_FILENAME}-dry"
 		if [ $? != 0 ]; then
-			echo "Error while rewriting "$state_dir"master"$DELETED_LIST_FILENAME"-dry"
+			echo "Error while rewriting ${state_dir}master${DELETED_LIST_FILENAME}-dry"
 		else
 			rewrite=true
 		fi
 	fi
-	if [ -f "$state_dir""master"$FAILED_DELETE_LIST_FILENAME"-dry" ]; then
-		mv -f "$state_dir""master"$FAILED_DELETE_LIST_FILENAME"-dry" "$state_dir""initiator"$FAILED_DELETE_LIST_FILENAME"-dry"
+	if [ -f "${state_dir}master${FAILED_DELETE_LIST_FILENAME}-dry" ]; then
+		mv -f "${state_dir}master${FAILED_DELETE_LIST_FILENAME}-dry" "${state_dir}initiator${FAILED_DELETE_LIST_FILENAME}-dry"
 		if [ $? != 0 ]; then
-			echo "Error while rewriting "$state_dir"master"$FAILED_DELETE_LIST_FILENAME"-dry"
-		else
-			rewrite=true
-		fi
-	fi
-
-	if [ -f "$state_dir""slave"$TREE_CURRENT_FILENAME ]; then
-		mv -f "$state_dir""slave"$TREE_CURRENT_FILENAME "$state_dir""target"$TREE_CURRENT_FILENAME
-		if [ $? != 0 ]; then
-			echo "Error while rewriting "$state_dir"slave"$TREE_CURRENT_FILENAME
-		else
-			rewrite=true
-		fi
-	fi
-	if [ -f "$state_dir""slave"$TREE_AFTER_FILENAME ]; then
-		mv -f "$state_dir""slave"$TREE_AFTER_FILENAME "$state_dir""target"$TREE_AFTER_FILENAME
-		if [ $? != 0 ]; then
-			echo "Error while rewriting "$state_dir"slave"$TREE_AFTER_FILENAME
-		else
-			rewrite=true
-		fi
-	fi
-	if [ -f "$state_dir""slave"$DELETED_LIST_FILENAME ]; then
-		mv -f "$state_dir""slave"$DELETED_LIST_FILENAME "$state_dir""target"$DELETED_LIST_FILENAME
-		if [ $? != 0 ]; then
-			echo "Error while rewriting "$state_dir"slave"$DELETED_LIST_FILENAME
-		else
-			rewrite=true
-		fi
-	fi
-	if [ -f "$state_dir""slave"$FAILED_DELETE_LIST_FILENAME ]; then
-		mv -f "$state_dir""slave"$FAILED_DELETE_LIST_FILENAME "$state_dir""target"$FAILED_DELETE_LIST_FILENAME
-		if [ $? != 0 ]; then
-			echo "Error while rewriting "$state_dir"slave"$FAILED_DELETE_LIST_FILENAME
+			echo "Error while rewriting ${state_dir}master${FAILED_DELETE_LIST_FILENAME}-dry"
 		else
 			rewrite=true
 		fi
 	fi
 
-	if [ -f "$state_dir""slave"$TREE_CURRENT_FILENAME"-dry" ]; then
-		mv -f "$state_dir""slave"$TREE_CURRENT_FILENAME"-dry" "$state_dir""target"$TREE_CURRENT_FILENAME"-dry"
+	if [ -f "${state_dir}slave${TREE_CURRENT_FILENAME}" ]; then
+		mv -f "${state_dir}slave${TREE_CURRENT_FILENAME}" "${state_dir}target${TREE_CURRENT_FILENAME}"
 		if [ $? != 0 ]; then
-			echo "Error while rewriting "$state_dir"slave"$TREE_CURRENT_FILENAME"-dry"
+			echo "Error while rewriting ${state_dir}slave${TREE_CURRENT_FILENAME}"
 		else
 			rewrite=true
 		fi
 	fi
-	if [ -f "$state_dir""slave"$TREE_AFTER_FILENAME"-dry" ]; then
-		mv -f "$state_dir""slave"$TREE_AFTER_FILENAME"-dry" "$state_dir""target"$TREE_AFTER_FILENAME"-dry"
+	if [ -f "${state_dir}slave${TREE_AFTER_FILENAME}" ]; then
+		mv -f "${state_dir}slave${TREE_AFTER_FILENAME}" "${state_dir}target${TREE_AFTER_FILENAME}"
 		if [ $? != 0 ]; then
-			echo "Error while rewriting "$state_dir"slave"$TREE_AFTER_FILENAME"-dry"
+			echo "Error while rewriting ${state_dir}slave${TREE_AFTER_FILENAME}"
 		else
 			rewrite=true
 		fi
 	fi
-	if [ -f "$state_dir""slave"$DELETED_LIST_FILENAME"-dry" ]; then
-		mv -f "$state_dir""slave"$DELETED_LIST_FILENAME"-dry" "$state_dir""target"$DELETED_LIST_FILENAME"-dry"
+	if [ -f "${state_dir}slave${DELETED_LIST_FILENAME}" ]; then
+		mv -f "${state_dir}slave${DELETED_LIST_FILENAME}" "${state_dir}target${DELETED_LIST_FILENAME}"
 		if [ $? != 0 ]; then
-			echo "Error while rewriting "$state_dir"slave"$DELETED_LIST_FILENAME"-dry"
+			echo "Error while rewriting ${state_dir}slave${DELETED_LIST_FILENAME}"
 		else
 			rewrite=true
 		fi
 	fi
-	if [ -f "$state_dir""slave"$FAILED_DELETE_LIST_FILENAME"-dry" ]; then
-		mv -f "$state_dir""slave"$FAILED_DELETE_LIST_FILENAME"-dry" "$state_dir""target"$FAILED_DELETE_LIST_FILENAME"-dry"
+	if [ -f "${state_dir}slave${FAILED_DELETE_LIST_FILENAME}" ]; then
+		mv -f "${state_dir}slave${FAILED_DELETE_LIST_FILENAME}" "${state_dir}target${FAILED_DELETE_LIST_FILENAME}"
 		if [ $? != 0 ]; then
-			echo "Error while rewriting "$state_dir"slave"$FAILED_DELETE_LIST_FILENAME"-dry"
+			echo "Error while rewriting ${state_dir}slave${FAILED_DELETE_LIST_FILENAME}"
+		else
+			rewrite=true
+		fi
+	fi
+
+	if [ -f "${state_dir}slave${TREE_CURRENT_FILENAME}-dry" ]; then
+		mv -f "${state_dir}slave${TREE_CURRENT_FILENAME}-dry" "${state_dir}target${TREE_CURRENT_FILENAME}-dry"
+		if [ $? != 0 ]; then
+			echo "Error while rewriting ${state_dir}slave${TREE_CURRENT_FILENAME}-dry"
+		else
+			rewrite=true
+		fi
+	fi
+	if [ -f "${state_dir}slave${TREE_AFTER_FILENAME}-dry" ]; then
+		mv -f "${state_dir}slave${TREE_AFTER_FILENAME}-dry" "${state_dir}target${TREE_AFTER_FILENAME}-dry"
+		if [ $? != 0 ]; then
+			echo "Error while rewriting ${state_dir}slave${TREE_AFTER_FILENAME}-dry"
+		else
+			rewrite=true
+		fi
+	fi
+	if [ -f "${state_dir}slave${DELETED_LIST_FILENAME}-dry" ]; then
+		mv -f "${state_dir}slave${DELETED_LIST_FILENAME}-dry" "${state_dir}target${DELETED_LIST_FILENAME}-dry"
+		if [ $? != 0 ]; then
+			echo "Error while rewriting ${state_dir}slave${DELETED_LIST_FILENAME}-dry"
+		else
+			rewrite=true
+		fi
+	fi
+	if [ -f "${state_dir}slave${FAILED_DELETE_LIST_FILENAME}-dry" ]; then
+		mv -f "${state_dir}slave${FAILED_DELETE_LIST_FILENAME}-dry" "${state_dir}target${FAILED_DELETE_LIST_FILENAME}-dry"
+		if [ $? != 0 ]; then
+			echo "Error while rewriting ${state_dir}slave${FAILED_DELETE_LIST_FILENAME}-dry"
 		else
 			rewrite=true
 		fi
@@ -404,24 +404,24 @@ $SSH_CMD state_dir="${1}" DELETED_LIST_FILENAME="$DELETED_LIST_FILENAME" FAILED_
 	state_dir="${state_dir%/}/"
 	rewrite=false
 
-	if [ -f "$state_dir""master"$DELETED_LIST_FILENAME ]; then
-		mv -f "$state_dir""master"$DELETED_LIST_FILENAME "$state_dir""initiator"$DELETED_LIST_FILENAME
+	if [ -f "${state_dir}master${DELETED_LIST_FILENAME}" ]; then
+		mv -f "${state_dir}master${DELETED_LIST_FILENAME}" "${state_dir}initiator${DELETED_LIST_FILENAME}"
 		if [ $? != 0 ]; then
 			echo "Error while rewriting "$state_dir"master"$DELETED_LIST_FILENAME
 		else
 			rewrite=true
 		fi
 	fi
-	if [ -f "$state_dir""master"$FAILED_DELETE_LIST_FILENAME ]; then
-		mv -f "$state_dir""master"$FAILED_DELETE_LIST_FILENAME "$state_dir""initiator"$FAILED_DELETE_LIST_FILENAME
+	if [ -f "${state_dir}master${FAILED_DELETE_LIST_FILENAME}" ]; then
+		mv -f "${state_dir}master${FAILED_DELETE_LIST_FILENAME}" "${state_dir}initiator${FAILED_DELETE_LIST_FILENAME}"
 		if [ $? != 0 ]; then
 			echo "Error while rewriting "$state_dir"master"$FAILED_DELETE_LIST_FILENAME
 		else
 			rewrite=true
 		fi
 	fi
-	if [ -f "$state_dir""master"$FAILED_DELETE_LIST_FILENAME"-dry" ]; then
-		mv -f "$state_dir""master"$FAILED_DELETE_LIST_FILENAME"-dry" "$state_dir""initiator"$FAILED_DELETE_LIST_FILENAME"-dry"
+	if [ -f "${state_dir}master${FAILED_DELETE_LIST_FILENAME}-dry" ]; then
+		mv -f "${state_dir}master${FAILED_DELETE_LIST_FILENAME}-dry" "${state_dir}initiator${FAILED_DELETE_LIST_FILENAME}-dry"
 		if [ $? != 0 ]; then
 			echo "Error while rewriting "$state_dir"master"$FAILED_DELETE_LIST_FILENAME"-dry"
 		else
