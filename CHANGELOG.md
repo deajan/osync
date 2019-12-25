@@ -1,17 +1,19 @@
 RECENT CHANGES
 --------------
 
-dd Mmm YYYY: dev
-- --log-conflicts
+dd Mmm YYYY: To be done
+- Make --log-conflicts non experimental (randomly fails)
+- ! new option FORCE_CONFLICT_PREVALANCE which will always use Initiator or Target, regardless of best time
+- ! target-helper: destination mails etc on target, also, no cmd after on configs
 
 dd Mmm YYYY: osync v1.3 release (for full changelog since v1.2 branch see all v1.3-beta/RC entries)
 
 dd Mmm YYYY: osync v1.3-RC1 release
+- New option to use SSH_CONTROLMASTER in order to speed up remote sync tasks and preserve a single ssh channel
+- New option SSH_OPTIONAL_ARGS
+- Fixed a problem with macos mv not preserving ownership of files from /tmp
+- Fixed various cosmetic issues with code and logs
 - Improved upgrade script
-- ! new option FORCE_CONFLICT_PREVALANCE which will always use Initiator or Target, regardless of best time
-- ! target-helper: destination mails etc on target, also, no cmd after on configs
-
-dd Mmm YYYY: osync v1.3-x release
 - Fixed a possible bash buffer overflow when synchronizing large filesets (tested with 2M files)
 	- This fix actually truncats every string sent to Logger not being more than 16KB
 - Fixed osync leaving temporary log files behind in RUN_DIR (/tmp by default)
