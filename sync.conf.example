@@ -138,7 +138,7 @@ MAX_WAIT=7200
 [BACKUP_DELETE_OPTIONS]
 
 ## Log a list of conflictual files (EXPERIMENTAL)
-LOG_CONFLICTS=true
+LOG_CONFLICTS=false
 ## Send an email when conflictual files are found (implies LOG_CONFLICTS)
 ALERT_CONFLICTS=false
 ## Enabling this option will keep a backup of a file on the target replica if it gets updated from the source replica. Backups will be made to .osync_workdir/backups

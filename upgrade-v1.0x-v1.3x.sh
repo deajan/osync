@@ -7,7 +7,7 @@ CONTACT="http://www.netpower.fr/osync - ozy@netpower.fr"
 OLD_PROGRAM_VERSION="v1.0x-v1.2x"
 NEW_PROGRAM_VERSION="v1.3x"
 CONFIG_FILE_REVISION=1.3.0
-PROGRAM_BUILD=2019122501
+PROGRAM_BUILD=2020011001
 
 ## type -p does not work on platforms other than linux (bash). If if does not work, always assume output is not a zero exitcode
 if ! type "$BASH" > /dev/null; then
@@ -135,7 +135,7 @@ true
 1801
 60
 7200
-true
+false
 false
 true
 false
