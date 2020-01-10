@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 SUBPROGRAM=[prgname]
 PROGRAM="$SUBPROGRAM-batch" # Batch program to run osync / obackup instances sequentially and rerun failed ones
-AUTHOR="(L) 2013-2019 by Orsiris de Jong"
+AUTHOR="(L) 2013-2020 by Orsiris de Jong"
 CONTACT="http://www.netpower.fr - ozy@netpower.fr"
 PROGRAM_BUILD=2019090901
 

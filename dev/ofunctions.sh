@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-## Generic and highly portable bash functions written in 2013-2019 by Orsiris de Jong - http://www.netpower.fr - ozy@netpower.fr
+## Generic and highly portable bash functions written in 2013-2020 by Orsiris de Jong - http://www.netpower.fr - ozy@netpower.fr
 
 #TODO: ExecTasks postponed arrays / files grow a lot. Consider having them "rolling" (cleaned at numberOfEvents)
 #TODO: command line arguments don't take -AaqV for example
