@@ -2,7 +2,7 @@
 
 PROGRAM="osync instance upgrade script"
 SUBPROGRAM="osync"
-AUTHOR="(C) 2016-2019 by Orsiris de Jong"
+AUTHOR="(C) 2016-2020 by Orsiris de Jong"
 CONTACT="http://www.netpower.fr/osync - ozy@netpower.fr"
 OLD_PROGRAM_VERSION="v1.0x-v1.2x"
 NEW_PROGRAM_VERSION="v1.3x"
