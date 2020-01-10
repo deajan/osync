@@ -21,6 +21,7 @@
 -   Updated target helper service configuration file
 -   Improved codacy results
 -   Added more debugging
+-   Fixed service logs being junked by spinner
 
 ### 22 May 2019: osync v1.3-beta3 release
 
