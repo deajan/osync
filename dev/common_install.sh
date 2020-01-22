@@ -27,62 +27,6 @@ _STATS=1
 ACTION="install"
 FAKEROOT=""
 
-function GetCommandlineArguments {
-        for i in "$@"; do
-                case $i in
-			--prefix=*)
-                        FAKEROOT="${i##*=}"
-                        ;;
-			--silent)
-			_LOGGER_SILENT=true
-			;;
-			--no-stats)
-			_STATS=0
-			;;
-			--remove)
-			ACTION="uninstall"
-			;;
-			--help|-h|-?)
-			Usage
-			;;
-                        *)
-			Logger "Unknown option '$i'" "ERROR"
-			Usage
-			exit
-                        ;;
-                esac
-	done
-}
-
-GetCommandlineArguments "$@"
-
-CONF_DIR=$FAKEROOT/etc/$PROGRAM
-BIN_DIR="$FAKEROOT/usr/local/bin"
-SERVICE_DIR_INIT=$FAKEROOT/etc/init.d
-# Should be /usr/lib/systemd/system, but /lib/systemd/system exists on debian & rhel / fedora
-SERVICE_DIR_SYSTEMD_SYSTEM=$FAKEROOT/lib/systemd/system
-SERVICE_DIR_SYSTEMD_USER=$FAKEROOT/etc/systemd/user
-SERVICE_DIR_OPENRC=$FAKEROOT/etc/init.d
-
-if [ "$PROGRAM" == "osync" ]; then
-	SERVICE_NAME="osync-srv"
-	TARGET_HELPER_SERVICE_NAME="osync-target-helper-srv"
-
-	TARGET_HELPER_SERVICE_FILE_INIT="$TARGET_HELPER_SERVICE_NAME"
-	TARGET_HELPER_SERVICE_FILE_SYSTEMD_SYSTEM="$TARGET_HELPER_SERVICE_NAME@.service"
-	TARGET_HELPER_SERVICE_FILE_SYSTEMD_USER="$TARGET_HELPER_SERVICE_NAME@.service.user"
-	TARGET_HELPER_SERVICE_FILE_OPENRC="$TARGET_HELPER_SERVICE_NAME-openrc"
-elif [ "$PROGRAM" == "pmocr" ]; then
-	SERVICE_NAME="pmocr-srv"
-fi
-
-SERVICE_FILE_INIT="$SERVICE_NAME"
-SERVICE_FILE_SYSTEMD_SYSTEM="$SERVICE_NAME@.service"
-SERVICE_FILE_SYSTEMD_USER="$SERVICE_NAME@.service.user"
-SERVICE_FILE_OPENRC="$SERVICE_NAME-openrc"
-
-## Generic code
-
 ## Default log file
 if [ -w "$FAKEROOT/var/log" ]; then
 	LOG_FILE="$FAKEROOT/var/log/$PROGRAM-install.log"
@@ -411,6 +355,62 @@ function TrapQuit {
 }
 
 ############################## Script entry point
+
+function GetCommandlineArguments {
+        for i in "$@"; do
+                case $i in
+			--prefix=*)
+                        FAKEROOT="${i##*=}"
+                        ;;
+			--silent)
+			_LOGGER_SILENT=true
+			;;
+			--no-stats)
+			_STATS=0
+			;;
+			--remove)
+			ACTION="uninstall"
+			;;
+			--help|-h|-?)
+			Usage
+			;;
+                        *)
+			Logger "Unknown option '$i'" "ERROR"
+			Usage
+			exit
+                        ;;
+                esac
+	done
+}
+
+GetCommandlineArguments "$@"
+
+CONF_DIR=$FAKEROOT/etc/$PROGRAM
+BIN_DIR="$FAKEROOT/usr/local/bin"
+SERVICE_DIR_INIT=$FAKEROOT/etc/init.d
+# Should be /usr/lib/systemd/system, but /lib/systemd/system exists on debian & rhel / fedora
+SERVICE_DIR_SYSTEMD_SYSTEM=$FAKEROOT/lib/systemd/system
+SERVICE_DIR_SYSTEMD_USER=$FAKEROOT/etc/systemd/user
+SERVICE_DIR_OPENRC=$FAKEROOT/etc/init.d
+
+if [ "$PROGRAM" == "osync" ]; then
+	SERVICE_NAME="osync-srv"
+	TARGET_HELPER_SERVICE_NAME="osync-target-helper-srv"
+
+	TARGET_HELPER_SERVICE_FILE_INIT="$TARGET_HELPER_SERVICE_NAME"
+	TARGET_HELPER_SERVICE_FILE_SYSTEMD_SYSTEM="$TARGET_HELPER_SERVICE_NAME@.service"
+	TARGET_HELPER_SERVICE_FILE_SYSTEMD_USER="$TARGET_HELPER_SERVICE_NAME@.service.user"
+	TARGET_HELPER_SERVICE_FILE_OPENRC="$TARGET_HELPER_SERVICE_NAME-openrc"
+elif [ "$PROGRAM" == "pmocr" ]; then
+	SERVICE_NAME="pmocr-srv"
+fi
+
+SERVICE_FILE_INIT="$SERVICE_NAME"
+SERVICE_FILE_SYSTEMD_SYSTEM="$SERVICE_NAME@.service"
+SERVICE_FILE_SYSTEMD_USER="$SERVICE_NAME@.service.user"
+SERVICE_FILE_OPENRC="$SERVICE_NAME-openrc"
+
+## Generic code
 
 trap TrapQuit TERM EXIT HUP QUIT
 
