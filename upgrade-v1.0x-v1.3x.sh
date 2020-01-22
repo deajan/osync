@@ -7,7 +7,7 @@ CONTACT="http://www.netpower.fr/osync - ozy@netpower.fr"
 OLD_PROGRAM_VERSION="v1.0x-v1.2x"
 NEW_PROGRAM_VERSION="v1.3x"
 CONFIG_FILE_REVISION=1.3.0
-PROGRAM_BUILD=2020011001
+PROGRAM_BUILD=2020012201
 
 ## type -p does not work on platforms other than linux (bash). If if does not work, always assume output is not a zero exitcode
 if ! type "$BASH" > /dev/null; then
@@ -70,6 +70,7 @@ CONFLICT_PREVALANCE
 SOFT_DELETE
 SOFT_DELETE_DAYS
 SKIP_DELETION
+SYNC_TYPE
 RESUME_SYNC
 RESUME_TRY
 FORCE_STRANGER_LOCK_RESUME
@@ -143,6 +144,7 @@ false
 initiator
 true
 30
+''
 ''
 true
 2
