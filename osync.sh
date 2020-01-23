@@ -7,7 +7,7 @@ PROGRAM="osync" # Rsync based two way sync engine with fault tolerance
 AUTHOR="(C) 2013-2020 by Orsiris de Jong"
 CONTACT="http://www.netpower.fr/osync - ozy@netpower.fr"
 PROGRAM_VERSION=1.3.0-prerc1
-PROGRAM_BUILD=2019122406
+PROGRAM_BUILD=2020012301
 IS_STABLE=false
 
 CONFIG_FILE_REVISION_REQUIRED=1.3.0
@@ -2506,21 +2506,24 @@ function _CheckReplicasLocal {
 		return 1
 	fi
 
-	Logger "Checking minimum disk space in local replica [$replicaPath]." "NOTICE"
-	diskSpace=$($DF_CMD "$replicaPath" | tail -1 | awk '{print $4}')
-	retval=$?
-	if [ $retval -ne 0 ]; then
-		Logger "Cannot get free space." "ERROR" $retval
-	else
-		# Ugly fix for df in some busybox environments that can only show human formats
-		if [ $(IsInteger $diskSpace) -eq 0 ]; then
-			diskSpace=$(HumanToNumeric $diskSpace)
-		fi
+	if [ $MINIMUM_SPACE -ne 0 ]; then
+		Logger "Checking minimum disk space in local replica [$replicaPath]." "NOTICE"
+		diskSpace=$($DF_CMD "$replicaPath" | tail -1 | awk '{print $4}')
+		retval=$?
+		if [ $retval -ne 0 ]; then
+			Logger "Cannot get free space." "ERROR" $retval
+		else
+			# Ugly fix for df in some busybox environments that can only show human formats
+			if [ $(IsInteger $diskSpace) -eq 0 ]; then
+				diskSpace=$(HumanToNumeric $diskSpace)
+			fi
 
-		if [ $diskSpace -lt $MINIMUM_SPACE ]; then
-			Logger "There is not enough free space on local replica [$replicaPath] ($diskSpace KB)." "WARN"
+			if [ $diskSpace -lt $MINIMUM_SPACE ]; then
+				Logger "There is not enough free space on local replica [$replicaPath] ($diskSpace KB)." "WARN"
+			fi
 		fi
 	fi
+	return $retval
 }
 
 function _CheckReplicasRemote {
@@ -2759,19 +2762,21 @@ function _CheckReplicasRemoteSub {
 		exit 1
 	fi
 
-	RemoteLogger "Checking minimum disk space in remote replica [$replicaPath]." "NOTICE"
-	diskSpace=$($DF_CMD "$replicaPath" | tail -1 | awk '{print $4}')
-	retval=$?
-	if [ $retval -ne 0 ]; then
-		RemoteLogger "Cannot get free space." "ERROR" $retval
-	else
-		# Ugly fix for df in some busybox environments that can only show human formats
-		if [ $(IsInteger $diskSpace) -eq 0 ]; then
-			diskSpace=$(HumanToNumeric $diskSpace)
-		fi
+	if [ $MINIMUM_SPACE -ne 0 ]; then
+		RemoteLogger "Checking minimum disk space in remote replica [$replicaPath]." "NOTICE"
+		diskSpace=$($DF_CMD "$replicaPath" | tail -1 | awk '{print $4}')
+		retval=$?
+		if [ $retval -ne 0 ]; then
+			RemoteLogger "Cannot get free space." "ERROR" $retval
+		else
+			# Ugly fix for df in some busybox environments that can only show human formats
+			if [ $(IsInteger $diskSpace) -eq 0 ]; then
+				diskSpace=$(HumanToNumeric $diskSpace)
+			fi
 
-		if [ $diskSpace -lt $MINIMUM_SPACE ]; then
-			RemoteLogger "There is not enough free space on remote replica [$replicaPath] ($diskSpace KB)." "WARN"
+			if [ $diskSpace -lt $MINIMUM_SPACE ]; then
+				RemoteLogger "There is not enough free space on remote replica [$replicaPath] ($diskSpace KB)." "WARN"
+			fi
 		fi
 	fi
 	return $retval
