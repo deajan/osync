@@ -22,6 +22,7 @@
 -   Improved codacy results
 -   Added more debugging
 -   Fixed service logs being junked by spinner
+-   Fixed MINIMUM_SPACE=0 didn't stop the disk space check anymore (Thanks to Val)
 
 ### 22 May 2019: osync v1.3-beta3 release
 
