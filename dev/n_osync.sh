@@ -7,7 +7,7 @@ PROGRAM="osync" # Rsync based two way sync engine with fault tolerance
 AUTHOR="(C) 2013-2020 by Orsiris de Jong"
 CONTACT="http://www.netpower.fr/osync - ozy@netpower.fr"
 PROGRAM_VERSION=1.3.0-prerc1
-PROGRAM_BUILD=2020012301
+PROGRAM_BUILD=2020012302
 IS_STABLE=false
 
 CONFIG_FILE_REVISION_REQUIRED=1.3.0
@@ -1466,6 +1466,7 @@ $SSH_CMD env _REMOTE_TOKEN="$_REMOTE_TOKEN" \
 env _DEBUG="'$_DEBUG'" env _PARANOIA_DEBUG="'$_PARANOIA_DEBUG'" env _LOGGER_SILENT="'$_LOGGER_SILENT'" env _LOGGER_VERBOSE="'$_LOGGER_VERBOSE'" env _LOGGER_PREFIX="'$_LOGGER_PREFIX'" env _LOGGER_ERR_ONLY="'$_LOGGER_ERR_ONLY'" \
 env _REMOTE_EXECUTION="true" env PROGRAM="'$PROGRAM'" env SCRIPT_PID="'$SCRIPT_PID'" env TSTAMP="'$TSTAMP'" \
 env _DRYRUN="'$_DRYRUN'" \
+env LOCAL_OS="$REMOTE_OS" \
 env FILE_LIST="'${TARGET[$__replicaDir]}${TARGET[$__stateDir]}/$deletionListFromReplica${INITIATOR[$__deletedListFile]}'" env REPLICA_DIR="'$replicaDir'" env SOFT_DELETE="'$SOFT_DELETE'" \
 env DELETION_DIR="'$(EscapeSpaces "$deletionDir")'" env FAILED_DELETE_LIST="'$failedDeleteList'" env SUCCESS_DELETE_LIST="'$successDeleteList'" env REPLICA_TYPE="'$replicaType'" \
 env LC_ALL=C $COMMAND_SUDO' bash -s' << 'ENDSSH' >> "$RUN_DIR/$PROGRAM.remote_deletion.$SCRIPT_PID.$TSTAMP" 2>&1
