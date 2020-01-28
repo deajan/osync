@@ -42,6 +42,7 @@ include #### GetConfFileValue SUBSET ####
 
 function SetLocalOSSettings {
 	USER=root
+	DO_INIT=true
 
 	# LOCAL_OS and LOCAL_OS_FULL are global variables set at GetLocalOS
 
@@ -51,6 +52,7 @@ function SetLocalOSSettings {
 		;;
 		*"MacOSX"*)
 		GROUP=admin
+		DO_INIT=false
 		;;
 		*"msys"*|*"Cygwin"*)
 		USER=""
@@ -425,7 +427,11 @@ umask 0022
 
 GetLocalOS
 SetLocalOSSettings
-GetInit
+# On Mac OS this always produces a warning which causes the installer to fail with exit code 2
+# Since we know it won't work anyway, and that's fine, just skip this step
+if $DO_INIT; then
+	GetInit
+fi
 
 STATS_LINK="http://instcount.netpower.fr?program=$PROGRAM&version=$PROGRAM_VERSION&os=$OS&action=$ACTION"
 
