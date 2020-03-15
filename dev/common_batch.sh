@@ -3,7 +3,7 @@ SUBPROGRAM=[prgname]
 PROGRAM="$SUBPROGRAM-batch" # Batch program to run osync / obackup instances sequentially and rerun failed ones
 AUTHOR="(L) 2013-2020 by Orsiris de Jong"
 CONTACT="http://www.netpower.fr - ozy@netpower.fr"
-PROGRAM_BUILD=2020031501
+PROGRAM_BUILD=2020031502
 
 ## Runs an osync /obackup instance for every conf file found
 ## If an instance fails, run it again if time permits
@@ -38,7 +38,7 @@ fi
 
 include #### Logger SUBSET ####
 include #### CleanUp SUBSET ####
-include #### TrapQuit SUBSET ####
+include #### GenericTrapQuit SUBSET ####
 
 function CheckEnvironment {
 	## osync / obackup executable full path can be set here if it cannot be found on the system
@@ -128,7 +128,7 @@ function Usage {
 	exit 128
 }
 
-trap TrapQuit TERM EXIT HUP QUIT
+trap GenericTrapQuit TERM EXIT HUP QUIT
 
 opts=""
 for i in "$@"

@@ -10,7 +10,7 @@ PROGRAM_BINARY=$PROGRAM".sh"
 PROGRAM_BATCH=$PROGRAM"-batch.sh"
 SSH_FILTER="ssh_filter.sh"
 
-SCRIPT_BUILD=2020031501
+SCRIPT_BUILD=2020031502
 INSTANCE_ID="installer-$SCRIPT_BUILD"
 
 ## osync / obackup / pmocr / zsnap install script
@@ -40,7 +40,7 @@ include #### UrlEncode SUBSET ####
 include #### GetLocalOS SUBSET ####
 include #### GetConfFileValue SUBSET ####
 include #### CleanUp SUBSET ####
-include #### TrapQuit SUBSET ####
+include #### GenericTrapQuit SUBSET ####
 
 function SetLocalOSSettings {
 	USER=root
@@ -397,7 +397,7 @@ SERVICE_FILE_OPENRC="$SERVICE_NAME-openrc"
 
 ## Generic code
 
-trap TrapQuit TERM EXIT HUP QUIT
+trap GenericTrapQuit TERM EXIT HUP QUIT
 
 if [ ! -w "$(dirname $LOG_FILE)" ]; then
         echo "Cannot write to log [$(dirname $LOG_FILE)]."
