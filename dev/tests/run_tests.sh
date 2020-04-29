@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-# osync test suite 2019072301
+# osync test suite 2020042901
 
 
 # Allows the following environment variables
@@ -392,9 +392,9 @@ function test_Exclusions () {
 
 function test_Deletetion () {
 	local iFile1="$INITIATOR_DIR/i fic"
-	local iFile2="$INITIATOR_DIR/i foc"
+	local iFile2="$INITIATOR_DIR/i foc (something)"
 	local tFile1="$TARGET_DIR/t fic"
-	local tFile2="$TARGET_DIR/t foc"
+	local tFile2="$TARGET_DIR/t foc [nothing]"
 
 
 	for i in "${osyncParameters[@]}"; do
