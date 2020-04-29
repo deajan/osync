@@ -2844,7 +2844,7 @@ function Usage {
 	echo "--initiator=\"\"		Master replica path. Will contain state and backup directory (is mandatory)"
 	echo "--target=\"\" 		Local or remote target replica path. Can be a ssh uri like ssh://user@host.com:22//path/to/target/replica (is mandatory)"
 	echo "--rsakey=\"\"		Alternative path to rsa private key for ssh connection to target replica"
-	echo "--ssh-controlmaster       Allow using a single TCP connection for all ssh calls. Will make remote sync faster, but may fail easier on lossy links"
+	echo "--ssh-controlmaster     Allow using a single TCP connection for all ssh calls. Will make remote sync faster, but may fail easier on lossy links"
 	echo "--password-file=\"\"      If no rsa private key is used for ssh authentication, a password file can be used"
 	echo "--remote-token=\"\"       When using ssh filter protection, you must specify the remote token set in ssh_filter.sh"
 	echo "--instance-id=\"\"	Optional sync task name to identify this synchronization task when using multiple targets"
