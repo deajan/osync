@@ -31,7 +31,7 @@
 #### OFUNCTIONS MINI SUBSET ####
 #### OFUNCTIONS MICRO SUBSET ####
 _OFUNCTIONS_VERSION=2.3.0-RC4
-_OFUNCTIONS_BUILD=2020042901
+_OFUNCTIONS_BUILD=2020042902
 #### _OFUNCTIONS_BOOTSTRAP SUBSET ####
 _OFUNCTIONS_BOOTSTRAP=true
 #### _OFUNCTIONS_BOOTSTRAP SUBSET END ####
@@ -1780,11 +1780,7 @@ function RunLocalCommand {
 	if [ $_LOGGER_VERBOSE == true ] || [ $retval -ne 0 ]; then
 		Logger "Truncated output:\n$(head -c16384 "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$SCRIPT_PID.$TSTAMP")" "NOTICE"
 	fi
-
-	if [ "$STOP_ON_CMD_ERROR" == true ] && [ $retval -ne 0 ]; then
-		Logger "Stopping on command execution error." "CRITICAL"
-		exit 1
-	fi
+	return $retval
 }
 
 ## Runs remote command $1 and waits for completition in $2 seconds
@@ -1818,15 +1814,10 @@ function RunRemoteCommand {
 		Logger "Command failed." "ERROR"
 	fi
 
-	if [ -f "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$SCRIPT_PID.$TSTAMP" ] && ([ $_LOGGER_VERBOSE == true ] || [ $retval -ne 0 ])
-	then
+	if [ -f "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$SCRIPT_PID.$TSTAMP" ] && ([ $_LOGGER_VERBOSE == true ] || [ $retval -ne 0 ]); then
 		Logger "Truncated output:\n$(head -c16384 "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$SCRIPT_PID.$TSTAMP")" "NOTICE"
 	fi
-
-	if [ "$STOP_ON_CMD_ERROR" == true ] && [ $retval -ne 0 ]; then
-		Logger "Stopping on command execution error." "CRITICAL"
-		exit 1
-	fi
+	return $retval
 }
 
 function RunBeforeHook {
@@ -1845,6 +1836,14 @@ function RunBeforeHook {
 	fi
 	if [ "$pids" != "" ]; then
 		ExecTasks $pids "${FUNCNAME[0]}" false 0 0 0 0 true $SLEEP_TIME $KEEP_LOGGING
+		retval=$?
+	fi
+
+	echo "ert=$retval"
+
+	if [ "$STOP_ON_CMD_ERROR" == true ] && [ $retval -ne 0 ]; then
+		Logger "Stopping on command execution error." "CRITICAL"
+		exit 1
 	fi
 }
 
