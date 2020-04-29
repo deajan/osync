@@ -10,7 +10,7 @@ PROGRAM_BINARY=$PROGRAM".sh"
 PROGRAM_BATCH=$PROGRAM"-batch.sh"
 SSH_FILTER="ssh_filter.sh"
 
-SCRIPT_BUILD=2020031502
+SCRIPT_BUILD=2020042901
 INSTANCE_ID="installer-$SCRIPT_BUILD"
 
 ## osync / obackup / pmocr / zsnap install script
@@ -56,9 +56,10 @@ function SetLocalOSSettings {
 		GROUP=admin
 		DO_INIT=false
 		;;
-		*"msys"*|*"Cygwin"*)
+		*"Cygwin"*|*"Android"*|*"msys"*|*"BusyBox"*)
 		USER=""
 		GROUP=""
+		DO_INIT=false
 		;;
 		*)
 		GROUP=root
