@@ -213,7 +213,7 @@ REMOTE_RUN_AFTER_CMD=""
 MAX_EXEC_TIME_PER_CMD_BEFORE=0
 MAX_EXEC_TIME_PER_CMD_AFTER=0
 
-## Stops osync execution if one of the above commands fail
+## Stops osync execution if one of the above before commands fail
 STOP_ON_CMD_ERROR=true
 
 ## Run local and remote after sync commands even on failure
