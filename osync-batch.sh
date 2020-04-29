@@ -160,8 +160,8 @@ function Logger {
 	fi
 
 	## Obfuscate _REMOTE_TOKEN in logs (for ssh_filter usage only in osync and obackup)
-	value="${value/env _REMOTE_TOKEN=$_REMOTE_TOKEN/env _REMOTE_TOKEN=__(o_O)__}"
-	value="${value/env _REMOTE_TOKEN=\$_REMOTE_TOKEN/env _REMOTE_TOKEN=__(o_O)__}"
+	value="${value/env _REMOTE_TOKEN=$_REMOTE_TOKEN/env _REMOTE_TOKEN=__o_O__}"
+	value="${value/env _REMOTE_TOKEN=\$_REMOTE_TOKEN/env _REMOTE_TOKEN=__o_O__}"
 
 	if [ "$level" == "CRITICAL" ]; then
 		_Logger "$prefix($level):$value" "$prefix\e[1;33;41m$value\e[0m" true
@@ -1490,11 +1490,7 @@ function RunLocalCommand {
 	if [ $_LOGGER_VERBOSE == true ] || [ $retval -ne 0 ]; then
 		Logger "Truncated output:\n$(head -c16384 "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$SCRIPT_PID.$TSTAMP")" "NOTICE"
 	fi
-
-	if [ "$STOP_ON_CMD_ERROR" == true ] && [ $retval -ne 0 ]; then
-		Logger "Stopping on command execution error." "CRITICAL"
-		exit 1
-	fi
+	return $retval
 }
 
 ## Runs remote command $1 and waits for completition in $2 seconds
@@ -1527,15 +1523,10 @@ function RunRemoteCommand {
 		Logger "Command failed." "ERROR"
 	fi
 
-	if [ -f "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$SCRIPT_PID.$TSTAMP" ] && ([ $_LOGGER_VERBOSE == true ] || [ $retval -ne 0 ])
-	then
+	if [ -f "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$SCRIPT_PID.$TSTAMP" ] && ([ $_LOGGER_VERBOSE == true ] || [ $retval -ne 0 ]); then
 		Logger "Truncated output:\n$(head -c16384 "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$SCRIPT_PID.$TSTAMP")" "NOTICE"
 	fi
-
-	if [ "$STOP_ON_CMD_ERROR" == true ] && [ $retval -ne 0 ]; then
-		Logger "Stopping on command execution error." "CRITICAL"
-		exit 1
-	fi
+	return $retval
 }
 
 function RunBeforeHook {
@@ -1553,6 +1544,14 @@ function RunBeforeHook {
 	fi
 	if [ "$pids" != "" ]; then
 		ExecTasks $pids "${FUNCNAME[0]}" false 0 0 0 0 true $SLEEP_TIME $KEEP_LOGGING
+		retval=$?
+	fi
+
+	echo "ert=$retval"
+
+	if [ "$STOP_ON_CMD_ERROR" == true ] && [ $retval -ne 0 ]; then
+		Logger "Stopping on command execution error." "CRITICAL"
+		exit 1
 	fi
 }
 
