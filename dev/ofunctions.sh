@@ -421,6 +421,26 @@ function KillAllChilds {
 	return $errorcount
 }
 
+#### GenericTrapQuit SUBSET ####
+function GenericTrapQuit {
+	local exitcode=0
+
+	# Get ERROR / WARN alert flags from subprocesses that call Logger
+	if [ -f "$RUN_DIR/$PROGRAM.Logger.warn.$SCRIPT_PID.$TSTAMP" ]; then
+		WARN_ALERT=true
+		exitcode=2
+	fi
+	if [ -f "$RUN_DIR/$PROGRAM.Logger.error.$SCRIPT_PID.$TSTAMP" ]; then
+		ERROR_ALERT=true
+		exitcode=1
+	fi
+
+	CleanUp
+	exit $exitcode
+}
+
+#### TrapQuit SUBSET END ####
+
 #### CleanUp SUBSET ####
 function CleanUp {
 	# Exit controlmaster before it's socket gets deleted
@@ -441,23 +461,6 @@ function CleanUp {
 }
 
 #### CleanUp SUBSET END ####
-
-function GenericTrapQuit {
-	local exitcode=0
-
-	# Get ERROR / WARN alert flags from subprocesses that call Logger
-	if [ -f "$RUN_DIR/$PROGRAM.Logger.warn.$SCRIPT_PID.$TSTAMP" ]; then
-		WARN_ALERT=true
-		exitcode=2
-	fi
-	if [ -f "$RUN_DIR/$PROGRAM.Logger.error.$SCRIPT_PID.$TSTAMP" ]; then
-		ERROR_ALERT=true
-		exitcode=1
-	fi
-
-	CleanUp
-	exit $exitcode
-}
 
 #### OFUNCTIONS MICRO SUBSET END ####
 

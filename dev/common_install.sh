@@ -10,7 +10,7 @@ PROGRAM_BINARY=$PROGRAM".sh"
 PROGRAM_BATCH=$PROGRAM"-batch.sh"
 SSH_FILTER="ssh_filter.sh"
 
-SCRIPT_BUILD=2020011001
+SCRIPT_BUILD=2020031502
 INSTANCE_ID="installer-$SCRIPT_BUILD"
 
 ## osync / obackup / pmocr / zsnap install script
@@ -39,6 +39,8 @@ fi
 include #### UrlEncode SUBSET ####
 include #### GetLocalOS SUBSET ####
 include #### GetConfFileValue SUBSET ####
+include #### CleanUp SUBSET ####
+include #### GenericTrapQuit SUBSET ####
 
 function SetLocalOSSettings {
 	USER=root
@@ -337,23 +339,6 @@ function Usage {
 	exit 127
 }
 
-function TrapQuit {
-	local exitcode=0
-
-	# Get ERROR / WARN alert flags from subprocesses that call Logger
-	if [ -f "$RUN_DIR/$PROGRAM.Logger.warn.$SCRIPT_PID.$TSTAMP" ]; then
-		WARN_ALERT=true
-		exitcode=2
-	fi
-	if [ -f "$RUN_DIR/$PROGRAM.Logger.error.$SCRIPT_PID.$TSTAMP" ]; then
-		ERROR_ALERT=true
-		exitcode=1
-	fi
-
-	CleanUp
-	exit $exitcode
-}
-
 ############################## Script entry point
 
 function GetCommandlineArguments {
@@ -412,7 +397,7 @@ SERVICE_FILE_OPENRC="$SERVICE_NAME-openrc"
 
 ## Generic code
 
-trap TrapQuit TERM EXIT HUP QUIT
+trap GenericTrapQuit TERM EXIT HUP QUIT
 
 if [ ! -w "$(dirname $LOG_FILE)" ]; then
         echo "Cannot write to log [$(dirname $LOG_FILE)]."
