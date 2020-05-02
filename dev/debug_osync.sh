@@ -3024,7 +3024,7 @@ function _HandleLocksLocal {
 
 	# Skip the whole part if overwrite true
 	if [ -s "$lockfile" ] && [ $overwrite != true ]; then
-		lockfileContent="$(head -c16384 $lockfile)"
+		lockfileContent="$(head -c16384 "$lockfile")"
 		Logger "Master lock pid present: $lockfileContent" "DEBUG"
 		lockPid="${lockfileContent%@*}"
 		if [ $(IsInteger $lockPid) -ne 1 ]; then
