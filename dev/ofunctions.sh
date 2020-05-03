@@ -31,7 +31,7 @@
 #### OFUNCTIONS MINI SUBSET ####
 #### OFUNCTIONS MICRO SUBSET ####
 _OFUNCTIONS_VERSION=2.3.0-RC4
-_OFUNCTIONS_BUILD=2020050301
+_OFUNCTIONS_BUILD=2020050302
 #### _OFUNCTIONS_BOOTSTRAP SUBSET ####
 _OFUNCTIONS_BOOTSTRAP=true
 #### _OFUNCTIONS_BOOTSTRAP SUBSET END ####
@@ -1837,9 +1837,9 @@ function RunBeforeHook {
 	if [ "$pids" != "" ]; then
 		ExecTasks $pids "${FUNCNAME[0]}" false 0 0 0 0 true $SLEEP_TIME $KEEP_LOGGING
 		retval=$?
+	else
+		retval=0
 	fi
-
-	echo "ert=$retval"
 
 	if [ "$STOP_ON_CMD_ERROR" == true ] && [ $retval -ne 0 ]; then
 		Logger "Stopping on command execution error." "CRITICAL"
