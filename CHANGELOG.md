@@ -15,6 +15,7 @@
 -   Fixed a problem with macos mv not preserving ownership of files from /tmp
 -   Fixed very long outstanding issue with special characters in remote target handling
 -   Fixed an issue where STOP_ON_ERROR_CMD did not work anymore
+-   Fixed a remote file lock problem (thanks to https://github.com/zhangzhishan)
 -   Fixed various cosmetic issues with code and logs
 -   Improved upgrade script
 -   Fixed a possible bash buffer overflow when synchronizing large filesets (tested with 2M files)
