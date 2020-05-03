@@ -31,7 +31,7 @@
 #### OFUNCTIONS MINI SUBSET ####
 #### OFUNCTIONS MICRO SUBSET ####
 _OFUNCTIONS_VERSION=2.3.0-RC4
-_OFUNCTIONS_BUILD=2020042902
+_OFUNCTIONS_BUILD=2020050301
 #### _OFUNCTIONS_BOOTSTRAP SUBSET ####
 _OFUNCTIONS_BOOTSTRAP=true
 #### _OFUNCTIONS_BOOTSTRAP SUBSET END ####
@@ -2051,7 +2051,7 @@ function PreInit {
 	fi
 
 	## Set compression executable and extension
-	if [ "$(IsInteger $COMPRESSION_LEVEL)" -eq 0 ]; then
+	if [ "$(IsInteger "$COMPRESSION_LEVEL")" -eq 0 ]; then
 		COMPRESSION_LEVEL=3
 	fi
 }
