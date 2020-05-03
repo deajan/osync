@@ -1748,7 +1748,7 @@ function PreInit {
 	fi
 
 	## Set compression executable and extension
-	if [ "$(IsInteger $COMPRESSION_LEVEL)" -eq 0 ]; then
+	if [ "$(IsInteger "$COMPRESSION_LEVEL")" -eq 0 ]; then
 		COMPRESSION_LEVEL=3
 	fi
 }

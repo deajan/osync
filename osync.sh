@@ -7,14 +7,14 @@ PROGRAM="osync" # Rsync based two way sync engine with fault tolerance
 AUTHOR="(C) 2013-2020 by Orsiris de Jong"
 CONTACT="http://www.netpower.fr/osync - ozy@netpower.fr"
 PROGRAM_VERSION=1.3.0-rc1
-PROGRAM_BUILD=2020042901
+PROGRAM_BUILD=2020050301
 IS_STABLE=false
 
 CONFIG_FILE_REVISION_REQUIRED=1.3.0
 
 
 _OFUNCTIONS_VERSION=2.3.0-RC4
-_OFUNCTIONS_BUILD=2020042902
+_OFUNCTIONS_BUILD=2020050301
 _OFUNCTIONS_BOOTSTRAP=true
 
 if ! type "$BASH" > /dev/null; then
@@ -1886,7 +1886,7 @@ function PreInit {
 	fi
 
 	## Set compression executable and extension
-	if [ "$(IsInteger $COMPRESSION_LEVEL)" -eq 0 ]; then
+	if [ "$(IsInteger "$COMPRESSION_LEVEL")" -eq 0 ]; then
 		COMPRESSION_LEVEL=3
 	fi
 }
@@ -2491,7 +2491,7 @@ function _CheckReplicasLocal {
 			retval=$?
 			if [ $retval -ne 0 ]; then
 				Logger "Cannot create local replica path [$replicaPath]." "CRITICAL" $retval
-				Logger "Truncated output:\n$(head -c16384 $RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$replicaType.$SCRIPT_PID.$TSTAMP)" "WARN"
+				Logger "Truncated output:\n$(head -c16384 "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$replicaType.$SCRIPT_PID.$TSTAMP")" "WARN"
 				return 1
 			else
 				Logger "Created local replica path [$replicaPath]." "NOTICE"
@@ -2515,8 +2515,8 @@ function _CheckReplicasLocal {
 			Logger "Cannot get free space." "ERROR" $retval
 		else
 			# Ugly fix for df in some busybox environments that can only show human formats
-			if [ $(IsInteger $diskSpace) -eq 0 ]; then
-				diskSpace=$(HumanToNumeric $diskSpace)
+			if [ $(IsInteger "$diskSpace") -eq 0 ]; then
+				diskSpace=$(HumanToNumeric "$diskSpace")
 			fi
 
 			if [ $diskSpace -lt $MINIMUM_SPACE ]; then
@@ -2771,8 +2771,8 @@ function _CheckReplicasRemoteSub {
 			RemoteLogger "Cannot get free space." "ERROR" $retval
 		else
 			# Ugly fix for df in some busybox environments that can only show human formats
-			if [ $(IsInteger $diskSpace) -eq 0 ]; then
-				diskSpace=$(HumanToNumeric $diskSpace)
+			if [ $(IsInteger "$diskSpace") -eq 0 ]; then
+				diskSpace=$(HumanToNumeric "$diskSpace")
 			fi
 
 			if [ $diskSpace -lt $MINIMUM_SPACE ]; then
@@ -2794,7 +2794,7 @@ ENDSSH
 	if [ -s "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$replicaType.$SCRIPT_PID.$TSTAMP" ]; then
 		(
 		_LOGGER_PREFIX=""
-		Logger "$(head -c16384 $RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$replicaType.$SCRIPT_PID.$TSTAMP)" "NOTICE"
+		Logger "$(head -c16384 "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$replicaType.$SCRIPT_PID.$TSTAMP")" "NOTICE"
 		)
 	fi
 	if [ $retval -ne 0 ]; then
@@ -2852,7 +2852,7 @@ function _HandleLocksLocal {
 		retval=$?
 		if [ $retval -ne 0 ]; then
 			Logger "Cannot create state dir [$replicaStateDir]." "CRITICAL" $retval
-			Logger "Truncated output:\n$(head -c16384 $RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$replicaType.$SCRIPT_PID.$TSTAMP)" "WARN"
+			Logger "Truncated output:\n$(head -c16384 "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$replicaType.$SCRIPT_PID.$TSTAMP")" "WARN"
 			return 1
 		fi
 	fi
@@ -2862,7 +2862,7 @@ function _HandleLocksLocal {
 		lockfileContent="$(head -c16384 "$lockfile")"
 		Logger "Master lock pid present: $lockfileContent" "DEBUG"
 		lockPid="${lockfileContent%@*}"
-		if [ $(IsInteger $lockPid) -ne 1 ]; then
+		if [ $(IsInteger "$lockPid") -ne 1 ]; then
 			Logger "Invalid pid [$lockPid] in local replica." "CRITICAL"
 			return 1
 		fi
@@ -2894,7 +2894,7 @@ function _HandleLocksLocal {
 		retval=$?
 		if [ $retval -ne 0 ]; then
 			Logger "Could not create lock file on local $replicaType in [$lockfile]." "CRITICAL" $retval
-			Logger "Command output\n$($RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$replicaType.$SCRIPT_PID.$TSTAMP)" "WARN"
+			Logger "Truncated output\n$(head -c 16384 "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$replicaType.$SCRIPT_PID.$TSTAMP")" "WARN"
 			return 1
 		else
 			Logger "Locked local $replicaType replica in [$lockfile]." "DEBUG"
@@ -3128,7 +3128,7 @@ function _HandleLocksRemoteSub {
 		lockfileContent="$(head -c16384 "$lockfile")"
 		RemoteLogger "Master lock pid present: $lockfileContent" "DEBUG"
 		lockPid="${lockfileContent%@*}"
-		if [ $(IsInteger $lockPid) -ne 1 ]; then
+		if [ $(IsInteger "$lockPid") -ne 1 ]; then
 			RemoteLogger "Invalid pid [$lockPid] in local replica." "CRITICAL"
 			return 1
 		fi
@@ -3191,7 +3191,7 @@ ENDSSH
 	if [ -s "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$replicaType.$SCRIPT_PID.$TSTAMP" ]; then
 		(
 		_LOGGER_PREFIX=""
-		Logger "$(head -c16384 $RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$replicaType.$SCRIPT_PID.$TSTAMP)" "NOTICE"
+		Logger "$(head -c16384 "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$replicaType.$SCRIPT_PID.$TSTAMP")" "NOTICE"
 		)
 	fi
 	if [ $retval -ne 0 ]; then
@@ -3297,7 +3297,7 @@ ENDSSH
 	retval=$?
 	if [ $retval -ne 0 ]; then
 		Logger "Could not unlock $replicaType remote replica." "ERROR" $retval
-		Logger "Truncated output:\n$(head -c16384 $RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$replicaType.$SCRIPT_PID.$TSTAMP)" "WARN"
+		Logger "Truncated output:\n$(head -c16384 "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$replicaType.$SCRIPT_PID.$TSTAMP")" "WARN"
 	else
 		Logger "Removed remote $replicaType replica lock." "DEBUG"
 	fi
@@ -3388,12 +3388,12 @@ function treeList {
 		return $?
 	elif [ $retval -eq 23 ]; then
 		Logger "Some files could not be listed in $replicaType replica [$replicaPath]. Check for failing symlinks." "ERROR" $retval
-		Logger "Truncated output:\n$(head -c16384 $RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$replicaType.error.$SCRIPT_PID.$TSTAMP)" "WARN"
+		Logger "Truncated output:\n$(head -c16384 "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$replicaType.error.$SCRIPT_PID.$TSTAMP")" "WARN"
 		return 0
 	else
 		Logger "Cannot create replica file list in [$replicaPath]." "CRITICAL" $retval
 		_LOGGER_SILENT=true Logger "Command was [$rsyncCmd]." "WARN"
-		Logger "Truncated output:\n$(head -c16384 $RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$replicaType.error.$SCRIPT_PID.$TSTAMP)" "WARN"
+		Logger "Truncated output:\n$(head -c16384 "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$replicaType.error.$SCRIPT_PID.$TSTAMP")" "WARN"
 		return $retval
 	fi
 }
@@ -3511,7 +3511,7 @@ function _getFileCtimeMtimeRemote {
 		Logger "Sending ctime required file list failed with [$retval] on $replicaType. Stopping execution." "CRITICAL" $retval
 		_LOGGER_SILENT=true Logger "Command was [$cmd]." "WARN"
 		if [ -s "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$replicaType.$SCRIPT_PID.$TSTAMP" ]; then
-			Logger "Truncated output:\n$(head -c16384 $RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$replicaType.$SCRIPT_PID.$TSTAMP)" "WARN"
+			Logger "Truncated output:\n$(head -c16384 "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$replicaType.$SCRIPT_PID.$TSTAMP")" "WARN"
 		fi
 		return $retval
 	fi
@@ -3750,7 +3750,7 @@ ENDSSH
 	if [ $retval -ne 0 ]; then
 		Logger "Getting file attributes failed [$retval] on $replicaType. Stopping execution." "CRITICAL" $retval
 		if [ -s "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$replicaType.$SCRIPT_PID.$TSTAMP" ]; then
-			Logger "Truncated output:\n$(head -c16384 $RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$replicaType.$SCRIPT_PID.$TSTAMP)" "WARN"
+			Logger "Truncated output:\n$(head -c16384 "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$replicaType.$SCRIPT_PID.$TSTAMP")" "WARN"
 		fi
 		return $retval
 	else
@@ -3899,12 +3899,12 @@ function syncAttrs {
 		Logger "Getting list of files that need updates failed [$retval]. Stopping execution." "CRITICAL" $retval
 		_LOGGER_SILENT=true Logger "Command was [$rsyncCmd]." "WARN"
 		if [ -f "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$SCRIPT_PID.$TSTAMP" ]; then
-			Logger "Truncated rsync output:\n$(head -c16384 $RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$SCRIPT_PID.$TSTAMP)" "NOTICE"
+			Logger "Truncated rsync output:\n$(head -c16384 "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$SCRIPT_PID.$TSTAMP")" "NOTICE"
 		fi
 		return $retval
 	else
 		if [ -f "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$SCRIPT_PID.$TSTAMP" ]; then
-			Logger "Truncated list:\n$(head -c16384 $RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$SCRIPT_PID.$TSTAMP)" "VERBOSE"
+			Logger "Truncated list:\n$(head -c16384 "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$SCRIPT_PID.$TSTAMP")" "VERBOSE"
 		fi
 		( grep -Ev "^[^ ]*(c|s|t)[^ ]* " "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$SCRIPT_PID.$TSTAMP" || :) | ( grep -E "^[^ ]*(p|o|g|a)[^ ]* " || :) | sed -e 's/^[^ ]* //' >> "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}-cleaned.$SCRIPT_PID.$TSTAMP"
 		retval=$?
@@ -3982,12 +3982,12 @@ function syncAttrs {
 		Logger "Updating file attributes on $destReplica [$retval]. Stopping execution." "CRITICAL" $retval
 		_LOGGER_SILENT=true Logger "Command was [$rsyncCmd]." "WARN"
 		if [ -f "$RUN_DIR/$PROGRAM.attr-update.$destReplica.$SCRIPT_PID.$TSTAMP" ]; then
-			Logger "Truncated rsync output:\n$(head -c16384 $RUN_DIR/$PROGRAM.attr-update.$destReplica.$SCRIPT_PID.$TSTAMP)" "NOTICE"
+			Logger "Truncated rsync output:\n$(head -c16384 "$RUN_DIR/$PROGRAM.attr-update.$destReplica.$SCRIPT_PID.$TSTAMP")" "NOTICE"
 		fi
 		return 1
 	else
 		if [ -f "$RUN_DIR/$PROGRAM.attr-update.$destReplica.$SCRIPT_PID.$TSTAMP" ]; then
-			Logger "Truncated list:\n$(head -c16384 $RUN_DIR/$PROGRAM.attr-update.$destReplica.$SCRIPT_PID.$TSTAMP)" "VERBOSE"
+			Logger "Truncated list:\n$(head -c16384 "$RUN_DIR/$PROGRAM.attr-update.$destReplica.$SCRIPT_PID.$TSTAMP")" "VERBOSE"
 		fi
 		Logger "Successfully updated file attributes on $destReplica replica." "NOTICE"
 	fi
@@ -4051,12 +4051,12 @@ function syncUpdate {
 		Logger "Updating $destinationReplica replica failed. Stopping execution." "CRITICAL" $retval
 		_LOGGER_SILENT=true Logger "Command was [$rsyncCmd]." "WARN"
 		if [ -f "$RUN_DIR/$PROGRAM.update.$destinationReplica.$SCRIPT_PID.$TSTAMP" ]; then
-			Logger "Truncated rsync output:\n$(head -c16384 $RUN_DIR/$PROGRAM.update.$destinationReplica.$SCRIPT_PID.$TSTAMP)" "NOTICE"
+			Logger "Truncated rsync output:\n$(head -c16384 "$RUN_DIR/$PROGRAM.update.$destinationReplica.$SCRIPT_PID.$TSTAMP")" "NOTICE"
 		fi
 		exit 1
 	else
 		if [ -f "$RUN_DIR/$PROGRAM.update.$destinationReplica.$SCRIPT_PID.$TSTAMP" ]; then
-			Logger "Truncated list:\n$(head -c16384 $RUN_DIR/$PROGRAM.update.$destinationReplica.$SCRIPT_PID.$TSTAMP)" "VERBOSE"
+			Logger "Truncated list:\n$(head -c16384 "$RUN_DIR/$PROGRAM.update.$destinationReplica.$SCRIPT_PID.$TSTAMP")" "VERBOSE"
 		fi
 		Logger "Updating $destinationReplica replica succeded." "NOTICE"
 		return 0
@@ -4190,7 +4190,7 @@ function _deleteRemote {
 		Logger "Cannot copy the deletion list to remote replica." "ERROR" $retval
 		_LOGGER_SILENT=true Logger "Command was [$rsyncCmd]." "WARN"
 		if [ -f "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.precopy.$SCRIPT_PID.$TSTAMP" ]; then
-			Logger "Truncated output:\n$(head -c16384 $RUN_DIR/$PROGRAM.${FUNCNAME[0]}.precopy.$SCRIPT_PID.$TSTAMP)" "ERROR"
+			Logger "Truncated output:\n$(head -c16384 "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.precopy.$SCRIPT_PID.$TSTAMP")" "ERROR"
 		fi
 		exit 1
 	fi
@@ -4457,19 +4457,19 @@ ENDSSH
 	if [ -s "$RUN_DIR/$PROGRAM.remote_deletion.$SCRIPT_PID.$TSTAMP" ] && ([ $retval -ne 0 ] || [ "$_LOGGER_VERBOSE" == true ]); then
 		(
 		_LOGGER_PREFIX=""
-		Logger "Truncated output:\n$(head -c16384 $RUN_DIR/$PROGRAM.remote_deletion.$SCRIPT_PID.$TSTAMP)" "ERROR"
+		Logger "Truncated output:\n$(head -c16384 "$RUN_DIR/$PROGRAM.remote_deletion.$SCRIPT_PID.$TSTAMP")" "ERROR"
 		)
 	fi
 
 	## Copy back the deleted failed file list
-	rsyncCmd="$(type -p $RSYNC_EXECUTABLE) -r --rsync-path=\"env LC_ALL=C env _REMOTE_TOKEN=$_REMOTE_TOKEN $RSYNC_PATH\" -e \"$RSYNC_SSH_CMD\" --include \"$(dirname ${TARGET[$__stateDir]})\" --include \"${TARGET[$__stateDir]}\" --include \"${TARGET[$__stateDir]}/$replicaType${TARGET[$__failedDeletedListFile]}\" --include \"${TARGET[$__stateDir]}/$replicaType${TARGET[$__successDeletedListFile]}\" --exclude='*' $REMOTE_USER@$REMOTE_HOST:\"'${TARGET[$__replicaDir]}'\" \"${INITIATOR[$__replicaDir]}\" > \"$RUN_DIR/$PROGRAM.remote_failed_deletion_list_copy.$SCRIPT_PID.$TSTAMP\""
+	rsyncCmd="$(type -p $RSYNC_EXECUTABLE) -r --rsync-path=\"env LC_ALL=C env _REMOTE_TOKEN=$_REMOTE_TOKEN $RSYNC_PATH\" -e \"$RSYNC_SSH_CMD\" --include \"$(dirname "${TARGET[$__stateDir]}")\" --include \"${TARGET[$__stateDir]}\" --include \"${TARGET[$__stateDir]}/$replicaType${TARGET[$__failedDeletedListFile]}\" --include \"${TARGET[$__stateDir]}/$replicaType${TARGET[$__successDeletedListFile]}\" --exclude='*' $REMOTE_USER@$REMOTE_HOST:\"'${TARGET[$__replicaDir]}'\" \"${INITIATOR[$__replicaDir]}\" > \"$RUN_DIR/$PROGRAM.remote_failed_deletion_list_copy.$SCRIPT_PID.$TSTAMP\""
 	Logger "RSYNC_CMD: $rsyncCmd" "DEBUG"
 	eval "$rsyncCmd" 2>> "$LOG_FILE"
 	if [ $? -ne 0 ]; then
 		Logger "Cannot copy back the failed deletion list to initiator replica." "CRITICAL" $retval
 		_LOGGER_SILENT=true Logger "Command was [$rsyncCmd]." "WARN"
 		if [ -f "$RUN_DIR/$PROGRAM.remote_failed_deletion_list_copy.$SCRIPT_PID.$TSTAMP" ]; then
-			Logger "Truncated output:\n$(head -c16384 $RUN_DIR/$PROGRAM.remote_failed_deletion_list_copy.$SCRIPT_PID.$TSTAMP)" "NOTICE"
+			Logger "Truncated output:\n$(head -c16384 "$RUN_DIR/$PROGRAM.remote_failed_deletion_list_copy.$SCRIPT_PID.$TSTAMP")" "NOTICE"
 		fi
 		return 1
 	fi
@@ -5107,9 +5107,9 @@ function _SoftDeleteLocal {
 
 		if [ -s "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.deleteErrors.$replicaType.$SCRIPT_PID.$TSTAMP" ]; then
 			Logger "Error while executing cleanup on $replicaType replica." "ERROR" $retval
-			Logger "Truncated output:\n$(head -c16384 $RUN_DIR/$PROGRAM.${FUNCNAME[0]}.deleteErrors.$replicaType.$SCRIPT_PID.$TSTAMP)" "WARN"
+			Logger "Truncated output:\n$(head -c16384 "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.deleteErrors.$replicaType.$SCRIPT_PID.$TSTAMP")" "WARN"
 		else
-			Logger "Truncated output:\n$(head -c16384 $RUN_DIR/$PROGRAM.${FUNCNAME[0]}.deleteErrors.$replicaType.$SCRIPT_PID.$TSTAMP)" "VERBOSE"
+			Logger "Truncated output:\n$(head -c16384 "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.deleteErrors.$replicaType.$SCRIPT_PID.$TSTAMP")" "VERBOSE"
 			Logger "File cleanup complete on $replicaType replica." "NOTICE"
 		fi
 
@@ -5366,10 +5366,10 @@ function _SoftDeleteRemoteSub {
 
 		if [ -s "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.deleteErrors.$replicaType.$SCRIPT_PID.$TSTAMP" ]; then
 			RemoteLogger "Error while executing cleanup on $replicaType replica." "ERROR" $retval
-			RemoteLogger "Truncated output:\n$(head -c16384 $RUN_DIR/$PROGRAM.${FUNCNAME[0]}.deleteErrors.$replicaType.$SCRIPT_PID.$TSTAMP)" "WARN"
+			RemoteLogger "Truncated output:\n$(head -c16384 "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.deleteErrors.$replicaType.$SCRIPT_PID.$TSTAMP")" "WARN"
 			exit 1
 		else
-			RemoteLogger "Truncated output:\n$(head -c16384 $RUN_DIR/$PROGRAM.${FUNCNAME[0]}.deleteErrors.$replicaType.$SCRIPT_PID.$TSTAMP)" "VERBOSE"
+			RemoteLogger "Truncated output:\n$(head -c16384 "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.deleteErrors.$replicaType.$SCRIPT_PID.$TSTAMP")" "VERBOSE"
 			RemoteLogger "File cleanup complete on $replicaType replica." "NOTICE"
 			exit 0
 		fi
@@ -5391,13 +5391,13 @@ ENDSSH
 		Logger "Error while executing cleanup on remote $replicaType replica." "ERROR" $retval
 		(
 		_LOGGER_PREFIX=""
-		Logger "Truncated output:\n$(head -c16384 $RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$replicaType.$SCRIPT_PID.$TSTAMP)" "WARN"
+		Logger "Truncated output:\n$(head -c16384 "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$replicaType.$SCRIPT_PID.$TSTAMP")" "WARN"
 		)
 	else
 		Logger "Cleanup complete on $replicaType replica." "NOTICE"
 		(
 		_LOGGER_PREFIX=""
-		Logger "Truncated output:\n$(head -c16384 $RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$replicaType.$SCRIPT_PID.$TSTAMP)" "VERBOSE"
+		Logger "Truncated output:\n$(head -c16384 "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$replicaType.$SCRIPT_PID.$TSTAMP")" "VERBOSE"
 		)
 	fi
 }
@@ -5749,7 +5749,7 @@ function LogConflicts {
 		Logger "File conflicts: INITIATOR << >> TARGET" "ALWAYS"
 		> "${INITIATOR[$__replicaDir]}${INITIATOR[$__stateDir]}/${INITIATOR[$__conflictListFile]}"
 		while read -r line; do
-			echo "${INITIATOR[$__replicaDir]}$(echo $line | awk -F';' '{print $1}') << >> ${TARGET[$__replicaDir]}$(echo $line | awk -F';' '{print $1}')" >> "${INITIATOR[$__replicaDir]}${INITIATOR[$__stateDir]}/${INITIATOR[$__conflictListFile]}"
+			echo "${INITIATOR[$__replicaDir]}$(echo "$line" | awk -F';' '{print $1}') << >> ${TARGET[$__replicaDir]}$(echo "$line" | awk -F';' '{print $1}')" >> "${INITIATOR[$__replicaDir]}${INITIATOR[$__stateDir]}/${INITIATOR[$__conflictListFile]}"
 			conflicts=$((conflicts+1))
 		done < "$RUN_DIR/$PROGRAM.conflictList.compare.$SCRIPT_PID.$TSTAMP"
 
@@ -6358,35 +6358,35 @@ if [ $_QUICK_SYNC -eq 2 ]; then
 	fi
 
 	# Let the possibility to initialize those values directly via command line like SOFT_DELETE_DAYS=60 ./osync.sh
-	if [ $(IsInteger $MINIMUM_SPACE) -ne 1 ]; then
+	if [ $(IsInteger "$MINIMUM_SPACE") -ne 1 ]; then
 		MINIMUM_SPACE=1024
 	fi
 
-	if [ $(IsInteger $CONFLICT_BACKUP_DAYS) -ne 1 ]; then
+	if [ $(IsInteger "$CONFLICT_BACKUP_DAYS") -ne 1 ]; then
 		CONFLICT_BACKUP_DAYS=30
 	fi
 
-	if [ $(IsInteger $SOFT_DELETE_DAYS) -ne 1 ]; then
+	if [ $(IsInteger "$SOFT_DELETE_DAYS") -ne 1 ]; then
 		SOFT_DELETE_DAYS=30
 	fi
 
-	if [ $(IsInteger $RESUME_TRY) -ne 1 ]; then
+	if [ $(IsInteger "$RESUME_TRY") -ne 1 ]; then
 		RESUME_TRY=1
 	fi
 
-	if [ $(IsInteger $SOFT_MAX_EXEC_TIME) -ne 1 ]; then
+	if [ $(IsInteger "$SOFT_MAX_EXEC_TIME") -ne 1 ]; then
 		SOFT_MAX_EXEC_TIME=0
 	fi
 
-	if [ $(IsInteger $HARD_MAX_EXEC_TIME) -ne 1 ]; then
+	if [ $(IsInteger "$HARD_MAX_EXEC_TIME") -ne 1 ]; then
 		HARD_MAX_EXEC_TIME=0
 	fi
 
-	if [ $(IsInteger $MAX_EXEC_TIME_PER_CMD_BEFORE) -ne 1 ]; then
+	if [ $(IsInteger "$MAX_EXEC_TIME_PER_CMD_BEFORE") -ne 1 ]; then
 		MAX_EXEC_TIME_PER_CMD_BEFORE=0
 	fi
 
-	if [ $(IsInteger $MAX_EXEC_TIME_PER_CMD_AFTER) -ne 1 ]; then
+	if [ $(IsInteger "$MAX_EXEC_TIME_PER_CMD_AFTER") -ne 1 ]; then
 		MAX_EXEC_TIME_PER_CMD_AFTER=0
 	fi
 
@@ -6398,7 +6398,7 @@ if [ $_QUICK_SYNC -eq 2 ]; then
 		PATH_SEPARATOR_CHAR=";"
 	fi
 
-	if [ $(IsInteger $MIN_WAIT) -ne 1 ]; then
+	if [ $(IsInteger "$MIN_WAIT") -ne 1 ]; then
 		MIN_WAIT=30
 	fi
 # First character shouldn't be '-' when config file given
