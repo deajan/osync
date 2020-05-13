@@ -72,8 +72,10 @@ SSH_COMPRESSION=true
 ## arcfour isn't accepted on most newer systems, you may then prefer any AES encryption if processor has aes-ni hardware acceleration
 ## If the system does not provide hardware assisted acceleration, chacha20-poly1305@openssh.com is a good cipher to select
 ## See: https://wiki.csnu.org/index.php/SSH_ciphers_speed_comparison
+## -o Compression=no is already handled by SSH_COMPRESSION option
 ## Uncomment the following line to use those optimizations, on secured links only
-#SSH_OPTIONAL_ARGS="-T -c aes128-ctr -o Compression=no -x"
+#SSH_OPTIONAL_ARGS="-T -c aes128-ctr -x"
+#SSH_OPTIONAL_ARGS="-T -c chacha20-poly1305@openssh.com -x"
 
 ## Ignore ssh known hosts. DANGER WILL ROBINSON DANGER ! This can lead to security issues. Only enable this if you know what you're doing.
 SSH_IGNORE_KNOWN_HOSTS=false
