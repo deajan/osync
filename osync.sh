@@ -8,13 +8,13 @@ AUTHOR="(C) 2013-2020 by Orsiris de Jong"
 CONTACT="http://www.netpower.fr/osync - ozy@netpower.fr"
 PROGRAM_VERSION=1.3.0-rc1
 PROGRAM_BUILD=2020050302
-IS_STABLE=false
+IS_STABLE=true
 
 CONFIG_FILE_REVISION_REQUIRED=1.3.0
 
 
 _OFUNCTIONS_VERSION=2.3.0-RC4
-_OFUNCTIONS_BUILD=2020050302
+_OFUNCTIONS_BUILD=2020051301
 _OFUNCTIONS_BOOTSTRAP=true
 
 if ! type "$BASH" > /dev/null; then
@@ -1845,7 +1845,7 @@ function PreInit {
 	if [ "$SSH_COMPRESSION" != false ]; then
 		SSH_COMP=-C
 	else
-		SSH_COMP=
+		SSH_COMP="-o Compression=no"
 	fi
 
 	## Ignore SSH known host verification

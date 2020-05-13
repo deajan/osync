@@ -1707,7 +1707,7 @@ function PreInit {
 	if [ "$SSH_COMPRESSION" != false ]; then
 		SSH_COMP=-C
 	else
-		SSH_COMP=
+		SSH_COMP="-o Compression=no"
 	fi
 
 	## Ignore SSH known host verification

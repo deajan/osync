@@ -18,7 +18,7 @@ INSTANCE_ID="installer-$SCRIPT_BUILD"
 ## Please adapt this to fit your distro needs
 
 _OFUNCTIONS_VERSION=2.3.0-RC4
-_OFUNCTIONS_BUILD=2020050302
+_OFUNCTIONS_BUILD=2020051301
 _OFUNCTIONS_BOOTSTRAP=true
 
 if ! type "$BASH" > /dev/null; then
@@ -2082,7 +2082,7 @@ function PreInit {
 	if [ "$SSH_COMPRESSION" != false ]; then
 		SSH_COMP=-C
 	else
-		SSH_COMP=
+		SSH_COMP="-o Compression=no"
 	fi
 
 	## Ignore SSH known host verification
