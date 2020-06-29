@@ -31,7 +31,7 @@
 #### OFUNCTIONS MINI SUBSET ####
 #### OFUNCTIONS MICRO SUBSET ####
 _OFUNCTIONS_VERSION=2.3.0-RC4
-_OFUNCTIONS_BUILD=2020051301
+_OFUNCTIONS_BUILD=2020062901
 #### _OFUNCTIONS_BOOTSTRAP SUBSET ####
 _OFUNCTIONS_BOOTSTRAP=true
 #### _OFUNCTIONS_BOOTSTRAP SUBSET END ####
@@ -2362,7 +2362,7 @@ function GetConfFileValue () {
 		echo "$value"
 	else
 		if [ $noError == true ]; then
-			Logger "Cannot get value for [$name] in config file [$file]." "NOTICE"
+			Logger "Cannot get value for [$name] in config file [$file]." "DEBUG"
 		else
 			Logger "Cannot get value for [$name] in config file [$file]." "ERROR"
 		fi
