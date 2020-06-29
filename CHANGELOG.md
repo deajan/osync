@@ -8,7 +8,7 @@
 
 ### dd Mmm YYYY: osync v1.3 release (for full changelog since v1.2 branch see all v1.3-beta/RC entries)
 
-### dd Mmm YYYY: osync v1.3-RC1 release
+### 29 June 2020: osync v1.3-RC1 release
 
 -   New option to use SSH_CONTROLMASTER in order to speed up remote sync tasks and preserve a single ssh channel
 -   New option SSH_OPTIONAL_ARGS
@@ -26,6 +26,7 @@
 -   Added more debugging
 -   Fixed service logs being junked by spinner
 -   Fixed MINIMUM_SPACE=0 didn't stop the disk space check anymore (Thanks to Val)
+-   Fixed conflict file logs to be less verbose when no conflicts happen
 
 ### 22 May 2019: osync v1.3-beta3 release
 
