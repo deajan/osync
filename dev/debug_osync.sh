@@ -43,7 +43,7 @@ CONFIG_FILE_REVISION_REQUIRED=1.3.0
 #	CleanUp					no		#__WITH_PARANOIA_DEBUG
 
 _OFUNCTIONS_VERSION=2.3.0-RC4
-_OFUNCTIONS_BUILD=2020051301
+_OFUNCTIONS_BUILD=2020062901
 _OFUNCTIONS_BOOTSTRAP=true
 
 if ! type "$BASH" > /dev/null; then
@@ -759,7 +759,7 @@ function _PerfProfiler {												#__WITH_PARANOIA_DEBUG
 	perfString=$(ps -p $$ -o args,pid,ppid,%cpu,%mem,time,etime,state,wchan)					#__WITH_PARANOIA_DEBUG
 															#__WITH_PARANOIA_DEBUG
 	for i in $(pgrep -P $$); do											#__WITH_PARANOIA_DEBUG
-		perfString="$perfString\n"$(ps -p $i -o args,pid,ppid,%cpu,%mem,time,etime,state,wchan | tail -1)	#__WITH_PARANOIA_DEBUG
+		perfString="$perfString\n"$(ps -p $i -o args,pid,ppid,%cpu,%mem,time,etime,state,wchan | :| tail -1)	#__WITH_PARANOIA_DEBUG
 	done														#__WITH_PARANOIA_DEBUG
 															#__WITH_PARANOIA_DEBUG
 	if type iostat > /dev/null 2>&1; then										#__WITH_PARANOIA_DEBUG
@@ -2340,7 +2340,7 @@ function GetConfFileValue () {
 		echo "$value"
 	else
 		if [ $noError == true ]; then
-			Logger "Cannot get value for [$name] in config file [$file]." "NOTICE"
+			Logger "Cannot get value for [$name] in config file [$file]." "DEBUG"
 		else
 			Logger "Cannot get value for [$name] in config file [$file]." "ERROR"
 		fi
