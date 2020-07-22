@@ -7,7 +7,7 @@ PROGRAM="osync" # Rsync based two way sync engine with fault tolerance
 AUTHOR="(C) 2013-2020 by Orsiris de Jong"
 CONTACT="http://www.netpower.fr/osync - ozy@netpower.fr"
 PROGRAM_VERSION=1.3.0-rc1
-PROGRAM_BUILD=2020063001
+PROGRAM_BUILD=2020072201
 IS_STABLE=false
 
 CONFIG_FILE_REVISION_REQUIRED=1.3.0
@@ -901,10 +901,12 @@ function _getFileCtimeMtimeLocal {
 	echo -n "" > "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$replicaType.$SCRIPT_PID.$TSTAMP"
 
 	while IFS='' read -r file; do
-		$STAT_CTIME_MTIME_CMD "$replicaPath$file" >> "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$replicaType.$SCRIPT_PID.$TSTAMP" 2> "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$replicaType.error.$SCRIPT_PID.$TSTAMP"
-		if [ $? -ne 0 ]; then
-			Logger "Could not get file attributes for [$replicaPath$file]." "ERROR"
-			echo "1" > "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.subshellError.$replicaType.$SCRIPT_PID.$TSTAMP"
+		if [ -f "$replicaPath$file" ]; then
+			$STAT_CTIME_MTIME_CMD "$replicaPath$file" >> "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$replicaType.$SCRIPT_PID.$TSTAMP" 2> "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$replicaType.error.$SCRIPT_PID.$TSTAMP"
+			if [ $? -ne 0 ]; then
+				Logger "Could not get file attributes for [$replicaPath$file]." "ERROR"
+				echo "1" > "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.subshellError.$replicaType.$SCRIPT_PID.$TSTAMP"
+			fi
 		fi
 	done < "$fileList"
 	if [ -f "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.subshellError.$replicaType.$SCRIPT_PID.$TSTAMP" ]; then
@@ -962,10 +964,12 @@ include #### CleanUp SUBSET ####
 function _getFileCtimeMtimeRemoteSub {
 
 	while IFS='' read -r file; do
-		$REMOTE_STAT_CTIME_MTIME_CMD "$replicaPath$file"
-		if [ $? -ne 0 ]; then
-			RemoteLogger "Could not get file attributes for [$replicaPath$file]." "ERROR"
-			echo 1 > "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.subshellError.$replicaType.$SCRIPT_PID.$TSTAMP"
+		if [ -f "$replicaPath$file" ]; then
+			$REMOTE_STAT_CTIME_MTIME_CMD "$replicaPath$file"
+			if [ $? -ne 0 ]; then
+				RemoteLogger "Could not get file attributes for [$replicaPath$file]." "ERROR"
+				echo 1 > "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.subshellError.$replicaType.$SCRIPT_PID.$TSTAMP"
+			fi
 		fi
 	done < "./$PROGRAM._getFileCtimeMtimeRemote.Sent.$replicaType.$SCRIPT_PID.$TSTAMP"
 
@@ -987,7 +991,7 @@ function _getFileCtimeMtimeRemoteSub {
 ENDSSH
 	retval=$?
 	if [ $retval -ne 0 ]; then
-		Logger "Getting file attributes failed [$retval] on $replicaType. Stopping execution." "CRITICAL" $retval
+		Logger "Getting file attributes failed with code [$retval] on $replicaType. Stopping execution." "CRITICAL" $retval
 		if [ -s "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$replicaType.$SCRIPT_PID.$TSTAMP" ]; then
 			Logger "Truncated output:\n$(head -c16384 "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$replicaType.$SCRIPT_PID.$TSTAMP")" "WARN"
 		fi
