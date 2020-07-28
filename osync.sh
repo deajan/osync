@@ -7,8 +7,8 @@ PROGRAM="osync" # Rsync based two way sync engine with fault tolerance
 AUTHOR="(C) 2013-2020 by Orsiris de Jong"
 CONTACT="http://www.netpower.fr/osync - ozy@netpower.fr"
 PROGRAM_VERSION=1.3.0-rc1
-PROGRAM_BUILD=2020062901
-IS_STABLE=true
+PROGRAM_BUILD=2020072201
+IS_STABLE=false
 
 CONFIG_FILE_REVISION_REQUIRED=1.3.0
 
@@ -3421,12 +3421,17 @@ function deleteList {
 	Logger "Creating $replicaType replica deleted file list." "NOTICE"
 	if [ -f "${INITIATOR[$__replicaDir]}${INITIATOR[$__stateDir]}/$replicaType${INITIATOR[$__treeAfterFileNoSuffix]}" ]; then
 		## Same functionnality, comm is much faster than grep but is not available on every platform
+
+		## Let's add awk in order to filter results based on sub directories already deleted because parent directory is dleeted
+		## awk ' BEGIN {prev="^dummy/"} $0 !~ prev { print $0; prev="^"$0"/" }'
+		## See https://stackoverflow.com/q/62652954/2635443
 		if type comm > /dev/null 2>&1 ; then
-			cmd="comm -23 \"${INITIATOR[$__replicaDir]}${INITIATOR[$__stateDir]}/$replicaType${INITIATOR[$__treeAfterFileNoSuffix]}\" \"${INITIATOR[$__replicaDir]}${INITIATOR[$__stateDir]}/$replicaType${INITIATOR[$__treeCurrentFile]}\" > \"${INITIATOR[$__replicaDir]}${INITIATOR[$__stateDir]}/$replicaType${INITIATOR[$__deletedListFile]}\""
+			cmd="comm -23 \"${INITIATOR[$__replicaDir]}${INITIATOR[$__stateDir]}/$replicaType${INITIATOR[$__treeAfterFileNoSuffix]}\" \"${INITIATOR[$__replicaDir]}${INITIATOR[$__stateDir]}/$replicaType${INITIATOR[$__treeCurrentFile]}\" | awk ' BEGIN {prev=\"^dummyfirstlinefileshouldnotexist1234/\"} \$0 !~ prev { print \$0; prev=\"^\"\$0\"/\" }' > \"${INITIATOR[$__replicaDir]}${INITIATOR[$__stateDir]}/$replicaType${INITIATOR[$__deletedListFile]}\""
 		else
 			## The || : forces the command to have a good result
-			cmd="(grep -F -x -v -f \"${INITIATOR[$__replicaDir]}${INITIATOR[$__stateDir]}/$replicaType${INITIATOR[$__treeCurrentFile]}\" \"${INITIATOR[$__replicaDir]}${INITIATOR[$__stateDir]}/$replicaType${INITIATOR[$__treeAfterFileNoSuffix]}\" || :) > \"${INITIATOR[$__replicaDir]}${INITIATOR[$__stateDir]}/$replicaType${INITIATOR[$__deletedListFile]}\""
+			cmd="(grep -F -x -v -f \"${INITIATOR[$__replicaDir]}${INITIATOR[$__stateDir]}/$replicaType${INITIATOR[$__treeCurrentFile]}\" \"${INITIATOR[$__replicaDir]}${INITIATOR[$__stateDir]}/$replicaType${INITIATOR[$__treeAfterFileNoSuffix]}\" || :) | awk ' BEGIN {prev=\"^dummyfirstlinefileshouldnotexist1234/\"} \$0 !~ prev { print \$0; prev=\"^\"\$0\"/\" }' > \"${INITIATOR[$__replicaDir]}${INITIATOR[$__stateDir]}/$replicaType${INITIATOR[$__deletedListFile]}\""
 		fi
+
 
 		Logger "Launching command [$cmd]." "DEBUG"
 		eval "$cmd" 2>> "$LOG_FILE"
@@ -3474,10 +3479,12 @@ function _getFileCtimeMtimeLocal {
 	echo -n "" > "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$replicaType.$SCRIPT_PID.$TSTAMP"
 
 	while IFS='' read -r file; do
-		$STAT_CTIME_MTIME_CMD "$replicaPath$file" >> "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$replicaType.$SCRIPT_PID.$TSTAMP" 2> "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$replicaType.error.$SCRIPT_PID.$TSTAMP"
-		if [ $? -ne 0 ]; then
-			Logger "Could not get file attributes for [$replicaPath$file]." "ERROR"
-			echo "1" > "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.subshellError.$replicaType.$SCRIPT_PID.$TSTAMP"
+		if [ -f "$replicaPath$file" ]; then
+			$STAT_CTIME_MTIME_CMD "$replicaPath$file" >> "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$replicaType.$SCRIPT_PID.$TSTAMP" 2> "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$replicaType.error.$SCRIPT_PID.$TSTAMP"
+			if [ $? -ne 0 ]; then
+				Logger "Could not get file attributes for [$replicaPath$file]." "ERROR"
+				echo "1" > "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.subshellError.$replicaType.$SCRIPT_PID.$TSTAMP"
+			fi
 		fi
 	done < "$fileList"
 	if [ -f "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.subshellError.$replicaType.$SCRIPT_PID.$TSTAMP" ]; then
@@ -3723,10 +3730,12 @@ function CleanUp {
 function _getFileCtimeMtimeRemoteSub {
 
 	while IFS='' read -r file; do
-		$REMOTE_STAT_CTIME_MTIME_CMD "$replicaPath$file"
-		if [ $? -ne 0 ]; then
-			RemoteLogger "Could not get file attributes for [$replicaPath$file]." "ERROR"
-			echo 1 > "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.subshellError.$replicaType.$SCRIPT_PID.$TSTAMP"
+		if [ -f "$replicaPath$file" ]; then
+			$REMOTE_STAT_CTIME_MTIME_CMD "$replicaPath$file"
+			if [ $? -ne 0 ]; then
+				RemoteLogger "Could not get file attributes for [$replicaPath$file]." "ERROR"
+				echo 1 > "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.subshellError.$replicaType.$SCRIPT_PID.$TSTAMP"
+			fi
 		fi
 	done < "./$PROGRAM._getFileCtimeMtimeRemote.Sent.$replicaType.$SCRIPT_PID.$TSTAMP"
 
@@ -3748,7 +3757,7 @@ function _getFileCtimeMtimeRemoteSub {
 ENDSSH
 	retval=$?
 	if [ $retval -ne 0 ]; then
-		Logger "Getting file attributes failed [$retval] on $replicaType. Stopping execution." "CRITICAL" $retval
+		Logger "Getting file attributes failed with code [$retval] on $replicaType. Stopping execution." "CRITICAL" $retval
 		if [ -s "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$replicaType.$SCRIPT_PID.$TSTAMP" ]; then
 			Logger "Truncated output:\n$(head -c16384 "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$replicaType.$SCRIPT_PID.$TSTAMP")" "WARN"
 		fi
