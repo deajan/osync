@@ -287,6 +287,9 @@ function _CheckReplicasLocal {
 	if [ $MINIMUM_SPACE -ne 0 ]; then
 		Logger "Checking minimum disk space in local replica [$replicaPath]." "NOTICE"
 		diskSpace=$($DF_CMD "$replicaPath" | tail -1 | awk '{print $4}')
+		if [[ $diskSpace == *"%"* ]]; then
+	  		diskSpace=$($DF_CMD "$replicaPath" | tail -1 | awk '{print $3}')
+		fi
 		retval=$?
 		if [ $retval -ne 0 ]; then
 			Logger "Cannot get free space." "ERROR" $retval
@@ -355,6 +358,9 @@ function _CheckReplicasRemoteSub {
 	if [ $MINIMUM_SPACE -ne 0 ]; then
 		RemoteLogger "Checking minimum disk space in remote replica [$replicaPath]." "NOTICE"
 		diskSpace=$($DF_CMD "$replicaPath" | tail -1 | awk '{print $4}')
+		if [[ $diskSpace == *"%"* ]]; then
+	  		diskSpace=$($DF_CMD "$replicaPath" | tail -1 | awk '{print $3}')
+		fi
 		retval=$?
 		if [ $retval -ne 0 ]; then
 			RemoteLogger "Cannot get free space." "ERROR" $retval
@@ -508,7 +514,7 @@ function _HandleLocksRemote {
 	CheckConnectivityRemoteHost
 
 	# Create an array of all currently running pids
-	read -a initiatorRunningPids <<< $(ps -A | tail -n +2 | awk '{print $1}')
+	read -a initiatorRunningPids <<< $(ps -a | tail -n +2 | awk '{print $1}')
 
 # passing initiatorRunningPids as litteral string (has to be run through eval to be an array again)
 $SSH_CMD env _REMOTE_TOKEN="$_REMOTE_TOKEN" \
