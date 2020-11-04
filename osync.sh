@@ -1395,6 +1395,9 @@ function GetLocalOS {
 		*"Android"*)
 		LOCAL_OS="Android"
 		;;
+		*"qnap"*)
+		LOCAL_OS="Qnap"
+		;;
 		*"Linux"*)
 		LOCAL_OS="Linux"
 		;;
@@ -1564,6 +1567,9 @@ ENDSSH
 		case $remoteOsVar in
 			*"Android"*)
 			REMOTE_OS="Android"
+			;;
+			*"qnap"*)
+			REMOTE_OS="Qnap"
 			;;
 			*"Linux"*)
 			REMOTE_OS="Linux"
@@ -5086,7 +5092,7 @@ function _SoftDeleteLocal {
 
 	local retval
 
-	if [ "$LOCAL_OS" == "Busybox" ] || [ "$LOCAL_OS" == "Android" ]; then
+	if [ "$LOCAL_OS" == "Busybox" ] || [ "$LOCAL_OS" == "Android" ] || [ "$LOCAL_OS" == "Qnap" ]; then
 		Logger "Skipping $deletionType deletion on $replicaType. Busybox find -ctime not supported." "NOTICE"
 		return 0
 	fi
@@ -5138,7 +5144,7 @@ function _SoftDeleteRemote {
 
 	local retval
 
-	if [ "$REMOTE_OS" == "BusyBox" ] || [ "$REMOTE_OS" == "Android" ]; then
+	if [ "$REMOTE_OS" == "BusyBox" ] || [ "$REMOTE_OS" == "Android" ] || [ "$REMOTE_OS" == "Qnap" ]; then
 		Logger "Skipping $deletionType deletion on $replicaType. Busybox find -ctime not supported." "NOTICE"
 		return 0
 	fi

@@ -1255,6 +1255,9 @@ function GetLocalOS {
 		*"Android"*)
 		LOCAL_OS="Android"
 		;;
+		*"qnap"*)
+		LOCAL_OS="Qnap"
+		;;
 		*"Linux"*)
 		LOCAL_OS="Linux"
 		;;
@@ -1426,6 +1429,9 @@ ENDSSH
 		case $remoteOsVar in
 			*"Android"*)
 			REMOTE_OS="Android"
+			;;
+			*"qnap"*)
+			REMOTE_OS="Qnap"
 			;;
 			*"Linux"*)
 			REMOTE_OS="Linux"
