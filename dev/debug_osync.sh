@@ -759,7 +759,7 @@ function _PerfProfiler {												#__WITH_PARANOIA_DEBUG
 	perfString=$(ps -p $$ -o args,pid,ppid,%cpu,%mem,time,etime,state,wchan)					#__WITH_PARANOIA_DEBUG
 															#__WITH_PARANOIA_DEBUG
 	for i in $(pgrep -P $$); do											#__WITH_PARANOIA_DEBUG
-		perfString="$perfString\n"$(ps -p $i -o args,pid,ppid,%cpu,%mem,time,etime,state,wchan | :| tail -1)	#__WITH_PARANOIA_DEBUG
+		perfString="$perfString\n"$(ps -p $i -o args,pid,ppid,%cpu,%mem,time,etime,state,wchan | tail -1)	#__WITH_PARANOIA_DEBUG
 	done														#__WITH_PARANOIA_DEBUG
 															#__WITH_PARANOIA_DEBUG
 	if type iostat > /dev/null 2>&1; then										#__WITH_PARANOIA_DEBUG
@@ -1471,6 +1471,9 @@ function GetLocalOS {
 		*"Android"*)
 		LOCAL_OS="Android"
 		;;
+		*"qnap"*)
+		LOCAL_OS="Qnap"
+		;;
 		*"Linux"*)
 		LOCAL_OS="Linux"
 		;;
@@ -1696,6 +1699,9 @@ ENDSSH
 		case $remoteOsVar in
 			*"Android"*)
 			REMOTE_OS="Android"
+			;;
+			*"qnap"*)
+			REMOTE_OS="Qnap"
 			;;
 			*"Linux"*)
 			REMOTE_OS="Linux"
@@ -5297,7 +5303,7 @@ function _SoftDeleteLocal {
 
 	local retval
 
-	if [ "$LOCAL_OS" == "Busybox" ] || [ "$LOCAL_OS" == "Android" ]; then
+	if [ "$LOCAL_OS" == "Busybox" ] || [ "$LOCAL_OS" == "Android" ] || [ "$LOCAL_OS" == "Qnap" ]; then
 		Logger "Skipping $deletionType deletion on $replicaType. Busybox find -ctime not supported." "NOTICE"
 		return 0
 	fi
@@ -5350,7 +5356,7 @@ function _SoftDeleteRemote {
 
 	local retval
 
-	if [ "$REMOTE_OS" == "BusyBox" ] || [ "$REMOTE_OS" == "Android" ]; then
+	if [ "$REMOTE_OS" == "BusyBox" ] || [ "$REMOTE_OS" == "Android" ] || [ "$REMOTE_OS" == "Qnap" ]; then
 		Logger "Skipping $deletionType deletion on $replicaType. Busybox find -ctime not supported." "NOTICE"
 		return 0
 	fi
