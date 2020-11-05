@@ -767,7 +767,7 @@ function _PerfProfiler {												#__WITH_PARANOIA_DEBUG
 	perfString=$(ps -p $$ -o args,pid,ppid,%cpu,%mem,time,etime,state,wchan)					#__WITH_PARANOIA_DEBUG
 															#__WITH_PARANOIA_DEBUG
 	for i in $(pgrep -P $$); do											#__WITH_PARANOIA_DEBUG
-		perfString="$perfString\n"$(ps -p $i -o args,pid,ppid,%cpu,%mem,time,etime,state,wchan | :| tail -1)	#__WITH_PARANOIA_DEBUG
+		perfString="$perfString\n"$(ps -p $i -o args,pid,ppid,%cpu,%mem,time,etime,state,wchan | tail -1)	#__WITH_PARANOIA_DEBUG
 	done														#__WITH_PARANOIA_DEBUG
 															#__WITH_PARANOIA_DEBUG
 	if type iostat > /dev/null 2>&1; then										#__WITH_PARANOIA_DEBUG
