@@ -512,9 +512,17 @@ function _HandleLocksRemote {
 
 	CheckConnectivity3rdPartyHosts
 	CheckConnectivityRemoteHost
+	
+	# Check if -A exists on target
+	ps -A > /dev/null 2>&1
+	notExistaCapitalA=$?
 
 	# Create an array of all currently running pids
-	read -a initiatorRunningPids <<< $(ps -a | tail -n +2 | awk '{print $1}')
+	if [ "$notExistaCapitalA" == "1"]; then
+		read -a initiatorRunningPids <<< $(ps -e | tail -n +2 | awk '{print $1}')
+	else
+		read -a initiatorRunningPids <<< $(ps -A | tail -n +2 | awk '{print $1}')
+	fi
 
 # passing initiatorRunningPids as litteral string (has to be run through eval to be an array again)
 $SSH_CMD env _REMOTE_TOKEN="$_REMOTE_TOKEN" \
