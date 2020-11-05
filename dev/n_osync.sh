@@ -518,10 +518,10 @@ function _HandleLocksRemote {
 	notExistaCapitalA=$?
 
 	# Create an array of all currently running pids
-	if [ "$notExistaCapitalA" == "1"]; then
-		read -a initiatorRunningPids <<< $(ps -e | tail -n +2 | awk '{print $1}')
-	else
+	if [ "$notExistaCapitalA" == "0" ]; then
 		read -a initiatorRunningPids <<< $(ps -A | tail -n +2 | awk '{print $1}')
+	else
+		read -a initiatorRunningPids <<< $(ps -e | tail -n +2 | awk '{print $1}')
 	fi
 
 # passing initiatorRunningPids as litteral string (has to be run through eval to be an array again)
