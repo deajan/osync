@@ -7,14 +7,14 @@ PROGRAM="osync" # Rsync based two way sync engine with fault tolerance
 AUTHOR="(C) 2013-2020 by Orsiris de Jong"
 CONTACT="http://www.netpower.fr/osync - ozy@netpower.fr"
 PROGRAM_VERSION=1.3.0-rc1
-PROGRAM_BUILD=2020072201
+PROGRAM_BUILD=2020111501
 IS_STABLE=false
 
 CONFIG_FILE_REVISION_REQUIRED=1.3.0
 
 
 _OFUNCTIONS_VERSION=2.3.0-RC4
-_OFUNCTIONS_BUILD=2020062901
+_OFUNCTIONS_BUILD=2020111502
 _OFUNCTIONS_BOOTSTRAP=true
 
 if ! type "$BASH" > /dev/null; then
@@ -391,7 +391,6 @@ function GenericTrapQuit {
 	exit $exitcode
 }
 
-#### TrapQuit SUBSET END ####
 
 function CleanUp {
 	# Exit controlmaster before it's socket gets deleted
@@ -2078,10 +2077,11 @@ function InitRemoteOSDependingSettings {
 		fi
 	fi
 	if [ "$RSYNC_COMPRESS" == true ]; then
+		SKIP_COMPRESS_EXTENSIONS="--skip-compress=3fr/3g2/3gp/3gpp/7z/aac/ace/amr/apk/appx/appxbundle/arc/arj/arw/asf/avi/bz/bz2/cab/cr2/crypt[5678]/dat/dcr/deb/dmg/drc/ear/erf/flac/flv/gif/gpg/gz/iiq/jar/jp2/jpeg/jpg/h26[45]/k25/kdc/kgb/lha/lz/lzma/lzo/lzx/m4[apv]/mef/mkv/mos/mov/mp[34]/mpeg/mp[gv]/msi/nef/oga/ogg/ogv/opus/orf/pak/pef/png/qt/rar/r[0-9][0-9]/rz/rpm/rw2/rzip/s7z/sfark/sfx/sr2/srf/svgz/t[gb]z/tlz/txz/vob/wim/wma/wmv/xz/zip"
 		if [ "$LOCAL_OS" == "Qnap" ] || [ "$REMOTE_OS" == "Qnap" ]; then
-			RSYNC_DEFAULT_ARGS=$RSYNC_DEFAULT_ARGS" -z --skip-compress=3fr/3g2/3gp/3gpp/7z/aac/ace/amr/apk/appx/appxbundle/arc/arj/arw/asf/avi/bz/bz2/cab/cr2/crypt[5678]/dat/dcr/deb/dmg/drc/ear/erf/flac/flv/gif/gpg/gz/iiq/jar/jp2/jpeg/jpg/h26[45]/k25/kdc/kgb/lha/lz/lzma/lzo/lzx/m4[apv]/mef/mkv/mos/mov/mp[34]/mpeg/mp[gv]/msi/nef/oga/ogg/ogv/opus/orf/pak/pef/png/qt/rar/r[0-9][0-9]/rz/rpm/rw2/rzip/s7z/sfark/sfx/sr2/srf/svgz/t[gb]z/tlz/txz/vob/wim/wma/wmv/xz/zip"
+			RSYNC_DEFAULT_ARGS=$RSYNC_DEFAULT_ARGS" -z $SKIP_COMPRESS_EXTENSIONS"
 		elif [ "$LOCAL_OS" != "MacOSX" ] && [ "$REMOTE_OS" != "MacOSX" ]; then
-			RSYNC_DEFAULT_ARGS=$RSYNC_DEFAULT_ARGS" -zz --skip-compress=3fr/3g2/3gp/3gpp/7z/aac/ace/amr/apk/appx/appxbundle/arc/arj/arw/asf/avi/bz/bz2/cab/cr2/crypt[5678]/dat/dcr/deb/dmg/drc/ear/erf/flac/flv/gif/gpg/gz/iiq/jar/jp2/jpeg/jpg/h26[45]/k25/kdc/kgb/lha/lz/lzma/lzo/lzx/m4[apv]/mef/mkv/mos/mov/mp[34]/mpeg/mp[gv]/msi/nef/oga/ogg/ogv/opus/orf/pak/pef/png/qt/rar/r[0-9][0-9]/rz/rpm/rw2/rzip/s7z/sfark/sfx/sr2/srf/svgz/t[gb]z/tlz/txz/vob/wim/wma/wmv/xz/zip"
+			RSYNC_DEFAULT_ARGS=$RSYNC_DEFAULT_ARGS" -zz $SKIP_COMPRESS_EXTENSIONS"
 		else
 			Logger "Disabling compression skips on synchronization on [$LOCAL_OS] due to lack of support." "NOTICE"
 		fi
@@ -2928,13 +2928,13 @@ function _HandleLocksRemote {
 
 	CheckConnectivity3rdPartyHosts
 	CheckConnectivityRemoteHost
-	
+
 	# Check if -A exists on target
 	ps -A > /dev/null 2>&1
-	notExistaCapitalA=$?
+	psNotExistsOptA=$?
 
 	# Create an array of all currently running pids
-	if [ "$notExistaCapitalA" == "0" ]; then
+	if [ "$psNotExistaOptA" == "0" ]; then
 		read -a initiatorRunningPids <<< $(ps -A | tail -n +2 | awk '{print $1}')
 	else
 		read -a initiatorRunningPids <<< $(ps -e | tail -n +2 | awk '{print $1}')
