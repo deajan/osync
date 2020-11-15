@@ -7,7 +7,7 @@ PROGRAM="osync" # Rsync based two way sync engine with fault tolerance
 AUTHOR="(C) 2013-2020 by Orsiris de Jong"
 CONTACT="http://www.netpower.fr/osync - ozy@netpower.fr"
 PROGRAM_VERSION=1.3.0-rc1
-PROGRAM_BUILD=2020072201
+PROGRAM_BUILD=2020111501
 IS_STABLE=false
 
 CONFIG_FILE_REVISION_REQUIRED=1.3.0
@@ -512,13 +512,13 @@ function _HandleLocksRemote {
 
 	CheckConnectivity3rdPartyHosts
 	CheckConnectivityRemoteHost
-	
+
 	# Check if -A exists on target
 	ps -A > /dev/null 2>&1
-	notExistaCapitalA=$?
+	psNotExistsOptA=$?
 
 	# Create an array of all currently running pids
-	if [ "$notExistaCapitalA" == "0" ]; then
+	if [ "$psNotExistaOptA" == "0" ]; then
 		read -a initiatorRunningPids <<< $(ps -A | tail -n +2 | awk '{print $1}')
 	else
 		read -a initiatorRunningPids <<< $(ps -e | tail -n +2 | awk '{print $1}')
