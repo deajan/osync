@@ -31,7 +31,7 @@
 #### OFUNCTIONS MINI SUBSET ####
 #### OFUNCTIONS MICRO SUBSET ####
 _OFUNCTIONS_VERSION=2.3.0-RC4
-_OFUNCTIONS_BUILD=2020111501
+_OFUNCTIONS_BUILD=2020111502
 #### _OFUNCTIONS_BOOTSTRAP SUBSET ####
 _OFUNCTIONS_BOOTSTRAP=true
 #### _OFUNCTIONS_BOOTSTRAP SUBSET END ####
@@ -439,7 +439,7 @@ function GenericTrapQuit {
 	exit $exitcode
 }
 
-#### TrapQuit SUBSET END ####
+#### GenericTrapQuit SUBSET END ####
 
 #### CleanUp SUBSET ####
 function CleanUp {
