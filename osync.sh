@@ -1395,6 +1395,9 @@ function GetLocalOS {
 		*"Android"*)
 		LOCAL_OS="Android"
 		;;
+		*"qnap"*)
+		LOCAL_OS="Qnap"
+		;;
 		*"Linux"*)
 		LOCAL_OS="Linux"
 		;;
@@ -1564,6 +1567,9 @@ ENDSSH
 		case $remoteOsVar in
 			*"Android"*)
 			REMOTE_OS="Android"
+			;;
+			*"qnap"*)
+			REMOTE_OS="Qnap"
 			;;
 			*"Linux"*)
 			REMOTE_OS="Linux"
@@ -2072,7 +2078,9 @@ function InitRemoteOSDependingSettings {
 		fi
 	fi
 	if [ "$RSYNC_COMPRESS" == true ]; then
-		if [ "$LOCAL_OS" != "MacOSX" ] && [ "$REMOTE_OS" != "MacOSX" ]; then
+		if [ "$LOCAL_OS" == "Qnap" ] || [ "$REMOTE_OS" == "Qnap" ]; then
+			RSYNC_DEFAULT_ARGS=$RSYNC_DEFAULT_ARGS" -z --skip-compress=3fr/3g2/3gp/3gpp/7z/aac/ace/amr/apk/appx/appxbundle/arc/arj/arw/asf/avi/bz/bz2/cab/cr2/crypt[5678]/dat/dcr/deb/dmg/drc/ear/erf/flac/flv/gif/gpg/gz/iiq/jar/jp2/jpeg/jpg/h26[45]/k25/kdc/kgb/lha/lz/lzma/lzo/lzx/m4[apv]/mef/mkv/mos/mov/mp[34]/mpeg/mp[gv]/msi/nef/oga/ogg/ogv/opus/orf/pak/pef/png/qt/rar/r[0-9][0-9]/rz/rpm/rw2/rzip/s7z/sfark/sfx/sr2/srf/svgz/t[gb]z/tlz/txz/vob/wim/wma/wmv/xz/zip"
+		elif [ "$LOCAL_OS" != "MacOSX" ] && [ "$REMOTE_OS" != "MacOSX" ]; then
 			RSYNC_DEFAULT_ARGS=$RSYNC_DEFAULT_ARGS" -zz --skip-compress=3fr/3g2/3gp/3gpp/7z/aac/ace/amr/apk/appx/appxbundle/arc/arj/arw/asf/avi/bz/bz2/cab/cr2/crypt[5678]/dat/dcr/deb/dmg/drc/ear/erf/flac/flv/gif/gpg/gz/iiq/jar/jp2/jpeg/jpg/h26[45]/k25/kdc/kgb/lha/lz/lzma/lzo/lzx/m4[apv]/mef/mkv/mos/mov/mp[34]/mpeg/mp[gv]/msi/nef/oga/ogg/ogv/opus/orf/pak/pef/png/qt/rar/r[0-9][0-9]/rz/rpm/rw2/rzip/s7z/sfark/sfx/sr2/srf/svgz/t[gb]z/tlz/txz/vob/wim/wma/wmv/xz/zip"
 		else
 			Logger "Disabling compression skips on synchronization on [$LOCAL_OS] due to lack of support." "NOTICE"
@@ -2510,6 +2518,9 @@ function _CheckReplicasLocal {
 	if [ $MINIMUM_SPACE -ne 0 ]; then
 		Logger "Checking minimum disk space in local replica [$replicaPath]." "NOTICE"
 		diskSpace=$($DF_CMD "$replicaPath" | tail -1 | awk '{print $4}')
+		if [[ $diskSpace == *"%"* ]]; then
+			diskSpace=$($DF_CMD "$replicaPath" | tail -1 | awk '{print $3}')
+		fi
 		retval=$?
 		if [ $retval -ne 0 ]; then
 			Logger "Cannot get free space." "ERROR" $retval
@@ -2766,6 +2777,9 @@ function _CheckReplicasRemoteSub {
 	if [ $MINIMUM_SPACE -ne 0 ]; then
 		RemoteLogger "Checking minimum disk space in remote replica [$replicaPath]." "NOTICE"
 		diskSpace=$($DF_CMD "$replicaPath" | tail -1 | awk '{print $4}')
+		if [[ $diskSpace == *"%"* ]]; then
+			diskSpace=$($DF_CMD "$replicaPath" | tail -1 | awk '{print $3}')
+		fi
 		retval=$?
 		if [ $retval -ne 0 ]; then
 			RemoteLogger "Cannot get free space." "ERROR" $retval
@@ -2914,9 +2928,17 @@ function _HandleLocksRemote {
 
 	CheckConnectivity3rdPartyHosts
 	CheckConnectivityRemoteHost
+	
+	# Check if -A exists on target
+	ps -A > /dev/null 2>&1
+	notExistaCapitalA=$?
 
 	# Create an array of all currently running pids
-	read -a initiatorRunningPids <<< $(ps -A | tail -n +2 | awk '{print $1}')
+	if [ "$notExistaCapitalA" == "0" ]; then
+		read -a initiatorRunningPids <<< $(ps -A | tail -n +2 | awk '{print $1}')
+	else
+		read -a initiatorRunningPids <<< $(ps -e | tail -n +2 | awk '{print $1}')
+	fi
 
 # passing initiatorRunningPids as litteral string (has to be run through eval to be an array again)
 $SSH_CMD env _REMOTE_TOKEN="$_REMOTE_TOKEN" \
@@ -5086,7 +5108,7 @@ function _SoftDeleteLocal {
 
 	local retval
 
-	if [ "$LOCAL_OS" == "Busybox" ] || [ "$LOCAL_OS" == "Android" ]; then
+	if [ "$LOCAL_OS" == "Busybox" ] || [ "$LOCAL_OS" == "Android" ] || [ "$LOCAL_OS" == "Qnap" ]; then
 		Logger "Skipping $deletionType deletion on $replicaType. Busybox find -ctime not supported." "NOTICE"
 		return 0
 	fi
@@ -5138,7 +5160,7 @@ function _SoftDeleteRemote {
 
 	local retval
 
-	if [ "$REMOTE_OS" == "BusyBox" ] || [ "$REMOTE_OS" == "Android" ]; then
+	if [ "$REMOTE_OS" == "BusyBox" ] || [ "$REMOTE_OS" == "Android" ] || [ "$REMOTE_OS" == "Qnap" ]; then
 		Logger "Skipping $deletionType deletion on $replicaType. Busybox find -ctime not supported." "NOTICE"
 		return 0
 	fi

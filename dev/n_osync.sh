@@ -287,6 +287,9 @@ function _CheckReplicasLocal {
 	if [ $MINIMUM_SPACE -ne 0 ]; then
 		Logger "Checking minimum disk space in local replica [$replicaPath]." "NOTICE"
 		diskSpace=$($DF_CMD "$replicaPath" | tail -1 | awk '{print $4}')
+		if [[ $diskSpace == *"%"* ]]; then
+	  		diskSpace=$($DF_CMD "$replicaPath" | tail -1 | awk '{print $3}')
+		fi
 		retval=$?
 		if [ $retval -ne 0 ]; then
 			Logger "Cannot get free space." "ERROR" $retval
@@ -355,6 +358,9 @@ function _CheckReplicasRemoteSub {
 	if [ $MINIMUM_SPACE -ne 0 ]; then
 		RemoteLogger "Checking minimum disk space in remote replica [$replicaPath]." "NOTICE"
 		diskSpace=$($DF_CMD "$replicaPath" | tail -1 | awk '{print $4}')
+		if [[ $diskSpace == *"%"* ]]; then
+	  		diskSpace=$($DF_CMD "$replicaPath" | tail -1 | awk '{print $3}')
+		fi
 		retval=$?
 		if [ $retval -ne 0 ]; then
 			RemoteLogger "Cannot get free space." "ERROR" $retval
@@ -506,9 +512,17 @@ function _HandleLocksRemote {
 
 	CheckConnectivity3rdPartyHosts
 	CheckConnectivityRemoteHost
+	
+	# Check if -A exists on target
+	ps -A > /dev/null 2>&1
+	notExistaCapitalA=$?
 
 	# Create an array of all currently running pids
-	read -a initiatorRunningPids <<< $(ps -A | tail -n +2 | awk '{print $1}')
+	if [ "$notExistaCapitalA" == "0" ]; then
+		read -a initiatorRunningPids <<< $(ps -A | tail -n +2 | awk '{print $1}')
+	else
+		read -a initiatorRunningPids <<< $(ps -e | tail -n +2 | awk '{print $1}')
+	fi
 
 # passing initiatorRunningPids as litteral string (has to be run through eval to be an array again)
 $SSH_CMD env _REMOTE_TOKEN="$_REMOTE_TOKEN" \
@@ -2173,7 +2187,7 @@ function _SoftDeleteLocal {
 
 	local retval
 
-	if [ "$LOCAL_OS" == "Busybox" ] || [ "$LOCAL_OS" == "Android" ]; then
+	if [ "$LOCAL_OS" == "Busybox" ] || [ "$LOCAL_OS" == "Android" ] || [ "$LOCAL_OS" == "Qnap" ]; then
 		Logger "Skipping $deletionType deletion on $replicaType. Busybox find -ctime not supported." "NOTICE"
 		return 0
 	fi
@@ -2226,7 +2240,7 @@ function _SoftDeleteRemote {
 
 	local retval
 
-	if [ "$REMOTE_OS" == "BusyBox" ] || [ "$REMOTE_OS" == "Android" ]; then
+	if [ "$REMOTE_OS" == "BusyBox" ] || [ "$REMOTE_OS" == "Android" ] || [ "$REMOTE_OS" == "Qnap" ]; then
 		Logger "Skipping $deletionType deletion on $replicaType. Busybox find -ctime not supported." "NOTICE"
 		return 0
 	fi
