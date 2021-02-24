@@ -379,11 +379,11 @@ function _CheckReplicasRemoteSub {
 		mkdir -p "$replicaPath/$OSYNC_DIR" >> "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$replicaType.$SCRIPT_PID.$TSTAMP" 2>&1
 		retval=$?
 		if [ $retval -ne 0 ]; then
-			Logger "Cannot create local replica osync path [$replicaPath/$OSYNC_DIR]." "CRITICAL" $retval
-			Logger "Truncated output:\n$(head -c16384 "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$replicaType.$SCRIPT_PID.$TSTAMP")" "WARN"
+			RemoteLogger "Cannot create local replica osync path [$replicaPath/$OSYNC_DIR]." "CRITICAL" $retval
+			RemoteLogger "Truncated output:\n$(head -c16384 "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$replicaType.$SCRIPT_PID.$TSTAMP")" "WARN"
 			return 1
 		else
-			Logger "Created local replica osync path [$replicaPath/$OSYNC_DIR]." "NOTICE"
+			RemoteLogger "Created local replica osync path [$replicaPath/$OSYNC_DIR]." "NOTICE"
 		fi
 	fi
 
@@ -391,8 +391,8 @@ function _CheckReplicasRemoteSub {
 		mkdir -p "$stateDir" >> "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$replicaType.$SCRIPT_PID.$TSTAMP" 2>&1
 		retval=$?
 		if [ $retval -ne 0 ]; then
-			Logger "Cannot create remote replica state dir [$stateDir]." "CRITICAL" $retval
-			Logger "Truncated output:\n$(head -c16384 "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$replicaType.$SCRIPT_PID.$TSTAMP")" "WARN"
+			RemoteLogger "Cannot create remote replica state dir [$stateDir]." "CRITICAL" $retval
+			RemoteLogger "Truncated output:\n$(head -c16384 "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$replicaType.$SCRIPT_PID.$TSTAMP")" "WARN"
 			return 1
 		fi
 	fi
