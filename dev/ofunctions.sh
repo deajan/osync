@@ -30,8 +30,8 @@
 #### OFUNCTIONS FULL SUBSET ####
 #### OFUNCTIONS MINI SUBSET ####
 #### OFUNCTIONS MICRO SUBSET ####
-_OFUNCTIONS_VERSION=2.3.0-RC4
-_OFUNCTIONS_BUILD=2020111502
+_OFUNCTIONS_VERSION=2.3.1
+_OFUNCTIONS_BUILD=2021050501
 #### _OFUNCTIONS_BOOTSTRAP SUBSET ####
 _OFUNCTIONS_BOOTSTRAP=true
 #### _OFUNCTIONS_BOOTSTRAP SUBSET END ####
@@ -1871,6 +1871,42 @@ function RunAfterHook {
 		ExecTasks $pids "${FUNCNAME[0]}" false 0 0 0 0 true $SLEEP_TIME $KEEP_LOGGING
 	fi
 }
+
+function TimeCheck {
+	# Checks if more than deltatime seconds have passed since last check, which is stored in timefile
+	__CheckArguments 2 $# "$@"      #__WITH_PARANOIA_DEBUG
+
+	local timefile="${1}"
+	local deltatime="${2}"
+
+	if [ -f "$timefile" ]; then
+		result=$(cat "$timefile")
+		tstamp=$(date +%s)
+		if [ $((tstamp-result)) -gt $deltatime ]; then
+			echo "$(date +%s)" > "$timefile"
+			return 0
+		else
+			return 1
+		fi
+	else
+		echo "$(date +%s)" > "$timefile"
+		return 0
+	fi
+}
+
+function Ping {
+	# Simple ping check
+	__CheckArguments 1 $# "$@"
+
+	local host="${1}"
+
+	local retval
+
+	eval "$PING_CMD $host > /dev/null 2>&1" &
+	ExecTasks $! "${FUNCNAME[0]}" false 0 0 60 180 true $SLEEP_TIME $KEEP_LOGGING
+	return $?
+}
+
 
 function CheckConnectivityRemoteHost {
 	__CheckArguments 0 $# "$@"	#__WITH_PARANOIA_DEBUG
