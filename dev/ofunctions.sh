@@ -1928,7 +1928,13 @@ function CheckConnectivityRemoteHost {
 }
 
 function CheckConnectivity3rdPartyHosts {
-	__CheckArguments 0 $# "$@"	#__WITH_PARANOIA_DEBUG
+	# Check if at least one host is reachable in order to diag internet
+	# third_party_hosts_ips=('1.1.1.1' '8.8.8.8' 'kernel.org' 'google.com')
+	# CheckConnectivity3rdPartyHosts $third_party_hosts_ips
+
+	__CheckArguments 0-1 $# "$@"	#__WITH_PARANOIA_DEBUG
+
+	local remote_3rd_party_hosts="${1}"	# Optional list of hosts to check
 
 	local remote3rdPartySuccess
 	local retval
@@ -1936,7 +1942,10 @@ function CheckConnectivity3rdPartyHosts {
 
 	if [ "$_PARANOIA_DEBUG" != true ]; then # Do not loose time in paranoia debug		#__WITH_PARANOIA_DEBUG
 
-		if [ "$REMOTE_3RD_PARTY_HOSTS" != "" ]; then
+		if [ "$remote_3rd_party_hosts" == "" ]; then
+			remote_3rd_party_hosts="$REMOTE_3RD_PARTY_HOSTS
+		fi
+		if [ "$remote_3rd_party_hosts" != "" ]; then
 			remote3rdPartySuccess=false
 			for i in $REMOTE_3RD_PARTY_HOSTS
 			do
@@ -1947,6 +1956,7 @@ function CheckConnectivity3rdPartyHosts {
 					Logger "Cannot ping 3rd party host [$i]. Return code [$retval]." "NOTICE"
 				else
 					remote3rdPartySuccess=true
+					break
 				fi
 			done
 
