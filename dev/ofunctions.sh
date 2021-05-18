@@ -1943,11 +1943,11 @@ function CheckConnectivity3rdPartyHosts {
 	if [ "$_PARANOIA_DEBUG" != true ]; then # Do not loose time in paranoia debug		#__WITH_PARANOIA_DEBUG
 
 		if [ "$remote_3rd_party_hosts" == "" ]; then
-			remote_3rd_party_hosts="$REMOTE_3RD_PARTY_HOSTS
+			remote_3rd_party_hosts="$REMOTE_3RD_PARTY_HOSTS"
 		fi
 		if [ "$remote_3rd_party_hosts" != "" ]; then
 			remote3rdPartySuccess=false
-			for i in $REMOTE_3RD_PARTY_HOSTS
+			for i in $remote_3rd_party_hosts
 			do
 				eval "$PING_CMD $i > /dev/null 2>&1" &
 				ExecTasks $! "${FUNCNAME[0]}" false 0 0 60 180 true $SLEEP_TIME $KEEP_LOGGING
