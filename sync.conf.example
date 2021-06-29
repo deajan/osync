@@ -62,6 +62,12 @@ RSYNC_EXCLUDE_FROM=""
 ## List elements separator char.  You may set an alternative separator char for your directories lists above.
 PATH_SEPARATOR_CHAR=";"
 
+## By default, osync stores its state into the replica_path/.osync_workdir/state
+## This behavior can be changed for initiator or slave by overriding the following with an absolute path to a statedir, ex /opt/osync_state/initiator
+## If osync runs locally, initiator and target state dirs **must** be different
+INITIATOR_CUSTOM_STATE_DIR=""
+TARGET_CUSTOM_STATE_DIR=""
+
 [REMOTE_OPTIONS]
 
 ## ssh compression should be used on WAN links, unless your remote connection is good enough (LAN), in which case it would slow down things

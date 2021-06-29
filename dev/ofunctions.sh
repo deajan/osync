@@ -30,8 +30,8 @@
 #### OFUNCTIONS FULL SUBSET ####
 #### OFUNCTIONS MINI SUBSET ####
 #### OFUNCTIONS MICRO SUBSET ####
-_OFUNCTIONS_VERSION=2.3.0-RC4
-_OFUNCTIONS_BUILD=2020111502
+_OFUNCTIONS_VERSION=2.3.2
+_OFUNCTIONS_BUILD=2021051801
 #### _OFUNCTIONS_BOOTSTRAP SUBSET ####
 _OFUNCTIONS_BOOTSTRAP=true
 #### _OFUNCTIONS_BOOTSTRAP SUBSET END ####
@@ -1872,6 +1872,42 @@ function RunAfterHook {
 	fi
 }
 
+function TimeCheck {
+	# Checks if more than deltatime seconds have passed since last check, which is stored in timefile
+	__CheckArguments 2 $# "$@"      #__WITH_PARANOIA_DEBUG
+
+	local timefile="${1}"
+	local deltatime="${2}"
+
+	if [ -f "$timefile" ]; then
+		result=$(cat "$timefile")
+		tstamp=$(date +%s)
+		if [ $((tstamp-result)) -gt $deltatime ]; then
+			echo "$(date +%s)" > "$timefile"
+			return 0
+		else
+			return 1
+		fi
+	else
+		echo "$(date +%s)" > "$timefile"
+		return 0
+	fi
+}
+
+function Ping {
+	# Simple ping check
+	__CheckArguments 1 $# "$@"
+
+	local host="${1}"
+
+	local retval
+
+	eval "$PING_CMD $host > /dev/null 2>&1" &
+	ExecTasks $! "${FUNCNAME[0]}" false 0 0 60 180 true $SLEEP_TIME $KEEP_LOGGING
+	return $?
+}
+
+
 function CheckConnectivityRemoteHost {
 	__CheckArguments 0 $# "$@"	#__WITH_PARANOIA_DEBUG
 
@@ -1892,7 +1928,13 @@ function CheckConnectivityRemoteHost {
 }
 
 function CheckConnectivity3rdPartyHosts {
-	__CheckArguments 0 $# "$@"	#__WITH_PARANOIA_DEBUG
+	# Check if at least one host is reachable in order to diag internet
+	# third_party_hosts_ips=('1.1.1.1' '8.8.8.8' 'kernel.org' 'google.com')
+	# CheckConnectivity3rdPartyHosts $third_party_hosts_ips
+
+	__CheckArguments 0-1 $# "$@"	#__WITH_PARANOIA_DEBUG
+
+	local remote_3rd_party_hosts="${1}"	# Optional list of hosts to check
 
 	local remote3rdPartySuccess
 	local retval
@@ -1900,9 +1942,12 @@ function CheckConnectivity3rdPartyHosts {
 
 	if [ "$_PARANOIA_DEBUG" != true ]; then # Do not loose time in paranoia debug		#__WITH_PARANOIA_DEBUG
 
-		if [ "$REMOTE_3RD_PARTY_HOSTS" != "" ]; then
+		if [ "$remote_3rd_party_hosts" == "" ]; then
+			remote_3rd_party_hosts="$REMOTE_3RD_PARTY_HOSTS"
+		fi
+		if [ "$remote_3rd_party_hosts" != "" ]; then
 			remote3rdPartySuccess=false
-			for i in $REMOTE_3RD_PARTY_HOSTS
+			for i in $remote_3rd_party_hosts
 			do
 				eval "$PING_CMD $i > /dev/null 2>&1" &
 				ExecTasks $! "${FUNCNAME[0]}" false 0 0 60 180 true $SLEEP_TIME $KEEP_LOGGING
@@ -1911,6 +1956,7 @@ function CheckConnectivity3rdPartyHosts {
 					Logger "Cannot ping 3rd party host [$i]. Return code [$retval]." "NOTICE"
 				else
 					remote3rdPartySuccess=true
+					break
 				fi
 			done
 
