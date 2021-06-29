@@ -4,10 +4,10 @@
 #Check dryruns with nosuffix mode for timestampList
 
 PROGRAM="osync" # Rsync based two way sync engine with fault tolerance
-AUTHOR="(C) 2013-2020 by Orsiris de Jong"
+AUTHOR="(C) 2013-2021 by Orsiris de Jong"
 CONTACT="http://www.netpower.fr/osync - ozy@netpower.fr"
 PROGRAM_VERSION=1.3.0-rc1
-PROGRAM_BUILD=2020111501
+PROGRAM_BUILD=2021062901
 IS_STABLE=false
 
 CONFIG_FILE_REVISION_REQUIRED=1.3.0
@@ -109,6 +109,10 @@ function TrapQuit {
 		UnlockReplicas
 		RunAfterHook
 		Logger "$PROGRAM finished." "ALWAYS"
+		if [ $ALWAYS_SEND_MAILS == true ];
+		then
+			SendAlert
+		fi
 		exitcode=0
 	fi
 	CleanUp
@@ -3195,6 +3199,11 @@ if [ $_QUICK_SYNC -eq 2 ]; then
 	if [ $(IsInteger "$MIN_WAIT") -ne 1 ]; then
 		MIN_WAIT=30
 	fi
+
+	if [ "$ALWAYS_SEND_MAILS" == "" ]; then
+		ALWAYS_SEND_MAILS=false
+	fi
+
 # First character shouldn't be '-' when config file given
 elif [ "${1:0:1}" != "-" ]; then
 	ConfigFile="${1}"

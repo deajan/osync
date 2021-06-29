@@ -8,6 +8,8 @@
 
 ### dd Mmm YYYY: osync v1.3 release (for full changelog since v1.2 branch see all v1.3-beta/RC entries)
 
+-   New options ALWAYS_SEND_MAILS to allow sending logs regardless of execution states
+
 ### 29 June 2020: osync v1.3-RC1 release
 
 -   New option to use SSH_CONTROLMASTER in order to speed up remote sync tasks and preserve a single ssh channel
