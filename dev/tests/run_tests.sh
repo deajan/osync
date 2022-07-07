@@ -98,9 +98,12 @@ function SetupSSH {
 	ls "${HOME}" -alh
 	ls "${HOME}/.ssh" -alh
 
-	if [ ! -f "${HOME}/.ssh/authorized_keys" ] && ! grep "$(cat ${HOME}/.ssh/${PUBKEY_NAME})" "${HOME}/.ssh/authorized_keys"; then
+	if [ -f "${HOME}/.ssh/authorized_keys" ]; then
+		if ! grep "$(cat ${HOME}/.ssh/${PUBKEY_NAME})" "${HOME}/.ssh/authorized_keys"; then
+			echo "$SSH_AUTH_LINE" >> "${HOME}/.ssh/authorized_keys"
+		fi
+	else
 		echo "$SSH_AUTH_LINE" >> "${HOME}/.ssh/authorized_keys"
-		#echo "from=\"*\",no-port-forwarding,no-X11-forwarding,no-agent-forwarding,no-pty,command=\"$FAKEROOT/usr/local/bin/ssh_filter.sh SomeAlphaNumericToken9\" $(cat ${HOME}/.ssh/id_rsa_local_osync_tests.pub)" >> "${HOME}/.ssh/authorized_keys"
 	fi
 	chmod 600 "${HOME}/.ssh/authorized_keys"
 
@@ -194,7 +197,7 @@ function oneTimeSetUp () {
 	# Set some travis related changes
 	if [ "$RUNNING_ON_GITHUB_ACTIONS" == true ]; then
 	echo "Running with GITHUB ACTIONS settings"
-		REMOTE_USER="travis"
+		REMOTE_USER="runner"
 		RHOST_PING=false
 		SetConfFileValue "$CONF_DIR/$REMOTE_CONF" "REMOTE_3RD_PARTY_HOSTS" ""
 		SetConfFileValue "$CONF_DIR/$REMOTE_CONF" "REMOTE_HOST_PING" false
