@@ -12,6 +12,9 @@ jobs:
     steps:
     - uses: actions/checkout@v2
     - uses: Vampire/setup-wsl@v1
+      with:
+        additional-packages:
+          dos2unix
     - name: Execute tests and generate coverage report
       shell: wsl-bash {0}
       env:
