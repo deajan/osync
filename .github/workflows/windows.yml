@@ -17,6 +17,6 @@ jobs:
       env:
         RUNNING_ON_GITHUB_ACTIONS: true
       run: |
-        bash ./dev/tests/run_tests.sh
+         ./dev/tests/run_tests.sh
     - name: Upload Coverage to Codecov
       uses: codecov/codecov-action@v1
