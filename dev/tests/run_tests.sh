@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-# osync test suite 2022070701
+# osync test suite 2022070702
 
 
 # Allows the following environment variables
@@ -90,11 +90,15 @@ OSYNC_MIN_VERSION=x
 OSYNC_IS_STABLE=maybe
 
 function SetupSSH {
-	echo -e  'y\n'| ssh-keygen -t rsa -b 2048 -N "" -f "${HOME}/.ssh/id_rsa_local_osync_tests"
+	PRIVKEY_NAME="id_rsa_local_osync_tests"
+	PUBKEY_NAME="${PRIVKEY_NAME}.pub"
+	echo -e  'y\n'| ssh-keygen -t rsa -b 2048 -N "" -f "${HOME}/.ssh/${PRIVKEY_NAME}"
 
-	SSH_AUTH_LINE="from=\"*\",no-port-forwarding,no-X11-forwarding,no-agent-forwarding,no-pty,command=\"$FAKEROOT/usr/local/bin/ssh_filter.sh SomeAlphaNumericToken9\" $(cat ${HOME}/.ssh/id_rsa_local_osync_tests.pub)"
+	SSH_AUTH_LINE="from=\"*\",no-port-forwarding,no-X11-forwarding,no-agent-forwarding,no-pty,command=\"$FAKEROOT/usr/local/bin/ssh_filter.sh SomeAlphaNumericToken9\" $(cat ${HOME}/.ssh/${PUBKEY_NAME})"
+	ls "${HOME}" -alh
+	ls "${HOME}/.ssh" -alh
 
-	if ! grep "$(cat ${HOME}/.ssh/id_rsa_local_osync_tests.pub)" "${HOME}/.ssh/authorized_keys"; then
+	if ! grep "$(cat ${HOME}/.ssh/${PUBKEY_NAME})" "${HOME}/.ssh/authorized_keys"; then
 		echo "$SSH_AUTH_LINE" >> "${HOME}/.ssh/authorized_keys"
 		#echo "from=\"*\",no-port-forwarding,no-X11-forwarding,no-agent-forwarding,no-pty,command=\"$FAKEROOT/usr/local/bin/ssh_filter.sh SomeAlphaNumericToken9\" $(cat ${HOME}/.ssh/id_rsa_local_osync_tests.pub)" >> "${HOME}/.ssh/authorized_keys"
 	fi
@@ -173,7 +177,7 @@ function PrepareLocalDirs () {
 function oneTimeSetUp () {
 	START_TIME=$SECONDS
 
-	mkdir --parents "$FAKEROOT"
+	mkdir -p "$FAKEROOT"
 
 	source "$DEV_DIR/ofunctions.sh"
 
@@ -186,7 +190,7 @@ function oneTimeSetUp () {
 
 	# Set some travis related changes
 	if [ "$RUNNING_ON_GITHUB_ACTIONS" == true ]; then
-	echo "Running with travis settings"
+	echo "Running with GITHUB ACTIONS settings"
 		REMOTE_USER="travis"
 		RHOST_PING=false
 		SetConfFileValue "$CONF_DIR/$REMOTE_CONF" "REMOTE_3RD_PARTY_HOSTS" ""
