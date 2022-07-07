@@ -3,7 +3,7 @@
 #
 # Unit test suite runner.
 #
-# Copyright 2008-2017 Kate Ward. All Rights Reserved.
+# Copyright 2008-2020 Kate Ward. All Rights Reserved.
 # Released under the Apache 2.0 license.
 #
 # Author: kate.ward@forestent.com (Kate Ward)
@@ -11,6 +11,20 @@
 #
 # This script runs all the unit tests that can be found, and generates a nice
 # report of the tests.
+#
+### Sample usage:
+#
+# Run all tests for all shells.
+# $ ./test_runner
+#
+# Run all tests for single shell.
+# $ ./test_runner -s /bin/bash
+#
+# Run single test for all shells.
+# $ ./test_runner -t shunit_asserts_test.sh
+#
+# Run single test for single shell.
+# $ ./test_runner -s /bin/bash -t shunit_asserts_test.sh
 #
 ### ShellCheck (http://www.shellcheck.net/)
 # Disable source following.
@@ -25,8 +39,10 @@
 RUNNER_LOADED=0
 
 RUNNER_ARGV0=`basename "$0"`
-RUNNER_SHELLS='/bin/sh ash /bin/bash /bin/dash /bin/ksh /bin/pdksh /bin/zsh'
+RUNNER_SHELLS='/bin/sh ash /bin/bash /bin/dash /bin/ksh /bin/mksh /bin/zsh'
 RUNNER_TEST_SUFFIX='_test.sh'
+true; RUNNER_TRUE=$?
+false; RUNNER_FALSE=$?
 
 runner_warn() { echo "runner:WARN $*" >&2; }
 runner_error() { echo "runner:ERROR $*" >&2; }
@@ -36,7 +52,7 @@ runner_usage() {
   echo "usage: ${RUNNER_ARGV0} [-e key=val ...] [-s shell(s)] [-t test(s)]"
 }
 
-_runner_tests() { echo ./*${RUNNER_TEST_SUFFIX} |sed 's#./##g'; }
+_runner_tests() { echo ./*${RUNNER_TEST_SUFFIX} |sed 's#\./##g'; }
 _runner_testName() {
   # shellcheck disable=SC1117
   _runner_testName_=`expr "${1:-}" : "\(.*\)${RUNNER_TEST_SUFFIX}"`
@@ -114,6 +130,7 @@ for key in ${env}; do
 done
 
 # Run tests.
+runner_passing_=${RUNNER_TRUE}
 for shell in ${shells}; do
   echo
 
@@ -127,20 +144,20 @@ EOF
     # Check for existence of shell.
     shell_bin=${shell}
     shell_name=''
-    shell_present=${FALSE}
+    shell_present=${RUNNER_FALSE}
     case ${shell} in
       ash)
-        shell_bin=`which busybox |grep -v '^no busybox'`
-        [ $? -eq "${TRUE}" -a -n "${shell_bin}" ] && shell_present="${TRUE}"
-        shell_bin="${shell_bin} ash"
+        shell_bin=`command -v busybox`
+        [ $? -eq "${RUNNER_TRUE}" ] && shell_present="${RUNNER_TRUE}"
+        shell_bin="${shell_bin:+${shell_bin} }ash"
         shell_name=${shell}
         ;;
       *)
-        [ -x "${shell_bin}" ] && shell_present="${TRUE}"
+        [ -x "${shell_bin}" ] && shell_present="${RUNNER_TRUE}"
         shell_name=`basename "${shell}"`
         ;;
     esac
-    if [ "${shell_present}" -eq "${FALSE}" ]; then
+    if [ "${shell_present}" -eq "${RUNNER_FALSE}" ]; then
       runner_warn "unable to run tests with the ${shell_name} shell"
       continue
     fi
@@ -157,9 +174,18 @@ EOF
       # ${shell_bin} needs word splitting.
       #   shellcheck disable=SC2086
       ( exec ${shell_bin} "./${t}" 2>&1; )
+      shell_passing=$?
+      if [ "${shell_passing}" -ne "${RUNNER_TRUE}" ]; then
+        runner_warn "${shell_bin} not passing"
+      fi
+      test "${runner_passing_}" -eq ${RUNNER_TRUE} -a ${shell_passing} -eq ${RUNNER_TRUE}
+      runner_passing_=$?
     done
   done
+  return ${runner_passing_}
 }
 
 # Execute main() if this is run in standalone mode (i.e. not from a unit test).
-[ -z "${SHUNIT_VERSION}" ] && main "$@"
+if [ -z "${SHUNIT_VERSION}" ]; then
+  main "$@"
+fi

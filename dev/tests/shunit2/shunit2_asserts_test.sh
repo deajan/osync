@@ -3,11 +3,15 @@
 #
 # shunit2 unit test for assert functions.
 #
-# Copyright 2008-2017 Kate Ward. All Rights Reserved.
+# Copyright 2008-2021 Kate Ward. All Rights Reserved.
 # Released under the Apache 2.0 license.
+# http://www.apache.org/licenses/LICENSE-2.0
 #
 # Author: kate.ward@forestent.com (Kate Ward)
 # https://github.com/kward/shunit2
+#
+# In this file, all assert calls under test must be wrapped in () so they do not
+# influence the metrics of the test itself.
 #
 # Disable source following.
 #   shellcheck disable=SC1090,SC1091
@@ -22,174 +26,376 @@ stderrF="${TMPDIR:-/tmp}/STDERR"
 commonEqualsSame() {
   fn=$1
 
-  ( ${fn} 'x' 'x' >"${stdoutF}" 2>"${stderrF}" )
-  th_assertTrueWithNoOutput 'equal' $? "${stdoutF}" "${stderrF}"
+  # These should succeed.
 
-  ( ${fn} "${MSG}" 'x' 'x' >"${stdoutF}" 2>"${stderrF}" )
-  th_assertTrueWithNoOutput 'equal; with msg' $? "${stdoutF}" "${stderrF}"
+  desc='equal'
+  if (${fn} 'x' 'x' >"${stdoutF}" 2>"${stderrF}"); then
+    th_assertTrueWithNoOutput "${desc}" $? "${stdoutF}" "${stderrF}"
+  else
+    fail "${desc}: unexpected failure"
+    _showTestOutput
+  fi
 
-  ( ${fn} 'abc def' 'abc def' >"${stdoutF}" 2>"${stderrF}" )
-  th_assertTrueWithNoOutput 'equal with spaces' $? "${stdoutF}" "${stderrF}"
+  desc='equal_with_message'
+  if (${fn} 'some message' 'x' 'x' >"${stdoutF}" 2>"${stderrF}"); then
+    th_assertTrueWithNoOutput "${desc}" $? "${stdoutF}" "${stderrF}"
+  else
+    fail "${desc}: unexpected failure"
+    _showTestOutput
+  fi
 
-  ( ${fn} 'x' 'y' >"${stdoutF}" 2>"${stderrF}" )
-  th_assertFalseWithOutput 'not equal' $? "${stdoutF}" "${stderrF}"
+  desc='equal_with_spaces'
+  if (${fn} 'abc def' 'abc def' >"${stdoutF}" 2>"${stderrF}"); then
+    th_assertTrueWithNoOutput "${desc}" $? "${stdoutF}" "${stderrF}"
+  else
+    fail "${desc}: unexpected failure"
+    _showTestOutput
+  fi
 
-  ( ${fn} '' '' >"${stdoutF}" 2>"${stderrF}" )
-  th_assertTrueWithNoOutput 'null values' $? "${stdoutF}" "${stderrF}"
+  desc='equal_null_values'
+  if (${fn} '' '' >"${stdoutF}" 2>"${stderrF}"); then
+    th_assertTrueWithNoOutput "${desc}" $? "${stdoutF}" "${stderrF}"
+  else
+    fail "${desc}: unexpected failure"
+    _showTestOutput
+  fi
 
-  ( ${fn} arg1 >"${stdoutF}" 2>"${stderrF}" )
-  th_assertFalseWithError 'too few arguments' $? "${stdoutF}" "${stderrF}"
+  # These should fail.
 
-  ( ${fn} arg1 arg2 arg3 arg4 >"${stdoutF}" 2>"${stderrF}" )
-  th_assertFalseWithError 'too many arguments' $? "${stdoutF}" "${stderrF}"
+  desc='not_equal'
+  if (${fn} 'x' 'y' >"${stdoutF}" 2>"${stderrF}"); then
+    fail "${desc}: expected a failure"
+    _showTestOutput
+  else
+    th_assertFalseWithOutput "${desc}" $? "${stdoutF}" "${stderrF}"
+  fi
 }
 
 commonNotEqualsSame() {
   fn=$1
 
-  ( ${fn} 'x' 'y' >"${stdoutF}" 2>"${stderrF}" )
-  th_assertTrueWithNoOutput 'not same' $? "${stdoutF}" "${stderrF}"
+  # These should succeed.
 
-  ( ${fn} "${MSG}" 'x' 'y' >"${stdoutF}" 2>"${stderrF}" )
-  th_assertTrueWithNoOutput 'not same, with msg' $? "${stdoutF}" "${stderrF}"
+  desc='not_same'
+  if (${fn} 'x' 'y' >"${stdoutF}" 2>"${stderrF}"); then
+    th_assertTrueWithNoOutput "${desc}" $? "${stdoutF}" "${stderrF}"
+  else
+    fail "${desc}: unexpected failure"
+    _showTestOutput
+  fi
 
-  ( ${fn} 'x' 'x' >"${stdoutF}" 2>"${stderrF}" )
-  th_assertFalseWithOutput 'same' $? "${stdoutF}" "${stderrF}"
+  desc='not_same_with_message'
+  if (${fn} 'some message' 'x' 'y' >"${stdoutF}" 2>"${stderrF}"); then
+    th_assertTrueWithNoOutput "${desc}" $? "${stdoutF}" "${stderrF}"
+  else
+    fail "${desc}: unexpected failure"
+    _showTestOutput
+  fi
 
-  ( ${fn} '' '' >"${stdoutF}" 2>"${stderrF}" )
-  th_assertFalseWithOutput 'null values' $? "${stdoutF}" "${stderrF}"
+  # These should fail.
 
-  ( ${fn} arg1 >"${stdoutF}" 2>"${stderrF}" )
-  th_assertFalseWithError 'too few arguments' $? "${stdoutF}" "${stderrF}"
+  desc='same'
+  if (${fn} 'x' 'x' >"${stdoutF}" 2>"${stderrF}"); then
+    fail "${desc}: expected a failure"
+    _showTestOutput
+  else
+    th_assertFalseWithOutput "${desc}" $? "${stdoutF}" "${stderrF}"
+  fi
 
-  ( ${fn} arg1 arg2 arg3 arg4 >"${stdoutF}" 2>"${stderrF}" )
-  th_assertFalseWithError 'too many arguments' $? "${stdoutF}" "${stderrF}"
+  desc='unequal_null_values'
+  if (${fn} '' '' >"${stdoutF}" 2>"${stderrF}"); then
+    fail "${desc}: expected a failure"
+    _showTestOutput
+  else
+    th_assertFalseWithOutput "${desc}" $? "${stdoutF}" "${stderrF}"
+  fi
 }
 
-testAssertEquals() {
-  commonEqualsSame 'assertEquals'
+testAssertEquals()    { commonEqualsSame 'assertEquals'; }
+testAssertNotEquals() { commonNotEqualsSame 'assertNotEquals'; }
+testAssertSame()      { commonEqualsSame 'assertSame'; }
+testAssertNotSame()   { commonNotEqualsSame 'assertNotSame'; }
+
+testAssertContains() {
+  # Content is present.
+  while read -r desc container content; do
+    if (assertContains "${container}" "${content}" >"${stdoutF}" 2>"${stderrF}"); then
+      th_assertTrueWithNoOutput "${desc}" $? "${stdoutF}" "${stderrF}"
+    else
+      fail "${desc}: unexpected failure"
+      _showTestOutput
+    fi
+  done <<EOF
+abc_at_start  abcdef abc
+bcd_in_middle abcdef bcd
+def_at_end    abcdef def
+EOF
+
+  # Content missing.
+  while read -r desc container content; do
+    if (assertContains "${container}" "${content}" >"${stdoutF}" 2>"${stderrF}"); then
+      fail "${desc}: unexpected failure"
+      _showTestOutput
+    else
+      th_assertFalseWithOutput "${desc}" $? "${stdoutF}" "${stderrF}"
+    fi
+  done <<EOF
+xyz_not_present    abcdef xyz
+zab_contains_start abcdef zab
+efg_contains_end   abcdef efg
+acf_has_parts      abcdef acf
+EOF
+
+  desc="content_starts_with_dash"
+  if (assertContains 'abc -Xabc def' '-Xabc' >"${stdoutF}" 2>"${stderrF}"); then
+    th_assertTrueWithNoOutput "${desc}" $? "${stdoutF}" "${stderrF}"
+  else
+    fail "${desc}: unexpected failure"
+    _showTestOutput
+  fi
+
+  desc="contains_with_message"
+  if (assertContains 'some message' 'abcdef' 'abc' >"${stdoutF}" 2>"${stderrF}"); then
+    th_assertTrueWithNoOutput "${desc}" $? "${stdoutF}" "${stderrF}"
+  else
+    fail "${desc}: unexpected failure"
+    _showTestOutput
+  fi
 }
 
-testAssertNotEquals() {
-  commonNotEqualsSame 'assertNotEquals'
-}
+testAssertNotContains() {
+  # Content not present.
+  while read -r desc container content; do
+    if (assertNotContains "${container}" "${content}" >"${stdoutF}" 2>"${stderrF}"); then
+      th_assertTrueWithNoOutput "${desc}" $? "${stdoutF}" "${stderrF}"
+    else
+      fail "${desc}: unexpected failure"
+      _showTestOutput
+    fi
+  done <<EOF
+xyz_not_present    abcdef xyz
+zab_contains_start abcdef zab
+efg_contains_end   abcdef efg
+acf_has_parts      abcdef acf
+EOF
 
-testAssertSame() {
-  commonEqualsSame 'assertSame'
-}
+  # Content present.
+  while read -r desc container content; do
+    if (assertNotContains "${container}" "${content}" >"${stdoutF}" 2>"${stderrF}"); then
+      fail "${desc}: expected a failure"
+      _showTestOutput
+    else
+      th_assertFalseWithOutput "${desc}" $? "${stdoutF}" "${stderrF}"
+    fi
+  done <<EOF
+abc_is_present abcdef abc
+EOF
 
-testAssertNotSame() {
-  commonNotEqualsSame 'assertNotSame'
+  desc='not_contains_with_message'
+  if (assertNotContains 'some message' 'abcdef' 'xyz' >"${stdoutF}" 2>"${stderrF}"); then
+    th_assertTrueWithNoOutput "${desc}" $? "${stdoutF}" "${stderrF}"
+  else
+    fail "${desc}: unexpected failure"
+    _showTestOutput
+  fi
 }
 
 testAssertNull() {
-  ( assertNull '' >"${stdoutF}" 2>"${stderrF}" )
-  th_assertTrueWithNoOutput 'null' $? "${stdoutF}" "${stderrF}"
+  while read -r desc value; do
+    if (assertNull "${value}" >"${stdoutF}" 2>"${stderrF}"); then
+      fail "${desc}: unexpected failure"
+      _showTestOutput
+    else
+      th_assertFalseWithOutput "${desc}" $? "${stdoutF}" "${stderrF}"
+    fi
+  done <<'EOF'
+x_alone          x
+x_double_quote_a x"a
+x_single_quote_a x'a
+x_dollar_a       x$a
+x_backtick_a     x`a
+EOF
 
-  ( assertNull "${MSG}" '' >"${stdoutF}" 2>"${stderrF}" )
-  th_assertTrueWithNoOutput 'null, with msg' $? "${stdoutF}" "${stderrF}"
+  desc='null_without_message'
+  if (assertNull '' >"${stdoutF}" 2>"${stderrF}"); then
+    th_assertTrueWithNoOutput "${desc}" $? "${stdoutF}" "${stderrF}"
+  else
+    fail "${desc}: unexpected failure"
+    _showTestOutput
+  fi
 
-  ( assertNull 'x' >"${stdoutF}" 2>"${stderrF}" )
-  th_assertFalseWithOutput 'not null' $? "${stdoutF}" "${stderrF}"
+  desc='null_with_message'
+  if (assertNull 'some message' '' >"${stdoutF}" 2>"${stderrF}"); then
+    th_assertTrueWithNoOutput "${desc}" $? "${stdoutF}" "${stderrF}"
+  else
+    fail "${desc}: unexpected failure"
+    _showTestOutput
+  fi
 
-  ( assertNull >"${stdoutF}" 2>"${stderrF}" )
-  th_assertFalseWithError 'too few arguments' $? "${stdoutF}" "${stderrF}"
-
-  ( assertNull arg1 arg2 arg3 >"${stdoutF}" 2>"${stderrF}" )
-  th_assertFalseWithError 'too many arguments' $? "${stdoutF}" "${stderrF}"
+  desc='x_is_not_null'
+  if (assertNull 'x' >"${stdoutF}" 2>"${stderrF}"); then
+    fail "${desc}: expected a failure"
+    _showTestOutput
+  else
+    th_assertFalseWithOutput "${desc}" $? "${stdoutF}" "${stderrF}"
+  fi
 }
 
-testAssertNotNull()
-{
-  ( assertNotNull 'x' >"${stdoutF}" 2>"${stderrF}" )
-  th_assertTrueWithNoOutput 'not null' $? "${stdoutF}" "${stderrF}"
+testAssertNotNull() {
+  while read -r desc value; do
+    if (assertNotNull "${value}" >"${stdoutF}" 2>"${stderrF}"); then
+      th_assertTrueWithNoOutput "${desc}" $? "${stdoutF}" "${stderrF}"
+    else
+      fail "${desc}: unexpected failure"
+      _showTestOutput
+    fi
+  done <<'EOF'
+x_alone          x
+x_double_quote_b x"b
+x_single_quote_b x'b
+x_dollar_b       x$b
+x_backtick_b     x`b
+EOF
 
-  ( assertNotNull "${MSG}" 'x' >"${stdoutF}" 2>"${stderrF}" )
-  th_assertTrueWithNoOutput 'not null, with msg' $? "${stdoutF}" "${stderrF}"
+  desc='not_null_with_message'
+  if (assertNotNull 'some message' 'x' >"${stdoutF}" 2>"${stderrF}"); then
+    th_assertTrueWithNoOutput "${desc}" $? "${stdoutF}" "${stderrF}"
+  else
+    fail "${desc}: unexpected failure"
+    _showTestOutput
+  fi
 
-  ( assertNotNull 'x"b' >"${stdoutF}" 2>"${stderrF}" )
-  th_assertTrueWithNoOutput 'not null, with double-quote' $? \
-      "${stdoutF}" "${stderrF}"
-
-  ( assertNotNull "x'b" >"${stdoutF}" 2>"${stderrF}" )
-  th_assertTrueWithNoOutput 'not null, with single-quote' $? \
-      "${stdoutF}" "${stderrF}"
-
-  # shellcheck disable=SC2016
-  ( assertNotNull 'x$b' >"${stdoutF}" 2>"${stderrF}" )
-  th_assertTrueWithNoOutput 'not null, with dollar' $? \
-      "${stdoutF}" "${stderrF}"
-
-  ( assertNotNull 'x`b' >"${stdoutF}" 2>"${stderrF}" )
-  th_assertTrueWithNoOutput 'not null, with backtick' $? \
-      "${stdoutF}" "${stderrF}"
-
-  ( assertNotNull '' >"${stdoutF}" 2>"${stderrF}" )
-  th_assertFalseWithOutput 'null' $? "${stdoutF}" "${stderrF}"
-
-  # There is no test for too few arguments as $1 might actually be null.
-
-  ( assertNotNull arg1 arg2 arg3 >"${stdoutF}" 2>"${stderrF}" )
-  th_assertFalseWithError 'too many arguments' $? "${stdoutF}" "${stderrF}"
+  desc="double_ticks_are_null"
+  if (assertNotNull '' >"${stdoutF}" 2>"${stderrF}"); then
+    fail "${desc}: expected a failure"
+    _showTestOutput
+  else
+    th_assertFalseWithOutput "${desc}" $? "${stdoutF}" "${stderrF}"
+  fi
 }
 
 testAssertTrue() {
-  ( assertTrue 0 >"${stdoutF}" 2>"${stderrF}" )
-  th_assertTrueWithNoOutput 'true' $? "${stdoutF}" "${stderrF}"
+  # True values.
+  while read -r desc value; do
+    if (assertTrue "${value}" >"${stdoutF}" 2>"${stderrF}"); then
+      th_assertTrueWithNoOutput "${desc}" $? "${stdoutF}" "${stderrF}"
+    else
+      fail "${desc}: unexpected failure"
+      _showTestOutput
+    fi
+  done <<'EOF'
+zero         0
+zero_eq_zero [ 0 -eq 0 ]
+EOF
 
-  ( assertTrue "${MSG}" 0 >"${stdoutF}" 2>"${stderrF}" )
-  th_assertTrueWithNoOutput 'true, with msg' $? "${stdoutF}" "${stderrF}"
+  # Not true values.
+  while read -r desc value; do
+    if (assertTrue "${value}" >"${stdoutF}" 2>"${stderrF}"); then
+      fail "${desc}: expected a failure"
+      _showTestOutput
+    else
+      th_assertFalseWithOutput "${desc}" $? "${stdoutF}" "${stderrF}"
+    fi
+  done <<EOF
+one       1
+zero_eq_1 [ 0 -eq 1 ]
+null
+EOF
 
-  ( assertTrue '[ 0 -eq 0 ]' >"${stdoutF}" 2>"${stderrF}" )
-  th_assertTrueWithNoOutput 'true condition' $? "${stdoutF}" "${stderrF}"
-
-  ( assertTrue 1 >"${stdoutF}" 2>"${stderrF}" )
-  th_assertFalseWithOutput 'false' $? "${stdoutF}" "${stderrF}"
-
-  ( assertTrue '[ 0 -eq 1 ]' >"${stdoutF}" 2>"${stderrF}" )
-  th_assertFalseWithOutput 'false condition' $? "${stdoutF}" "${stderrF}"
-
-  ( assertTrue '' >"${stdoutF}" 2>"${stderrF}" )
-  th_assertFalseWithOutput 'null' $? "${stdoutF}" "${stderrF}"
-
-  ( assertTrue >"${stdoutF}" 2>"${stderrF}" )
-  th_assertFalseWithError 'too few arguments' $? "${stdoutF}" "${stderrF}"
-
-  ( assertTrue arg1 arg2 arg3 >"${stdoutF}" 2>"${stderrF}" )
-  th_assertFalseWithError 'too many arguments' $? "${stdoutF}" "${stderrF}"
+  desc='true_with_message'
+  if (assertTrue 'some message' 0 >"${stdoutF}" 2>"${stderrF}"); then
+    th_assertTrueWithNoOutput "${desc}" $? "${stdoutF}" "${stderrF}"
+  else
+    fail "${desc}: unexpected failure"
+    _showTestOutput
+  fi
 }
 
 testAssertFalse() {
-  ( assertFalse 1 >"${stdoutF}" 2>"${stderrF}" )
-  th_assertTrueWithNoOutput 'false' $? "${stdoutF}" "${stderrF}"
+  # False values.
+  while read -r desc value; do
+    if (assertFalse "${value}" >"${stdoutF}" 2>"${stderrF}"); then
+      th_assertTrueWithNoOutput "${desc}" $? "${stdoutF}" "${stderrF}"
+    else
+      fail "${desc}: unexpected failure"
+      _showTestOutput
+    fi
+  done <<EOF
+one       1
+zero_eq_1 [ 0 -eq 1 ]
+null
+EOF
 
-  ( assertFalse "${MSG}" 1 >"${stdoutF}" 2>"${stderrF}" )
-  th_assertTrueWithNoOutput 'false, with msg' $? "${stdoutF}" "${stderrF}"
+  # Not true values.
+  while read -r desc value; do
+    if (assertFalse "${value}" >"${stdoutF}" 2>"${stderrF}"); then
+      fail "${desc}: expected a failure"
+      _showTestOutput
+    else
+      th_assertFalseWithOutput "${desc}" $? "${stdoutF}" "${stderrF}"
+    fi
+  done <<'EOF'
+zero         0
+zero_eq_zero [ 0 -eq 0 ]
+EOF
 
-  ( assertFalse '[ 0 -eq 1 ]' >"${stdoutF}" 2>"${stderrF}" )
-  th_assertTrueWithNoOutput 'false condition' $? "${stdoutF}" "${stderrF}"
+  desc='false_with_message'
+  if (assertFalse 'some message' 1 >"${stdoutF}" 2>"${stderrF}"); then
+    th_assertTrueWithNoOutput "${desc}" $? "${stdoutF}" "${stderrF}"
+  else
+    fail "${desc}: unexpected failure"
+    _showTestOutput
+  fi
+}
 
-  ( assertFalse 0 >"${stdoutF}" 2>"${stderrF}" )
-  th_assertFalseWithOutput 'true' $? "${stdoutF}" "${stderrF}"
+FUNCTIONS='
+assertEquals assertNotEquals
+assertSame assertNotSame
+assertContains assertNotContains
+assertNull assertNotNull
+assertTrue assertFalse
+'
 
-  ( assertFalse '[ 0 -eq 0 ]' >"${stdoutF}" 2>"${stderrF}" )
-  th_assertFalseWithOutput 'true condition' $? "${stdoutF}" "${stderrF}"
+testTooFewArguments() {
+  for fn in ${FUNCTIONS}; do
+    # These functions support zero arguments.
+    case "${fn}" in
+      assertNull) continue ;;
+      assertNotNull) continue ;;
+    esac
 
-  ( assertFalse '' >"${stdoutF}" 2>"${stderrF}" )
-  th_assertFalseWithOutput 'true condition' $? "${stdoutF}" "${stderrF}"
+    desc="${fn}"
+    if (${fn} >"${stdoutF}" 2>"${stderrF}"); then
+      fail "${desc}: expected a failure"
+      _showTestOutput
+    else
+      got=$? want=${SHUNIT_ERROR}
+      assertEquals "${desc}: incorrect return code" "${got}" "${want}"
+      th_assertFalseWithError "${desc}" "${got}" "${stdoutF}" "${stderrF}"
+    fi
+  done
+}
 
-  ( assertFalse >"${stdoutF}" 2>"${stderrF}" )
-  th_assertFalseWithError 'too few arguments' $? "${stdoutF}" "${stderrF}"
-
-  ( assertFalse arg1 arg2 arg3 >"${stdoutF}" 2>"${stderrF}" )
-  th_assertFalseWithError 'too many arguments' $? "${stdoutF}" "${stderrF}"
+testTooManyArguments() {
+  for fn in ${FUNCTIONS}; do
+    desc="${fn}"
+    if (${fn} arg1 arg2 arg3 arg4 >"${stdoutF}" 2>"${stderrF}"); then
+      fail "${desc}: expected a failure"
+      _showTestOutput
+    else
+      got=$? want=${SHUNIT_ERROR}
+      assertEquals "${desc}: incorrect return code" "${got}" "${want}"
+      th_assertFalseWithError "${desc}" "${got}" "${stdoutF}" "${stderrF}"
+    fi
+  done
 }
 
 oneTimeSetUp() {
   th_oneTimeSetUp
-
-  MSG='This is a test message'
 }
+
+# showTestOutput for the most recently run test.
+_showTestOutput() { th_showOutput "${SHUNIT_FALSE}" "${stdoutF}" "${stderrF}"; }
 
 # Load and run shunit2.
 # shellcheck disable=SC2034
