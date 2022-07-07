@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
 
-# osync test suite 2020042901
+# osync test suite 2022070701
 
 
 # Allows the following environment variables
-# TRAVIS_RUN=[true|false]
+# RUNNING_ON_GITHUB_ACTIONS=[true|false]
 # SSH_PORT=22
 # SKIP_REMOTE=[true|false]
 
@@ -185,7 +185,7 @@ function oneTimeSetUp () {
 	echo "Detected OS: $LOCAL_OS"
 
 	# Set some travis related changes
-	if [ "$TRAVIS_RUN" == true ]; then
+	if [ "$RUNNING_ON_GITHUB_ACTIONS" == true ]; then
 	echo "Running with travis settings"
 		REMOTE_USER="travis"
 		RHOST_PING=false
@@ -324,7 +324,7 @@ function test_Merge () {
 	# Set osync version to stable while testing to avoid warning message
 	# Don't use SetConfFileValue here since for whatever reason Travis does not like creating a sed temporary file in $FAKEROOT
 
-	if [ "$TRAVIS_RUN" == true ]; then
+	if [ "$RUNNING_ON_GITHUB_ACTIONS" == true ]; then
 		$SUDO_CMD sed -i.tmp 's/^IS_STABLE=.*/IS_STABLE=true/' "$OSYNC_EXECUTABLE"
 	else
 		sed -i.tmp 's/^IS_STABLE=.*/IS_STABLE=true/' "$OSYNC_EXECUTABLE"
@@ -510,7 +510,7 @@ function test_skip_deletion () {
 	fi
 
 	# TRAVIS SPECIFIC - time limitation
-	if [ "$TRAVIS_RUN" != true ]; then
+	if [ "$RUNNING_ON_GITHUB_ACTIONS" != true ]; then
 		modes=('initiator' 'target' 'initiator,target')
 	else
 		modes=('target')
@@ -671,7 +671,7 @@ function test_handle_symlinks () {
 	done
 
 	# TRAVIS SPECIFIC - time limitation
-	if [ "$TRAVIS_RUN" != true ]; then
+	if [ "$RUNNING_ON_GITHUB_ACTIONS" != true ]; then
 		return 0
 	fi
 
@@ -790,13 +790,13 @@ function test_softdeletion_cleanup () {
 
 			touch "$file.new"
 
-			if [ "$TRAVIS_RUN" == true ] || [ "$LOCAL_OS" == "BSD" ] || [ "$LOCAL_OS" == "MacOSX" ] || [ "$LOCAL_OS" == "WinNT10" ] || [ "$LOCAL_OS" == "msys" ] || [ "$LOCAL_OS" == "Cygwin" ]; then
+			if [ "$RUNNING_ON_GITHUB_ACTIONS" == true ] || [ "$LOCAL_OS" == "BSD" ] || [ "$LOCAL_OS" == "MacOSX" ] || [ "$LOCAL_OS" == "WinNT10" ] || [ "$LOCAL_OS" == "msys" ] || [ "$LOCAL_OS" == "Cygwin" ]; then
 				echo "Skipping changing ctime on file because travis / bsd / macos / Win10 / msys / cygwin does not support debugfs"
 			else
 				CreateOldFile "$file.old"
 			fi
 		done
-		if [ "$TRAVIS_RUN" == true ] || [ "$LOCAL_OS" == "BSD" ] || [ "$LOCAL_OS" == "MacOSX" ] || [ "$LOCAL_OS" == "WinNT10" ] || [ "$LOCAL_OS" == "msys" ] || [ "$LOCAL_OS" == "Cygwin" ]; then
+		if [ "$RUNNING_ON_GITHUB_ACTIONS" == true ] || [ "$LOCAL_OS" == "BSD" ] || [ "$LOCAL_OS" == "MacOSX" ] || [ "$LOCAL_OS" == "WinNT10" ] || [ "$LOCAL_OS" == "msys" ] || [ "$LOCAL_OS" == "Cygwin" ]; then
 			echo "Skipping changing ctime on dir too"
 		else
 			CreateOldFile "$DirA" true
@@ -811,7 +811,7 @@ function test_softdeletion_cleanup () {
 			[ -f "$file.new" ]
 			assertEquals "New softdeleted / backed up file [$file.new] exists." "0" $?
 
-			if [ "$TRAVIS_RUN" == true ] || [ "$LOCAL_OS" == "BSD" ] || [ "$LOCAL_OS" == "MacOSX" ] || [ "$LOCAL_OS" == "WinNT10" ] || [ "$LOCAL_OS" == "msys" ] || [ "$LOCAL_OS" == "Cygwin" ]; then
+			if [ "$RUNNING_ON_GITHUB_ACTIONS" == true ] || [ "$LOCAL_OS" == "BSD" ] || [ "$LOCAL_OS" == "MacOSX" ] || [ "$LOCAL_OS" == "WinNT10" ] || [ "$LOCAL_OS" == "msys" ] || [ "$LOCAL_OS" == "Cygwin" ]; then
 				[ ! -f "$file.old" ]
 				assertEquals "Old softdeleted / backed up file [$file.old] is deleted permanently." "0" $?
 			else
@@ -820,7 +820,7 @@ function test_softdeletion_cleanup () {
 			fi
 		done
 
-		if [ "$TRAVIS_RUN" == true ] || [ "$LOCAL_OS" == "BSD" ] || [ "$LOCAL_OS" == "MacOSX" ] || [ "$LOCAL_OS" == "WinNT10" ] || [ "$LOCAL_OS" == "msys" ] || [ "$LOCAL_OS" == "Cygwin" ]; then
+		if [ "$RUNNING_ON_GITHUB_ACTIONS" == true ] || [ "$LOCAL_OS" == "BSD" ] || [ "$LOCAL_OS" == "MacOSX" ] || [ "$LOCAL_OS" == "WinNT10" ] || [ "$LOCAL_OS" == "msys" ] || [ "$LOCAL_OS" == "Cygwin" ]; then
 			[ ! -d "$DirA" ]
 			assertEquals "Old softdeleted / backed up directory [$dirA] is deleted permanently." "0" $?
 			[ ! -d "$DirB" ]
@@ -837,7 +837,7 @@ function test_softdeletion_cleanup () {
 
 function test_FileAttributePropagation () {
 
-	if [ "$TRAVIS_RUN" == true ]; then
+	if [ "$RUNNING_ON_GITHUB_ACTIONS" == true ]; then
 		echo "Skipping FileAttributePropagation tests as travis does not support getfacl / setfacl."
 		return 0
 	fi
