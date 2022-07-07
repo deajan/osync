@@ -109,7 +109,7 @@ function TrapQuit {
 		UnlockReplicas
 		RunAfterHook
 		Logger "$PROGRAM finished." "ALWAYS"
-		if [ $ALWAYS_SEND_MAILS == true ];
+		if [ "$ALWAYS_SEND_MAILS" == true ];
 		then
 			SendAlert
 		fi
