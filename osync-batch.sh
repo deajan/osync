@@ -88,29 +88,29 @@ function RemoteLogger {
 
 	if [ "$level" == "CRITICAL" ]; then
 		_Logger "" "$prefix\e[1;33;41m$value\e[0m" true
-		if [ $_DEBUG == true ]; then
+		if [ "$_DEBUG" == true ]; then
 			_Logger -e "" "[$retval] in [$(joinString , ${FUNCNAME[@]})] SP=$SCRIPT_PID P=$$" true
 		fi
 		return
 	elif [ "$level" == "ERROR" ]; then
 		_Logger "" "$prefix\e[31m$value\e[0m" true
-		if [ $_DEBUG == true ]; then
+		if [ "$_DEBUG" == true ]; then
 			_Logger -e "" "[$retval] in [$(joinString , ${FUNCNAME[@]})] SP=$SCRIPT_PID P=$$" true
 		fi
 		return
 	elif [ "$level" == "WARN" ]; then
 		_Logger "" "$prefix\e[33m$value\e[0m" true
-		if [ $_DEBUG == true ]; then
+		if [ "$_DEBUG" == true ]; then
 			_Logger -e "" "[$retval] in [$(joinString , ${FUNCNAME[@]})] SP=$SCRIPT_PID P=$$" true
 		fi
 		return
 	elif [ "$level" == "NOTICE" ]; then
-		if [ $_LOGGER_ERR_ONLY != true ]; then
+		if [ "$_LOGGER_ERR_ONLY" != true ]; then
 			_Logger "" "$prefix$value"
 		fi
 		return
 	elif [ "$level" == "VERBOSE" ]; then
-		if [ $_LOGGER_VERBOSE == true ]; then
+		if [ "$_LOGGER_VERBOSE" == true ]; then
 			_Logger "" "$prefix$value"
 		fi
 		return
@@ -185,7 +185,7 @@ function Logger {
 		fi
 		return
 	elif [ "$level" == "VERBOSE" ]; then
-		if [ $_LOGGER_VERBOSE == true ]; then
+		if [ "$_LOGGER_VERBOSE" == true ]; then
 			_Logger "$prefix($level):$value" "$prefix$value"
 		fi
 		return
@@ -203,7 +203,7 @@ function Logger {
 	fi
 }
 function CleanUp {
-	# Exit controlmaster before it's socket gets deleted
+	# Exit controlmaster before the socket gets deleted
 	if [ "$SSH_CONTROLMASTER" == true ] && [ "$SSH_CMD" != "" ]; then
 		$SSH_CMD -O exit
 	fi
