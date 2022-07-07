@@ -11,10 +11,9 @@ jobs:
         os: [windows-latest]
     steps:
     - uses: actions/checkout@v2
-    - name: Execute tests and generate coverage report
     - uses: Vampire/setup-wsl@v1
-      with:
-      distribution: Debian
+    - name: Execute tests and generate coverage report
+      shell: wsl-bash {0}
       env:
         RUNNING_ON_GITHUB_ACTIONS: true
       run: |
