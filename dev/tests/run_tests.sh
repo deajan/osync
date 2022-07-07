@@ -98,7 +98,7 @@ function SetupSSH {
 	ls "${HOME}" -alh
 	ls "${HOME}/.ssh" -alh
 
-	if ! grep "$(cat ${HOME}/.ssh/${PUBKEY_NAME})" "${HOME}/.ssh/authorized_keys"; then
+	if [ ! -f "${HOME}/.ssh/authorized_keys" ] && ! grep "$(cat ${HOME}/.ssh/${PUBKEY_NAME})" "${HOME}/.ssh/authorized_keys"; then
 		echo "$SSH_AUTH_LINE" >> "${HOME}/.ssh/authorized_keys"
 		#echo "from=\"*\",no-port-forwarding,no-X11-forwarding,no-agent-forwarding,no-pty,command=\"$FAKEROOT/usr/local/bin/ssh_filter.sh SomeAlphaNumericToken9\" $(cat ${HOME}/.ssh/id_rsa_local_osync_tests.pub)" >> "${HOME}/.ssh/authorized_keys"
 	fi
@@ -111,6 +111,9 @@ function SetupSSH {
 
 	# Update remote conf files with SSH port
 	sed -i.tmp 's#ssh://.*@localhost:[0-9]*/${HOME}/osync-tests/target#ssh://'$REMOTE_USER'@localhost:'$SSH_PORT'/${HOME}/osync-tests/target#' "$CONF_DIR/$REMOTE_CONF"
+
+	ls "${HOME}/.ssh" -alh
+	cat "${HOME}/.ssh/authorized_keys"
 }
 
 function RemoveSSH {
