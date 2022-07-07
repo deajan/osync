@@ -1,0 +1,28 @@
+name: macosx-tests
+
+on: [push, pull_request]
+
+jobs:
+  build:
+
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [macos-latest]
+    steps:
+    - uses: actions/checkout@v2
+    - name: Install Bash 4
+      run: |
+        /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
+        brew update
+
+        brew install bash
+        brew install gnu-sed
+        echo "/usr/local/bin" >> $GITHUB_PATH
+    - name: Execute tests and generate coverage report
+      env:
+        RUNNING_ON_GITHUB_ACTIONS: true
+      run: |
+        bash ./dev/tests/run_tests.sh
+    - name: Upload Coverage to Codecov
+      uses: codecov/codecov-action@v1
