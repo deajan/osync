@@ -20,6 +20,7 @@ jobs:
       env:
         RUNNING_ON_GITHUB_ACTIONS: true
       run: |
+         find . -type f -print0 | xargs -0 -n 1 -P 4 dos2unix
          ./dev/tests/run_tests.sh
     - name: Upload Coverage to Codecov
       uses: codecov/codecov-action@v1
