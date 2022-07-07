@@ -1,4 +1,4 @@
-name: linux-tests
+name: macosx-tests
 
 on: [push, pull_request]
 
@@ -8,12 +8,17 @@ jobs:
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
-        os: [ubuntu-latest]
+        os: [macos-latest]
     steps:
     - uses: actions/checkout@v2
-    - name: Install dependencies
+    - name: Install Bash 4
       run: |
-        sudo apt-get install inotify-tools acl
+        /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
+        brew update
+
+        brew install bash
+        brew install gnu-sed
+        echo "/usr/local/bin" >> $GITHUB_PATH
     - name: Execute tests and generate coverage report
       env:
         RUNNING_ON_GITHUB_ACTIONS: true

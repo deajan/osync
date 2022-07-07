@@ -1,4 +1,4 @@
-name: linux-tests
+name: windows-tests
 
 on: [push, pull_request]
 
@@ -8,16 +8,15 @@ jobs:
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
-        os: [ubuntu-latest]
+        os: [windows-latest]
     steps:
     - uses: actions/checkout@v2
-    - name: Install dependencies
-      run: |
-        sudo apt-get install inotify-tools acl
+    - uses: Vampire/setup-wsl@v1
     - name: Execute tests and generate coverage report
+      shell: wsl-bash {0}
       env:
         RUNNING_ON_GITHUB_ACTIONS: true
       run: |
-        bash ./dev/tests/run_tests.sh
+         ./dev/tests/run_tests.sh
     - name: Upload Coverage to Codecov
       uses: codecov/codecov-action@v1
