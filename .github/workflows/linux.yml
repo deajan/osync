@@ -12,7 +12,7 @@ jobs:
     steps:
     - name: Install dependencies
       run: |
-        sudo apt-get intall inotify-tools acl
+        sudo apt-get install inotify-tools acl
     - name: Execute tests and generate coverage report
       env:
         RUNNING_ON_GITHUB_ACTIONS: true
