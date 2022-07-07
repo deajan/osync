@@ -1,0 +1,23 @@
+name: linux-tests
+
+on: [push, pull_request]
+
+jobs:
+  build:
+
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ubuntu-latest]
+    steps:
+    - name: Install dependencies
+      run: |
+        sudo apt-get install inotify-tools acl
+    - name: Execute tests and generate coverage report
+      env:
+        RUNNING_ON_GITHUB_ACTIONS: true
+      run: |
+        ls -alh ./
+        sh ./dev/tests/run_tests.sh
+    - name: Upload Coverage to Codecov
+      uses: codecov/codecov-action@v1
