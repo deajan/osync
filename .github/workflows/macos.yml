@@ -17,7 +17,7 @@ jobs:
         brew update
 
         brew install bash
-        brew install gnu-sed
+        brew install fswatch
         echo "/usr/local/bin" >> $GITHUB_PATH
     - name: Execute tests and generate coverage report
       env:
