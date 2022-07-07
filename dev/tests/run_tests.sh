@@ -89,9 +89,10 @@ OSYNC_VERSION=1.x.y
 OSYNC_MIN_VERSION=x
 OSYNC_IS_STABLE=maybe
 
+PRIVKEY_NAME="id_rsa_local_osync_tests"
+PUBKEY_NAME="${PRIVKEY_NAME}.pub"
+
 function SetupSSH {
-	PRIVKEY_NAME="id_rsa_local_osync_tests"
-	PUBKEY_NAME="${PRIVKEY_NAME}.pub"
 	echo -e  'y\n'| ssh-keygen -t rsa -b 2048 -N "" -f "${HOME}/.ssh/${PRIVKEY_NAME}"
 
 	SSH_AUTH_LINE="from=\"*\",no-port-forwarding,no-X11-forwarding,no-agent-forwarding,no-pty,command=\"$FAKEROOT/usr/local/bin/ssh_filter.sh SomeAlphaNumericToken9\" $(cat ${HOME}/.ssh/${PUBKEY_NAME})"
@@ -313,6 +314,14 @@ function oneTimeTearDown () {
 function setUp () {
 	rm -rf "$INITIATOR_DIR"
 	rm -rf "$TARGET_DIR"
+}
+
+function test_SSH {
+	# Make sure we have SSH on your test server
+	echo "Testing SSH"
+
+	# SSH_PORT and SSH_USER are set by oneTimeSetup
+	ssh -i "${PUBKEY_NAME}" -p $SSH_PORT ${REMOTE_USER}@localhost "echo \"Remotely:\"; whoami; ls -alh"
 }
 
 # This test has to be done everytime in order for osync executable to be fresh
