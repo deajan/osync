@@ -10,6 +10,8 @@ jobs:
       matrix:
         os: [ubuntu-latest]
     steps:
+    - name: Checkout git
+    - uses: actions/checkout@v2
     - name: Install dependencies
       run: |
         sudo apt-get install inotify-tools acl
