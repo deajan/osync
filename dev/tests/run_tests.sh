@@ -330,14 +330,14 @@ function test_SSH {
 
 	echo "Running SSH test as ${REMOTE_USER}"
 	# SSH_PORT and SSH_USER are set by oneTimeSetup
-	ssh -i "${PUBKEY_NAME}" -p $SSH_PORT ${REMOTE_USER}@localhost "echo \"Remotely:\"; whoami; echo \"TEST OK\""
+	ssh -i "${REMOTE_USER}/.ssh/${PUBKEY_NAME}" -p $SSH_PORT ${REMOTE_USER}@localhost "echo \"Remotely:\"; whoami; echo \"TEST OK\""
 	if [ $? -ne 0 ]; then
 		echo "SSH test failed"
 		#exit 1
 	fi
 	
 	echo "Running SSH test as $(whoami)"
-	ssh -i "${PUBKEY_NAME}" -p $SSH_PORT $(whoami)@localhost "echo \"Remotely:\"; whoami; echo \"TEST OK\""
+	ssh -i "$(whoami)/.ssh/${PUBKEY_NAME}" -p $SSH_PORT $(whoami)@localhost "echo \"Remotely:\"; whoami; echo \"TEST OK\""
 	if [ $? -ne 0 ]; then
 		echo "SSH test failed"
 		#exit 1
