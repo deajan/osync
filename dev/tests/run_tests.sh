@@ -129,6 +129,7 @@ function SetupSSH {
 }
 
 function RemoveSSH {
+	echo "Now removing SSH keys"
 	if [ -f "${HOME}/.ssh/id_rsa_local_osync_tests" ]; then
 		echo "Restoring SSH authorized_keys file"
 		sed -i.bak "s|.*$(cat "${HOME}/.ssh/id_rsa_local_osync_tests.pub")||g" "${HOME}/.ssh/authorized_keys"
@@ -330,17 +331,20 @@ function test_SSH {
 	echo "Testing SSH"
 
 	failure=false
+	
+	echo "ls -alh ${HOME}/.ssh"
+	ls -alh "${HOME}/.ssh"
 
 	echo "Running SSH test as ${REMOTE_USER}"
 	# SSH_PORT and SSH_USER are set by oneTimeSetup
-	$SUDO_CMD ssh -i "${REMOTE_USER}/.ssh/${PUBKEY_NAME}" -p $SSH_PORT ${REMOTE_USER}@localhost "echo \"Remotely:\"; whoami; echo \"TEST OK\""
+	$SUDO_CMD ssh -i "${REMOTE_USER}/.ssh/${PRIVKEY_NAME}" -p $SSH_PORT ${REMOTE_USER}@localhost "echo \"Remotely:\"; whoami; echo \"TEST OK\""
 	if [ $? -ne 0 ]; then
 		echo "SSH test failed"
 		failure=true
 	fi
 	
 	echo "Running SSH test as $(whoami)"
-	$SUDO_CMD ssh -i "$(whoami)/.ssh/${PUBKEY_NAME}" -p $SSH_PORT $(whoami)@localhost "echo \"Remotely:\"; whoami; echo \"TEST OK\""
+	$SUDO_CMD ssh -i "$(whoami)/.ssh/${PRIVKEY_NAME}" -p $SSH_PORT $(whoami)@localhost "echo \"Remotely:\"; whoami; echo \"TEST OK\""
 	if [ $? -ne 0 ]; then
 		echo "SSH test failed"
 		failure=true
