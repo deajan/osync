@@ -326,28 +326,34 @@ function setUp () {
 
 function test_SSH {
 	# Make sure we have SSH on your test server
+	# This has become kind of tricky on github actions servers
 	echo "Testing SSH"
+
+	failure=false
 
 	echo "Running SSH test as ${REMOTE_USER}"
 	# SSH_PORT and SSH_USER are set by oneTimeSetup
 	ssh -i "${REMOTE_USER}/.ssh/${PUBKEY_NAME}" -p $SSH_PORT ${REMOTE_USER}@localhost "echo \"Remotely:\"; whoami; echo \"TEST OK\""
 	if [ $? -ne 0 ]; then
 		echo "SSH test failed"
-		#exit 1
+		failure=true
 	fi
 	
 	echo "Running SSH test as $(whoami)"
 	ssh -i "$(whoami)/.ssh/${PUBKEY_NAME}" -p $SSH_PORT $(whoami)@localhost "echo \"Remotely:\"; whoami; echo \"TEST OK\""
 	if [ $? -ne 0 ]; then
 		echo "SSH test failed"
-		#exit 1
+		failure=true
 	fi
 	
-		
+	if [ $failure == true ]; then
+		exit 1 # Try to see if we can abort all tests
+		assertEquals "Test SSH failed" false $failure
+	fi
 }
 
 # This test has to be done everytime in order for osync executable to be fresh
-function xtest_Merge () {
+function test_Merge () {
 	cd "$DEV_DIR"
 	./merge.sh osync
 	assertEquals "Merging code" "0" $?
