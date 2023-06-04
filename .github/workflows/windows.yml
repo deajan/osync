@@ -15,6 +15,7 @@ jobs:
       with:
         additional-packages:
           dos2unix
+          rsync
     - name: Execute tests and generate coverage report
       shell: wsl-bash {0}
       env:
