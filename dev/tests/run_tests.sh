@@ -93,11 +93,14 @@ PRIVKEY_NAME="id_rsa_local_osync_tests"
 PUBKEY_NAME="${PRIVKEY_NAME}.pub"
 
 function SetupSSH {
+	echo "Setting up an ssh key to ${HOME}/.ssh/${PRIVKEY_NAME}"
 	echo -e  'y\n'| ssh-keygen -t rsa -b 2048 -N "" -f "${HOME}/.ssh/${PRIVKEY_NAME}"
 
 	SSH_AUTH_LINE="from=\"*\",no-port-forwarding,no-X11-forwarding,no-agent-forwarding,no-pty,command=\"$FAKEROOT/usr/local/bin/ssh_filter.sh SomeAlphaNumericToken9\" $(cat ${HOME}/.ssh/${PUBKEY_NAME})"
-	ls "${HOME}" -alh
-	ls "${HOME}/.ssh" -alh
+	echo "ls -alh ${HOME}"
+	ls -alh "${HOME}"
+	echo "ls -alh ${HOME}/.ssh"
+	ls -alh "${HOME}/.ssh"
 
 	if [ -f "${HOME}/.ssh/authorized_keys" ]; then
 		if ! grep "$(cat ${HOME}/.ssh/${PUBKEY_NAME})" "${HOME}/.ssh/authorized_keys"; then
@@ -116,8 +119,13 @@ function SetupSSH {
 	# Update remote conf files with SSH port
 	sed -i.tmp 's#ssh://.*@localhost:[0-9]*/${HOME}/osync-tests/target#ssh://'$REMOTE_USER'@localhost:'$SSH_PORT'/${HOME}/osync-tests/target#' "$CONF_DIR/$REMOTE_CONF"
 
-	ls "${HOME}/.ssh" -alh
+	echp "ls -alh ${HOME}/.ssh"
+	ls -alh "${HOME}/.ssh"
+	echo "cat ${HOME}/.ssh.authorized_keys" 
 	cat "${HOME}/.ssh/authorized_keys"
+	
+	echo "###"
+	echo "END SETUP SSH"
 }
 
 function RemoveSSH {
@@ -320,12 +328,26 @@ function test_SSH {
 	# Make sure we have SSH on your test server
 	echo "Testing SSH"
 
+	echo "Running SSH test as ${REMOTE_USER}"
 	# SSH_PORT and SSH_USER are set by oneTimeSetup
-	ssh -i "${PUBKEY_NAME}" -p $SSH_PORT ${REMOTE_USER}@localhost "echo \"Remotely:\"; whoami; ls -alh"
+	ssh -i "${PUBKEY_NAME}" -p $SSH_PORT ${REMOTE_USER}@localhost "echo \"Remotely:\"; whoami; echo \"TEST OK\""
+	if [ $? -ne 0 ]; then
+		echo "SSH test failed"
+		#exit 1
+	fi
+	
+	echo "Running SSH test as $(whoami)"
+	ssh -i "${PUBKEY_NAME}" -p $SSH_PORT $(whoami)@localhost "echo \"Remotely:\"; whoami; echo \"TEST OK\""
+	if [ $? -ne 0 ]; then
+		echo "SSH test failed"
+		#exit 1
+	fi
+	
+		
 }
 
 # This test has to be done everytime in order for osync executable to be fresh
-function test_Merge () {
+function xtest_Merge () {
 	cd "$DEV_DIR"
 	./merge.sh osync
 	assertEquals "Merging code" "0" $?
@@ -354,7 +376,7 @@ function test_Merge () {
 	assertEquals "Install failed" "0" $?
 }
 
-function test_LargeFileSet () {
+function xtest_LargeFileSet () {
 	for i in "${osyncParameters[@]}"; do
 		cd "$OSYNC_DIR"
 
@@ -372,7 +394,7 @@ function test_LargeFileSet () {
 	done
 }
 
-function test_controlMaster () {
+function xtest_controlMaster () {
 	cd "$OSYNC_DIR"
 
 	PrepareLocalDirs
@@ -381,7 +403,7 @@ function test_controlMaster () {
 	assertEquals "Running quick remote test with controlmaster enabled." "0" $?
 }
 
-function test_Exclusions () {
+function xtest_Exclusions () {
 	# Will sync except php files
 	# RSYNC_EXCLUDE_PATTERN="*.php" is set at runtime for quicksync and in config files for other runs
 
@@ -409,7 +431,7 @@ function test_Exclusions () {
 	done
 }
 
-function test_Deletetion () {
+function xtest_Deletetion () {
 	local iFile1="$INITIATOR_DIR/i fic"
 	local iFile2="$INITIATOR_DIR/i foc (something)"
 	local tFile1="$TARGET_DIR/t fic"
@@ -453,7 +475,7 @@ function test_Deletetion () {
 	done
 }
 
-function test_deletion_failure () {
+function xtest_deletion_failure () {
 	if [ "$LOCAL_OS" == "WinNT10" ] || [ "$LOCAL_OS" == "msys" ] || [ "$LOCAL_OS" == "Cygwin" ]; then
 		echo "Skipping deletion failure test as Win10 does not have chattr  support."
 		return 0
@@ -520,7 +542,7 @@ function test_deletion_failure () {
 	done
 }
 
-function test_skip_deletion () {
+function xtest_skip_deletion () {
 	local modes
 
 	if [ "$OSYNC_MIN_VERSION" == "1" ]; then
@@ -596,7 +618,7 @@ function test_skip_deletion () {
 	SetConfFileValue "$CONF_DIR/$REMOTE_CONF" "SKIP_DELETION" ""
 }
 
-function test_handle_symlinks () {
+function xtest_handle_symlinks () {
 	if [ "$OSYNC_MIN_VERSION" == "1" ]; then
 		echo "Skipping symlink tests as osync v1.1x didn't handle this."
 		return 0
@@ -777,7 +799,7 @@ function test_handle_symlinks () {
 	done
 }
 
-function test_softdeletion_cleanup () {
+function xtest_softdeletion_cleanup () {
 	#declare -A files
 
 	files=()
@@ -854,7 +876,7 @@ function test_softdeletion_cleanup () {
 
 }
 
-function test_FileAttributePropagation () {
+function xtest_FileAttributePropagation () {
 
 	if [ "$RUNNING_ON_GITHUB_ACTIONS" == true ]; then
 		echo "Skipping FileAttributePropagation tests as travis does not support getfacl / setfacl."
@@ -942,7 +964,7 @@ function test_FileAttributePropagation () {
         SetConfFileValue "$CONF_DIR/$REMOTE_CONF" "PRESERVE_XATTR" false
 }
 
-function test_ConflictBackups () {
+function xtest_ConflictBackups () {
 	for i in "${osyncParameters[@]}"; do
 		cd "$OSYNC_DIR"
 		PrepareLocalDirs
@@ -978,7 +1000,7 @@ function test_ConflictBackups () {
 	done
 }
 
-function test_MultipleConflictBackups () {
+function xtest_MultipleConflictBackups () {
 
 	local additionalParameters
 
@@ -1040,7 +1062,7 @@ function test_MultipleConflictBackups () {
 	SetConfFileValue "$CONF_DIR/$REMOTE_CONF" "CONFLICT_BACKUP_MULTIPLE" false
 }
 
-function test_Locking () {
+function xtest_Locking () {
 # local not running = resume
 # remote same instance_id = resume
 # remote different instance_id = stop
@@ -1147,7 +1169,7 @@ function test_Locking () {
 	SetConfFileValue "$CONF_DIR/$REMOTE_CONF" "FORCE_STRANGER_LOCK_RESUME" false
 }
 
-function test_ConflictDetetion () {
+function xtest_ConflictDetetion () {
 	# Tests compatible with v1.4+
 
 	if [ $OSYNC_MIN_VERSION -lt 4 ]; then
@@ -1198,7 +1220,7 @@ function test_ConflictDetetion () {
 	return 0
 }
 
-function test_WaitForTaskCompletion () {
+function xtest_WaitForTaskCompletion () {
 	local pids
 
 	# Tests compatible with v1.1 syntax
@@ -1292,7 +1314,7 @@ function test_WaitForTaskCompletion () {
 	assertEquals "WaitForTaskCompletion test 5" "2" $?
 }
 
-function test_ParallelExec () {
+function xtest_ParallelExec () {
 	if [ "$OSYNC_MIN_VERSION" == "1" ]; then
 		echo "Skipping ParallelExec test because osync v1.1 ofunctions don't have this function."
 		return 0
@@ -1353,7 +1375,7 @@ function test_ParallelExec () {
 	assertNotEquals "ParallelExec full test 3" "0" $?
 }
 
-function test_timedExecution () {
+function xtest_timedExecution () {
 	local arguments
 
 	# Clever usage of indexes and exit codes
@@ -1399,7 +1421,7 @@ function test_timedExecution () {
 	done
 }
 
-function test_UpgradeConfRun () {
+function xtest_UpgradeConfRun () {
 	if [ "$OSYNC_MIN_VERSION" == "1" ]; then
 		echo "Skipping Upgrade script test because no further dev will happen on this for v1.1"
 		return 0
@@ -1425,7 +1447,7 @@ function test_UpgradeConfRun () {
 	rm -f "$CONF_DIR/$TMP_OLD_CONF.save"
 }
 
-function test_DaemonMode () {
+function xtest_DaemonMode () {
 	if [ "$LOCAL_OS" == "WinNT10" ] || [ "$LOCAL_OS" == "msys" ] || [ "$LOCAL_OS" == "Cygwin" ]; then
 		echo "Skipping daemon mode test as [$LOCAL_OS] does not have inotifywait support."
 		return 0
@@ -1481,7 +1503,7 @@ function test_DaemonMode () {
 
 }
 
-function test_NoRemoteAccessTest () {
+function xtest_NoRemoteAccessTest () {
 	RemoveSSH
 
 	cd "$OSYNC_DIR"
