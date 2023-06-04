@@ -2477,8 +2477,16 @@ function FileMove () {
 		mv -f "$source" "$dest"
 		return $?
 	elif [ -w "$source" ]; then
-		[ -f "$dest" ] && rm -f "$dest"
-		cp -p "$source" "$dest" && rm -f "$source"
+		if [ -f "$dest" ]; then # for files we don't need recursive delete
+			rm -f "$dest"
+		elif [ -d "$dest" ]; then # for directories we need recursive delete
+			rm -rf "$dest"
+		fi
+		if [ -f "$source" ]; then
+			cp -p "$source" "$dest" && rm -f "$source" # for files we don't need recursive copy & delete
+		elif [ -d "$source" ]; then
+			cp -rp "$source" "$dest" && rm -rf "$source" # for directories we need recursive copy & delete
+		fi
 		return $?
 	else
 		return -1
@@ -4865,8 +4873,16 @@ function FileMove () {
 		mv -f "$source" "$dest"
 		return $?
 	elif [ -w "$source" ]; then
-		[ -f "$dest" ] && rm -f "$dest"
-		cp -p "$source" "$dest" && rm -f "$source"
+		if [ -f "$dest" ]; then # for files we don't need recursive delete
+			rm -f "$dest"
+		elif [ -d "$dest" ]; then # for directories we need recursive delete
+			rm -rf "$dest"
+		fi
+		if [ -f "$source" ]; then
+			cp -p "$source" "$dest" && rm -f "$source" # for files we don't need recursive copy & delete
+		elif [ -d "$source" ]; then
+			cp -rp "$source" "$dest" && rm -rf "$source" # for directories we need recursive copy & delete
+		fi
 		return $?
 	else
 		return -1
