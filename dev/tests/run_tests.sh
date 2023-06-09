@@ -331,20 +331,27 @@ function test_SSH {
 	echo "Testing SSH"
 
 	failure=false
-	
-	echo "ls -alh ${HOME}/.ssh"
-	ls -alh "${HOME}/.ssh"
+
+	# Testing as "remote user"
+	homedir=$( getent passwd "${REMOTE_USER}" | cut -d: -f6 )
+	echo "ls -alh ${homedir}/.ssh"
+	ls -alh "${homedir}/.ssh"
 
 	echo "Running SSH test as ${REMOTE_USER}"
 	# SSH_PORT and SSH_USER are set by oneTimeSetup
-	$SUDO_CMD ssh -i "${REMOTE_USER}/.ssh/${PRIVKEY_NAME}" -p $SSH_PORT ${REMOTE_USER}@localhost "echo \"Remotely:\"; whoami; echo \"TEST OK\""
+	$SUDO_CMD ssh -i "${homedir}/.ssh/${PRIVKEY_NAME}" -p $SSH_PORT ${REMOTE_USER}@localhost "echo \"Remotely:\"; whoami; echo \"TEST OK\""
 	if [ $? -ne 0 ]; then
 		echo "SSH test failed"
 		failure=true
 	fi
+
+	" Testing as current user
+	homedir=$( getent passwd "$(whoami)" | cut -d: -f6 )
+	echo "ls -alh ${homedir}/.ssh"
+	ls -alh "${homedir}/.ssh"
 	
 	echo "Running SSH test as $(whoami)"
-	$SUDO_CMD ssh -i "$(whoami)/.ssh/${PRIVKEY_NAME}" -p $SSH_PORT $(whoami)@localhost "echo \"Remotely:\"; whoami; echo \"TEST OK\""
+	$SUDO_CMD ssh -i "$(homedir)/.ssh/${PRIVKEY_NAME}" -p $SSH_PORT $(whoami)@localhost "echo \"Remotely:\"; whoami; echo \"TEST OK\""
 	if [ $? -ne 0 ]; then
 		echo "SSH test failed"
 		failure=true
