@@ -19,11 +19,10 @@ jobs:
           openssh-server
     - name: Execute tests and generate coverage report
       shell: wsl-bash {0}
-      env:
-        RUNNING_ON_GITHUB_ACTIONS: true
-        SSH_PORT: 22
       run: |
-         find . -type f ! -name ".git*" -print0 | xargs -0 -n 1 -P 4 dos2unix
+        RUNNING_ON_GITHUB_ACTIONS=true
+        SSH_PORT=22
+         find . -type f -not -path ".git/*" -print0 | xargs -0 -n 1 -P 4 dos2unix
          service ssh start
          ./dev/tests/run_tests.sh
     - name: Upload Coverage to Codecov

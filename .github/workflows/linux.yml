@@ -15,10 +15,9 @@ jobs:
       run: |
         sudo apt-get install inotify-tools acl
     - name: Execute tests and generate coverage report
-      env:
-        RUNNING_ON_GITHUB_ACTIONS: true
-        SSH_PORT: 22
       run: |
+        export RUNNING_ON_GITHUB_ACTIONS=true
+        export SSH_PORT=22
         sudo bash ./dev/tests/run_tests.sh
     - name: Upload Coverage to Codecov
       uses: codecov/codecov-action@v1
