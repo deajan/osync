@@ -31,8 +31,8 @@
 #### OFUNCTIONS FULL SUBSET ####
 #### OFUNCTIONS MINI SUBSET ####
 #### OFUNCTIONS MICRO SUBSET ####
-_OFUNCTIONS_VERSION=2.4.4
-_OFUNCTIONS_BUILD=2022081901
+_OFUNCTIONS_VERSION=2.5.0
+_OFUNCTIONS_BUILD=2023061001
 #### _OFUNCTIONS_BOOTSTRAP SUBSET ####
 _OFUNCTIONS_BOOTSTRAP=true
 #### _OFUNCTIONS_BOOTSTRAP SUBSET END ####
@@ -58,6 +58,7 @@ _LOGGER_VERBOSE=false
 _LOGGER_ERR_ONLY=false
 _LOGGER_PREFIX="date"
 _LOGGER_WRITE_PARTIAL_LOGS=false			# Writes partial log files to /tmp so sending logs via alerts can feed on them
+_OFUNCTIONS_SHOW_SPINNER=true				# Show spinner in ExecTasks function
 if [ "$KEEP_LOGGING" == "" ]; then
 	KEEP_LOGGING=1801
 fi
@@ -995,7 +996,7 @@ function ExecTasks {
 
 	# soft / hard execution time checks that needs to be a subfunction since it is called both from main loop and from parallelExec sub loop
 	function _ExecTasksTimeCheck {
-		if [ $spinner == true ]; then
+		if [ $spinner == true ] && [ "$_OFUNCTIONS_SHOW_SPINNER" != false ]; then
 			Spinner
 		fi
 		if [ $counting == true ]; then
