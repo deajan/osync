@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-# osync test suite 2023061001
+# osync test suite 2023060901
 
 
 # Allows the following environment variables
@@ -401,7 +401,7 @@ function test_Merge () {
 	assertEquals "Install failed" "0" $?
 }
 
-function xtest_LargeFileSet () {
+function test_LargeFileSet () {
 	for i in "${osyncParameters[@]}"; do
 		cd "$OSYNC_DIR"
 
@@ -419,7 +419,7 @@ function xtest_LargeFileSet () {
 	done
 }
 
-function xtest_controlMaster () {
+function test_controlMaster () {
 	cd "$OSYNC_DIR"
 
 	PrepareLocalDirs
@@ -428,7 +428,7 @@ function xtest_controlMaster () {
 	assertEquals "Running quick remote test with controlmaster enabled." "0" $?
 }
 
-function xtest_Exclusions () {
+function test_Exclusions () {
 	# Will sync except php files
 	# RSYNC_EXCLUDE_PATTERN="*.php" is set at runtime for quicksync and in config files for other runs
 
@@ -456,7 +456,7 @@ function xtest_Exclusions () {
 	done
 }
 
-function xtest_Deletetion () {
+function test_Deletetion () {
 	local iFile1="$INITIATOR_DIR/i fic"
 	local iFile2="$INITIATOR_DIR/i foc (something)"
 	local tFile1="$TARGET_DIR/t fic"
@@ -500,7 +500,7 @@ function xtest_Deletetion () {
 	done
 }
 
-function xtest_deletion_failure () {
+function test_deletion_failure () {
 	if [ "$LOCAL_OS" == "WinNT10" ] || [ "$LOCAL_OS" == "msys" ] || [ "$LOCAL_OS" == "Cygwin" ]; then
 		echo "Skipping deletion failure test as Win10 does not have chattr  support."
 		return 0
@@ -567,7 +567,7 @@ function xtest_deletion_failure () {
 	done
 }
 
-function xtest_skip_deletion () {
+function test_skip_deletion () {
 	local modes
 
 	if [ "$OSYNC_MIN_VERSION" == "1" ]; then
@@ -643,7 +643,7 @@ function xtest_skip_deletion () {
 	SetConfFileValue "$CONF_DIR/$REMOTE_CONF" "SKIP_DELETION" ""
 }
 
-function xtest_handle_symlinks () {
+function test_handle_symlinks () {
 	if [ "$OSYNC_MIN_VERSION" == "1" ]; then
 		echo "Skipping symlink tests as osync v1.1x didn't handle this."
 		return 0
@@ -824,7 +824,7 @@ function xtest_handle_symlinks () {
 	done
 }
 
-function xtest_softdeletion_cleanup () {
+function test_softdeletion_cleanup () {
 	#declare -A files
 
 	files=()
@@ -901,7 +901,7 @@ function xtest_softdeletion_cleanup () {
 
 }
 
-function xtest_FileAttributePropagation () {
+function test_FileAttributePropagation () {
 
 	if [ "$RUNNING_ON_GITHUB_ACTIONS" == true ]; then
 		echo "Skipping FileAttributePropagation tests as travis does not support getfacl / setfacl."
@@ -989,7 +989,7 @@ function xtest_FileAttributePropagation () {
         SetConfFileValue "$CONF_DIR/$REMOTE_CONF" "PRESERVE_XATTR" false
 }
 
-function xtest_ConflictBackups () {
+function test_ConflictBackups () {
 	for i in "${osyncParameters[@]}"; do
 		cd "$OSYNC_DIR"
 		PrepareLocalDirs
@@ -1025,7 +1025,7 @@ function xtest_ConflictBackups () {
 	done
 }
 
-function xtest_MultipleConflictBackups () {
+function test_MultipleConflictBackups () {
 
 	local additionalParameters
 
@@ -1087,7 +1087,7 @@ function xtest_MultipleConflictBackups () {
 	SetConfFileValue "$CONF_DIR/$REMOTE_CONF" "CONFLICT_BACKUP_MULTIPLE" false
 }
 
-function xtest_Locking () {
+function test_Locking () {
 # local not running = resume
 # remote same instance_id = resume
 # remote different instance_id = stop
@@ -1194,7 +1194,7 @@ function xtest_Locking () {
 	SetConfFileValue "$CONF_DIR/$REMOTE_CONF" "FORCE_STRANGER_LOCK_RESUME" false
 }
 
-function xtest_ConflictDetetion () {
+function test_ConflictDetetion () {
 	# Tests compatible with v1.4+
 
 	if [ $OSYNC_MIN_VERSION -lt 4 ]; then
@@ -1245,7 +1245,7 @@ function xtest_ConflictDetetion () {
 	return 0
 }
 
-function xtest_WaitForTaskCompletion () {
+function test_WaitForTaskCompletion () {
 	local pids
 
 	# Tests compatible with v1.1 syntax
@@ -1339,7 +1339,7 @@ function xtest_WaitForTaskCompletion () {
 	assertEquals "WaitForTaskCompletion test 5" "2" $?
 }
 
-function xtest_ParallelExec () {
+function test_ParallelExec () {
 	if [ "$OSYNC_MIN_VERSION" == "1" ]; then
 		echo "Skipping ParallelExec test because osync v1.1 ofunctions don't have this function."
 		return 0
@@ -1400,7 +1400,7 @@ function xtest_ParallelExec () {
 	assertNotEquals "ParallelExec full test 3" "0" $?
 }
 
-function xtest_timedExecution () {
+function test_timedExecution () {
 	local arguments
 
 	# Clever usage of indexes and exit codes
@@ -1446,7 +1446,7 @@ function xtest_timedExecution () {
 	done
 }
 
-function xtest_UpgradeConfRun () {
+function test_UpgradeConfRun () {
 	if [ "$OSYNC_MIN_VERSION" == "1" ]; then
 		echo "Skipping Upgrade script test because no further dev will happen on this for v1.1"
 		return 0
@@ -1472,7 +1472,7 @@ function xtest_UpgradeConfRun () {
 	rm -f "$CONF_DIR/$TMP_OLD_CONF.save"
 }
 
-function xtest_DaemonMode () {
+function test_DaemonMode () {
 	if [ "$LOCAL_OS" == "WinNT10" ] || [ "$LOCAL_OS" == "msys" ] || [ "$LOCAL_OS" == "Cygwin" ]; then
 		echo "Skipping daemon mode test as [$LOCAL_OS] does not have inotifywait support."
 		return 0
@@ -1528,7 +1528,7 @@ function xtest_DaemonMode () {
 
 }
 
-function xtest_NoRemoteAccessTest () {
+function test_NoRemoteAccessTest () {
 	RemoveSSH
 
 	cd "$OSYNC_DIR"
