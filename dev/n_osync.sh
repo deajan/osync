@@ -6,8 +6,8 @@
 PROGRAM="osync" # Rsync based two way sync engine with fault tolerance
 AUTHOR="(C) 2013-2022 by Orsiris de Jong"
 CONTACT="http://www.netpower.fr/osync - ozy@netpower.fr"
-PROGRAM_VERSION=1.3.0-rc3
-PROGRAM_BUILD=2021062901
+PROGRAM_VERSION=1.3.0-rc4-dev
+PROGRAM_BUILD=2023061001
 IS_STABLE=true
 
 CONFIG_FILE_REVISION_REQUIRED=1.3.0
@@ -2898,6 +2898,7 @@ function Usage {
 	echo "--no-prefix            Will suppress time / date suffix from output"
 	echo "--silent               Will run osync without any output to stdout, used for cron jobs"
 	echo "--errors-only          Output only errors (can be combined with silent or verbose)"
+	echo "--non-interactive      Don't show running animation in cron / service mode"
 	echo "--summary              Outputs a list of transferred / deleted files at the end of the run"
 	echo "--log-conflicts        [EXPERIMENTAL] Outputs a list of conflicted files"
 	echo "--alert-conflicts      Send an email if conflictual files found (implies --log-conflicts)"
@@ -3173,6 +3174,10 @@ function GetCommandlineArguments {
 			--errors-only)
 			opts=$opts" --errors-only"
 			_LOGGER_ERR_ONLY=true
+			;;
+			--non-interactive)
+			opts$opts" --non-interactive"
+			_OFUNCTIONS_SHOW_SPINNER=false
 			;;
 			--summary)
 			opts=$opts" --summary"
