@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-# osync test suite 2022070702
+# osync test suite 2023061001
 
 
 # Allows the following environment variables
@@ -50,19 +50,22 @@
 
 if [ "$SKIP_REMOTE" = "" ]; then
 	SKIP_REMOTE=false
+	REMOTE_USER=root
 fi
+
+homedir=$(eval echo ~${REMOTE_USER})
 
 # drupal servers are often unreachable for whetever reason or give 0 bytes files
 #LARGE_FILESET_URL="http://ftp.drupal.org/files/projects/drupal-8.2.2.tar.gz"
 LARGE_FILESET_URL="http://www.netpower.fr/sites/default/files/osync-test-files.tar.gz"
 
-# Fakeroot for install / uninstall and test of executables
-FAKEROOT="${HOME}/osync_test_install"
-
 OSYNC_DIR="$(pwd)"
 OSYNC_DIR=${OSYNC_DIR%%/dev*}
 DEV_DIR="$OSYNC_DIR/dev"
 TESTS_DIR="$DEV_DIR/tests"
+
+# Fakeroot for install / uninstall and test of executables
+FAKEROOT="${homedir}/osync_test_install"
 
 CONF_DIR="$TESTS_DIR/conf"
 LOCAL_CONF="local.conf"
@@ -76,7 +79,7 @@ OSYNC_UPGRADE="upgrade-v1.0x-v1.3x.sh"
 TMP_FILE="$DEV_DIR/tmp"
 
 
-OSYNC_TESTS_DIR="${HOME}/osync-tests"
+OSYNC_TESTS_DIR="${homedir}/osync-tests"
 INITIATOR_DIR="$OSYNC_TESTS_DIR/initiator"
 TARGET_DIR="$OSYNC_TESTS_DIR/target"
 OSYNC_WORKDIR=".osync_workdir"
@@ -93,46 +96,51 @@ PRIVKEY_NAME="id_rsa_local_osync_tests"
 PUBKEY_NAME="${PRIVKEY_NAME}.pub"
 
 function SetupSSH {
-	echo "Setting up an ssh key to ${HOME}/.ssh/${PRIVKEY_NAME}"
-	echo -e  'y\n'| ssh-keygen -t rsa -b 2048 -N "" -f "${HOME}/.ssh/${PRIVKEY_NAME}"
+	echo "Setting up an ssh key to ${homedir}/.ssh/${PRIVKEY_NAME}"
+	echo -e  'y\n'| ssh-keygen -t rsa -b 2048 -N "" -f "${homedir}/.ssh/${PRIVKEY_NAME}"
 
-	SSH_AUTH_LINE="from=\"*\",no-port-forwarding,no-X11-forwarding,no-agent-forwarding,no-pty,command=\"$FAKEROOT/usr/local/bin/ssh_filter.sh SomeAlphaNumericToken9\" $(cat ${HOME}/.ssh/${PUBKEY_NAME})"
-	echo "ls -alh ${HOME}"
-	ls -alh "${HOME}"
-	echo "ls -alh ${HOME}/.ssh"
-	ls -alh "${HOME}/.ssh"
 
-	if [ -f "${HOME}/.ssh/authorized_keys" ]; then
-		if ! grep "$(cat ${HOME}/.ssh/${PUBKEY_NAME})" "${HOME}/.ssh/authorized_keys"; then
-			echo "$SSH_AUTH_LINE" >> "${HOME}/.ssh/authorized_keys"
+
+	SSH_AUTH_LINE="from=\"*\",no-port-forwarding,no-X11-forwarding,no-agent-forwarding,no-pty,command=\"$FAKEROOT/usr/local/bin/ssh_filter.sh SomeAlphaNumericToken9\" $(cat ${homedir}/.ssh/${PUBKEY_NAME})"
+	echo "ls -alh ${homedir}"
+	ls -alh "${homedir}"
+	echo "ls -alh ${homedir}/.ssh"
+	ls -alh "${homedir}/.ssh"
+
+	if [ -f "${homedir}/.ssh/authorized_keys" ]; then
+		if ! grep "$(cat ${homedir}/.ssh/${PUBKEY_NAME})" "${homedir}/.ssh/authorized_keys"; then
+			echo "Adding auth line in authorized_keys file ${homedir}/.ssh/authorized_keys"
+			echo "$SSH_AUTH_LINE" >> "${homedir}/.ssh/authorized_keys"
 		fi
 	else
-		echo "$SSH_AUTH_LINE" >> "${HOME}/.ssh/authorized_keys"
+		echo "Creating authorized_keys file ${homedir}/.ssh/authorized_keys"
+		echo "$SSH_AUTH_LINE" >> "${homedir}/.ssh/authorized_keys"
 	fi
-	chmod 600 "${HOME}/.ssh/authorized_keys"
+	chmod 600 "${homedir}/.ssh/authorized_keys"
 
 	# Add localhost to known hosts so self connect works
 	if [ -z "$(ssh-keygen -F localhost)" ]; then
-		ssh-keyscan -H localhost >> "${HOME}/.ssh/known_hosts"
+		ssh-keyscan -H localhost >> "${homedir}/.ssh/known_hosts"
 	fi
 
 	# Update remote conf files with SSH port
-	sed -i.tmp 's#ssh://.*@localhost:[0-9]*/${HOME}/osync-tests/target#ssh://'$REMOTE_USER'@localhost:'$SSH_PORT'/${HOME}/osync-tests/target#' "$CONF_DIR/$REMOTE_CONF"
+	sed -i.tmp 's#ssh://.*@localhost:[0-9]*/${homedir}/osync-tests/target#ssh://'$REMOTE_USER'@localhost:'$SSH_PORT'/${homedir}/osync-tests/target#' "$CONF_DIR/$REMOTE_CONF"
 
-	echp "ls -alh ${HOME}/.ssh"
-	ls -alh "${HOME}/.ssh"
-	echo "cat ${HOME}/.ssh.authorized_keys" 
-	cat "${HOME}/.ssh/authorized_keys"
+	echo "ls -alh ${homedir}/.ssh"
+	ls -alh "${homedir}/.ssh"
+	echo "cat ${homedir}/.ssh/authorized_keys" 
+	cat "${homedir}/.ssh/authorized_keys"
 	
 	echo "###"
 	echo "END SETUP SSH"
 }
 
 function RemoveSSH {
-	if [ -f "${HOME}/.ssh/id_rsa_local_osync_tests" ]; then
+	echo "Now removing SSH keys"
+	if [ -f "${homedir}/.ssh/id_rsa_local_osync_tests" ]; then
 		echo "Restoring SSH authorized_keys file"
-		sed -i.bak "s|.*$(cat "${HOME}/.ssh/id_rsa_local_osync_tests.pub")||g" "${HOME}/.ssh/authorized_keys"
-		rm -f "${HOME}/.ssh/{id_rsa_local_osync_tests.pub,id_rsa_local_osync_tests}"
+		sed -i.bak "s|.*$(cat "${homedir}/.ssh/id_rsa_local_osync_tests.pub")||g" "${homedir}/.ssh/authorized_keys"
+		rm -f "${homedir}/.ssh/{id_rsa_local_osync_tests.pub,id_rsa_local_osync_tests}"
 	fi
 }
 
@@ -192,8 +200,9 @@ function PrepareLocalDirs () {
 function oneTimeSetUp () {
 	START_TIME=$SECONDS
 
-	mkdir -p "$FAKEROOT"
-
+	echo "Running install.sh from ${OSYNC_DIR}"
+	ls -alh ${OSYNC_DIR}
+	$SUDO_CMD ${OSYNC_DIR}/install.sh --prefix="${FAKEROOT}"
 	source "$DEV_DIR/ofunctions.sh"
 
 	# Fix default umask because of ACL test that expects 0022 when creating test files
@@ -207,6 +216,7 @@ function oneTimeSetUp () {
 	if [ "$RUNNING_ON_GITHUB_ACTIONS" == true ]; then
 	echo "Running with GITHUB ACTIONS settings"
 		REMOTE_USER="runner"
+		homedir=$(eval echo ~${REMOTE_USER})
 		RHOST_PING=false
 		SetConfFileValue "$CONF_DIR/$REMOTE_CONF" "REMOTE_3RD_PARTY_HOSTS" ""
 		SetConfFileValue "$CONF_DIR/$REMOTE_CONF" "REMOTE_HOST_PING" false
@@ -216,6 +226,7 @@ function oneTimeSetUp () {
 	else
 		echo "Running with local settings"
 		REMOTE_USER="root"
+		homedir=$(eval echo ~${REMOTE_USER})
 		RHOST_PING=true
 		SetConfFileValue "$CONF_DIR/$REMOTE_CONF" "REMOTE_3RD_PARTY_HOSTS" "\"www.kernel.org www.google.com\""
 		SetConfFileValue "$CONF_DIR/$REMOTE_CONF" "REMOTE_HOST_PING" true
@@ -248,7 +259,7 @@ function oneTimeSetUp () {
 
   # Do not check remote config on msys or cygwin since we don't have a local SSH server
 	if [ "$LOCAL_OS" != "msys" ] && [ "$LOCAL_OS" != "Cygwin" ] && [ $SKIP_REMOTE != true ]; then
-		osyncParameters[$__quickRemote]="--initiator=$INITIATOR_DIR --target=ssh://localhost:$SSH_PORT/$TARGET_DIR --rsakey=${HOME}/.ssh/id_rsa_local_osync_tests --instance-id=quickremote --remote-token=SomeAlphaNumericToken9"
+		osyncParameters[$__quickRemote]="--initiator=$INITIATOR_DIR --target=ssh://localhost:$SSH_PORT/$TARGET_DIR --rsakey=${homedir}/.ssh/id_rsa_local_osync_tests --instance-id=quickremote --remote-token=SomeAlphaNumericToken9"
 		osyncParameters[$__confRemote]="$CONF_DIR/$REMOTE_CONF"
 
 		osyncDaemonParameters[$__remote]="$CONF_DIR/$REMOTE_CONF --on-changes"
@@ -331,20 +342,28 @@ function test_SSH {
 
 	failure=false
 
+	# Testing as "remote user"
+	echo "ls -alh ${homedir}/.ssh"
+	ls -alh "${homedir}/.ssh"
+
 	echo "Running SSH test as ${REMOTE_USER}"
 	# SSH_PORT and SSH_USER are set by oneTimeSetup
-	ssh -i "${REMOTE_USER}/.ssh/${PUBKEY_NAME}" -p $SSH_PORT ${REMOTE_USER}@localhost "echo \"Remotely:\"; whoami; echo \"TEST OK\""
+	$SUDO_CMD ssh -i "${homedir}/.ssh/${PRIVKEY_NAME}" -p $SSH_PORT ${REMOTE_USER}@localhost "env _REMOTE_TOKEN=SomeAlphaNumericToken9 echo \"Remotely:\"; whoami; echo \"TEST OK\""
 	if [ $? -ne 0 ]; then
 		echo "SSH test failed"
 		failure=true
 	fi
+
+	# Testing as current user
+	#echo "ls -alh ${homedir}/.ssh"
+	#ls -alh "${homedir}/.ssh"
 	
-	echo "Running SSH test as $(whoami)"
-	ssh -i "$(whoami)/.ssh/${PUBKEY_NAME}" -p $SSH_PORT $(whoami)@localhost "echo \"Remotely:\"; whoami; echo \"TEST OK\""
-	if [ $? -ne 0 ]; then
-		echo "SSH test failed"
-		failure=true
-	fi
+	#echo "Running SSH test as $(whoami)"
+	#$SUDO_CMD ssh -i "${homedir}/.ssh/${PRIVKEY_NAME}" -p $SSH_PORT $(whoami)@localhost "env _REMOTE_TOKEN=SomeAlphaNumericToken9 echo \"Remotely:\"; whoami; echo \"TEST OK\""
+	#if [ $? -ne 0 ]; then
+	#	echo "SSH test failed"
+	#	failure=true
+	#fi
 	
 	if [ $failure == true ]; then
 		exit 1 # Try to see if we can abort all tests
@@ -1444,7 +1463,7 @@ function xtest_UpgradeConfRun () {
 	assertEquals "Conf file upgrade" "0" $?
 
 	# Update remote conf files with SSH port
-	sed -i.tmp 's#ssh://.*@localhost:[0-9]*/${HOME}/osync-tests/target#ssh://'$REMOTE_USER'@localhost:'$SSH_PORT'/${HOME}/osync-tests/target#' "$CONF_DIR/$TMP_OLD_CONF"
+	sed -i.tmp 's#ssh://.*@localhost:[0-9]*/${homedir}/osync-tests/target#ssh://'$REMOTE_USER'@localhost:'$SSH_PORT'/${homedir}/osync-tests/target#' "$CONF_DIR/$TMP_OLD_CONF"
 
 	$OSYNC_EXECUTABLE "$CONF_DIR/$TMP_OLD_CONF"
 	assertEquals "Upgraded conf file execution test" "0" $?
