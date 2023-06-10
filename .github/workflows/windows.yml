@@ -21,6 +21,7 @@ jobs:
       shell: wsl-bash {0}
       env:
         RUNNING_ON_GITHUB_ACTIONS: true
+        SSH_PORT=22
       run: |
          find . -type f ! -name ".git*" -print0 | xargs -0 -n 1 -P 4 dos2unix
          service ssh start
