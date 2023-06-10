@@ -17,7 +17,7 @@ jobs:
     - name: Execute tests and generate coverage report
       env:
         RUNNING_ON_GITHUB_ACTIONS: true
-        SSH_PORT=22
+        SSH_PORT: 22
       run: |
         sudo bash ./dev/tests/run_tests.sh
     - name: Upload Coverage to Codecov
