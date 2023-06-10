@@ -238,6 +238,7 @@ function oneTimeSetUp () {
 	# Get default ssh port from env
 	if [ "$SSH_PORT" == "" ]; then
 		SSH_PORT=22
+		echo "Running with SSH_PORT=${SSH_PORT}"
 	fi
 
 	# Setup modes per test
