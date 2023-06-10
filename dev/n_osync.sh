@@ -48,6 +48,7 @@ include #### _OFUNCTIONS_BOOTSTRAP SUBSET ####
 [ "$_OFUNCTIONS_BOOTSTRAP" != true ] && echo "Please use bootstrap.sh to load this dev version of $(basename $0) or build it with merge.sh" && exit 1
 
 _LOGGER_PREFIX="time"
+_LOGGER_WRITE_PARTIAL_LOGS=true
 
 ## Working directory. This directory exists in any replica and contains state files, backups, soft deleted files etc
 OSYNC_DIR=".osync_workdir"
