@@ -20,8 +20,8 @@ jobs:
     - name: Execute tests and generate coverage report
       shell: wsl-bash {0}
       run: |
-        RUNNING_ON_GITHUB_ACTIONS=true
-        SSH_PORT=22
+        export RUNNING_ON_GITHUB_ACTIONS=true
+        export SSH_PORT=22
          find . -type f -not -path ".git/*" -print0 | xargs -0 -n 1 -P 4 dos2unix
          service ssh start
          ./dev/tests/run_tests.sh
