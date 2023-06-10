@@ -124,7 +124,7 @@ function SetupSSH {
 	fi
 
 	# Update remote conf files with SSH port
-	sed -i.tmp 's#ssh://.*@localhost:[0-9]*/${homedir}/osync-tests/target#ssh://'$REMOTE_USER'@localhost:'$SSH_PORT'/${homedir}/osync-tests/target#' "$CONF_DIR/$REMOTE_CONF"
+	sed -i.tmp 's#ssh://.*@localhost:[0-9]*/${HOME}/osync-tests/target#ssh://'$REMOTE_USER'@localhost:'$SSH_PORT'/'${homedir}'/osync-tests/target#' "$CONF_DIR/$REMOTE_CONF"
 
 	echo "ls -alh ${homedir}/.ssh"
 	ls -alh "${homedir}/.ssh"
@@ -215,7 +215,8 @@ function oneTimeSetUp () {
 	# Set some travis related changes
 	if [ "$RUNNING_ON_GITHUB_ACTIONS" == true ]; then
 	echo "Running with GITHUB ACTIONS settings"
-		REMOTE_USER="runner"
+		#REMOTE_USER="runner"
+		REMOTE_USER="root" # WIP
 		homedir=$(eval echo ~${REMOTE_USER})
 		RHOST_PING=false
 		SetConfFileValue "$CONF_DIR/$REMOTE_CONF" "REMOTE_3RD_PARTY_HOSTS" ""
