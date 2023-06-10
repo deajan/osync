@@ -121,7 +121,7 @@ function SetupSSH {
 
 	echp "ls -alh ${HOME}/.ssh"
 	ls -alh "${HOME}/.ssh"
-	echo "cat ${HOME}/.ssh/authorized_keys" 
+	echo "cat ${HOME}/.ssh.authorized_keys" 
 	cat "${HOME}/.ssh/authorized_keys"
 	
 	echo "###"
@@ -333,14 +333,14 @@ function test_SSH {
 
 	echo "Running SSH test as ${REMOTE_USER}"
 	# SSH_PORT and SSH_USER are set by oneTimeSetup
-	ssh -i "${REMOTE_USER}/.ssh/${PRIVKEY_NAME}" -p $SSH_PORT ${REMOTE_USER}@localhost "echo \"Remotely:\"; whoami; echo \"TEST OK\""
+	ssh -i "${REMOTE_USER}/.ssh/${PUBKEY_NAME}" -p $SSH_PORT ${REMOTE_USER}@localhost "echo \"Remotely:\"; whoami; echo \"TEST OK\""
 	if [ $? -ne 0 ]; then
 		echo "SSH test failed"
 		failure=true
 	fi
 	
 	echo "Running SSH test as $(whoami)"
-	ssh -i "$(whoami)/.ssh/${PRIVKEY_NAME}" -p $SSH_PORT $(whoami)@localhost "echo \"Remotely:\"; whoami; echo \"TEST OK\""
+	ssh -i "$(whoami)/.ssh/${PUBKEY_NAME}" -p $SSH_PORT $(whoami)@localhost "echo \"Remotely:\"; whoami; echo \"TEST OK\""
 	if [ $? -ne 0 ]; then
 		echo "SSH test failed"
 		failure=true
