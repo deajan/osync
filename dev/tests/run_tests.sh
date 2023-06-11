@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-# osync test suite 2023060901
+# osync test suite 2023061101
 
 
 # Allows the following environment variables
@@ -79,7 +79,7 @@ OSYNC_UPGRADE="upgrade-v1.0x-v1.3x.sh"
 TMP_FILE="$DEV_DIR/tmp"
 
 
-OSYNC_TESTS_DIR="${homedir}/osync-tests"
+OSYNC_TESTS_DIR="/tmp/osync-tests"
 INITIATOR_DIR="$OSYNC_TESTS_DIR/initiator"
 TARGET_DIR="$OSYNC_TESTS_DIR/target"
 OSYNC_WORKDIR=".osync_workdir"
