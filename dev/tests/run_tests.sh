@@ -200,6 +200,10 @@ function PrepareLocalDirs () {
 function oneTimeSetUp () {
 	START_TIME=$SECONDS
 
+	echo "Running forced merge"
+	cd "${DEV_DIR}"
+	./merge.sh osync
+
 	echo "Running install.sh from ${OSYNC_DIR}"
 	ls -alh ${OSYNC_DIR}
 	$SUDO_CMD ${OSYNC_DIR}/install.sh --prefix="${FAKEROOT}"
