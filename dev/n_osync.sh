@@ -7,7 +7,7 @@ PROGRAM="osync" # Rsync based two way sync engine with fault tolerance
 AUTHOR="(C) 2013-2022 by Orsiris de Jong"
 CONTACT="http://www.netpower.fr/osync - ozy@netpower.fr"
 PROGRAM_VERSION=1.3.0-rc4-dev
-PROGRAM_BUILD=2023061001
+PROGRAM_BUILD=2023061101
 IS_STABLE=true
 
 CONFIG_FILE_REVISION_REQUIRED=1.3.0
@@ -3177,7 +3177,7 @@ function GetCommandlineArguments {
 			_LOGGER_ERR_ONLY=true
 			;;
 			--non-interactive)
-			opts$opts" --non-interactive"
+			opts=$opts" --non-interactive"
 			_OFUNCTIONS_SHOW_SPINNER=false
 			;;
 			--summary)
