@@ -79,7 +79,7 @@ OSYNC_UPGRADE="upgrade-v1.0x-v1.3x.sh"
 TMP_FILE="$DEV_DIR/tmp"
 
 
-OSYNC_TESTS_DIR="/tmp/osync-tests"
+OSYNC_TESTS_DIR="${homedir}/osync-tests"
 INITIATOR_DIR="$OSYNC_TESTS_DIR/initiator"
 TARGET_DIR="$OSYNC_TESTS_DIR/target"
 OSYNC_WORKDIR=".osync_workdir"
@@ -224,6 +224,7 @@ function oneTimeSetUp () {
 
 		SetConfFileValue "$CONF_DIR/$OLD_CONF" "REMOTE_3RD_PARTY_HOSTS" ""
 		SetConfFileValue "$CONF_DIR/$OLD_CONF" "REMOTE_HOST_PING" false
+
 	else
 		echo "Running with local settings"
 		REMOTE_USER="root"
@@ -235,6 +236,17 @@ function oneTimeSetUp () {
 		SetConfFileValue "$CONF_DIR/$OLD_CONF" "REMOTE_3RD_PARTY_HOSTS" "\"www.kernel.org www.google.com\""
 		SetConfFileValue "$CONF_DIR/$OLD_CONF" "REMOTE_HOST_PING" true
 	fi
+
+
+	# Fix test directories for Github actions
+	SetConfFileValue "$CONF_DIR/$LOCAL_CONF" INITIATOR_SYNC_DIR "\"${homedir}/osync-tests/initiator\""
+	SetConfFileValue "$CONF_DIR/$LOCAL_CONF" TARGET_SYNC_DIR "\"${homedir}/osync-tests/target\""
+
+	SetConfFileValue "$CONF_DIR/$REMOTE_CONF" INITIATOR_SYNC_DIR "\"${homedir}/osync-tests/initiator\""
+
+	SetConfFileValue "$CONF_DIR/$OLD_CONF" MASTER_SYNC_DIR "\"${homedir}/osync-tests/initiator\""
+	SetConfFileValue "$CONF_DIR/$OLD_CONF" SLAVE_SYNC_DIR "\"${homedir}/osync-tests/target\""
+
 
 	# Get default ssh port from env
 	if [ "$SSH_PORT" == "" ]; then
@@ -249,8 +261,8 @@ function oneTimeSetUp () {
 	readonly __confRemote=3
 
 	osyncParameters=()
-	osyncParameters[$__quickLocal]="--initiator=$INITIATOR_DIR --target=$TARGET_DIR --instance-id=quicklocal"
-	osyncParameters[$__confLocal]="$CONF_DIR/$LOCAL_CONF"
+	osyncParameters[$__quickLocal]="--initiator=$INITIATOR_DIR --target=$TARGET_DIR --instance-id=quicklocal --non-interactive"
+	osyncParameters[$__confLocal]="$CONF_DIR/$LOCAL_CONF --non-interactive"
 
 	osyncDaemonParameters=()
 
@@ -261,8 +273,8 @@ function oneTimeSetUp () {
 
   # Do not check remote config on msys or cygwin since we don't have a local SSH server
 	if [ "$LOCAL_OS" != "msys" ] && [ "$LOCAL_OS" != "Cygwin" ] && [ $SKIP_REMOTE != true ]; then
-		osyncParameters[$__quickRemote]="--initiator=$INITIATOR_DIR --target=ssh://localhost:$SSH_PORT/$TARGET_DIR --rsakey=${homedir}/.ssh/id_rsa_local_osync_tests --instance-id=quickremote --remote-token=SomeAlphaNumericToken9"
-		osyncParameters[$__confRemote]="$CONF_DIR/$REMOTE_CONF"
+		osyncParameters[$__quickRemote]="--initiator=$INITIATOR_DIR --target=ssh://localhost:$SSH_PORT/$TARGET_DIR --rsakey=${homedir}/.ssh/id_rsa_local_osync_tests --instance-id=quickremote --remote-token=SomeAlphaNumericToken9 --non-interactive"
+		osyncParameters[$__confRemote]="$CONF_DIR/$REMOTE_CONF --non-interactive"
 
 		osyncDaemonParameters[$__remote]="$CONF_DIR/$REMOTE_CONF --on-changes"
 
