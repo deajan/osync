@@ -200,9 +200,9 @@ function PrepareLocalDirs () {
 function oneTimeSetUp () {
 	START_TIME=$SECONDS
 
-	echo "Running forced merge"
-	cd "${DEV_DIR}"
-	$SUDO_CMD ./merge.sh osync
+	#echo "Running forced merge"
+	#cd "${DEV_DIR}"
+	#$SUDO_CMD ./merge.sh osync
 	echo "Setting security for files"
 	$SUDO_CMD find ${OSYNC_DIR} -exec chmod 755 {} \+ 
 
