@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-# osync test suite 2023061101
+# osync test suite 2023061401
 
 
 # Allows the following environment variables
@@ -202,10 +202,13 @@ function oneTimeSetUp () {
 
 	echo "Running forced merge"
 	cd "${DEV_DIR}"
-	./merge.sh osync
+	$SUDO_CMD ./merge.sh osync
+	echo "Setting security for files"
+	$SUDO_CMD find ${OSYNC_DIR} -exec chmod 755 {} \+ 
 
-	echo "Running install.sh from ${OSYNC_DIR}"
+	echo "Show content of osync dir"
 	ls -alh ${OSYNC_DIR}
+	echo "Running install.sh from ${OSYNC_DIR}"
 	$SUDO_CMD ${OSYNC_DIR}/install.sh --prefix="${FAKEROOT}"
 	source "$DEV_DIR/ofunctions.sh"
 
