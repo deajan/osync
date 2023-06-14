@@ -42,8 +42,8 @@ CONFIG_FILE_REVISION_REQUIRED=1.3.0
 #	UnlockReplicas				yes		#__WITH_PARANOIA_DEBUG
 #	CleanUp					no		#__WITH_PARANOIA_DEBUG
 
-_OFUNCTIONS_VERSION=2.5.0
-_OFUNCTIONS_BUILD=2023061001
+_OFUNCTIONS_VERSION=2.5.1
+_OFUNCTIONS_BUILD=2023061401
 _OFUNCTIONS_BOOTSTRAP=true
 
 if ! type "$BASH" > /dev/null; then
@@ -2254,12 +2254,23 @@ function InitRemoteOSDependingSettings {
 
 	## Set rsync default arguments (complete with -r or -d depending on recursivity later)
 	RSYNC_DEFAULT_ARGS="-ltD -8"
+
+	## NPF-MOD: Regarding #242, we need to add --old-args if rsync > 3.2.3
+	#rsync_version=$("${RSYNC_EXECUTABLE}" --version 2>/dev/null| head -1 | awk '{print $3}')
+	#if [ $(VerComp $rsync_version 3.2.3) -eq 1 ]; then
+	#	RSYNC_DEFAULT_ARGS="$RSYNC_DEFAULT_ARGS --old-args"
+	#fi
+	# NPF-MOD: Strangely enough, also happens on RHEL7 rsync 3.1.1
+	# Let's resolve this easier
+	RSYNC_OLD_ARGS=1
+
 	if [ "$_DRYRUN" == true ]; then
 		RSYNC_DRY_ARG="-n"
 		DRY_WARNING="/!\ DRY RUN "
 	else
 		RSYNC_DRY_ARG=""
 	fi
+
 
 	RSYNC_ATTR_ARGS=""
 	if [ "$PRESERVE_PERMISSIONS" != false ]; then
