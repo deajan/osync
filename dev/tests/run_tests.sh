@@ -209,7 +209,7 @@ function oneTimeSetUp () {
 	echo "Show content of osync dir"
 	ls -alh ${OSYNC_DIR}
 	echo "Running install.sh from ${OSYNC_DIR}"
-	$SUDO_CMD ${OSYNC_DIR}/install.sh --prefix="${FAKEROOT}"
+	$SUDO_CMD ${OSYNC_DIR}/install.sh --no-stats --prefix="${FAKEROOT}"
 	source "$DEV_DIR/ofunctions.sh"
 
 	# Fix default umask because of ACL test that expects 0022 when creating test files
