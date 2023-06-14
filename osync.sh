@@ -12,6 +12,35 @@ IS_STABLE=true
 
 CONFIG_FILE_REVISION_REQUIRED=1.3.0
 
+##### Execution order						#__WITH_PARANOIA_DEBUG
+#####	Function Name				Is parallel	#__WITH_PARANOIA_DEBUG
+#	GetLocalOS				no		#__WITH_PARANOIA_DEBUG
+#	InitLocalOSDependingSettings		no		#__WITH_PARANOIA_DEBUG
+#	CheckEnvironment			no		#__WITH_PARANOIA_DEBUG
+#	PreInit					no		#__WITH_PARANOIA_DEBUG
+#	Init					no		#__WITH_PARANOIA_DEBUG
+#	PostInit				no		#__WITH_PARANOIA_DEBUG
+#	GetRemoteOS				no		#__WITH_PARANOIA_DEBUG
+#	InitRemoteOSDependingSettings		no		#__WITH_PARANOIA_DEBUG
+#	CheckReplicas				yes		#__WITH_PARANOIA_DEBUG
+#	RunBeforeHook				yes		#__WITH_PARANOIA_DEBUG
+#	Main					no		#__WITH_PARANOIA_DEBUG
+#	 	HandleLocks			yes		#__WITH_PARANOIA_DEBUG
+#	 	Sync				no		#__WITH_PARANOIA_DEBUG
+#			treeList		yes		#__WITH_PARANOIA_DEBUG
+#			deleteList		yes		#__WITH_PARANOIA_DEBUG
+#			timestampList		yes		#__WITH_PARANOIA_DEBUG
+#			conflictList		no		#__WITH_PARANOIA_DEBUG
+#			syncAttrs		no		#__WITH_PARANOIA_DEBUG
+#			syncUpdate		no		#__WITH_PARANOIA_DEBUG
+#			syncUpdate		no		#__WITH_PARANOIA_DEBUG
+#			deletionPropagation	yes		#__WITH_PARANOIA_DEBUG
+#			treeList		yes		#__WITH_PARANOIA_DEBUG
+#			timestampList		yes		#__WITH_PARANOIA_DEBUG
+#		SoftDelete			yes		#__WITH_PARANOIA_DEBUG
+#	RunAfterHook				yes		#__WITH_PARANOIA_DEBUG
+#	UnlockReplicas				yes		#__WITH_PARANOIA_DEBUG
+#	CleanUp					no		#__WITH_PARANOIA_DEBUG
 
 _OFUNCTIONS_VERSION=2.5.1
 _OFUNCTIONS_BUILD=2023061401
@@ -47,6 +76,10 @@ fi
 ERROR_ALERT=false
 WARN_ALERT=false
 
+## allow function call checks			#__WITH_PARANOIA_DEBUG
+if [ "$_PARANOIA_DEBUG" == true ];then		#__WITH_PARANOIA_DEBUG
+	_DEBUG=true				#__WITH_PARANOIA_DEBUG
+fi						#__WITH_PARANOIA_DEBUG
 
 ## allow debugging from command line with _DEBUG=true
 if [ ! "$_DEBUG" == true ]; then
@@ -211,6 +244,11 @@ function RemoteLogger {
 			_Logger "" "$prefix$value"
 			return
 		fi
+	elif [ "$level" == "PARANOIA_DEBUG" ]; then				#__WITH_PARANOIA_DEBUG
+		if [ "$_PARANOIA_DEBUG" == true ]; then			#__WITH_PARANOIA_DEBUG
+			_Logger "" "$prefix\e[35m$value\e[0m"			#__WITH_PARANOIA_DEBUG
+			return							#__WITH_PARANOIA_DEBUG
+		fi								#__WITH_PARANOIA_DEBUG
 	else
 		_Logger "" "\e[41mLogger function called without proper loglevel [$level].\e[0m" true
 		_Logger "" "Value was: $prefix$value" true
@@ -285,6 +323,11 @@ function Logger {
 			_Logger "$prefix$value" "$prefix$value"
 			return
 		fi
+	elif [ "$level" == "PARANOIA_DEBUG" ]; then				#__WITH_PARANOIA_DEBUG
+		if [ "$_PARANOIA_DEBUG" == true ]; then			#__WITH_PARANOIA_DEBUG
+			_Logger "$prefix$value" "$prefix\e[35m$value\e[0m"	#__WITH_PARANOIA_DEBUG
+			return							#__WITH_PARANOIA_DEBUG
+		fi								#__WITH_PARANOIA_DEBUG
 	else
 		_Logger "\e[41mLogger function called without proper loglevel [$level].\e[0m" "\e[41mLogger function called without proper loglevel [$level].\e[0m" true
 		_Logger "Value was: $prefix$value" "Value was: $prefix$value" true
@@ -329,6 +372,7 @@ function KillChilds {
 				children="${children/$pid/}"
 			fi
 			for child in $children; do
+				Logger "Launching KillChilds \"$child\" true" "DEBUG"	#__WITH_PARANOIA_DEBUG
 				KillChilds "$child" true
 			done
 		fi
@@ -363,6 +407,7 @@ function KillAllChilds {
 	local pids="${1}" # List of parent pids to kill separated by semi-colon
 	local self="${2:-false}" # Should parent be killed too ?
 
+	__CheckArguments 1 $# "$@"	#__WITH_PARANOIA_DEBUG
 
 	local errorcount=0
 
@@ -419,6 +464,7 @@ function SendAlert {
 	local runAlert="${1:-false}" # Specifies if current message is sent while running or at the end of a run
 	local attachment="${2:-true}" # Should we send the log file as attachment
 
+	__CheckArguments 0-2 $# "$@"	#__WITH_PARANOIA_DEBUG
 
 	local attachmentFile
 	local subject
@@ -500,6 +546,7 @@ function SendEmail {
 	local smtpUser="${9}"
 	local smtpPassword="${10}"
 
+	__CheckArguments 3-10 $# "$@"	#__WITH_PARANOIA_DEBUG
 
 	local mail_no_attachment=
 	local attachment_command=
@@ -680,6 +727,7 @@ function LoadConfigFile {
 	local configFile="${1}"
 	local revisionRequired="${2}"
 
+	__CheckArguments 2 $# "$@"	#__WITH_PARANOIA_DEBUG
 
 	local revisionPresent
 
@@ -709,6 +757,22 @@ function LoadConfigFile {
 }
 
 # Quick and dirty performance logger only used for debugging
+function _PerfProfiler {												#__WITH_PARANOIA_DEBUG
+	local perfString												#__WITH_PARANOIA_DEBUG
+	local i														#__WITH_PARANOIA_DEBUG
+															#__WITH_PARANOIA_DEBUG
+	perfString=$(ps -p $$ -o args,pid,ppid,%cpu,%mem,time,etime,state,wchan)					#__WITH_PARANOIA_DEBUG
+															#__WITH_PARANOIA_DEBUG
+	for i in $(pgrep -P $$); do											#__WITH_PARANOIA_DEBUG
+		perfString="$perfString\n"$(ps -p $i -o args,pid,ppid,%cpu,%mem,time,etime,state,wchan | tail -1)	#__WITH_PARANOIA_DEBUG
+	done														#__WITH_PARANOIA_DEBUG
+															#__WITH_PARANOIA_DEBUG
+	if type iostat > /dev/null 2>&1; then										#__WITH_PARANOIA_DEBUG
+		perfString="$perfString\n"$(iostat)									#__WITH_PARANOIA_DEBUG
+	fi														#__WITH_PARANOIA_DEBUG
+															#__WITH_PARANOIA_DEBUG
+	Logger "PerfProfiler:\n$perfString" "PARANOIA_DEBUG"								#__WITH_PARANOIA_DEBUG
+}															#__WITH_PARANOIA_DEBUG
 
 _OFUNCTIONS_SPINNER="|/-\\"
 function Spinner {
@@ -811,9 +875,11 @@ function ExecTasks {
 	local minTimeBetweenRetries="${17:-300}"	# Time (in seconds) between postponed command retries
 	local validExitCodes="${18:-0}"			# Semi colon separated list of valid main command exit codes which will not trigger errors
 
+	__CheckArguments 1-18 $# "$@"																	       #__WITH_PARANOIA_DEBUG
 
 	local i
 
+	Logger "${FUNCNAME[0]} id [$id] called by [${FUNCNAME[1]} < ${FUNCNAME[2]} < ${FUNCNAME[3]} < ${FUNCNAME[4]} < ${FUNCNAME[5]} < ${FUNCNAME[6]} ...]." "PARANOIA_DEBUG"	 #__WITH_PARANOIA_DEBUG
 
 	# Since ExecTasks takes up to 17 arguments, do a quick preflight check in DEBUG mode
 	if [ "$_DEBUG" == true ]; then
@@ -866,6 +932,7 @@ function ExecTasks {
 	local newPidsArray		# New array of currently running pids for next iteration
 	local pidsTimeArray		# Array containing execution begin time of pids
 	local executeCommand		# Boolean to check if currentCommand can be executed given a condition
+	local hasPids=false		# Are any valable pids given to function ?		#__WITH_PARANOIA_DEBUG
 	local functionMode
 	local softAlert=false		# Does a soft alert need to be triggered, if yes, send an alert once
 	local failedPidsList		# List containing failed pids with exit code separated by semicolons (eg : 2355:1;4534:2;2354:3)
@@ -915,6 +982,7 @@ function ExecTasks {
 		counter=$mainItemCount
 	fi
 
+	Logger "Running ${FUNCNAME[0]} as [$functionMode] for [$mainItemCount] mainItems and [$auxItemCount] auxItems." "PARANOIA_DEBUG"	      #__WITH_PARANOIA_DEBUG
 
 	# soft / hard execution time checks that needs to be a subfunction since it is called both from main loop and from parallelExec sub loop
 	function _ExecTasksTimeCheck {
@@ -1064,15 +1132,22 @@ function ExecTasks {
 						Logger "${FUNCNAME[0]} called by [$id] finished monitoring pid [$pid] with exitcode [$retval]." "DEBUG"
 					fi
 				fi
+				hasPids=true					##__WITH_PARANOIA_DEBUG
 			fi
 		done
 
 		# hasPids can be false on last iteration in ParallelExec mode
+		if [ $hasPids == false ] && [ "$functionMode" = "WaitForTaskCompletion" ]; then					##__WITH_PARANOIA_DEBUG
+			Logger "No valable pids given." "ERROR"									##__WITH_PARANOIA_DEBUG
+		fi														##__WITH_PARANOIA_DEBUG
 		pidsArray=("${newPidsArray[@]}")
 
 		# Trivial wait time for bash to not eat up all CPU
 		sleep $sleepTime
 
+		if [ "$_PERF_PROFILER" == true ]; then				##__WITH_PARANOIA_DEBUG
+			_PerfProfiler						##__WITH_PARANOIA_DEBUG
+		fi								##__WITH_PARANOIA_DEBUG
 
 	}
 
@@ -1210,6 +1285,7 @@ function ExecTasks {
 	_ExecTasksPidsCheck
 	done
 
+	Logger "${FUNCNAME[0]} ended for [$id] using [$mainItemCount] subprocesses with [$errorcount] errors." "PARANOIA_DEBUG" #__WITH_PARANOIA_DEBUG
 
 	# Return exit code if only one process was monitored, else return number of errors
 	# As we cannot return multiple values, a global variable WAIT_FOR_TASK_COMPLETION contains all pids with their return value
@@ -1490,9 +1566,65 @@ function GetLocalOS {
 	fi
 }
 
+#__BEGIN_WITH_PARANOIA_DEBUG
+function __CheckArguments {
+	# Checks the number of arguments of a function and raises an error if some are missing
+
+	if [ "$_DEBUG" == true ]; then
+		local numberOfArguments="${1}" # Number of arguments the tested function should have, can be a number of a range, eg 0-2 for zero to two arguments
+		local numberOfGivenArguments="${2}" # Number of arguments that have been passed
+
+		local minArgs
+		local maxArgs
+
+		# All arguments of the function to check are passed as array in ${3} (the function call waits for $@)
+		# If any of the arguments contains spaces, bash things there are two aguments
+		# In order to avoid this, we need to iterate over ${3} and count
+
+		callerName="${FUNCNAME[1]}"
+
+		local iterate=3
+		local fetchArguments=true
+		local argList=""
+		local countedArguments
+		while [ $fetchArguments == true ]; do
+			cmd='argument=${'$iterate'}'
+			eval $cmd
+			if [ "$argument" == "" ]; then
+				fetchArguments=false
+			else
+				argList="$argList[Argument $((iterate-2)): $argument] "
+				iterate=$((iterate+1))
+			fi
+		done
+
+		countedArguments=$((iterate-3))
+
+		if [ $(IsInteger "$numberOfArguments") -eq 1 ]; then
+			minArgs=$numberOfArguments
+			maxArgs=$numberOfArguments
+		else
+			IFS='-' read minArgs maxArgs <<< "$numberOfArguments"
+		fi
+
+		Logger "Entering function [$callerName]." "PARANOIA_DEBUG"
+
+		if ! ([ $countedArguments -ge $minArgs ] && [ $countedArguments -le $maxArgs ]); then
+			Logger "Function $callerName may have inconsistent number of arguments. Expected min: $minArgs, max: $maxArgs, count: $countedArguments, bash seen: $numberOfGivenArguments." "ERROR"
+			Logger "$callerName arguments: $argList" "ERROR"
+		else
+			if [ ! -z "$argList" ]; then
+				Logger "$callerName arguments: $argList" "PARANOIA_DEBUG"
+			fi
+		fi
+	fi
+}
+
+#__END_WITH_PARANOIA_DEBUG
 
 
 function GetRemoteOS {
+	__CheckArguments 0 $# "$@"	#__WITH_PARANOIA_DEBUG
 
 	if [ "$REMOTE_OPERATION" != true ]; then
 		return 0
@@ -1631,6 +1763,7 @@ ENDSSH
 function RunLocalCommand {
 	local command="${1}" # Command to run
 	local hardMaxTime="${2}" # Max time to wait for command to compleet
+	__CheckArguments 2 $# "$@"	#__WITH_PARANOIA_DEBUG
 
 	if [ $_DRYRUN == true ]; then
 		Logger "Dryrun: Local command [$command] not run." "NOTICE"
@@ -1658,6 +1791,7 @@ function RunLocalCommand {
 function RunRemoteCommand {
 	local command="${1}" # Command to run
 	local hardMaxTime="${2}" # Max time to wait for command to compleet
+	__CheckArguments 2 $# "$@"	#__WITH_PARANOIA_DEBUG
 
 
 	if [ "$REMOTE_OPERATION" != true ]; then
@@ -1691,6 +1825,7 @@ function RunRemoteCommand {
 }
 
 function RunBeforeHook {
+	__CheckArguments 0 $# "$@"	#__WITH_PARANOIA_DEBUG
 
 	local pids
 
@@ -1717,6 +1852,7 @@ function RunBeforeHook {
 }
 
 function RunAfterHook {
+	__CheckArguments 0 $# "$@"	#__WITH_PARANOIA_DEBUG
 
 	local pids
 
@@ -1736,6 +1872,7 @@ function RunAfterHook {
 
 function TimeCheck {
 	# Checks if more than deltatime seconds have passed since last check, which is stored in timefile
+	__CheckArguments 2 $# "$@"      #__WITH_PARANOIA_DEBUG
 
 	local timefile="${1}"
 	local deltatime="${2}"
@@ -1770,9 +1907,11 @@ function Ping {
 
 
 function CheckConnectivityRemoteHost {
+	__CheckArguments 0 $# "$@"	#__WITH_PARANOIA_DEBUG
 
 	local retval
 
+	if [ "$_PARANOIA_DEBUG" != true ]; then # Do not loose time in paranoia debug		#__WITH_PARANOIA_DEBUG
 
 		if [ "$REMOTE_HOST_PING" != false ] && [ "$REMOTE_OPERATION" != false ]; then
 			eval "$PING_CMD $REMOTE_HOST > /dev/null 2>&1" &
@@ -1783,6 +1922,7 @@ function CheckConnectivityRemoteHost {
 				return $retval
 			fi
 		fi
+	fi											#__WITH_PARANOIA_DEBUG
 }
 
 function CheckConnectivity3rdPartyHosts {
@@ -1790,6 +1930,7 @@ function CheckConnectivity3rdPartyHosts {
 	# third_party_hosts_ips=('1.1.1.1' '8.8.8.8' 'kernel.org' 'google.com')
 	# CheckConnectivity3rdPartyHosts $third_party_hosts_ips
 
+	__CheckArguments 0-1 $# "$@"	#__WITH_PARANOIA_DEBUG
 
 	local remote_3rd_party_hosts="${1}"	# Optional list of hosts to check
 
@@ -1797,6 +1938,7 @@ function CheckConnectivity3rdPartyHosts {
 	local retval
 	local i
 
+	if [ "$_PARANOIA_DEBUG" != true ]; then # Do not loose time in paranoia debug		#__WITH_PARANOIA_DEBUG
 
 		if [ "$remote_3rd_party_hosts" == "" ]; then
 			remote_3rd_party_hosts="$REMOTE_3RD_PARTY_HOSTS"
@@ -1823,11 +1965,13 @@ function CheckConnectivity3rdPartyHosts {
 				return 0
 			fi
 		fi
+	fi											#__WITH_PARANOIA_DEBUG
 }
 
 function RsyncPatternsAdd {
 	local patternType="${1}"	# exclude or include
 	local pattern="${2}"
+	__CheckArguments 2 $# "$@"	#__WITH_PARANOIA_DEBUG
 
 	local rest
 
@@ -1857,6 +2001,7 @@ function RsyncPatternsAdd {
 function RsyncPatternsFromAdd {
 	local patternType="${1}"
 	local patternFrom="${2}"
+	__CheckArguments 2 $# "$@"    #__WITH_PARANOIA_DEBUG
 
 	## Check if the exclude list has a full path, and if not, add the config file path if there is one
 	if [ "$(basename "$patternFrom")" == "$patternFrom" ]; then
@@ -1869,6 +2014,7 @@ function RsyncPatternsFromAdd {
 }
 
 function RsyncPatterns {
+	__CheckArguments 0 $# "$@"    #__WITH_PARANOIA_DEBUG
 
        if [ "$RSYNC_PATTERN_FIRST" == "exclude" ]; then
 		if [ "$RSYNC_EXCLUDE_PATTERN" != "" ]; then
@@ -1906,6 +2052,7 @@ function RsyncPatterns {
 }
 
 function PreInit {
+	 __CheckArguments 0 $# "$@"    #__WITH_PARANOIA_DEBUG
 
 	local compressionString
 
@@ -1960,6 +2107,7 @@ function PreInit {
 }
 
 function PostInit {
+	__CheckArguments 0 $# "$@"    #__WITH_PARANOIA_DEBUG
 
 	# Define remote commands
 	if [ -f "$SSH_RSA_PRIVATE_KEY" ]; then
@@ -2026,6 +2174,7 @@ function SetCompression {
 }
 
 function InitLocalOSDependingSettings {
+	__CheckArguments 0 $# "$@"    #__WITH_PARANOIA_DEBUG
 
 	## If running under Msys, some commands do not run the same way
 	## Using mingw version of find instead of windows one
@@ -2086,6 +2235,7 @@ function InitLocalOSDependingSettings {
 
 # Gets executed regardless of the need of remote connections. It is just that this code needs to get executed after we know if there is a remote os, and if yes, which one
 function InitRemoteOSDependingSettings {
+	__CheckArguments 0 $# "$@"    #__WITH_PARANOIA_DEBUG
 
 	if [ "$REMOTE_OS" == "msys" ] || [ "$REMOTE_OS" == "Cygwin" ]; then
 		REMOTE_FIND_CMD="$(dirname $BASH)/find"
@@ -2112,7 +2262,7 @@ function InitRemoteOSDependingSettings {
 	#fi
 	# NPF-MOD: Strangely enough, also happens on RHEL7 rsync 3.1.1
 	# Let's resolve this easier
-	RSYNC_OLD_ARGS=1
+	export RSYNC_OLD_ARGS=1
 
 	if [ "$_DRYRUN" == true ]; then
 		RSYNC_DRY_ARG="-n"
@@ -2575,6 +2725,7 @@ function TrapQuit {
 }
 
 function CheckEnvironment {
+	__CheckArguments 0 $# "$@"    #__WITH_PARANOIA_DEBUG
 
 	if [ "$REMOTE_OPERATION" == true ]; then
 		if ! type ssh > /dev/null 2>&1 ; then
@@ -2624,6 +2775,7 @@ function CheckCurrentConfig {
 	local booleans
 	local num_vars
 
+	__CheckArguments 1 $# "$@"    #__WITH_PARANOIA_DEBUG
 
 	# Full check is for initiator driven runs
 	if [ $fullCheck == true ]; then
@@ -2665,6 +2817,7 @@ function UpdateBooleans {
 
 # Gets checked in quicksync and config file mode
 function CheckCurrentConfigAll {
+	__CheckArguments 0 $# "$@"    #__WITH_PARANOIA_DEBUG
 
 	local tmp
 
@@ -2712,6 +2865,7 @@ function _CheckReplicasLocal {
 	local replicaType="${2}"
 	local stateDir="${3}"
 
+	__CheckArguments 3 $# "$@"	#__WITH_PARANOIA_DEBUG
 
 	local retval
 	local diskSpace
@@ -2788,6 +2942,7 @@ function _CheckReplicasRemote {
 	local replicaType="${2}"
 	local stateDir="${3}"
 
+	__CheckArguments 3 $# "$@"	#__WITH_PARANOIA_DEBUG
 
 	local retval
 	local cmd
@@ -2819,6 +2974,10 @@ if [ "$_REMOTE_EXECUTION" == true ]; then
 	mkdir -p "$RUN_DIR/$PROGRAM.remote.$SCRIPT_PID.$TSTAMP"
 	RUN_DIR="$RUN_DIR/$PROGRAM.remote.$SCRIPT_PID.$TSTAMP"
 fi
+## allow function call checks			#__WITH_PARANOIA_DEBUG
+if [ "$_PARANOIA_DEBUG" == true ];then		#__WITH_PARANOIA_DEBUG
+	_DEBUG=true				#__WITH_PARANOIA_DEBUG
+fi						#__WITH_PARANOIA_DEBUG
 
 ## allow debugging from command line with _DEBUG=true
 if [ ! "$_DEBUG" == true ]; then
@@ -2975,6 +3134,11 @@ function RemoteLogger {
 			_Logger "" "$prefix$value"
 			return
 		fi
+	elif [ "$level" == "PARANOIA_DEBUG" ]; then				#__WITH_PARANOIA_DEBUG
+		if [ "$_PARANOIA_DEBUG" == true ]; then			#__WITH_PARANOIA_DEBUG
+			_Logger "" "$prefix\e[35m$value\e[0m"			#__WITH_PARANOIA_DEBUG
+			return							#__WITH_PARANOIA_DEBUG
+		fi								#__WITH_PARANOIA_DEBUG
 	else
 		_Logger "" "\e[41mLogger function called without proper loglevel [$level].\e[0m" true
 		_Logger "" "Value was: $prefix$value" true
@@ -3089,6 +3253,7 @@ ENDSSH
 }
 
 function CheckReplicas {
+	__CheckArguments 0 $# "$@"	#__WITH_PARANOIA_DEBUG
 
 	local initiatorPid
 	local targetPid
@@ -3137,6 +3302,7 @@ function _HandleLocksLocal {
 	local replicaType="${3}"
 	local overwrite="${4:-false}"
 
+	__CheckArguments 4 $# "$@"	#__WITH_PARANOIA_DEBUG
 
 	local retval
 	local lockfileContent
@@ -3205,6 +3371,7 @@ function _HandleLocksRemote {
 	local replicaType="${3}"
 	local overwrite="${4:-false}"
 
+	__CheckArguments 4 $# "$@"	#__WITH_PARANOIA_DEBUG
 
 	local retval
 	local initiatorRunningPids
@@ -3248,6 +3415,10 @@ if [ "$_REMOTE_EXECUTION" == true ]; then
 	mkdir -p "$RUN_DIR/$PROGRAM.remote.$SCRIPT_PID.$TSTAMP"
 	RUN_DIR="$RUN_DIR/$PROGRAM.remote.$SCRIPT_PID.$TSTAMP"
 fi
+## allow function call checks			#__WITH_PARANOIA_DEBUG
+if [ "$_PARANOIA_DEBUG" == true ];then		#__WITH_PARANOIA_DEBUG
+	_DEBUG=true				#__WITH_PARANOIA_DEBUG
+fi						#__WITH_PARANOIA_DEBUG
 
 ## allow debugging from command line with _DEBUG=true
 if [ ! "$_DEBUG" == true ]; then
@@ -3392,6 +3563,11 @@ function RemoteLogger {
 			_Logger "" "$prefix$value"
 			return
 		fi
+	elif [ "$level" == "PARANOIA_DEBUG" ]; then				#__WITH_PARANOIA_DEBUG
+		if [ "$_PARANOIA_DEBUG" == true ]; then			#__WITH_PARANOIA_DEBUG
+			_Logger "" "$prefix\e[35m$value\e[0m"			#__WITH_PARANOIA_DEBUG
+			return							#__WITH_PARANOIA_DEBUG
+		fi								#__WITH_PARANOIA_DEBUG
 	else
 		_Logger "" "\e[41mLogger function called without proper loglevel [$level].\e[0m" true
 		_Logger "" "Value was: $prefix$value" true
@@ -3505,6 +3681,7 @@ ENDSSH
 }
 
 function HandleLocks {
+	__CheckArguments 0 $# "$@"	#__WITH_PARANOIA_DEBUG
 
 	local retval
 	local initiatorPid
@@ -3565,6 +3742,7 @@ function _UnlockReplicasLocal {
 	local lockfile="${1}"
 	local replicaType="${2}"
 
+	__CheckArguments 2 $# "$@"	#__WITH_PARANOIA_DEBUG
 
 	local retval
 
@@ -3583,6 +3761,7 @@ function _UnlockReplicasRemote {
 	local lockfile="${1}"
 	local replicaType="${2}"
 
+	__CheckArguments 2 $# "$@"	#__WITH_PARANOIA_DEBUG
 
 	local retval
 	local cmd
@@ -3609,6 +3788,7 @@ ENDSSH
 }
 
 function UnlockReplicas {
+	__CheckArguments 0 $# "$@"	#__WITH_PARANOIA_DEBUG
 
 	local initiatorPid=0
 	local targetPid=0
@@ -3656,6 +3836,7 @@ function treeList {
 	local replicaType="${2}" # replica type: initiator, target
 	local treeFilename="${3}" # filename to output tree (will be prefixed with $replicaType)
 
+	__CheckArguments 3 $# "$@"	#__WITH_PARANOIA_DEBUG
 
 	local retval
 	local rsyncCmd
@@ -3707,6 +3888,7 @@ function treeList {
 function deleteList {
 	local replicaType="${1}" # replica type: initiator, target
 
+	__CheckArguments 1 $# "$@"	#__WITH_PARANOIA_DEBUG
 
 	local retval
 	local subretval
@@ -3780,6 +3962,7 @@ function _getFileCtimeMtimeLocal {
 	local fileList="${3}" # Contains list of files to get time attrs
 	local timestampFile="${4}" # Where to store the timestamp file
 
+	__CheckArguments 4 $# "$@"	#__WITH_PARANOIA_DEBUG
 
 	echo -n "" > "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.$replicaType.$SCRIPT_PID.$TSTAMP"
 
@@ -3811,6 +3994,7 @@ function _getFileCtimeMtimeRemote {
 	local fileList="${3}"
 	local timestampFile="${4}"
 
+	__CheckArguments 4 $# "$@"	#__WITH_PARANOIA_DEBUG
 
 	local retval
 	local cmd
@@ -3852,6 +4036,10 @@ if [ "$_REMOTE_EXECUTION" == true ]; then
 	mkdir -p "$RUN_DIR/$PROGRAM.remote.$SCRIPT_PID.$TSTAMP"
 	RUN_DIR="$RUN_DIR/$PROGRAM.remote.$SCRIPT_PID.$TSTAMP"
 fi
+## allow function call checks			#__WITH_PARANOIA_DEBUG
+if [ "$_PARANOIA_DEBUG" == true ];then		#__WITH_PARANOIA_DEBUG
+	_DEBUG=true				#__WITH_PARANOIA_DEBUG
+fi						#__WITH_PARANOIA_DEBUG
 
 ## allow debugging from command line with _DEBUG=true
 if [ ! "$_DEBUG" == true ]; then
@@ -4008,6 +4196,11 @@ function RemoteLogger {
 			_Logger "" "$prefix$value"
 			return
 		fi
+	elif [ "$level" == "PARANOIA_DEBUG" ]; then				#__WITH_PARANOIA_DEBUG
+		if [ "$_PARANOIA_DEBUG" == true ]; then			#__WITH_PARANOIA_DEBUG
+			_Logger "" "$prefix\e[35m$value\e[0m"			#__WITH_PARANOIA_DEBUG
+			return							#__WITH_PARANOIA_DEBUG
+		fi								#__WITH_PARANOIA_DEBUG
 	else
 		_Logger "" "\e[41mLogger function called without proper loglevel [$level].\e[0m" true
 		_Logger "" "Value was: $prefix$value" true
@@ -4090,6 +4283,7 @@ function timestampList {
 	local fileList="${3}" # List of files to get timestamps for
 	local timestampFilename="${4}" # filename to output timestamp list (will be prefixed with $replicaType)
 
+	__CheckArguments 4 $# "$@"	#__WITH_PARANOIA_DEBUG
 
 	local retval
 	local rsyncCmd
@@ -4111,6 +4305,7 @@ function conflictList {
 	local timestampCurrentFilename="${1}" # filename of current timestamp list (will be prefixed with $replicaType)
 	local timestampAfterFilename="${2}" # filename of previous timestamp list (will be prefixed with $replicaType)
 
+	__CheckArguments 2 $# "$@"	#__WITH_PARANOIA_DEBUG
 
 	local retval
 
@@ -4179,6 +4374,7 @@ function syncAttrs {
 	local initiatorReplica="${1}"
 	local targetReplica="${2}"
 
+	__CheckArguments 2 $# "$@"	#__WITH_PARANOIA_DEBUG
 
 	local initiatorPid
 	local targetPid
@@ -4312,6 +4508,7 @@ function syncUpdate {
 	local sourceReplica="${1}" # Contains replica type of source: initiator, target
 	local destinationReplica="${2}" # Contains replica type of destination: initiator, target
 	local remoteDelete="${3:-false}" # Use rsnyc to delete remote files if not existent in source
+	__CheckArguments 2-3 $# "$@"	#__WITH_PARANOIA_DEBUG
 
 	local rsyncCmd
 	local retval
@@ -4381,6 +4578,7 @@ function _deleteLocal {
 	local replicaType="${1}" # Replica type
 	local replicaDir="${2}" # Full path to replica
 	local deletionDir="${3}" # deletion dir in format .[workdir]/deleted
+	__CheckArguments 3 $# "$@"	#__WITH_PARANOIA_DEBUG
 
 	local retval=0
 	local parentdir
@@ -4471,6 +4669,7 @@ function _deleteRemote {
 	local replicaType="${1}" # Replica type
 	local replicaDir="${2}" # Full path to replica
 	local deletionDir="${3}" # deletion dir in format .[workdir]/deleted
+	__CheckArguments 3 $# "$@"	#__WITH_PARANOIA_DEBUG
 
 	local retval
 	local rsyncCmd
@@ -4536,6 +4735,10 @@ if [ "$_REMOTE_EXECUTION" == true ]; then
 	mkdir -p "$RUN_DIR/$PROGRAM.remote.$SCRIPT_PID.$TSTAMP"
 	RUN_DIR="$RUN_DIR/$PROGRAM.remote.$SCRIPT_PID.$TSTAMP"
 fi
+## allow function call checks			#__WITH_PARANOIA_DEBUG
+if [ "$_PARANOIA_DEBUG" == true ];then		#__WITH_PARANOIA_DEBUG
+	_DEBUG=true				#__WITH_PARANOIA_DEBUG
+fi						#__WITH_PARANOIA_DEBUG
 
 ## allow debugging from command line with _DEBUG=true
 if [ ! "$_DEBUG" == true ]; then
@@ -4643,6 +4846,11 @@ function RemoteLogger {
 			_Logger "" "$prefix$value"
 			return
 		fi
+	elif [ "$level" == "PARANOIA_DEBUG" ]; then				#__WITH_PARANOIA_DEBUG
+		if [ "$_PARANOIA_DEBUG" == true ]; then			#__WITH_PARANOIA_DEBUG
+			_Logger "" "$prefix\e[35m$value\e[0m"			#__WITH_PARANOIA_DEBUG
+			return							#__WITH_PARANOIA_DEBUG
+		fi								#__WITH_PARANOIA_DEBUG
 	else
 		_Logger "" "\e[41mLogger function called without proper loglevel [$level].\e[0m" true
 		_Logger "" "Value was: $prefix$value" true
@@ -4793,6 +5001,7 @@ ENDSSH
 # delete_Propagation(replica type)
 function deletionPropagation {
 	local replicaType="${1}" # Contains replica type: initiator, target where to delete
+	__CheckArguments 1 $# "$@"	#__WITH_PARANOIA_DEBUG
 
 	local retval
 	local replicaDir
@@ -4836,6 +5045,7 @@ function deletionPropagation {
 }
 
 function Initialize {
+	__CheckArguments 0 $# "$@"	#__WITH_PARANOIA_DEBUG
 
 	Logger "Initializing initiator and target file lists." "NOTICE"
 
@@ -4898,6 +5108,7 @@ function Initialize {
 ###### Step 8a & 8b: Create after run ctime & mtime file list of replicas
 
 function Sync {
+	__CheckArguments 0 $# "$@"	#__WITH_PARANOIA_DEBUG
 
 	local resumeCount
 	local resumeInitiator
@@ -5388,6 +5599,7 @@ function _SoftDeleteLocal {
 	local changeTime="${3}" # Delete files older than changeTime days
 	local deletionType="${4}" # Trivial deletion type string
 
+	__CheckArguments 4 $# "$@"	#__WITH_PARANOIA_DEBUG
 
 	local retval
 
@@ -5440,6 +5652,7 @@ function _SoftDeleteRemote {
 	local changeTime="${3}" # Delete files older than changeTime days
 	local deletionType="${4}" # Trivial deletion type string
 
+	__CheckArguments 4 $# "$@"	#__WITH_PARANOIA_DEBUG
 
 	local retval
 
@@ -5480,6 +5693,10 @@ if [ "$_REMOTE_EXECUTION" == true ]; then
 	mkdir -p "$RUN_DIR/$PROGRAM.remote.$SCRIPT_PID.$TSTAMP"
 	RUN_DIR="$RUN_DIR/$PROGRAM.remote.$SCRIPT_PID.$TSTAMP"
 fi
+## allow function call checks			#__WITH_PARANOIA_DEBUG
+if [ "$_PARANOIA_DEBUG" == true ];then		#__WITH_PARANOIA_DEBUG
+	_DEBUG=true				#__WITH_PARANOIA_DEBUG
+fi						#__WITH_PARANOIA_DEBUG
 
 ## allow debugging from command line with _DEBUG=true
 if [ ! "$_DEBUG" == true ]; then
@@ -5636,6 +5853,11 @@ function RemoteLogger {
 			_Logger "" "$prefix$value"
 			return
 		fi
+	elif [ "$level" == "PARANOIA_DEBUG" ]; then				#__WITH_PARANOIA_DEBUG
+		if [ "$_PARANOIA_DEBUG" == true ]; then			#__WITH_PARANOIA_DEBUG
+			_Logger "" "$prefix\e[35m$value\e[0m"			#__WITH_PARANOIA_DEBUG
+			return							#__WITH_PARANOIA_DEBUG
+		fi								#__WITH_PARANOIA_DEBUG
 	else
 		_Logger "" "\e[41mLogger function called without proper loglevel [$level].\e[0m" true
 		_Logger "" "Value was: $prefix$value" true
@@ -5717,6 +5939,7 @@ ENDSSH
 }
 
 function SoftDelete {
+	__CheckArguments 0 $# "$@"	#__WITH_PARANOIA_DEBUG
 
 	local initiatorPid
 	local targetPid
@@ -5759,6 +5982,7 @@ function SoftDelete {
 }
 
 function _TriggerInitiatorRunLocal {
+	__CheckArguments 0 $# "$@"	#__WITH_PARANOIA_DEBUG
 
 	local PUSH_FILE
 
@@ -5781,6 +6005,7 @@ function _TriggerInitiatorRunLocal {
 }
 
 function _TriggerInitiatorRunRemote {
+	__CheckArguments 0 $# "$@"	#__WITH_PARANOIA_DEBUG
 
 $SSH_CMD env _REMOTE_TOKEN="$_REMOTE_TOKEN" \
 env _DEBUG="'$_DEBUG'" env _PARANOIA_DEBUG="'$_PARANOIA_DEBUG'" env _LOGGER_SILENT="'$_LOGGER_SILENT'" env _LOGGER_VERBOSE="'$_LOGGER_VERBOSE'" env _LOGGER_PREFIX="'$_LOGGER_PREFIX'" env _LOGGER_ERR_ONLY="'$_LOGGER_ERR_ONLY'" \
@@ -5805,6 +6030,10 @@ if [ "$_REMOTE_EXECUTION" == true ]; then
 	mkdir -p "$RUN_DIR/$PROGRAM.remote.$SCRIPT_PID.$TSTAMP"
 	RUN_DIR="$RUN_DIR/$PROGRAM.remote.$SCRIPT_PID.$TSTAMP"
 fi
+## allow function call checks			#__WITH_PARANOIA_DEBUG
+if [ "$_PARANOIA_DEBUG" == true ];then		#__WITH_PARANOIA_DEBUG
+	_DEBUG=true				#__WITH_PARANOIA_DEBUG
+fi						#__WITH_PARANOIA_DEBUG
 
 ## allow debugging from command line with _DEBUG=true
 if [ ! "$_DEBUG" == true ]; then
@@ -5912,6 +6141,11 @@ function RemoteLogger {
 			_Logger "" "$prefix$value"
 			return
 		fi
+	elif [ "$level" == "PARANOIA_DEBUG" ]; then				#__WITH_PARANOIA_DEBUG
+		if [ "$_PARANOIA_DEBUG" == true ]; then			#__WITH_PARANOIA_DEBUG
+			_Logger "" "$prefix\e[35m$value\e[0m"			#__WITH_PARANOIA_DEBUG
+			return							#__WITH_PARANOIA_DEBUG
+		fi								#__WITH_PARANOIA_DEBUG
 	else
 		_Logger "" "\e[41mLogger function called without proper loglevel [$level].\e[0m" true
 		_Logger "" "Value was: $prefix$value" true
@@ -5961,6 +6195,7 @@ ENDSSH
 }
 
 function TriggerInitiatorRun {
+	__CheckArguments 0 $# "$@"	#__WITH_PARANOIA_DEBUG
 
 	if [ "$REMOTE_OPERATION" != false ]; then
 		_TriggerInitiatorRunRemote
@@ -5974,6 +6209,7 @@ function _SummaryFromRsyncFile {
 	local summaryFile="${2}"
 	local direction="${3}"
 
+	__CheckArguments 3 $# "$@"	#__WITH_PARANOIA_DEBUG
 
 	if [ -f "$summaryFile" ]; then
 		while read -r file; do
@@ -6010,6 +6246,7 @@ function _SummaryFromDeleteFile {
 	local summaryFile="${2}"
 	local direction="${3}"
 
+	__CheckArguments 3 $# "$@"	#__WITH_PARANOIA_DEBUG
 
 	if [ -f "$summaryFile" ]; then
 		while read -r file; do
@@ -6024,6 +6261,7 @@ function _SummaryFromDeleteFile {
 }
 
 function Summary {
+	__CheckArguments 0 $# "$@"	#__WITH_PARANOIA_DEBUG
 
 	(
 	_LOGGER_PREFIX=""
@@ -6053,6 +6291,7 @@ function Summary {
 }
 
 function LogConflicts {
+	__CheckArguments 0 $# "$@"	#__WITH_PARANOIA_DEBUG
 
 	local subject
 	local body
@@ -6088,6 +6327,7 @@ function LogConflicts {
 }
 
 function Init {
+	__CheckArguments 0 $# "$@"	#__WITH_PARANOIA_DEBUG
 
 	# Set error exit code if a piped command fails
 	set -o pipefail
@@ -6331,12 +6571,14 @@ function Init {
 }
 
 function Main {
+	__CheckArguments 0 $# "$@"	#__WITH_PARANOIA_DEBUG
 
 	HandleLocks
 	Sync
 }
 
 function Usage {
+	__CheckArguments 0 $# "$@"	#__WITH_PARANOIA_DEBUG
 
 	if [ "$IS_STABLE" != true ]; then
 		echo -e "\e[93mThis is an unstable dev build. Please use with caution.\e[0m"
@@ -6394,6 +6636,7 @@ function Usage {
 function SyncOnChanges {
 	local isTargetHelper="${1:-false}"		# Is this service supposed to be run as target helper ?
 
+	__CheckArguments 1 $# "$@"	#__WITH_PARANOIA_DEBUG
 
 	local watchDirectory
 	local watchCmd

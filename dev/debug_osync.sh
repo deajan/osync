@@ -2262,7 +2262,7 @@ function InitRemoteOSDependingSettings {
 	#fi
 	# NPF-MOD: Strangely enough, also happens on RHEL7 rsync 3.1.1
 	# Let's resolve this easier
-	RSYNC_OLD_ARGS=1
+	export RSYNC_OLD_ARGS=1
 
 	if [ "$_DRYRUN" == true ]; then
 		RSYNC_DRY_ARG="-n"
