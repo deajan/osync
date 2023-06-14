@@ -123,8 +123,9 @@ function SetupSSH {
 		ssh-keyscan -H localhost >> "${homedir}/.ssh/known_hosts"
 	fi
 
-	# Update remote conf files with SSH port
+	# Update remote conf files with SSH port and file id location
 	sed -i.tmp 's#ssh://.*@localhost:[0-9]*/${HOME}/osync-tests/target#ssh://'$REMOTE_USER'@localhost:'$SSH_PORT'/'${homedir}'/osync-tests/target#' "$CONF_DIR/$REMOTE_CONF"
+	sed -i.tmp2 's#SSH_RSA_PRIVATE_KEY="${HOME}/.ssh/id_rsa_local_osync_tests"#SSH_RSA_PRIVATE_KEY="'${homedir}'/.ssh/id_rsa_local_osync_tests"#' "$CONF_DIR/$REMOTE_CONF"
 
 	echo "ls -alh ${homedir}/.ssh"
 	ls -alh "${homedir}/.ssh"
