@@ -1,13 +1,14 @@
 ## RECENT CHANGES
 
-### dd Mmm YYYY: To be done
+### Current master
 
 -   Make --log-conflicts non experimental (randomly fails)
 -   ! new option FORCE_CONFLICT_PREVALANCE which will always use Initiator or Target, regardless of best time
 -   ! target-helper: destination mails etc on target, also, no cmd after on configs
 
-### dd Mmm YYYY: osync v1.3 release (for full changelog since v1.2 branch see all v1.3-beta/RC entries)
+### 16 June 2023: osync v1.3 release (for full changelog since v1.2 branch see all v1.3-beta/RC entries)
 
+-   Fix for new RSYNC protocol
 -   New options ALWAYS_SEND_MAILS to allow sending logs regardless of execution states
 
 ### 29 June 2020: osync v1.3-RC1 release
