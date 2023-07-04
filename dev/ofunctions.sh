@@ -512,7 +512,7 @@ function SendAlert {
 	fi
 
 	if [ $runAlert == true ]; then
-		subject="Currently runing - $subject"
+		subject="Currently running - $subject"
 	else
 		subject="Finished run - $subject"
 	fi
