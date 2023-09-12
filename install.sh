@@ -10,15 +10,15 @@ PROGRAM_BINARY=$PROGRAM".sh"
 PROGRAM_BATCH=$PROGRAM"-batch.sh"
 SSH_FILTER="ssh_filter.sh"
 
-SCRIPT_BUILD=2020112901
+SCRIPT_BUILD=2023061101
 INSTANCE_ID="installer-$SCRIPT_BUILD"
 
 ## osync / obackup / pmocr / zsnap install script
 ## Tested on RHEL / CentOS 6 & 7, Fedora 23, Debian 7 & 8, Mint 17 and FreeBSD 8, 10 and 11
 ## Please adapt this to fit your distro needs
 
-_OFUNCTIONS_VERSION=2.4.3
-_OFUNCTIONS_BUILD=2022050801
+_OFUNCTIONS_VERSION=2.5.1
+_OFUNCTIONS_BUILD=2023061401
 _OFUNCTIONS_BOOTSTRAP=true
 
 if ! type "$BASH" > /dev/null; then
@@ -41,6 +41,8 @@ _LOGGER_SILENT=false
 _LOGGER_VERBOSE=false
 _LOGGER_ERR_ONLY=false
 _LOGGER_PREFIX="date"
+_LOGGER_WRITE_PARTIAL_LOGS=false			# Writes partial log files to /tmp so sending logs via alerts can feed on them
+_OFUNCTIONS_SHOW_SPINNER=true				# Show spinner in ExecTasks function
 if [ "$KEEP_LOGGING" == "" ]; then
 	KEEP_LOGGING=1801
 fi
@@ -145,7 +147,7 @@ function _Logger {
 		echo -e "$logValue" >> "$LOG_FILE"
 
 		# Build current log file for alerts if we have a sufficient environment
-		if [ "$RUN_DIR/$PROGRAM" != "/" ]; then
+		if [ "$_LOGGER_WRITE_PARTIAL_LOGS" == true ] && [ "$RUN_DIR/$PROGRAM" != "/" ]; then
 			echo -e "$logValue" >> "$RUN_DIR/$PROGRAM._Logger.$SCRIPT_PID.$TSTAMP"
 		fi
 	fi
@@ -256,18 +258,18 @@ function Logger {
 	if [ "$level" == "CRITICAL" ]; then
 		_Logger "$prefix($level):$value" "$prefix\e[1;33;41m$value\e[0m" true
 		ERROR_ALERT=true
-		# ERROR_ALERT / WARN_ALERT is not set in main when Logger is called from a subprocess. Need to keep this flag.
-		echo -e "[$retval] in [$(joinString , ${FUNCNAME[@]})] SP=$SCRIPT_PID P=$$\n$prefix($level):$value" >> "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.error.$SCRIPT_PID.$TSTAMP"
+		# ERROR_ALERT / WARN_ALERT is not set in main when Logger is called from a subprocess. We need to create these flag files for ERROR_ALERT / WARN_ALERT to be picked up by Alert
+		echo -e "[$retval] in [$(joinString , ${FUNCNAME[@]})] SP=$SCRIPT_PID P=$$\n$prefix($level):$value" >> "$RUN_DIR/$PROGRAM.ERROR_ALERT.$SCRIPT_PID.$TSTAMP"
 		return
 	elif [ "$level" == "ERROR" ]; then
 		_Logger "$prefix($level):$value" "$prefix\e[91m$value\e[0m" true
 		ERROR_ALERT=true
-		echo -e "[$retval] in [$(joinString , ${FUNCNAME[@]})] SP=$SCRIPT_PID P=$$\n$prefix($level):$value" >> "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.error.$SCRIPT_PID.$TSTAMP"
+		echo -e "[$retval] in [$(joinString , ${FUNCNAME[@]})] SP=$SCRIPT_PID P=$$\n$prefix($level):$value" >> "$RUN_DIR/$PROGRAM.ERROR_ALERT.$SCRIPT_PID.$TSTAMP"
 		return
 	elif [ "$level" == "WARN" ]; then
 		_Logger "$prefix($level):$value" "$prefix\e[33m$value\e[0m" true
 		WARN_ALERT=true
-		echo -e "[$retval] in [$(joinString , ${FUNCNAME[@]})] SP=$SCRIPT_PID P=$$\n$prefix($level):$value" >> "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.warn.$SCRIPT_PID.$TSTAMP"
+		echo -e "[$retval] in [$(joinString , ${FUNCNAME[@]})] SP=$SCRIPT_PID P=$$\n$prefix($level):$value" >> "$RUN_DIR/$PROGRAM.WARN_ALERT.$SCRIPT_PID.$TSTAMP"
 		return
 	elif [ "$level" == "NOTICE" ]; then
 		if [ "$_LOGGER_ERR_ONLY" != true ]; then
@@ -382,11 +384,11 @@ function GenericTrapQuit {
 	local exitcode=0
 
 	# Get ERROR / WARN alert flags from subprocesses that call Logger
-	if [ -f "$RUN_DIR/$PROGRAM.Logger.warn.$SCRIPT_PID.$TSTAMP" ]; then
+	if [ -f "$RUN_DIR/$PROGRAM.WARN_ALERT.$SCRIPT_PID.$TSTAMP" ]; then
 		WARN_ALERT=true
 		exitcode=2
 	fi
-	if [ -f "$RUN_DIR/$PROGRAM.Logger.error.$SCRIPT_PID.$TSTAMP" ]; then
+	if [ -f "$RUN_DIR/$PROGRAM.ERROR_ALERT.$SCRIPT_PID.$TSTAMP" ]; then
 		ERROR_ALERT=true
 		exitcode=1
 	fi
@@ -601,11 +603,11 @@ function GenericTrapQuit {
 	local exitcode=0
 
 	# Get ERROR / WARN alert flags from subprocesses that call Logger
-	if [ -f "$RUN_DIR/$PROGRAM.Logger.warn.$SCRIPT_PID.$TSTAMP" ]; then
+	if [ -f "$RUN_DIR/$PROGRAM.WARN_ALERT.$SCRIPT_PID.$TSTAMP" ]; then
 		WARN_ALERT=true
 		exitcode=2
 	fi
-	if [ -f "$RUN_DIR/$PROGRAM.Logger.error.$SCRIPT_PID.$TSTAMP" ]; then
+	if [ -f "$RUN_DIR/$PROGRAM.ERROR_ALERT.$SCRIPT_PID.$TSTAMP" ]; then
 		ERROR_ALERT=true
 		exitcode=1
 	fi
@@ -653,15 +655,26 @@ function SetLocalOSSettings {
 }
 
 function GetInit {
+	init="none"
 	if [ -f /sbin/openrc-run ]; then
 		init="openrc"
 		Logger "Detected openrc." "NOTICE"
+	elif [ -f /usr/lib/systemd/systemd ]; then
+		init="systemd"
+		Logger "Detected systemd." "NOTICE"
 	elif [ -f /sbin/init ]; then
-		if file /sbin/init | grep systemd > /dev/null; then
-			init="systemd"
-			Logger "Detected systemd." "NOTICE"
+		if type -p file > /dev/null 2>&1; then
+			if file /sbin/init | grep systemd > /dev/null; then
+				init="systemd"
+				Logger "Detected systemd." "NOTICE"
+			else
+				init="initV"
+			fi
 		else
 			init="initV"
+		fi
+
+		if [ $init == "initV" ]; then
 			Logger "Detected initV." "NOTICE"
 		fi
 	else

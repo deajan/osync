@@ -4,10 +4,10 @@
 #Check dryruns with nosuffix mode for timestampList
 
 PROGRAM="osync" # Rsync based two way sync engine with fault tolerance
-AUTHOR="(C) 2013-2022 by Orsiris de Jong"
+AUTHOR="(C) 2013-2023 by Orsiris de Jong"
 CONTACT="http://www.netpower.fr/osync - ozy@netpower.fr"
-PROGRAM_VERSION=1.3.0-rc3
-PROGRAM_BUILD=2021062901
+PROGRAM_VERSION=1.3.0
+PROGRAM_BUILD=2023061401
 IS_STABLE=true
 
 CONFIG_FILE_REVISION_REQUIRED=1.3.0
@@ -42,8 +42,8 @@ CONFIG_FILE_REVISION_REQUIRED=1.3.0
 #	UnlockReplicas				yes		#__WITH_PARANOIA_DEBUG
 #	CleanUp					no		#__WITH_PARANOIA_DEBUG
 
-_OFUNCTIONS_VERSION=2.4.3
-_OFUNCTIONS_BUILD=2022050801
+_OFUNCTIONS_VERSION=2.5.1
+_OFUNCTIONS_BUILD=2023061401
 _OFUNCTIONS_BOOTSTRAP=true
 
 if ! type "$BASH" > /dev/null; then
@@ -66,6 +66,8 @@ _LOGGER_SILENT=false
 _LOGGER_VERBOSE=false
 _LOGGER_ERR_ONLY=false
 _LOGGER_PREFIX="date"
+_LOGGER_WRITE_PARTIAL_LOGS=false			# Writes partial log files to /tmp so sending logs via alerts can feed on them
+_OFUNCTIONS_SHOW_SPINNER=true				# Show spinner in ExecTasks function
 if [ "$KEEP_LOGGING" == "" ]; then
 	KEEP_LOGGING=1801
 fi
@@ -174,7 +176,7 @@ function _Logger {
 		echo -e "$logValue" >> "$LOG_FILE"
 
 		# Build current log file for alerts if we have a sufficient environment
-		if [ "$RUN_DIR/$PROGRAM" != "/" ]; then
+		if [ "$_LOGGER_WRITE_PARTIAL_LOGS" == true ] && [ "$RUN_DIR/$PROGRAM" != "/" ]; then
 			echo -e "$logValue" >> "$RUN_DIR/$PROGRAM._Logger.$SCRIPT_PID.$TSTAMP"
 		fi
 	fi
@@ -290,18 +292,18 @@ function Logger {
 	if [ "$level" == "CRITICAL" ]; then
 		_Logger "$prefix($level):$value" "$prefix\e[1;33;41m$value\e[0m" true
 		ERROR_ALERT=true
-		# ERROR_ALERT / WARN_ALERT is not set in main when Logger is called from a subprocess. Need to keep this flag.
-		echo -e "[$retval] in [$(joinString , ${FUNCNAME[@]})] SP=$SCRIPT_PID P=$$\n$prefix($level):$value" >> "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.error.$SCRIPT_PID.$TSTAMP"
+		# ERROR_ALERT / WARN_ALERT is not set in main when Logger is called from a subprocess. We need to create these flag files for ERROR_ALERT / WARN_ALERT to be picked up by Alert
+		echo -e "[$retval] in [$(joinString , ${FUNCNAME[@]})] SP=$SCRIPT_PID P=$$\n$prefix($level):$value" >> "$RUN_DIR/$PROGRAM.ERROR_ALERT.$SCRIPT_PID.$TSTAMP"
 		return
 	elif [ "$level" == "ERROR" ]; then
 		_Logger "$prefix($level):$value" "$prefix\e[91m$value\e[0m" true
 		ERROR_ALERT=true
-		echo -e "[$retval] in [$(joinString , ${FUNCNAME[@]})] SP=$SCRIPT_PID P=$$\n$prefix($level):$value" >> "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.error.$SCRIPT_PID.$TSTAMP"
+		echo -e "[$retval] in [$(joinString , ${FUNCNAME[@]})] SP=$SCRIPT_PID P=$$\n$prefix($level):$value" >> "$RUN_DIR/$PROGRAM.ERROR_ALERT.$SCRIPT_PID.$TSTAMP"
 		return
 	elif [ "$level" == "WARN" ]; then
 		_Logger "$prefix($level):$value" "$prefix\e[33m$value\e[0m" true
 		WARN_ALERT=true
-		echo -e "[$retval] in [$(joinString , ${FUNCNAME[@]})] SP=$SCRIPT_PID P=$$\n$prefix($level):$value" >> "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.warn.$SCRIPT_PID.$TSTAMP"
+		echo -e "[$retval] in [$(joinString , ${FUNCNAME[@]})] SP=$SCRIPT_PID P=$$\n$prefix($level):$value" >> "$RUN_DIR/$PROGRAM.WARN_ALERT.$SCRIPT_PID.$TSTAMP"
 		return
 	elif [ "$level" == "NOTICE" ]; then
 		if [ "$_LOGGER_ERR_ONLY" != true ]; then
@@ -423,11 +425,11 @@ function GenericTrapQuit {
 	local exitcode=0
 
 	# Get ERROR / WARN alert flags from subprocesses that call Logger
-	if [ -f "$RUN_DIR/$PROGRAM.Logger.warn.$SCRIPT_PID.$TSTAMP" ]; then
+	if [ -f "$RUN_DIR/$PROGRAM.WARN_ALERT.$SCRIPT_PID.$TSTAMP" ]; then
 		WARN_ALERT=true
 		exitcode=2
 	fi
-	if [ -f "$RUN_DIR/$PROGRAM.Logger.error.$SCRIPT_PID.$TSTAMP" ]; then
+	if [ -f "$RUN_DIR/$PROGRAM.ERROR_ALERT.$SCRIPT_PID.$TSTAMP" ]; then
 		ERROR_ALERT=true
 		exitcode=1
 	fi
@@ -487,7 +489,11 @@ function SendAlert {
 		fi
 	fi
 
-	body="$MAIL_ALERT_MSG"$'\n\n'"Last 1000 lines of current log"$'\n\n'"$(tail -n 1000 "$RUN_DIR/$PROGRAM._Logger.$SCRIPT_PID.$TSTAMP")"
+	if [ "$_LOGGER_WRITE_PARTIAL_LOGS" == true ]; then
+		body="$MAIL_ALERT_MSG"$'\n\n'"Last 1000 lines of current log"$'\n\n'"$(tail -n 1000 "$RUN_DIR/$PROGRAM._Logger.$SCRIPT_PID.$TSTAMP")"
+	else
+		body="$MAIL_ALERT_MSG"$'\n\n'"Last 1000 lines of current log"$'\n\n'"$(tail -n 1000 "$LOG_FILE")"
+	fi
 
 	if [ $ERROR_ALERT == true ]; then
 		subject="Error alert for $INSTANCE_ID"
@@ -498,7 +504,7 @@ function SendAlert {
 	fi
 
 	if [ $runAlert == true ]; then
-		subject="Currently runing - $subject"
+		subject="Currently running - $subject"
 	else
 		subject="Finished run - $subject"
 	fi
@@ -980,7 +986,7 @@ function ExecTasks {
 
 	# soft / hard execution time checks that needs to be a subfunction since it is called both from main loop and from parallelExec sub loop
 	function _ExecTasksTimeCheck {
-		if [ $spinner == true ]; then
+		if [ $spinner == true ] && [ "$_OFUNCTIONS_SHOW_SPINNER" != false ]; then
 			Spinner
 		fi
 		if [ $counting == true ]; then
@@ -2248,12 +2254,23 @@ function InitRemoteOSDependingSettings {
 
 	## Set rsync default arguments (complete with -r or -d depending on recursivity later)
 	RSYNC_DEFAULT_ARGS="-ltD -8"
+
+	## NPF-MOD: Regarding #242, we need to add --old-args if rsync > 3.2.3
+	#rsync_version=$("${RSYNC_EXECUTABLE}" --version 2>/dev/null| head -1 | awk '{print $3}')
+	#if [ $(VerComp $rsync_version 3.2.3) -eq 1 ]; then
+	#	RSYNC_DEFAULT_ARGS="$RSYNC_DEFAULT_ARGS --old-args"
+	#fi
+	# NPF-MOD: Strangely enough, also happens on RHEL7 rsync 3.1.1
+	# Let's resolve this easier
+	export RSYNC_OLD_ARGS=1
+
 	if [ "$_DRYRUN" == true ]; then
 		RSYNC_DRY_ARG="-n"
 		DRY_WARNING="/!\ DRY RUN "
 	else
 		RSYNC_DRY_ARG=""
 	fi
+
 
 	RSYNC_ATTR_ARGS=""
 	if [ "$PRESERVE_PERMISSIONS" != false ]; then
@@ -2477,16 +2494,8 @@ function FileMove () {
 		mv -f "$source" "$dest"
 		return $?
 	elif [ -w "$source" ]; then
-		if [ -f "$dest" ]; then # for files we don't need recursive delete
-			rm -f "$dest"
-		elif [ -d "$dest" ]; then # for directories we need recursive delete
-			rm -rf "$dest"
-		fi
-		if [ -f "$source" ]; then
-			cp -p "$source" "$dest" && rm -f "$source" # for files we don't need recursive copy & delete
-		elif [ -d "$source" ]; then
-			cp -rp "$source" "$dest" && rm -rf "$source" # for directories we need recursive copy & delete
-		fi
+		[ -f "$dest" ] && rm -f "$dest"
+		cp -p "$source" "$dest" && rm -f "$source"
 		return $?
 	else
 		return -1
@@ -2641,6 +2650,7 @@ _OFUNCTIONS_BOOTSTRAP=true
 [ "$_OFUNCTIONS_BOOTSTRAP" != true ] && echo "Please use bootstrap.sh to load this dev version of $(basename $0) or build it with merge.sh" && exit 1
 
 _LOGGER_PREFIX="time"
+_LOGGER_WRITE_PARTIAL_LOGS=true
 
 ## Working directory. This directory exists in any replica and contains state files, backups, soft deleted files etc
 OSYNC_DIR=".osync_workdir"
@@ -3056,7 +3066,7 @@ function _Logger {
 		echo -e "$logValue" >> "$LOG_FILE"
 
 		# Build current log file for alerts if we have a sufficient environment
-		if [ "$RUN_DIR/$PROGRAM" != "/" ]; then
+		if [ "$_LOGGER_WRITE_PARTIAL_LOGS" == true ] && [ "$RUN_DIR/$PROGRAM" != "/" ]; then
 			echo -e "$logValue" >> "$RUN_DIR/$PROGRAM._Logger.$SCRIPT_PID.$TSTAMP"
 		fi
 	fi
@@ -3485,7 +3495,7 @@ function _Logger {
 		echo -e "$logValue" >> "$LOG_FILE"
 
 		# Build current log file for alerts if we have a sufficient environment
-		if [ "$RUN_DIR/$PROGRAM" != "/" ]; then
+		if [ "$_LOGGER_WRITE_PARTIAL_LOGS" == true ] && [ "$RUN_DIR/$PROGRAM" != "/" ]; then
 			echo -e "$logValue" >> "$RUN_DIR/$PROGRAM._Logger.$SCRIPT_PID.$TSTAMP"
 		fi
 	fi
@@ -4118,7 +4128,7 @@ function _Logger {
 		echo -e "$logValue" >> "$LOG_FILE"
 
 		# Build current log file for alerts if we have a sufficient environment
-		if [ "$RUN_DIR/$PROGRAM" != "/" ]; then
+		if [ "$_LOGGER_WRITE_PARTIAL_LOGS" == true ] && [ "$RUN_DIR/$PROGRAM" != "/" ]; then
 			echo -e "$logValue" >> "$RUN_DIR/$PROGRAM._Logger.$SCRIPT_PID.$TSTAMP"
 		fi
 	fi
@@ -4768,7 +4778,7 @@ function _Logger {
 		echo -e "$logValue" >> "$LOG_FILE"
 
 		# Build current log file for alerts if we have a sufficient environment
-		if [ "$RUN_DIR/$PROGRAM" != "/" ]; then
+		if [ "$_LOGGER_WRITE_PARTIAL_LOGS" == true ] && [ "$RUN_DIR/$PROGRAM" != "/" ]; then
 			echo -e "$logValue" >> "$RUN_DIR/$PROGRAM._Logger.$SCRIPT_PID.$TSTAMP"
 		fi
 	fi
@@ -4873,16 +4883,8 @@ function FileMove () {
 		mv -f "$source" "$dest"
 		return $?
 	elif [ -w "$source" ]; then
-		if [ -f "$dest" ]; then # for files we don't need recursive delete
-			rm -f "$dest"
-		elif [ -d "$dest" ]; then # for directories we need recursive delete
-			rm -rf "$dest"
-		fi
-		if [ -f "$source" ]; then
-			cp -p "$source" "$dest" && rm -f "$source" # for files we don't need recursive copy & delete
-		elif [ -d "$source" ]; then
-			cp -rp "$source" "$dest" && rm -rf "$source" # for directories we need recursive copy & delete
-		fi
+		[ -f "$dest" ] && rm -f "$dest"
+		cp -p "$source" "$dest" && rm -f "$source"
 		return $?
 	else
 		return -1
@@ -5783,7 +5785,7 @@ function _Logger {
 		echo -e "$logValue" >> "$LOG_FILE"
 
 		# Build current log file for alerts if we have a sufficient environment
-		if [ "$RUN_DIR/$PROGRAM" != "/" ]; then
+		if [ "$_LOGGER_WRITE_PARTIAL_LOGS" == true ] && [ "$RUN_DIR/$PROGRAM" != "/" ]; then
 			echo -e "$logValue" >> "$RUN_DIR/$PROGRAM._Logger.$SCRIPT_PID.$TSTAMP"
 		fi
 	fi
@@ -6071,7 +6073,7 @@ function _Logger {
 		echo -e "$logValue" >> "$LOG_FILE"
 
 		# Build current log file for alerts if we have a sufficient environment
-		if [ "$RUN_DIR/$PROGRAM" != "/" ]; then
+		if [ "$_LOGGER_WRITE_PARTIAL_LOGS" == true ] && [ "$RUN_DIR/$PROGRAM" != "/" ]; then
 			echo -e "$logValue" >> "$RUN_DIR/$PROGRAM._Logger.$SCRIPT_PID.$TSTAMP"
 		fi
 	fi
@@ -6596,6 +6598,7 @@ function Usage {
 	echo "--no-prefix            Will suppress time / date suffix from output"
 	echo "--silent               Will run osync without any output to stdout, used for cron jobs"
 	echo "--errors-only          Output only errors (can be combined with silent or verbose)"
+	echo "--non-interactive      Don't show running animation in cron / service mode"
 	echo "--summary              Outputs a list of transferred / deleted files at the end of the run"
 	echo "--log-conflicts        [EXPERIMENTAL] Outputs a list of conflicted files"
 	echo "--alert-conflicts      Send an email if conflictual files found (implies --log-conflicts)"
@@ -6871,6 +6874,10 @@ function GetCommandlineArguments {
 			--errors-only)
 			opts=$opts" --errors-only"
 			_LOGGER_ERR_ONLY=true
+			;;
+			--non-interactive)
+			opts=$opts" --non-interactive"
+			_OFUNCTIONS_SHOW_SPINNER=false
 			;;
 			--summary)
 			opts=$opts" --summary"

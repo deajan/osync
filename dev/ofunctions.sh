@@ -14,6 +14,7 @@
 ## _LOGGER_VERBOSE=true/false
 ## _LOGGER_ERR_ONLY=true/false
 ## _LOGGER_PREFIX="date"/"time"/""
+## _LOGGER_WRITE_PARTIAL_LOGS=true/false
 
 ## Also, set the following trap in order to clean temporary files
 ## trap GenericTrapQuit TERM EXIT HUP QUIT
@@ -30,8 +31,8 @@
 #### OFUNCTIONS FULL SUBSET ####
 #### OFUNCTIONS MINI SUBSET ####
 #### OFUNCTIONS MICRO SUBSET ####
-_OFUNCTIONS_VERSION=2.4.3
-_OFUNCTIONS_BUILD=2022050801
+_OFUNCTIONS_VERSION=2.5.1
+_OFUNCTIONS_BUILD=2023061401
 #### _OFUNCTIONS_BOOTSTRAP SUBSET ####
 _OFUNCTIONS_BOOTSTRAP=true
 #### _OFUNCTIONS_BOOTSTRAP SUBSET END ####
@@ -56,6 +57,8 @@ _LOGGER_SILENT=false
 _LOGGER_VERBOSE=false
 _LOGGER_ERR_ONLY=false
 _LOGGER_PREFIX="date"
+_LOGGER_WRITE_PARTIAL_LOGS=false			# Writes partial log files to /tmp so sending logs via alerts can feed on them
+_OFUNCTIONS_SHOW_SPINNER=true				# Show spinner in ExecTasks function
 if [ "$KEEP_LOGGING" == "" ]; then
 	KEEP_LOGGING=1801
 fi
@@ -172,7 +175,7 @@ function _Logger {
 		echo -e "$logValue" >> "$LOG_FILE"
 
 		# Build current log file for alerts if we have a sufficient environment
-		if [ "$RUN_DIR/$PROGRAM" != "/" ]; then
+		if [ "$_LOGGER_WRITE_PARTIAL_LOGS" == true ] && [ "$RUN_DIR/$PROGRAM" != "/" ]; then
 			echo -e "$logValue" >> "$RUN_DIR/$PROGRAM._Logger.$SCRIPT_PID.$TSTAMP"
 		fi
 	fi
@@ -289,18 +292,18 @@ function Logger {
 	if [ "$level" == "CRITICAL" ]; then
 		_Logger "$prefix($level):$value" "$prefix\e[1;33;41m$value\e[0m" true
 		ERROR_ALERT=true
-		# ERROR_ALERT / WARN_ALERT is not set in main when Logger is called from a subprocess. Need to keep this flag.
-		echo -e "[$retval] in [$(joinString , ${FUNCNAME[@]})] SP=$SCRIPT_PID P=$$\n$prefix($level):$value" >> "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.error.$SCRIPT_PID.$TSTAMP"
+		# ERROR_ALERT / WARN_ALERT is not set in main when Logger is called from a subprocess. We need to create these flag files for ERROR_ALERT / WARN_ALERT to be picked up by Alert
+		echo -e "[$retval] in [$(joinString , ${FUNCNAME[@]})] SP=$SCRIPT_PID P=$$\n$prefix($level):$value" >> "$RUN_DIR/$PROGRAM.ERROR_ALERT.$SCRIPT_PID.$TSTAMP"
 		return
 	elif [ "$level" == "ERROR" ]; then
 		_Logger "$prefix($level):$value" "$prefix\e[91m$value\e[0m" true
 		ERROR_ALERT=true
-		echo -e "[$retval] in [$(joinString , ${FUNCNAME[@]})] SP=$SCRIPT_PID P=$$\n$prefix($level):$value" >> "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.error.$SCRIPT_PID.$TSTAMP"
+		echo -e "[$retval] in [$(joinString , ${FUNCNAME[@]})] SP=$SCRIPT_PID P=$$\n$prefix($level):$value" >> "$RUN_DIR/$PROGRAM.ERROR_ALERT.$SCRIPT_PID.$TSTAMP"
 		return
 	elif [ "$level" == "WARN" ]; then
 		_Logger "$prefix($level):$value" "$prefix\e[33m$value\e[0m" true
 		WARN_ALERT=true
-		echo -e "[$retval] in [$(joinString , ${FUNCNAME[@]})] SP=$SCRIPT_PID P=$$\n$prefix($level):$value" >> "$RUN_DIR/$PROGRAM.${FUNCNAME[0]}.warn.$SCRIPT_PID.$TSTAMP"
+		echo -e "[$retval] in [$(joinString , ${FUNCNAME[@]})] SP=$SCRIPT_PID P=$$\n$prefix($level):$value" >> "$RUN_DIR/$PROGRAM.WARN_ALERT.$SCRIPT_PID.$TSTAMP"
 		return
 	elif [ "$level" == "NOTICE" ]; then
 		if [ "$_LOGGER_ERR_ONLY" != true ]; then
@@ -426,11 +429,11 @@ function GenericTrapQuit {
 	local exitcode=0
 
 	# Get ERROR / WARN alert flags from subprocesses that call Logger
-	if [ -f "$RUN_DIR/$PROGRAM.Logger.warn.$SCRIPT_PID.$TSTAMP" ]; then
+	if [ -f "$RUN_DIR/$PROGRAM.WARN_ALERT.$SCRIPT_PID.$TSTAMP" ]; then
 		WARN_ALERT=true
 		exitcode=2
 	fi
-	if [ -f "$RUN_DIR/$PROGRAM.Logger.error.$SCRIPT_PID.$TSTAMP" ]; then
+	if [ -f "$RUN_DIR/$PROGRAM.ERROR_ALERT.$SCRIPT_PID.$TSTAMP" ]; then
 		ERROR_ALERT=true
 		exitcode=1
 	fi
@@ -494,7 +497,11 @@ function SendAlert {
 		fi
 	fi
 
-	body="$MAIL_ALERT_MSG"$'\n\n'"Last 1000 lines of current log"$'\n\n'"$(tail -n 1000 "$RUN_DIR/$PROGRAM._Logger.$SCRIPT_PID.$TSTAMP")"
+	if [ "$_LOGGER_WRITE_PARTIAL_LOGS" == true ]; then
+		body="$MAIL_ALERT_MSG"$'\n\n'"Last 1000 lines of current log"$'\n\n'"$(tail -n 1000 "$RUN_DIR/$PROGRAM._Logger.$SCRIPT_PID.$TSTAMP")"
+	else
+		body="$MAIL_ALERT_MSG"$'\n\n'"Last 1000 lines of current log"$'\n\n'"$(tail -n 1000 "$LOG_FILE")"
+	fi
 
 	if [ $ERROR_ALERT == true ]; then
 		subject="Error alert for $INSTANCE_ID"
@@ -505,7 +512,7 @@ function SendAlert {
 	fi
 
 	if [ $runAlert == true ]; then
-		subject="Currently runing - $subject"
+		subject="Currently running - $subject"
 	else
 		subject="Finished run - $subject"
 	fi
@@ -989,7 +996,7 @@ function ExecTasks {
 
 	# soft / hard execution time checks that needs to be a subfunction since it is called both from main loop and from parallelExec sub loop
 	function _ExecTasksTimeCheck {
-		if [ $spinner == true ]; then
+		if [ $spinner == true ] && [ "$_OFUNCTIONS_SHOW_SPINNER" != false ]; then
 			Spinner
 		fi
 		if [ $counting == true ]; then
@@ -2268,12 +2275,23 @@ function InitRemoteOSDependingSettings {
 
 	## Set rsync default arguments (complete with -r or -d depending on recursivity later)
 	RSYNC_DEFAULT_ARGS="-ltD -8"
+
+	## NPF-MOD: Regarding #242, we need to add --old-args if rsync > 3.2.3
+	#rsync_version=$("${RSYNC_EXECUTABLE}" --version 2>/dev/null| head -1 | awk '{print $3}')
+	#if [ $(VerComp $rsync_version 3.2.3) -eq 1 ]; then
+	#	RSYNC_DEFAULT_ARGS="$RSYNC_DEFAULT_ARGS --old-args"
+	#fi
+	# NPF-MOD: Strangely enough, also happens on RHEL7 rsync 3.1.1
+	# Let's resolve this easier
+	export RSYNC_OLD_ARGS=1
+
 	if [ "$_DRYRUN" == true ]; then
 		RSYNC_DRY_ARG="-n"
 		DRY_WARNING="/!\ DRY RUN "
 	else
 		RSYNC_DRY_ARG=""
 	fi
+
 
 	RSYNC_ATTR_ARGS=""
 	if [ "$PRESERVE_PERMISSIONS" != false ]; then
@@ -2504,16 +2522,8 @@ function FileMove () {
 		mv -f "$source" "$dest"
 		return $?
 	elif [ -w "$source" ]; then
-		if [ -f "$dest" ]; then # for files we don't need recursive delete
-			rm -f "$dest"
-		elif [ -d "$dest" ]; then # for directories we need recursive delete
-			rm -rf "$dest"
-		fi
-		if [ -f "$source" ]; then
-			cp -p "$source" "$dest" && rm -f "$source" # for files we don't need recursive copy & delete
-		elif [ -d "$source" ]; then
-			cp -rp "$source" "$dest" && rm -rf "$source" # for directories we need recursive copy & delete
-		fi
+		[ -f "$dest" ] && rm -f "$dest"
+		cp -p "$source" "$dest" && rm -f "$source"
 		return $?
 	else
 		return -1

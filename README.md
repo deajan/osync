@@ -1,4 +1,12 @@
-# osync  [![Build Status](https://travis-ci.org/deajan/osync.svg?branch=master)](https://travis-ci.org/deajan/osync) [![License](https://img.shields.io/badge/License-BSD%203--Clause-blue.svg)](https://opensource.org/licenses/BSD-3-Clause) [![GitHub Release](https://img.shields.io/github/release/deajan/osync.svg?label=Latest)](https://github.com/deajan/osync/releases/latest) [![Percentage of issues still open](http://isitmaintained.com/badge/open/deajan/osync.svg)](http://isitmaintained.com/project/deajan/osync "Percentage of issues still open") [![Codacy Badge](https://api.codacy.com/project/badge/Grade/651acb2fd64642eb91078ba523b7f887)](https://www.codacy.com/app/ozy/osync?utm_source=github.com&amp;utm_medium=referral&amp;utm_content=deajan/osync&amp;utm_campaign=Badge_Grade)
+# osync
+[![License](https://img.shields.io/badge/License-BSD%203--Clause-blue.svg)](https://opensource.org/licenses/BSD-3-Clause)
+[![GitHub Release](https://img.shields.io/github/release/deajan/osync.svg?label=Latest)](https://github.com/deajan/osync/releases/latest)
+[![Percentage of issues still open](http://isitmaintained.com/badge/open/deajan/osync.svg)](http://isitmaintained.com/project/deajan/osync "Percentage of issues still open")
+[![Codacy Badge](https://api.codacy.com/project/badge/Grade/651acb2fd64642eb91078ba523b7f887)](https://www.codacy.com/app/ozy/osync?utm_source=github.com&amp;utm_medium=referral&amp;utm_content=deajan/osync&amp;utm_campaign=Badge_Grade)
+[![linux tests](https://github.com/deajan/osync/actions/workflows/linux.yml/badge.svg)](https://github.com/deajan/osync/actions/workflows/linux.yml/badge.svg)
+[![windows tests](https://github.com/deajan/osync/actions/workflows/windows.yml/badge.svg)](https://github.com/deajan/osync/actions/workflows/windows.yml/badge.svg)
+[![macos tests](https://github.com/deajan/osync/actions/workflows/macos.yml/badge.svg)](https://github.com/deajan/osync/actions/workflows/macos.yml/badge.svg)
+
 
 A two way filesync script running on bash Linux, BSD, Android, MacOSX, Cygwin, MSYS2, Win10 bash  and virtually any system supporting bash).
 File synchronization is bidirectional, and can be run manually, as scheduled task, or triggered on file changes in daemon mode.
@@ -30,8 +38,8 @@ osync uses pidlocks to prevent multiple concurrent sync processes on/to the same
 You may launch concurrent sync processes on the same system but as long as the replicas to synchronize are different.
 Multiple osync tasks may be launched sequentially by osync osync-batch tool.
 
-Currently, it has been tested on CentOS 5.x, 6.x, 7.x, Fedora 22-25, Debian 6-8, Linux Mint 14-18, Ubuntu 12.04-12.10, FreeBSD 8.3-11, Mac OS X, QTS 4.5.1(x86) and pfSense 2.3.x.
-Microsoft Windows is supported via MSYS or Cygwin and now via Windows 10 bash.
+Currently, it has been tested on CentOS 5.x, 6.x, 7.x, AlmaLinux 9, Fedora 22-25, Debian 6-11, Linux Mint 14-18, Ubuntu 12.04-22.04, FreeBSD 8.3-11, Mac OS X, QTS 4.5.1(x86) and pfSense 2.3.x.
+Microsoft Windows is supported via MSYS, Cygwin and or via WSL.
 Android support works via Termux.
 Some users also have successfully used osync on Gentoo and created an openRC init scriptt for it.
 
@@ -39,12 +47,6 @@ Some users also have successfully used osync on Gentoo and created an openRC ini
 
 osync has been designed to not delete any data, but rather make backups of conflictual files or soft deletes.
 Nevertheless, you should always have a neat backup of your data before trying a new sync tool.
-
-You may get osync on github (stable or latest dev snapshot) or on the author's site (stable version)
-Getting osync via author's site on <https://www.netpower.fr/osync>
-
-	$ wget http://www.netpower.fr/projects/osync/osync.v1.2.tar.gz
-	$ tar xvf osync.v1.2.tar.gz
 
 Getting osync via github (remove the -b "stable" if you want latest dev snapshot)
 
@@ -74,11 +76,11 @@ Archlinux packages are available at <https://aur.archlinux.org/packages/osync/> 
 
 Since osync v1.1 the config file format has changed in semantics and adds new config options.
 Also, master is now called initiator and slave is now called target.
-osync v1.2 also added multiple new configuration options.
+osync v1.3 also added multiple new configuration options.
 
-You can upgrade all v1.0x-v1.2-dev config files by running the upgrade script
+You can upgrade all v1.0x-v1.3-dev config files by running the upgrade script
 
-	$ ./upgrade-v1.0x-v1.2x.sh /etc/osync/your-config-file.conf
+	$ ./upgrade-v1.0x-v1.3x.sh /etc/osync/your-config-file.conf
 
 The script will backup your config file, update it's content and try to connect to initiator and target replicas to update the state dir.
 

@@ -10,7 +10,7 @@ PROGRAM_BINARY=$PROGRAM".sh"
 PROGRAM_BATCH=$PROGRAM"-batch.sh"
 SSH_FILTER="ssh_filter.sh"
 
-SCRIPT_BUILD=2020112901
+SCRIPT_BUILD=2023061101
 INSTANCE_ID="installer-$SCRIPT_BUILD"
 
 ## osync / obackup / pmocr / zsnap install script
@@ -80,15 +80,26 @@ function SetLocalOSSettings {
 }
 
 function GetInit {
+	init="none"
 	if [ -f /sbin/openrc-run ]; then
 		init="openrc"
 		Logger "Detected openrc." "NOTICE"
+	elif [ -f /usr/lib/systemd/systemd ]; then
+		init="systemd"
+		Logger "Detected systemd." "NOTICE"
 	elif [ -f /sbin/init ]; then
-		if file /sbin/init | grep systemd > /dev/null; then
-			init="systemd"
-			Logger "Detected systemd." "NOTICE"
+		if type -p file > /dev/null 2>&1; then
+			if file /sbin/init | grep systemd > /dev/null; then
+				init="systemd"
+				Logger "Detected systemd." "NOTICE"
+			else
+				init="initV"
+			fi
 		else
 			init="initV"
+		fi
+
+		if [ $init == "initV" ]; then
 			Logger "Detected initV." "NOTICE"
 		fi
 	else

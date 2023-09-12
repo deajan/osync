@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-# osync test suite 2022070702
+# osync test suite 2023061401
 
 
 # Allows the following environment variables
@@ -50,19 +50,22 @@
 
 if [ "$SKIP_REMOTE" = "" ]; then
 	SKIP_REMOTE=false
+	REMOTE_USER=root
 fi
+
+homedir=$(eval echo ~${REMOTE_USER})
 
 # drupal servers are often unreachable for whetever reason or give 0 bytes files
 #LARGE_FILESET_URL="http://ftp.drupal.org/files/projects/drupal-8.2.2.tar.gz"
 LARGE_FILESET_URL="http://www.netpower.fr/sites/default/files/osync-test-files.tar.gz"
 
-# Fakeroot for install / uninstall and test of executables
-FAKEROOT="${HOME}/osync_test_install"
-
 OSYNC_DIR="$(pwd)"
 OSYNC_DIR=${OSYNC_DIR%%/dev*}
 DEV_DIR="$OSYNC_DIR/dev"
 TESTS_DIR="$DEV_DIR/tests"
+
+# Fakeroot for install / uninstall and test of executables
+FAKEROOT="${homedir}/osync_test_install"
 
 CONF_DIR="$TESTS_DIR/conf"
 LOCAL_CONF="local.conf"
@@ -76,7 +79,7 @@ OSYNC_UPGRADE="upgrade-v1.0x-v1.3x.sh"
 TMP_FILE="$DEV_DIR/tmp"
 
 
-OSYNC_TESTS_DIR="${HOME}/osync-tests"
+OSYNC_TESTS_DIR="${homedir}/osync-tests"
 INITIATOR_DIR="$OSYNC_TESTS_DIR/initiator"
 TARGET_DIR="$OSYNC_TESTS_DIR/target"
 OSYNC_WORKDIR=".osync_workdir"
@@ -93,46 +96,52 @@ PRIVKEY_NAME="id_rsa_local_osync_tests"
 PUBKEY_NAME="${PRIVKEY_NAME}.pub"
 
 function SetupSSH {
-	echo "Setting up an ssh key to ${HOME}/.ssh/${PRIVKEY_NAME}"
-	echo -e  'y\n'| ssh-keygen -t rsa -b 2048 -N "" -f "${HOME}/.ssh/${PRIVKEY_NAME}"
+	echo "Setting up an ssh key to ${homedir}/.ssh/${PRIVKEY_NAME}"
+	echo -e  'y\n'| ssh-keygen -t rsa -b 2048 -N "" -f "${homedir}/.ssh/${PRIVKEY_NAME}"
 
-	SSH_AUTH_LINE="from=\"*\",no-port-forwarding,no-X11-forwarding,no-agent-forwarding,no-pty,command=\"$FAKEROOT/usr/local/bin/ssh_filter.sh SomeAlphaNumericToken9\" $(cat ${HOME}/.ssh/${PUBKEY_NAME})"
-	echo "ls -alh ${HOME}"
-	ls -alh "${HOME}"
-	echo "ls -alh ${HOME}/.ssh"
-	ls -alh "${HOME}/.ssh"
 
-	if [ -f "${HOME}/.ssh/authorized_keys" ]; then
-		if ! grep "$(cat ${HOME}/.ssh/${PUBKEY_NAME})" "${HOME}/.ssh/authorized_keys"; then
-			echo "$SSH_AUTH_LINE" >> "${HOME}/.ssh/authorized_keys"
+
+	SSH_AUTH_LINE="from=\"*\",no-port-forwarding,no-X11-forwarding,no-agent-forwarding,no-pty,command=\"$FAKEROOT/usr/local/bin/ssh_filter.sh SomeAlphaNumericToken9\" $(cat ${homedir}/.ssh/${PUBKEY_NAME})"
+	echo "ls -alh ${homedir}"
+	ls -alh "${homedir}"
+	echo "ls -alh ${homedir}/.ssh"
+	ls -alh "${homedir}/.ssh"
+
+	if [ -f "${homedir}/.ssh/authorized_keys" ]; then
+		if ! grep "$(cat ${homedir}/.ssh/${PUBKEY_NAME})" "${homedir}/.ssh/authorized_keys"; then
+			echo "Adding auth line in authorized_keys file ${homedir}/.ssh/authorized_keys"
+			echo "$SSH_AUTH_LINE" >> "${homedir}/.ssh/authorized_keys"
 		fi
 	else
-		echo "$SSH_AUTH_LINE" >> "${HOME}/.ssh/authorized_keys"
+		echo "Creating authorized_keys file ${homedir}/.ssh/authorized_keys"
+		echo "$SSH_AUTH_LINE" >> "${homedir}/.ssh/authorized_keys"
 	fi
-	chmod 600 "${HOME}/.ssh/authorized_keys"
+	chmod 600 "${homedir}/.ssh/authorized_keys"
 
 	# Add localhost to known hosts so self connect works
 	if [ -z "$(ssh-keygen -F localhost)" ]; then
-		ssh-keyscan -H localhost >> "${HOME}/.ssh/known_hosts"
+		ssh-keyscan -H localhost >> "${homedir}/.ssh/known_hosts"
 	fi
 
-	# Update remote conf files with SSH port
-	sed -i.tmp 's#ssh://.*@localhost:[0-9]*/${HOME}/osync-tests/target#ssh://'$REMOTE_USER'@localhost:'$SSH_PORT'/${HOME}/osync-tests/target#' "$CONF_DIR/$REMOTE_CONF"
+	# Update remote conf files with SSH port and file id location
+	sed -i.tmp 's#ssh://.*@localhost:[0-9]*/${HOME}/osync-tests/target#ssh://'$REMOTE_USER'@localhost:'$SSH_PORT'/'${homedir}'/osync-tests/target#' "$CONF_DIR/$REMOTE_CONF"
+	sed -i.tmp2 's#SSH_RSA_PRIVATE_KEY="${HOME}/.ssh/id_rsa_local_osync_tests"#SSH_RSA_PRIVATE_KEY="'${homedir}'/.ssh/id_rsa_local_osync_tests"#' "$CONF_DIR/$REMOTE_CONF"
 
-	echp "ls -alh ${HOME}/.ssh"
-	ls -alh "${HOME}/.ssh"
-	echo "cat ${HOME}/.ssh.authorized_keys" 
-	cat "${HOME}/.ssh/authorized_keys"
+	echo "ls -alh ${homedir}/.ssh"
+	ls -alh "${homedir}/.ssh"
+	echo "cat ${homedir}/.ssh/authorized_keys" 
+	cat "${homedir}/.ssh/authorized_keys"
 	
 	echo "###"
 	echo "END SETUP SSH"
 }
 
 function RemoveSSH {
-	if [ -f "${HOME}/.ssh/id_rsa_local_osync_tests" ]; then
+	echo "Now removing SSH keys"
+	if [ -f "${homedir}/.ssh/id_rsa_local_osync_tests" ]; then
 		echo "Restoring SSH authorized_keys file"
-		sed -i.bak "s|.*$(cat "${HOME}/.ssh/id_rsa_local_osync_tests.pub")||g" "${HOME}/.ssh/authorized_keys"
-		rm -f "${HOME}/.ssh/{id_rsa_local_osync_tests.pub,id_rsa_local_osync_tests}"
+		sed -i.bak "s|.*$(cat "${homedir}/.ssh/id_rsa_local_osync_tests.pub")||g" "${homedir}/.ssh/authorized_keys"
+		rm -f "${homedir}/.ssh/{id_rsa_local_osync_tests.pub,id_rsa_local_osync_tests}"
 	fi
 }
 
@@ -192,8 +201,16 @@ function PrepareLocalDirs () {
 function oneTimeSetUp () {
 	START_TIME=$SECONDS
 
-	mkdir -p "$FAKEROOT"
+	#echo "Running forced merge"
+	#cd "${DEV_DIR}"
+	#$SUDO_CMD ./merge.sh osync
+	echo "Setting security for files"
+	$SUDO_CMD find ${OSYNC_DIR} -exec chmod 755 {} \+ 
 
+	echo "Show content of osync dir"
+	ls -alh ${OSYNC_DIR}
+	echo "Running install.sh from ${OSYNC_DIR}"
+	$SUDO_CMD ${OSYNC_DIR}/install.sh --no-stats --prefix="${FAKEROOT}"
 	source "$DEV_DIR/ofunctions.sh"
 
 	# Fix default umask because of ACL test that expects 0022 when creating test files
@@ -206,16 +223,20 @@ function oneTimeSetUp () {
 	# Set some travis related changes
 	if [ "$RUNNING_ON_GITHUB_ACTIONS" == true ]; then
 	echo "Running with GITHUB ACTIONS settings"
-		REMOTE_USER="runner"
+		#REMOTE_USER="runner"
+		REMOTE_USER="root" # WIP
+		homedir=$(eval echo ~${REMOTE_USER})
 		RHOST_PING=false
 		SetConfFileValue "$CONF_DIR/$REMOTE_CONF" "REMOTE_3RD_PARTY_HOSTS" ""
 		SetConfFileValue "$CONF_DIR/$REMOTE_CONF" "REMOTE_HOST_PING" false
 
 		SetConfFileValue "$CONF_DIR/$OLD_CONF" "REMOTE_3RD_PARTY_HOSTS" ""
 		SetConfFileValue "$CONF_DIR/$OLD_CONF" "REMOTE_HOST_PING" false
+
 	else
 		echo "Running with local settings"
 		REMOTE_USER="root"
+		homedir=$(eval echo ~${REMOTE_USER})
 		RHOST_PING=true
 		SetConfFileValue "$CONF_DIR/$REMOTE_CONF" "REMOTE_3RD_PARTY_HOSTS" "\"www.kernel.org www.google.com\""
 		SetConfFileValue "$CONF_DIR/$REMOTE_CONF" "REMOTE_HOST_PING" true
@@ -224,9 +245,21 @@ function oneTimeSetUp () {
 		SetConfFileValue "$CONF_DIR/$OLD_CONF" "REMOTE_HOST_PING" true
 	fi
 
+
+	# Fix test directories for Github actions
+	SetConfFileValue "$CONF_DIR/$LOCAL_CONF" INITIATOR_SYNC_DIR "\"${homedir}/osync-tests/initiator\""
+	SetConfFileValue "$CONF_DIR/$LOCAL_CONF" TARGET_SYNC_DIR "\"${homedir}/osync-tests/target\""
+
+	SetConfFileValue "$CONF_DIR/$REMOTE_CONF" INITIATOR_SYNC_DIR "\"${homedir}/osync-tests/initiator\""
+
+	SetConfFileValue "$CONF_DIR/$OLD_CONF" MASTER_SYNC_DIR "\"${homedir}/osync-tests/initiator\""
+	SetConfFileValue "$CONF_DIR/$OLD_CONF" SLAVE_SYNC_DIR "\"${homedir}/osync-tests/target\""
+
+
 	# Get default ssh port from env
 	if [ "$SSH_PORT" == "" ]; then
 		SSH_PORT=22
+		echo "Running with SSH_PORT=${SSH_PORT}"
 	fi
 
 	# Setup modes per test
@@ -236,8 +269,8 @@ function oneTimeSetUp () {
 	readonly __confRemote=3
 
 	osyncParameters=()
-	osyncParameters[$__quickLocal]="--initiator=$INITIATOR_DIR --target=$TARGET_DIR --instance-id=quicklocal"
-	osyncParameters[$__confLocal]="$CONF_DIR/$LOCAL_CONF"
+	osyncParameters[$__quickLocal]="--initiator=$INITIATOR_DIR --target=$TARGET_DIR --instance-id=quicklocal --non-interactive"
+	osyncParameters[$__confLocal]="$CONF_DIR/$LOCAL_CONF --non-interactive"
 
 	osyncDaemonParameters=()
 
@@ -248,8 +281,8 @@ function oneTimeSetUp () {
 
   # Do not check remote config on msys or cygwin since we don't have a local SSH server
 	if [ "$LOCAL_OS" != "msys" ] && [ "$LOCAL_OS" != "Cygwin" ] && [ $SKIP_REMOTE != true ]; then
-		osyncParameters[$__quickRemote]="--initiator=$INITIATOR_DIR --target=ssh://localhost:$SSH_PORT/$TARGET_DIR --rsakey=${HOME}/.ssh/id_rsa_local_osync_tests --instance-id=quickremote --remote-token=SomeAlphaNumericToken9"
-		osyncParameters[$__confRemote]="$CONF_DIR/$REMOTE_CONF"
+		osyncParameters[$__quickRemote]="--initiator=$INITIATOR_DIR --target=ssh://localhost:$SSH_PORT/$TARGET_DIR --rsakey=${homedir}/.ssh/id_rsa_local_osync_tests --instance-id=quickremote --remote-token=SomeAlphaNumericToken9 --non-interactive"
+		osyncParameters[$__confRemote]="$CONF_DIR/$REMOTE_CONF --non-interactive"
 
 		osyncDaemonParameters[$__remote]="$CONF_DIR/$REMOTE_CONF --on-changes"
 
@@ -331,20 +364,28 @@ function test_SSH {
 
 	failure=false
 
+	# Testing as "remote user"
+	echo "ls -alh ${homedir}/.ssh"
+	ls -alh "${homedir}/.ssh"
+
 	echo "Running SSH test as ${REMOTE_USER}"
 	# SSH_PORT and SSH_USER are set by oneTimeSetup
-	ssh -i "${REMOTE_USER}/.ssh/${PUBKEY_NAME}" -p $SSH_PORT ${REMOTE_USER}@localhost "echo \"Remotely:\"; whoami; echo \"TEST OK\""
+	$SUDO_CMD ssh -i "${homedir}/.ssh/${PRIVKEY_NAME}" -p $SSH_PORT ${REMOTE_USER}@localhost "env _REMOTE_TOKEN=SomeAlphaNumericToken9 echo \"Remotely:\"; whoami; echo \"TEST OK\""
 	if [ $? -ne 0 ]; then
 		echo "SSH test failed"
 		failure=true
 	fi
+
+	# Testing as current user
+	#echo "ls -alh ${homedir}/.ssh"
+	#ls -alh "${homedir}/.ssh"
 	
-	echo "Running SSH test as $(whoami)"
-	ssh -i "$(whoami)/.ssh/${PUBKEY_NAME}" -p $SSH_PORT $(whoami)@localhost "echo \"Remotely:\"; whoami; echo \"TEST OK\""
-	if [ $? -ne 0 ]; then
-		echo "SSH test failed"
-		failure=true
-	fi
+	#echo "Running SSH test as $(whoami)"
+	#$SUDO_CMD ssh -i "${homedir}/.ssh/${PRIVKEY_NAME}" -p $SSH_PORT $(whoami)@localhost "env _REMOTE_TOKEN=SomeAlphaNumericToken9 echo \"Remotely:\"; whoami; echo \"TEST OK\""
+	#if [ $? -ne 0 ]; then
+	#	echo "SSH test failed"
+	#	failure=true
+	#fi
 	
 	if [ $failure == true ]; then
 		exit 1 # Try to see if we can abort all tests
@@ -382,7 +423,7 @@ function test_Merge () {
 	assertEquals "Install failed" "0" $?
 }
 
-function xtest_LargeFileSet () {
+function test_LargeFileSet () {
 	for i in "${osyncParameters[@]}"; do
 		cd "$OSYNC_DIR"
 
@@ -400,7 +441,7 @@ function xtest_LargeFileSet () {
 	done
 }
 
-function xtest_controlMaster () {
+function test_controlMaster () {
 	cd "$OSYNC_DIR"
 
 	PrepareLocalDirs
@@ -409,7 +450,7 @@ function xtest_controlMaster () {
 	assertEquals "Running quick remote test with controlmaster enabled." "0" $?
 }
 
-function xtest_Exclusions () {
+function test_Exclusions () {
 	# Will sync except php files
 	# RSYNC_EXCLUDE_PATTERN="*.php" is set at runtime for quicksync and in config files for other runs
 
@@ -437,7 +478,7 @@ function xtest_Exclusions () {
 	done
 }
 
-function xtest_Deletetion () {
+function test_Deletetion () {
 	local iFile1="$INITIATOR_DIR/i fic"
 	local iFile2="$INITIATOR_DIR/i foc (something)"
 	local tFile1="$TARGET_DIR/t fic"
@@ -481,7 +522,7 @@ function xtest_Deletetion () {
 	done
 }
 
-function xtest_deletion_failure () {
+function test_deletion_failure () {
 	if [ "$LOCAL_OS" == "WinNT10" ] || [ "$LOCAL_OS" == "msys" ] || [ "$LOCAL_OS" == "Cygwin" ]; then
 		echo "Skipping deletion failure test as Win10 does not have chattr  support."
 		return 0
@@ -548,7 +589,7 @@ function xtest_deletion_failure () {
 	done
 }
 
-function xtest_skip_deletion () {
+function test_skip_deletion () {
 	local modes
 
 	if [ "$OSYNC_MIN_VERSION" == "1" ]; then
@@ -624,7 +665,7 @@ function xtest_skip_deletion () {
 	SetConfFileValue "$CONF_DIR/$REMOTE_CONF" "SKIP_DELETION" ""
 }
 
-function xtest_handle_symlinks () {
+function test_handle_symlinks () {
 	if [ "$OSYNC_MIN_VERSION" == "1" ]; then
 		echo "Skipping symlink tests as osync v1.1x didn't handle this."
 		return 0
@@ -805,7 +846,7 @@ function xtest_handle_symlinks () {
 	done
 }
 
-function xtest_softdeletion_cleanup () {
+function test_softdeletion_cleanup () {
 	#declare -A files
 
 	files=()
@@ -882,7 +923,7 @@ function xtest_softdeletion_cleanup () {
 
 }
 
-function xtest_FileAttributePropagation () {
+function test_FileAttributePropagation () {
 
 	if [ "$RUNNING_ON_GITHUB_ACTIONS" == true ]; then
 		echo "Skipping FileAttributePropagation tests as travis does not support getfacl / setfacl."
@@ -970,7 +1011,7 @@ function xtest_FileAttributePropagation () {
         SetConfFileValue "$CONF_DIR/$REMOTE_CONF" "PRESERVE_XATTR" false
 }
 
-function xtest_ConflictBackups () {
+function test_ConflictBackups () {
 	for i in "${osyncParameters[@]}"; do
 		cd "$OSYNC_DIR"
 		PrepareLocalDirs
@@ -1006,7 +1047,7 @@ function xtest_ConflictBackups () {
 	done
 }
 
-function xtest_MultipleConflictBackups () {
+function test_MultipleConflictBackups () {
 
 	local additionalParameters
 
@@ -1068,7 +1109,7 @@ function xtest_MultipleConflictBackups () {
 	SetConfFileValue "$CONF_DIR/$REMOTE_CONF" "CONFLICT_BACKUP_MULTIPLE" false
 }
 
-function xtest_Locking () {
+function test_Locking () {
 # local not running = resume
 # remote same instance_id = resume
 # remote different instance_id = stop
@@ -1175,7 +1216,7 @@ function xtest_Locking () {
 	SetConfFileValue "$CONF_DIR/$REMOTE_CONF" "FORCE_STRANGER_LOCK_RESUME" false
 }
 
-function xtest_ConflictDetetion () {
+function test_ConflictDetetion () {
 	# Tests compatible with v1.4+
 
 	if [ $OSYNC_MIN_VERSION -lt 4 ]; then
@@ -1226,7 +1267,7 @@ function xtest_ConflictDetetion () {
 	return 0
 }
 
-function xtest_WaitForTaskCompletion () {
+function test_WaitForTaskCompletion () {
 	local pids
 
 	# Tests compatible with v1.1 syntax
@@ -1320,7 +1361,7 @@ function xtest_WaitForTaskCompletion () {
 	assertEquals "WaitForTaskCompletion test 5" "2" $?
 }
 
-function xtest_ParallelExec () {
+function test_ParallelExec () {
 	if [ "$OSYNC_MIN_VERSION" == "1" ]; then
 		echo "Skipping ParallelExec test because osync v1.1 ofunctions don't have this function."
 		return 0
@@ -1381,7 +1422,7 @@ function xtest_ParallelExec () {
 	assertNotEquals "ParallelExec full test 3" "0" $?
 }
 
-function xtest_timedExecution () {
+function test_timedExecution () {
 	local arguments
 
 	# Clever usage of indexes and exit codes
@@ -1427,7 +1468,7 @@ function xtest_timedExecution () {
 	done
 }
 
-function xtest_UpgradeConfRun () {
+function test_UpgradeConfRun () {
 	if [ "$OSYNC_MIN_VERSION" == "1" ]; then
 		echo "Skipping Upgrade script test because no further dev will happen on this for v1.1"
 		return 0
@@ -1444,7 +1485,7 @@ function xtest_UpgradeConfRun () {
 	assertEquals "Conf file upgrade" "0" $?
 
 	# Update remote conf files with SSH port
-	sed -i.tmp 's#ssh://.*@localhost:[0-9]*/${HOME}/osync-tests/target#ssh://'$REMOTE_USER'@localhost:'$SSH_PORT'/${HOME}/osync-tests/target#' "$CONF_DIR/$TMP_OLD_CONF"
+	sed -i.tmp 's#ssh://.*@localhost:[0-9]*/${homedir}/osync-tests/target#ssh://'$REMOTE_USER'@localhost:'$SSH_PORT'/${homedir}/osync-tests/target#' "$CONF_DIR/$TMP_OLD_CONF"
 
 	$OSYNC_EXECUTABLE "$CONF_DIR/$TMP_OLD_CONF"
 	assertEquals "Upgraded conf file execution test" "0" $?
@@ -1453,7 +1494,7 @@ function xtest_UpgradeConfRun () {
 	rm -f "$CONF_DIR/$TMP_OLD_CONF.save"
 }
 
-function xtest_DaemonMode () {
+function test_DaemonMode () {
 	if [ "$LOCAL_OS" == "WinNT10" ] || [ "$LOCAL_OS" == "msys" ] || [ "$LOCAL_OS" == "Cygwin" ]; then
 		echo "Skipping daemon mode test as [$LOCAL_OS] does not have inotifywait support."
 		return 0
@@ -1509,7 +1550,7 @@ function xtest_DaemonMode () {
 
 }
 
-function xtest_NoRemoteAccessTest () {
+function test_NoRemoteAccessTest () {
 	RemoveSSH
 
 	cd "$OSYNC_DIR"
