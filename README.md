@@ -9,7 +9,7 @@
 
 
 A two way filesync script running on bash Linux, BSD, Android, MacOSX, Cygwin, MSYS2, Win10 bash and virtually any system supporting bash.
-File synchronization is bidirectional, and can be run manually, as scheduled task, or triggered on file changes in daemon mode.
+File synchronization is bidirectional, and can be run manually, as scheduled task, or triggered on file changes in monitor mode.
 It is a command line tool rsync wrapper with a lot of additional features baked in.
 
 This is a quickstart guide, you can find the full documentation on the [author's site](http://www.netpower.fr/osync).
@@ -86,7 +86,7 @@ The script will backup your config file, update it's content and try to connect 
 
 ## Usage
 
-Osync can work with in three flavors: Quick sync mode, configuration file mode, and daemon mode.
+Osync can work with in three flavors: Quick sync mode, configuration file mode, and monitor mode.
 While quick sync mode is convenient to do fast syncs between some directories, a configuration file gives much more functionality.
 Please use double quotes as path delimiters. Do not use escaped characters in path names.
 
@@ -149,14 +149,15 @@ Having multiple conf files can then be run in a single cron command like
 
 	00 00 * * * root /usr/local/bin/osync-batch.sh --path=/etc/osync --silent
 
-### Daemon mode
+### Monitor mode
+
+> [!NOTE]
+> Monitoring changes requires inotifywait command (inotify-tools package for most Linux distributions) BSD, macOS and Windows are not yet supported for this operation mode, unless you find an inotify-tools package on these OSes.
 
 Additionaly, you may run osync in monitor mode, which means it will perform a sync upon file operations on initiator replica.
 This can be a drawback on functionality versus scheduled mode because this mode only launches a sync task if there are file modifications on the initiator replica, without being able to monitor the target replica.
 Target replica changes are only synced when initiator replica changes occur, or when a given amount of time (default 600 seconds) passed without any changes on initiator replica.
 File monitor mode can also be launched as a daemon with an init script. Please read the documentation for more info.
-Note that monitoring changes requires inotifywait command (inotify-tools package for most Linux distributions).
-BSD, macOS and Windows are not yet supported for this operation mode, unless you find an inotify-tools package on these OSes.
 
 	# osync.sh /etc/osync/my_sync.conf --on-changes
 
