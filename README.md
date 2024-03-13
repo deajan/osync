@@ -86,14 +86,28 @@ The script will backup your config file, update it's content and try to connect 
 
 ## Usage
 
-Osync can work with in three flavors: Quick sync mode, configuration file mode, and monitor mode.
-While quick sync mode is convenient to do fast syncs between some directories, a configuration file gives much more functionality.
-Please use double quotes as path delimiters. Do not use escaped characters in path names.
+Osync can work in 3 modes:
+1. [:rocket: Quick sync mode](#quick-sync-mode)
+2. [:gear: Configuration file mode](#configuration-file-mode)
+3. [:mag_right: Monitor mode](#monitor-mode)
 
-### QuickSync example
+> [!NOTE]
+> Please use double quotes as path delimiters. Do not use escaped characters in path names.
+
+### :rocket: Quick sync mode
+
+Quick sync mode is convenient to do fast syncs between some directories. However, the [configuration file mode](#configuration-file-mode) gives much more functionality.
 
 	# osync.sh --initiator="/path/to/dir1" --target="/path/to/remote dir2"
 	# osync.sh --initiator="/path/to/another dir" --target="ssh://user@host.com:22//path/to/dir2" --rsakey=/home/user/.ssh/id_rsa_private_key_example.com
+
+#### Quick sync with minimal options
+
+In order to run osync the quickest (without transferring file attributes, without softdeletion, without prior space checks and without remote connectivity checks, you may use the following:
+
+	# MINIMUM_SPACE=0 PRESERVE_ACL=no PRESERVE_XATTR=no SOFT_DELETE_DAYS=0 CONFLICT_BACKUP_DAYS=0 REMOTE_HOST_PING=no osync.sh --initiator="/path/to/another dir" --target="ssh://user@host.com:22//path/to/dir2" --rsakey=/home/user/.ssh/id_rsa_private_key_example.com
+
+All the settings described here may also be configured in the conf file.
 
 ### Summary mode
 
@@ -103,33 +117,30 @@ osync will output only file changes and errors with the following:
 
 This also works in configuration file mode.
 
-### QuickSync with minimal options
-
-In order to run osync the quickest (without transferring file attributes, without softdeletion, without prior space checks and without remote connectivity checks, you may use the following:
-
-	# MINIMUM_SPACE=0 PRESERVE_ACL=no PRESERVE_XATTR=no SOFT_DELETE_DAYS=0 CONFLICT_BACKUP_DAYS=0 REMOTE_HOST_PING=no osync.sh --initiator="/path/to/another dir" --target="ssh://user@host.com:22//path/to/dir2" --rsakey=/home/user/.ssh/id_rsa_private_key_example.com
-
-All the settings described here may also be configured in the conf file.
-
-### Running osync with a configuration file
+### :gear: Configuration file mode
 
 You'll have to customize the `sync.conf` file according to your needs.
-If you intend to sync a remote directory, osync will need a pair of private/public RSA keys to perform remote SSH connections.
-Also, running sync as superuser requires to configure the `/etc/sudoers` file.
-Please read the documentation about remote sync setups.
-Once you've customized a sync.conf file, you may run osync with the following test run:
+
+If you intend to sync a remote directory, osync will need a pair of private/public RSA keys to perform remote SSH connections. Also, running sync as superuser requires to configure the `/etc/sudoers` file.
+
+> [!TIP]
+> Read the [example configuration file](https://github.com/deajan/osync/blob/master/sync.conf.example) for documentation about remote sync setups.
+
+Once you've customized a `sync.conf` file, you may run osync with the following test run:
 
 	# osync.sh /path/to/your.conf --dry
 
-If everything went well, you may run the actual configuration with one of the following:
+If everything went well, you may run the actual configuration with:
 
 	# osync.sh /path/to/your.conf
-	# osync.sh /path/to/your.conf --verbose
-	# osync.sh /path/to/your.conf --no-maxtime
 
-Verbose option will display which files and attrs are actually synchronized and which files are to be soft deleted / are in conflict.
-You may mix "--silent" and "--verbose" parameters to output verbose input only in the log files.
-No-Maxtime option will disable execution time checks, which is usefull for big initial sync tasks that might take long time. Next runs should then only propagate changes and take much less time.
+To display which files and attrs are actually synchronized and which files are to be soft deleted / are in conflict, use `--verbose` (you may mix it with `--silent` to output verbose input only in the log files):
+ 
+	# osync.sh /path/to/your.conf --verbose
+
+Use `--no-maxtime` to disable execution time checks, which is usefull for big initial sync tasks that might take long time. Next runs should then only propagate changes and take much less time:
+ 
+ 	# osync.sh /path/to/your.conf --no-maxtime
 
 Once you're confident about your first runs, you may add osync as a cron task like the following in `/etc/crontab` which would run osync every 30 minutes:
 
@@ -139,9 +150,10 @@ Please note that this syntax works for RedHat/CentOS. On Debian you might want t
 
 ### Batch mode
 
-You may want to sequentially run multiple sync sets between the same servers. In that case, osync-batch.sh is a nice tool that will run every osync conf file, and, if a task fails,
+You may want to sequentially run multiple sync sets between the same servers. In that case, `osync-batch.sh` is a nice tool that will run every osync conf file, and, if a task fails,
 run it again if there's still some time left.
-The following example will run all .conf files found in `/etc/osync`, and retry 3 times every configuration that fails, if the whole sequential run took less than 2 hours.
+
+To run all `.conf` files found in `/etc/osync`, and retry 3 times every configuration that fails if the whole sequential run took less than 2 hours, use:
 
 	# osync-batch.sh --path=/etc/osync --max-retries=3 --max-exec-time=7200
 
@@ -149,7 +161,7 @@ Having multiple conf files can then be run in a single cron command like
 
 	00 00 * * * root /usr/local/bin/osync-batch.sh --path=/etc/osync --silent
 
-### Monitor mode
+### :mag_right: Monitor mode
 
 > [!NOTE]
 > Monitoring changes requires inotifywait command (inotify-tools package for most Linux distributions) BSD, macOS and Windows are not yet supported for this operation mode, unless you find an inotify-tools package on these OSes.
