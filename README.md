@@ -40,20 +40,20 @@ Multiple osync tasks may be launched sequentially by osync osync-batch tool.
 
 ## Tested platforms
 
-| Operating system | Version       | Method(s) (if applicable) |
-|------------------|---------------|---------------------------|
-| AlmaLinux        | 9             | (Not applicable)          |
-| Android          | Not known     | Termux                    |
-| CentOS           | 5.x, 6.x, 7.x | (Not applicable)          |
-| Fedora           | 22-25         | (Not applicable)          |
-| FreeBSD          | 8.3-11        | (Not applicable)          |
-| Debian           | 6-11          | (Not applicable)          |
-| Linux Mint       | 14-18         | (Not applicable)          |
-| macOS            | Not known     | (Not applicable)          |
-| pfSense          | 2.3.x         | (Not applicable)          |
-| QTS (x86)        | 4.5.1         | (Not applicable)          |
-| Ubuntu           | 12.04-22.04   | (Not applicable)          |
-| Windows          | 10            | MSYS, Cygwin and WSL      |
+| Operating system | Version                | Method(s) (if applicable) |
+|------------------|------------------------|---------------------------|
+| AlmaLinux        | 9                      | (Not applicable)          |
+| Android          | Not known (via Termux) | (Not applicable)          |
+| CentOS           | 5.x, 6.x, 7.x          | (Not applicable)          |
+| Fedora           | 22-25                  | (Not applicable)          |
+| FreeBSD          | 8.3-11                 | (Not applicable)          |
+| Debian           | 6-11                   | (Not applicable)          |
+| Linux Mint       | 14-18                  | (Not applicable)          |
+| macOS            | Not known              | (Not applicable)          |
+| pfSense          | 2.3.x                  | (Not applicable)          |
+| QTS (x86)        | 4.5.1                  | (Not applicable)          |
+| Ubuntu           | 12.04-22.04            | (Not applicable)          |
+| Windows          | 10                     | MSYS, Cygwin and WSL      |
 
 Some users also have successfully used osync on Gentoo and created an OpenRC init script for it.
 
