@@ -38,9 +38,23 @@ osync uses pidlocks to prevent multiple concurrent sync processes on/to the same
 You may launch concurrent sync processes on the same system but as long as the replicas to synchronize are different.
 Multiple osync tasks may be launched sequentially by osync osync-batch tool.
 
-Currently, it has been tested on CentOS 5.x, 6.x, 7.x, AlmaLinux 9, Fedora 22-25, Debian 6-11, Linux Mint 14-18, Ubuntu 12.04-22.04, FreeBSD 8.3-11, macOS, QTS 4.5.1(x86) and pfSense 2.3.x.
-Microsoft Windows is supported via MSYS, Cygwin and via WSL.
-Android support works via Termux.
+## Tested platforms
+
+| Operating system | Version       | Method(s) (if applicable) |
+|------------------|---------------|---------------------------|
+| AlmaLinux        | 9             | (Not applicable)          |
+| Android          | Not known     | Termux                    |
+| CentOS           | 5.x, 6.x, 7.x | (Not applicable)          |
+| Fedora           | 22-25         | (Not applicable)          |
+| FreeBSD          | 8.3-11        | (Not applicable)          |
+| Debian           | 6-11          | (Not applicable)          |
+| Linux Mint       | 14-18         | (Not applicable)          |
+| macOS            | Not known     | (Not applicable)          |
+| pfSense          | 2.3.x         | (Not applicable)          |
+| QTS (x86)        | 4.5.1         | (Not applicable)          |
+| Ubuntu           | 12.04-22.04   | (Not applicable)          |
+| Windows          | 10            | MSYS, Cygwin and WSL      |
+
 Some users also have successfully used osync on Gentoo and created an OpenRC init script for it.
 
 ## Installation
