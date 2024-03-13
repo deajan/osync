@@ -94,7 +94,7 @@ Osync can work in 3 modes:
 > [!NOTE]
 > Please use double quotes as path delimiters. Do not use escaped characters in path names.
 
-### :rocket: Quick sync mode
+### <a id="quick-sync-mode"></a>:rocket: Quick sync mode
 
 Quick sync mode is convenient to do fast syncs between some directories. However, the [configuration file mode](#configuration-file-mode) gives much more functionality.
 
@@ -117,7 +117,7 @@ osync will output only file changes and errors with the following:
 
 This also works in configuration file mode.
 
-### :gear: Configuration file mode
+### <a id="configuration-file-mode"></a>:gear: Configuration file mode
 
 You'll have to customize the `sync.conf` file according to your needs.
 
@@ -161,7 +161,7 @@ Having multiple conf files can then be run in a single cron command like
 
 	00 00 * * * root /usr/local/bin/osync-batch.sh --path=/etc/osync --silent
 
-### :mag_right: Monitor mode
+### <a id="monitor-mode"></a>:mag_right: Monitor mode
 
 > [!NOTE]
 > Monitoring changes requires inotifywait command (inotify-tools package for most Linux distributions) BSD, macOS and Windows are not yet supported for this operation mode, unless you find an inotify-tools package on these OSes.
