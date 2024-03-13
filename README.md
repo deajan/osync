@@ -166,15 +166,20 @@ Having multiple conf files can then be run in a single cron command like
 > [!NOTE]
 > Monitoring changes requires inotifywait command (inotify-tools package for most Linux distributions) BSD, macOS and Windows are not yet supported for this operation mode, unless you find an inotify-tools package on these OSes.
 
-Additionaly, you may run osync in monitor mode, which means it will perform a sync upon file operations on initiator replica.
-This can be a drawback on functionality versus scheduled mode because this mode only launches a sync task if there are file modifications on the initiator replica, without being able to monitor the target replica.
-Target replica changes are only synced when initiator replica changes occur, or when a given amount of time (default 600 seconds) passed without any changes on initiator replica.
+Monitor mode will perform a sync upon file operations on initiator replica. This can be a drawback on functionality versus scheduled mode because this mode only launches a sync task if there are file modifications on the initiator replica, without being able to monitor the target replica. Target replica changes are only synced when initiator replica changes occur, or when a given amount of time (600 seconds by default) passed without any changes on initiator replica.
+
 File monitor mode can also be launched as a daemon with an init script. Please read the documentation for more info.
+
+To use this mode, use `--on-changes`:
 
 	# osync.sh /etc/osync/my_sync.conf --on-changes
 
-Osync file monitor mode may be run as system service with the osync-srv script.
-You may run the install.sh script which should work in most cases or copy the files by hand (osync.sh to `/usr/bin/local`, sync.conf to `/etc/osync`, osync-srv to `/etc/init.d` for initV, osync-srv@.service to `/usr/lib/systemd/system` for systemd, osync-srv-openrc to `/etc/init.d/osync-srv-openrc` for OpenRC).
+Osync file monitor mode may be run as system service with the osync-srv script. You may run the install.sh script which should work in most cases or copy the files by hand:
+- `osync.sh` to `/usr/bin/local`
+- `sync.conf` to `/etc/osync`
+- For InitV, `osync-srv` to `/etc/init.d`
+- For systemd, `osync-srv@.service` to `/usr/lib/systemd/system`
+- For OpenRC, `osync-srv-openrc` to `/etc/init.d/osync-srv-openrc`
 
 For InitV (any configuration file found in `/etc/osync` will create an osync daemon instance when service is launched on initV):
 
