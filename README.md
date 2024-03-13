@@ -164,7 +164,7 @@ Having multiple conf files can then be run in a single cron command like
 ### <a id="monitor-mode"></a>:mag_right: Monitor mode
 
 > [!NOTE]
-> Monitoring changes requires inotifywait command (inotify-tools package for most Linux distributions) BSD, macOS and Windows are not yet supported for this operation mode, unless you find an inotify-tools package on these OSes.
+> Monitoring changes requires inotifywait command (`inotify-tools` package for most Linux distributions). BSD, macOS and Windows are not yet supported for this operation mode, unless you find an `inotify-tool` package on these OSes.
 
 Monitor mode will perform a sync upon file operations on initiator replica. This can be a drawback on functionality versus scheduled mode because this mode only launches a sync task if there are file modifications on the initiator replica, without being able to monitor the target replica. Target replica changes are only synced when initiator replica changes occur, or when a given amount of time (600 seconds by default) passed without any changes on initiator replica.
 
@@ -174,7 +174,7 @@ To use this mode, use `--on-changes`:
 
 	# osync.sh /etc/osync/my_sync.conf --on-changes
 
-To run this mode as system service with the `osync-srv` script, you can run the `install.sh` script (which should work in most cases) or copy the files by hand:
+To run this mode as a system service with the `osync-srv` script, you can run the `install.sh` script (which should work in most cases) or copy the files by hand:
 - `osync.sh` to `/usr/bin/local`
 - `sync.conf` to `/etc/osync`
 - For InitV, `osync-srv` to `/etc/init.d`
