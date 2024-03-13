@@ -170,10 +170,12 @@ For InitV (any configuration file found in `/etc/osync` will create an osync dae
 	$ chkconfig osync-srv on
 
 For systemd, launch service (one service per config file to launch) with:
+
 	$ systemctl start osync-srv@configfile.conf
 	$ systemctl enable osync-srv@configfile.conf
 
 For OpenRC (user contrib), launch service (one service per config file to launch) with:
+
 	$ rc-update add osync-srv.configfile default
 
 ## Security enhancements
