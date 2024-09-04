@@ -82,7 +82,7 @@ else
 	_LOGGER_VERBOSE=true
 fi
 
-if [ "$SLEEP_TIME" == "" ]; then # Leave the possibity to set SLEEP_TIME as environment variable when runinng with bash -x in order to avoid spamming console
+if [ "$SLEEP_TIME" == "" ]; then # Leave the possibility to set SLEEP_TIME as environment variable when running with bash -x in order to avoid spamming console
 	SLEEP_TIME=.05
 fi
 #### DEBUG SUBSET END ####
