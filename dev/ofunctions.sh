@@ -786,7 +786,7 @@ function _PerfProfiler {												#__WITH_PARANOIA_DEBUG
 
 _OFUNCTIONS_SPINNER="|/-\\"
 function Spinner {
-	if [ $_LOGGER_SILENT == true ] || [ "$_LOGGER_ERR_ONLY" == true ] || [ "$_SYNC_ON_CHANGES" == "initiator" ] || [ "$_SYNC_ON_CHANGES" == "target" ] ; then
+	if [ "$_LOGGER_SILENT" == true ] || [ "$_LOGGER_ERR_ONLY" == true ] || [ "$_SYNC_ON_CHANGES" == "initiator" ] || [ "$_SYNC_ON_CHANGES" == "target" ] ; then
 		return 0
 	else
 		printf " [%c]  \b\b\b\b\b\b" "$_OFUNCTIONS_SPINNER"
