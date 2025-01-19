@@ -234,8 +234,8 @@ function CheckCurrentConfigAll {
 		exit 1
 	fi
 
-	if [ "$REMOTE_OPERATION" == true ] && ([ ! -f "$SSH_RSA_PRIVATE_KEY" ] && [ ! -f "$SSH_PASSWORD_FILE" ]); then
-		Logger "Cannot find rsa private key [$SSH_RSA_PRIVATE_KEY] nor password file [$SSH_PASSWORD_FILE]. No authentication method provided." "CRITICAL"
+	if [ "$REMOTE_OPERATION" == true ] && ([ ! -f "$SSH_RSA_PRIVATE_KEY" ] && [ ! -f "$SSH_PASSWORD_FILE" ] && [ ! $KRB5 ]); then
+		Logger "Cannot find rsa private key [$SSH_RSA_PRIVATE_KEY] nor password file [$SSH_PASSWORD_FILE] nor KRB5CCFILE. No authentication method provided." "CRITICAL"
 		exit 1
 	fi
 
@@ -2918,6 +2918,7 @@ function Usage {
 	echo "--initiator=\"\"		 Master replica path. Will contain state and backup directory (is mandatory)"
 	echo "--target=\"\" 		 Local or remote target replica path. Can be a ssh uri like ssh://user@host.com:22//path/to/target/replica (is mandatory)"
 	echo "--rsakey=\"\"		 Alternative path to rsa private key for ssh connection to target replica"
+	echo "--krb5			              use KRB5 credential cache"
 	echo "--ssh-controlmaster      Allow using a single TCP connection for all ssh calls. Will make remote sync faster, but may fail easier on lossy links"
 	echo "--password-file=\"\"       If no rsa private key is used for ssh authentication, a password file can be used"
 	echo "--remote-token=\"\"        When using ssh filter protection, you must specify the remote token set in ssh_filter.sh"
@@ -3094,7 +3095,11 @@ function GetCommandlineArguments {
 			_DRYRUN=true
 			opts=$opts" --dry"
 			;;
-			--silent)
+			--krb5)
+			KRB5=true
+			opts=$opts" --krb5"
+			;;
+	    --silent)
 			_LOGGER_SILENT=true
 			opts=$opts" --silent"
 			;;
