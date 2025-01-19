@@ -82,7 +82,7 @@ else
 	_LOGGER_VERBOSE=true
 fi
 
-if [ "$SLEEP_TIME" == "" ]; then # Leave the possibity to set SLEEP_TIME as environment variable when runinng with bash -x in order to avoid spamming console
+if [ "$SLEEP_TIME" == "" ]; then # Leave the possibility to set SLEEP_TIME as environment variable when running with bash -x in order to avoid spamming console
 	SLEEP_TIME=.05
 fi
 #### DEBUG SUBSET END ####
@@ -512,7 +512,7 @@ function SendAlert {
 	fi
 
 	if [ $runAlert == true ]; then
-		subject="Currently runing - $subject"
+		subject="Currently running - $subject"
 	else
 		subject="Finished run - $subject"
 	fi
@@ -786,7 +786,7 @@ function _PerfProfiler {												#__WITH_PARANOIA_DEBUG
 
 _OFUNCTIONS_SPINNER="|/-\\"
 function Spinner {
-	if [ $_LOGGER_SILENT == true ] || [ "$_LOGGER_ERR_ONLY" == true ] || [ "$_SYNC_ON_CHANGES" == "initiator" ] || [ "$_SYNC_ON_CHANGES" == "target" ] ; then
+	if [ "$_LOGGER_SILENT" == true ] || [ "$_LOGGER_ERR_ONLY" == true ] || [ "$_SYNC_ON_CHANGES" == "initiator" ] || [ "$_SYNC_ON_CHANGES" == "target" ] ; then
 		return 0
 	else
 		printf " [%c]  \b\b\b\b\b\b" "$_OFUNCTIONS_SPINNER"

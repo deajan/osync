@@ -834,7 +834,7 @@ function CopyServiceFiles {
 
 
 		Logger "Created [$SERVICE_NAME] service in [$SERVICE_DIR_SYSTEMD_SYSTEM] and [$SERVICE_DIR_SYSTEMD_USER]." "NOTICE"
-		Logger "Can be activated with [systemctl start SERVICE_NAME@instance.conf] where instance.conf is the name of the config file in $CONF_DIR." "NOTICE"
+		Logger "Can be activated with [systemctl start $SERVICE_NAME@instance.conf] where instance.conf is the name of the config file in $CONF_DIR." "NOTICE"
 		Logger "Can be enabled on boot with [systemctl enable $SERVICE_NAME@instance.conf]." "NOTICE"
 		Logger "In userland, active with [systemctl --user start $SERVICE_NAME@instance.conf]." "NOTICE"
 	elif ([ "$init" == "initV" ] && [ -f "$SCRIPT_PATH/$SERVICE_FILE_INIT" ] && [ -d "$SERVICE_DIR_INIT" ]); then
@@ -907,13 +907,22 @@ function RemoveAll {
 	else
 		Logger "Skipping removal of [$BIN_DIR/$SSH_FILTER] because other programs present that need it." "NOTICE"
 	fi
-	RemoveFile "$SERVICE_DIR_SYSTEMD_SYSTEM/$SERVICE_FILE_SYSTEMD_SYSTEM"
-	RemoveFile "$SERVICE_DIR_SYSTEMD_USER/$SERVICE_FILE_SYSTEMD_USER"
-	RemoveFile "$SERVICE_DIR_INIT/$SERVICE_FILE_INIT"
 
-	RemoveFile "$TARGET_HELPER_SERVICE_DIR_SYSTEMD_SYSTEM/$SERVICE_FILE_SYSTEMD_SYSTEM"
-	RemoveFile "$TARGET_HELPER_SERVICE_DIR_SYSTEMD_USER/$SERVICE_FILE_SYSTEMD_USER"
-	RemoveFile "$TARGET_HELPER_SERVICE_DIR_INIT/$SERVICE_FILE_INIT"
+	# Try to uninstall every possible service file
+	#if [ $init == "systemd" ]; then
+		RemoveFile "$SERVICE_DIR_SYSTEMD_SYSTEM/$SERVICE_FILE_SYSTEMD_SYSTEM"
+		RemoveFile "$SERVICE_DIR_SYSTEMD_USER/$SERVICE_FILE_SYSTEMD_USER"
+		RemoveFile "$SERVICE_DIR_SYSTEMD_SYSTEM/$TARGET_HELPER_SERVICE_FILE_SYSTEMD_SYSTEM"
+		RemoveFile "$SERVICE_DIR_SYSTEMD_USER/$TARGET_HELPER_SERVICE_FILE_SYSTEMD_USER"
+	#elif [ $init == "initV" ]; then
+		RemoveFile "$SERVICE_DIR_INIT/$SERVICE_FILE_INIT"
+		RemoveFile "$SERVICE_DIR_INIT/$TARGET_HELPER_SERVICE_FILE_INIT"
+	#elif [ $init == "openrc" ]; then
+		RemoveFile "$SERVICE_DIR_OPENRC/$SERVICE_FILE_OPENRC"
+		RemoveFile "$SERVICE_DIR_OPENRC/$TARGET_HELPER_SERVICE_FILE_OPENRC"
+	#else
+		#Logger "Can't uninstall from initV, systemd or openRC." "WARN"
+	#fi
 
 	Logger "Skipping configuration files in [$CONF_DIR]. You may remove this directory manually." "NOTICE"
 }
@@ -921,8 +930,8 @@ function RemoveAll {
 function Usage {
 	echo "Installs $PROGRAM into $BIN_DIR"
 	echo "options:"
-	echo "--silent		Will log and bypass user interaction."
-	echo "--no-stats	Used with --silent in order to refuse sending anonymous install stats."
+	echo "--silent          Will log and bypass user interaction."
+	echo "--no-stats        Used with --silent in order to refuse sending anonymous install stats."
 	echo "--remove          Remove the program."
 	echo "--prefix=/path    Use prefix to install path."
 	exit 127
