@@ -10,7 +10,7 @@ PROGRAM_BINARY=$PROGRAM".sh"
 PROGRAM_BATCH=$PROGRAM"-batch.sh"
 SSH_FILTER="ssh_filter.sh"
 
-SCRIPT_BUILD=2023061101
+SCRIPT_BUILD=2025012001
 INSTANCE_ID="installer-$SCRIPT_BUILD"
 
 ## osync / obackup / pmocr / zsnap install script
@@ -907,14 +907,22 @@ function RemoveAll {
 	else
 		Logger "Skipping removal of [$BIN_DIR/$SSH_FILTER] because other programs present that need it." "NOTICE"
 	fi
-	RemoveFile "$SERVICE_DIR_SYSTEMD_SYSTEM/$SERVICE_FILE_SYSTEMD_SYSTEM"
-	RemoveFile "$SERVICE_DIR_SYSTEMD_USER/$SERVICE_FILE_SYSTEMD_USER"
-	RemoveFile "$SERVICE_DIR_INIT/$SERVICE_FILE_INIT"
 
-	RemoveFile "$TARGET_HELPER_SERVICE_DIR_SYSTEMD_SYSTEM/$SERVICE_FILE_SYSTEMD_SYSTEM"
-	RemoveFile "$TARGET_HELPER_SERVICE_DIR_SYSTEMD_USER/$SERVICE_FILE_SYSTEMD_USER"
-	RemoveFile "$TARGET_HELPER_SERVICE_DIR_INIT/$SERVICE_FILE_INIT"
-
+	# Try to uninstall every possible service file
+	if [ $init == "systemd" ]; then
+		RemoveFile "$SERVICE_DIR_SYSTEMD_SYSTEM/$SERVICE_FILE_SYSTEMD_SYSTEM"
+		RemoveFile "$SERVICE_DIR_SYSTEMD_USER/$SERVICE_FILE_SYSTEMD_USER"
+		RemoveFile "$SERVICE_DIR_SYSTEMD_SYSTEM/$TARGET_HELPER_SERVICE_FILE_SYSTEMD_SYSTEM"
+		RemoveFile "$SERVICE_DIR_SYSTEMD_USER/$TARGET_HELPER_SERVICE_FILE_SYSTEMD_USER"
+	elif [ $init == "initV" ]; then
+		RemoveFile "$SERVICE_DIR_INIT/$SERVICE_FILE_INIT"
+		RemoveFile "$SERVICE_DIR_INIT/$TARGET_HELPER_SERVICE_FILE_INIT"
+	elif [ $init == "openrc" ]; then
+		RemoveFile "$SERVICE_DIR_OPENRC/$SERVICE_FILE_OPENRC"
+		RemoveFile "$SERVICE_DIR_OPENRC/$TARGET_HELPER_SERVICE_FILE_OPENRC"
+	else
+		Logger "Can uninstall only from initV, systemd or openRC." "WARN"
+	fi
 	Logger "Skipping configuration files in [$CONF_DIR]. You may remove this directory manually." "NOTICE"
 }
 
