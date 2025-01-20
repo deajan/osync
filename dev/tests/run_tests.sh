@@ -57,7 +57,7 @@ homedir=$(eval echo ~${REMOTE_USER})
 
 # drupal servers are often unreachable for whetever reason or give 0 bytes files
 #LARGE_FILESET_URL="http://ftp.drupal.org/files/projects/drupal-8.2.2.tar.gz"
-LARGE_FILESET_URL="http://www.netpower.fr/sites/default/files/osync-test-files.tar.gz"
+LARGE_FILESET_URL="https://ftp.drupal.org/files/projects/drupal-11.0.10.tar.gz"
 
 OSYNC_DIR="$(pwd)"
 OSYNC_DIR=${OSYNC_DIR%%/dev*}
