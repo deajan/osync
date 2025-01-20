@@ -691,7 +691,7 @@ function SendEmail {
 			encryption_string=
 		elif [ "$encryption" == "tls" ]; then
 			encryption_string=-starttls
-		elif [ "$encryption" == "ssl" ]:; then
+		elif [ "$encryption" == "ssl" ]; then
 			encryption_string=-ssl
 		fi
 		if [ "$smtpUser" != "" ] && [ "$smtpPassword" != "" ]; then
@@ -2139,6 +2139,11 @@ function PostInit {
 		SSH_CMD="$(type -p sshpass) -f $SSH_PASSWORD_FILE $(type -p ssh) $SSH_COMP -q $SSH_OPTS $REMOTE_USER@$REMOTE_HOST -p $REMOTE_PORT"
 		SCP_CMD="$(type -p sshpass) -f $SSH_PASSWORD_FILE $(type -p scp) $SSH_COMP -q -P $REMOTE_PORT"
 		RSYNC_SSH_CMD="$(type -p sshpass) -f $SSH_PASSWORD_FILE $(type -p ssh) $SSH_COMP -q $SSH_OPTS -p $REMOTE_PORT"
+  elif [ $KRB5 ]; then
+    SSH_PASSWORD=""
+    SSH_CMD="$(type -p ssh) $SSH_COMP -q $SSH_OPTS $REMOTE_USER@$REMOTE_HOST -p $REMOTE_PORT"
+    SCP_CMD="$(type -p scp) $SSH_COMP -q -P $REMOTE_PORT"
+    RSYNC_SSH_CMD="$(type -p ssh) $SSH_COMP -q $SSH_OPTS -p $REMOTE_PORT"
 	else
 		SSH_PASSWORD=""
 		SSH_CMD=""
