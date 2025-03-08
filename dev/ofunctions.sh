@@ -2486,7 +2486,7 @@ function SetConfFileValue () {
 	else
 		echo "$name=$value" > "$file"
 		if [ $? -ne 0 ]; then
-			Logger "Config file [$file] does not exist. Failed to create it witn value [$name]." "ERROR"
+			Logger "Config file [$file] does not exist. Failed to create it with value [$name]." "ERROR"
 		fi
 	fi
 }
