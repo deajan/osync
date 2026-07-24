@@ -833,7 +833,7 @@ function ParallelExec {
 ## Main asynchronous execution function
 ## Function can work in:
 ## WaitForTaskCompletion mode: monitors given pid in background, and stops them if max execution time is reached. Suitable for multiple synchronous pids to monitor and wait for
-## ParallExec mode: takes list of commands to execute in parallel per batch, and stops them if max execution time is reahed.
+## ParallExec mode: takes list of commands to execute in parallel per batch, and stops them if max execution time is reached.
 
 ## Example of improved wait $!
 ## ExecTasks $! "some_identifier" false 0 0 0 0 true 1 1800 false
