@@ -385,20 +385,21 @@ function KillChilds {
 	if [ "$self" == true ]; then
 		# We need to check for pid again because it may have disappeared after recursive function call
 		if kill -0 "$pid" > /dev/null 2>&1; then
-			kill -s TERM "$pid"
-			Logger "Sent SIGTERM to process [$pid]." "DEBUG"
+			log "Sent SIGTERM to process [$pid]." "DEBUG"
+                        kill -s TERM "$pid"
 			if [ $? -ne 0 ]; then
 				sleep 60 # Arbitrary wait time to let process terminate gracefully
 				if kill -0 "$pid" > /dev/null 2>&1; then
-					Logger "Sending SIGTERM to process [$pid] failed." "DEBUG"
+					log "Sending SIGTERM to process [$pid] failed." "DEBUG"
 					kill -9 "$pid"
 					if [ $? -ne 0 ]; then
-						Logger "Sending SIGKILL to process [$pid] failed." "DEBUG"
+						log "Sending SIGKILL to process [$pid] failed." "DEBUG"
 						return 1
 					fi	# Simplify the return 0 logic here
 				else
 					return 0
 				fi
+                        fi
 		else
 			return 0
 		fi
