@@ -11,10 +11,13 @@ jobs:
         os: [macos-latest]
     steps:
     - uses: actions/checkout@v2
+    - name: Set up Homebrew
+      id: set-up-homebrew
+      uses: Homebrew/actions/setup-homebrew@1f8e202ffddf94def7f42f6fa3a482e821489f9c
     - name: Install Bash 4
       run: |
-        /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
-        brew update
+        #/bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
+        #brew update
 
         brew install bash
         brew install fswatch
