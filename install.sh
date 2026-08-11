@@ -909,19 +909,19 @@ function RemoveAll {
 	fi
 
 	# Try to uninstall every possible service file
-	if [ $init == "systemd" ]; then
+	if [ "$init" == "systemd" ]; then
 		RemoveFile "$SERVICE_DIR_SYSTEMD_SYSTEM/$SERVICE_FILE_SYSTEMD_SYSTEM"
 		RemoveFile "$SERVICE_DIR_SYSTEMD_USER/$SERVICE_FILE_SYSTEMD_USER"
 		RemoveFile "$SERVICE_DIR_SYSTEMD_SYSTEM/$TARGET_HELPER_SERVICE_FILE_SYSTEMD_SYSTEM"
 		RemoveFile "$SERVICE_DIR_SYSTEMD_USER/$TARGET_HELPER_SERVICE_FILE_SYSTEMD_USER"
-	elif [ $init == "initV" ]; then
+	elif [ "$init" == "initV" ]; then
 		RemoveFile "$SERVICE_DIR_INIT/$SERVICE_FILE_INIT"
 		RemoveFile "$SERVICE_DIR_INIT/$TARGET_HELPER_SERVICE_FILE_INIT"
-	elif [ $init == "openrc" ]; then
+	elif [ "$init" == "openrc" ]; then
 		RemoveFile "$SERVICE_DIR_OPENRC/$SERVICE_FILE_OPENRC"
 		RemoveFile "$SERVICE_DIR_OPENRC/$TARGET_HELPER_SERVICE_FILE_OPENRC"
 	else
-		Logger "Can uninstall only from initV, systemd or openRC." "WARN"
+		Logger "Can uninstall only from initV, systemd or openRC. Skipping uninstall service path" "NOTICE"
 	fi
 	Logger "Skipping configuration files in [$CONF_DIR]. You may remove this directory manually." "NOTICE"
 }
