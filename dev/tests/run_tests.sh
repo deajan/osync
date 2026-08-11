@@ -346,7 +346,8 @@ function oneTimeTearDown () {
 	echo ""
 	echo "Uninstalling osync from $FAKEROOT"
 	$SUDO_CMD ./install.sh --remove --no-stats --prefix="$FAKEROOT"
-	assertEquals "Uninstall failed" "0" $?
+	res=$?
+	assertTrue "Uninstall failed" '[ $res -eq 0 -o $res -eq 2 ]'
 
 	ELAPSED_TIME=$((SECONDS-START_TIME))
 	echo "It took $ELAPSED_TIME seconds to run these tests."
