@@ -11,7 +11,7 @@ jobs:
         os: [windows-latest]
     steps:
     - uses: actions/checkout@v2
-    - uses: Vampire/setup-wsl@v1
+    - uses: Vampire/setup-wsl@v7
       with:
         additional-packages:
           dos2unix
