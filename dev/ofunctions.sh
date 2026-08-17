@@ -359,7 +359,7 @@ function IsInteger {
 
 # Portable child (and grandchild) kill function tester under Linux, BSD and MacOS X
 function KillChilds {
-	local pid="${1}" # Parent pid to kill childs
+	local pid="${1}" # Parent pid to kill children
 	local self="${2:-false}" # Should parent be killed too ?
 
 	# Paranoid checks, we can safely assume that $pid should not be 0 nor 1
@@ -878,11 +878,11 @@ function ExecTasks {
 	local keepLogging="${10:-1800}"			# Every keepLogging seconds, an alive message is logged. Setting this value to zero disables any alive logging
 	local spinner="${11:-true}"			# Show spinner (true) or do not show anything (false) while running
 	local noTimeErrorLog="${12:-false}"		# Log errors when reaching soft / hard execution times (false) or do not log errors on those triggers (true)
-	local noErrorLogsAtAll="${13:-false}"		# Do not log any errros at all (useful for recursive ExecTasks checks)
+	local noErrorLogsAtAll="${13:-false}"		# Do not log any errors at all (useful for recursive ExecTasks checks)
 
 	# Parallelism specific arguments
 	local numberOfProcesses="${14:-0}"		# Number of simulanteous commands to run, given as mainInput. Set to 0 by default (WaitForTaskCompletion mode). Setting this value enables ParallelExec mode.
-	local auxInput="${15}"				# Contains list of commands separated by semicolons or filepath fo list of commands. Exit code of those commands decide whether main commands will be executed or not
+	local auxInput="${15}"				# Contains list of commands separated by semicolons or filepath for list of commands. Exit code of those commands decide whether main commands will be executed or not
 	local maxPostponeRetries="${16:-3}"		# If a conditional command fails, how many times shall we try to postpone the associated main command. Set this to 0 to disable postponing
 	local minTimeBetweenRetries="${17:-300}"	# Time (in seconds) between postponed command retries
 	local validExitCodes="${18:-0}"			# Semi colon separated list of valid main command exit codes which will not trigger errors
@@ -932,7 +932,7 @@ function ExecTasks {
 	local mainItemCount=0		# number of given items (pids or commands)
 	local readFromFile		# Should we read pids / commands from a file (true)
 	local counter=0
-	local log_ttime=0		# local time instance for comparaison
+	local log_ttime=0		# local time instance for comparison
 
 	local seconds_begin=$SECONDS	# Seconds since the beginning of the script
 	local exec_time=0		# Seconds since the beginning of this function
@@ -1071,7 +1071,7 @@ function ExecTasks {
 		for pid in "${pidsArray[@]}"; do
 			if [ $(IsInteger $pid) -eq 1 ]; then
 				if kill -0 $pid > /dev/null 2>&1; then
-					# Handle uninterruptible sleep state or zombies by ommiting them from running process array (How to kill that is already dead ? :)
+					# Handle uninterruptible sleep state or zombies by omitting them from running process array (How to kill that is already dead ? :)
 					pidState="$(eval $PROCESS_STATE_CMD)"
 					if [ "$pidState" != "D" ] && [ "$pidState" != "Z" ]; then
 
@@ -1170,7 +1170,7 @@ function ExecTasks {
 			return $retval;
 		fi
 
-		# The following execution bloc is only needed in ParallelExec mode since WaitForTaskCompletion does not execute commands, but only monitors them
+		# The following execution block is only needed in ParallelExec mode since WaitForTaskCompletion does not execute commands, but only monitors them
 		if [ $functionMode == "ParallelExec" ]; then
 			while [ ${#pidsArray[@]} -lt $numberOfProcesses ] && ([ $counter -lt $mainItemCount ] || [ $postponedItemCount -ne 0 ]); do
 				_ExecTasksTimeCheck
