@@ -170,9 +170,9 @@ Please note that this syntax works for RedHat/CentOS. On Debian you might want t
 You may want to sequentially run multiple sync sets between the same servers. In that case, `osync-batch.sh` is a nice tool that will run every osync conf file, and, if a task fails,
 run it again if there's still some time left.
 
-To run all `.conf` files found in `/etc/osync`, and retry 3 times every configuration that fails if the whole sequential run took less than 2 hours, use:
+To run all `.conf` files found in `/etc/osync`, allowing up to 3 runs per configuration if the whole sequential run took less than 2 hours, use:
 
-	# osync-batch.sh --path=/etc/osync --max-retries=3 --max-exec-time=7200
+	# osync-batch.sh --path=/etc/osync --max-runs=3 --max-exec-time=7200
 
 Having multiple conf files can then be run in a single cron command like
 
@@ -192,7 +192,7 @@ To use this mode, use `--on-changes`:
 	# osync.sh /etc/osync/my_sync.conf --on-changes
 
 To run this mode as a system service with the `osync-srv` script, you can run the `install.sh` script (which should work in most cases) or copy the files by hand:
-- `osync.sh` to `/usr/bin/local`
+- `osync.sh` to `/usr/local/bin`
 - `sync.conf` to `/etc/osync`
 - For InitV, `osync-srv` to `/etc/init.d`
 - For systemd, `osync-srv@.service` to `/usr/lib/systemd/system`
