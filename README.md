@@ -170,7 +170,7 @@ Please note that this syntax works for RedHat/CentOS. On Debian you might want t
 You may want to sequentially run multiple sync sets between the same servers. In that case, `osync-batch.sh` is a nice tool that will run every osync conf file, and, if a task fails,
 run it again if there's still some time left.
 
-To run all `.conf` files found in `/etc/osync`, allowing up to 3 runs per configuration if the whole sequential run took less than 2 hours, use:
+To run all `.conf` files found in `/etc/osync`, allowing up to 3 re-runs per configuration on failure in a two hours timeframe, use:
 
 	# osync-batch.sh --path=/etc/osync --max-runs=3 --max-exec-time=7200
 
