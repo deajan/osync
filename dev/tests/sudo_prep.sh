@@ -4,7 +4,7 @@ testUser=osyncsudo
 testUserHome=/home/osyncsudo
 
 function CreateUser {
-	local remoteUser"${1}"
+	local remoteUser"=${1}"
 	local homedir="${2}"
 
 	if type getent > /dev/null 2>&1; then
