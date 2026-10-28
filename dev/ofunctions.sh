@@ -2239,7 +2239,7 @@ function InitLocalOSDependingSettings {
 		PROCESS_STATE_CMD="echo none"
 		DF_CMD="df"
 	else
-		PROCESS_STATE_CMD='ps -p$pid -o state= 2 > /dev/null'
+		PROCESS_STATE_CMD='ps -p$pid -o state= 2> /dev/null'
 		# CentOS 5 needs -P for one line output
 		DF_CMD="df -P"
 	fi
