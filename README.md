@@ -103,10 +103,11 @@ The script will backup your config file, update it's content and try to connect 
 
 ## Usage
 
-Osync can work in 3 modes:
+Osync can work in 4 modes:
 1. [:rocket: Quick sync mode](#quick-sync-mode)
 2. [:gear: Configuration file mode](#configuration-file-mode)
 3. [:mag_right: Monitor mode](#monitor-mode)
+4. [:repeat_one: Target monitoring](#target-monitoring)
 
 > [!NOTE]
 > Please use double quotes as path delimiters. Do not use escaped characters in path names.
@@ -163,7 +164,7 @@ Once you're confident about your first runs, you may add osync as a cron task li
 
 	*/30 * * * * root /usr/local/bin/osync.sh /etc/osync/my_sync.conf --silent
 
-Please note that this syntax works for RedHat/CentOS. On Debian you might want to remove the username (i.e. root) in order to make the crontab entry work.
+Please note that this syntax is correct for the system crontab, i.e. `/etc/contab` and files in `/etc/cron.d`. For the user crontab (`crontab -e`) the user name field should be omitted.
 
 ### Batch mode
 
@@ -181,7 +182,7 @@ Having multiple conf files can then be run in a single cron command like
 ### <a id="monitor-mode"></a>:mag_right: Monitor mode
 
 > [!NOTE]
-> Monitoring changes requires inotifywait command (`inotify-tools` package for most Linux distributions). BSD, macOS and Windows are not yet supported for this operation mode, unless you find an `inotify-tool` package on these OSes.
+> Monitoring changes requires inotifywait command (`inotify-tools`) package for most Linux distributions). BSD, macOS and Windows are not yet supported for this operation mode, unless you find an `inotify-tool` package on these OSes.
 
 Monitor mode will perform a sync upon file operations on initiator replica. This can be a drawback on functionality versus scheduled mode because this mode only launches a sync task if there are file modifications on the initiator replica, without being able to monitor the target replica. Target replica changes are only synced when initiator replica changes occur, or when a given amount of time (600 seconds by default) passed without any changes on initiator replica.
 
@@ -211,6 +212,47 @@ For systemd, launch service (one service per config file to launch) with:
 For OpenRC (user contrib), launch service (one service per config file to launch) with:
 
 	$ rc-update add osync-srv.configfile default
+
+### <a id="target-monitoring"></a>:repeat_one: Target monitoring
+
+When the initiator replica operates in monitor mode a sync task is only launched when there are file modifications on the initiator replica. Changes on the target replica, for example by another initiator, remain unnoticed and hence unsynchronized. The solution is to run another instance of osync in a special target monitor mode on the target replica which detects changes and initiates a synchronization action.
+
+>[!NOTE]
+>The instance of osync is running on the target and detects and signals changes on the target, but does not perform an actual sync task. The target replica writes a special file `.osycnc_push` into the initiator replica directory. When the initiator replica is in monitor mode this change is detected and a synchronization is initiated. The synchronization is always initiated and executed by the initiator replica.
+
+>[!NOTE]
+>The target replica has to connect back to the initiator replica and does so using SSH and rsync. This means the initiator **must** be reachable from the target replica. When the initiator replica is behind a firewall, either some sort of port forwarding must be configured, or both hosts must be connected to the same VPN. The initiator replica does not not keep a connection open to enable the target to communicate back to the initiator.
+
+To run the target monitor mode, first install osync on the target. Next, change the configuration file so it correctly reflects the target and initiator setting. In the comments of the [example configuration file](https://github.com/deajan/osync/blob/master/osync-target-helper-srv@.service.user) you'll find in the comments the most important changes to make to run osync on the target replica.
+
+To run it from that command line, use this command:
+
+	# osync /etc/osync/my_sync.conf --on-changes-target
+
+Whenever a change happens which requires a synchronisation action to start, the target sends a notification to the initiator, and then returns back to a monitoring state.
+
+In most cases you want to run this monitoring as a service on the target. Example files for starting this service on InitV and Systemd are available as `osync-target-helper-srv*`
+
+## Running osync as root vs. running osync as user `Linux/systemd only`
+
+If you yourself are the owner of all directories and files to be kept in sync, osync runs equally well with just user permissions. When osync is installed as a user service there are a few things to take into account.
+
+>[!CAUTION]
+>Do not run osync with the same configuration alternatingly as user or as root. Which could happen if you run osync from the command line as user but as a service as root. This will cause problems with permissions on the state files. Once these files are modified by root, they cannot be modified as user, and osync will abort with an error.
+
+Let us assume you have no root permissions on the host osync is installed, and you want to run osync as a user. These are the important steps:
+
+-	Create a config file in a directory you have access to, hence not `/etc/osync`
+-	Choose a proper log file path and add this in the configuration file. The default `/var/log/` is not applicable here.
+-	Place the systemd unit file in `$HOME/.config/systemd/user/`. 
+-	Interact with systemctl in this way: `systemctl --user <command> <unit file>`
+
+The specification for the systemd unit file in the systemctl command is slightly different when the full path to the configuration file has to be specified for the osync instance. Explanation and examples are in the [example user unit file](https://github.com/deajan/osync/blob/master/osync-target-helper-srv@.service.user) 
+
+>[!NOTE} 
+>When connecting with SSH to a host you have not previously connected to, default behaviour is that you receive a prompt to approve to connect to an unknown host. When running osync as a service, you won't see this prompt. The SSH or rsync connection then returns a general error, and osync fails without being able to provide error details. 
+>This is especially relevant when running osync in target monitor mode where it is more likely to happen that you never before connected from the target replica back to the initiator.
+>The solution is to make sure that you once make a connection to each host osync is configured to connect to before you start the osync service. The workaround to specify `StrictHostKeyChecking = no` is not recommend, certainly not if the host is visible from the public internet. 
 
 ## Security enhancements
 

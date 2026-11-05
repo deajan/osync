@@ -10,11 +10,17 @@ CONFIG_FILE_REVISION=1.3.0
 INSTANCE_ID="target_test"
 
 ## Directories to synchronize.
-## Initiator is the system osync runs on. The initiator directory must be a local path.
-INITIATOR_SYNC_DIR="/home/git/osync/dir1"
-#INITIATOR_SYNC_DIR="ssh://backupuser@yourhost.old:22//home/git/osync/dir1"
+## Initiator is the system osync runs on. In this case the system which needs
+## to receive the signal to initiate a sync action.
+## In target monitoring mode only the initiator directory can be either a 
+## local or remote path.
+#INITIATOR_SYNC_DIR="/home/git/osync/dir1"
+INITIATOR_SYNC_DIR="ssh://backupuser@yourhost.old:22//home/git/osync/dir1"
 
-## Target is the system osync synchronizes to (can be the same system as the initiator in case of local sync tasks). The target directory can be a local or remote path.
+## Target is the system osync synchronizes to (can be the same system as the initiator in case of local sync tasks).
+## In this case the target system generates a notification on the initiator that a synchronisation is to be
+## executed.
+## In target monitor mode target directory must be a local path
 TARGET_SYNC_DIR="/home/git/osync/dir2"
 
 ## If the target system is remote, you can specify a RSA key (please use full path). If not defined, the default ~/.ssh/id_rsa will be used. See documentation for further information.

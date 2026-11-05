@@ -3,9 +3,34 @@ Description=A robust two way (bidirectional) file sync script based on rsync wit
 After=time-sync.target local-fs.target network-online.target
 Wants=network-online.target
 
+# When installing this file, it must be renamed with the extension .service
+# When installed with root permissions:
+# - place the osync configuration file(s) in /etc/osync
+# - place this file in /etc/systemd/user/
+# - service can be controlled without root permissions:
+#   $ systemctl --user <command> osync-srv@osync.conf.service
+#
+# When you do not have permissions in /etc/ the service can
+# be configured with only user permissions:
+# - place the osync configuration file(s) in a writable directory
+#   e.g. /home$/{USER}/my_configs/
+# - Change the line starting with 'ExecStart=' below with:
+#   ExecStart=/usr/local/bin/osync.sh /home/${USER}/my_configs/%i --on-changes --silent
+# - place this file in /home/${USER}/.config/systemd/user/
+# Note: The user environment is not exported when running this service,
+# so variables like $HOME are valid. ${USER} is a special variable.
+#
+# In case you want to pass a full path for the config file to systemctl
+# instead of using a single directory: 
+# - change the line starting with 'ExecStart=' to:
+#   ExecStart=/usr/local/bin/osync.sh %I --on-changes --silent
+# - call systemctl from the command line with this command:
+#   $ systemctl --user <command>  osync-srv@$(systemd-escape --suffix=service /path/to/config/dir/osync.conf)  
+
 [Service]
 Type=simple
 ExecStart=/usr/local/bin/osync.sh /etc/osync/%i --on-changes --silent
 SuccessExitStatus=0 2
+
 [Install]
 WantedBy=multi-user.target
